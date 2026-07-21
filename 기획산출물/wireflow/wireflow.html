@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BloomTalk — 와이어플로우 (틀 · 시나리오)</title>
+  <!--
+  BloomTalk 와이어플로우 보드 — 로파이(틀) 단계.
+  · 서비스: 화상 모의 소개팅 + AI 코칭 (데스크탑 웹 우선 · 앱뷰 지원).
+  · 각 노드는 아직 실제 화면이 아니라 배치·정보구조만 보여주는 스켈레톤 목업.
+    mockups/desktop/*.html + mockups/phone/*.html 을 iframe 축소 삽입 → 데스크탑·모바일 나란히.
+  · 지금 단계에서는 화살표(전환)·분기 없이 시나리오(S1~S9) 레인으로 화면만 나눈다.
+    유저플로우 연결·실제 화면 대체는 와이어프레임 확정 후 진행.
+-->
+  <link rel="stylesheet" href="design-system/tokens.css">
+  <style>
+    body {
+      margin: 0;
+      background: var(--bt-color-surface-sunken);
+      color: var(--bt-color-text);
+      font-family: var(--bt-font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      padding: 34px clamp(16px, 3vw, 40px) 90px;
+      max-width: 1680px;
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      color: var(--bt-color-action);
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 27px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      margin: 6px 0 0;
+      color: var(--bt-color-text);
+    }
+
+    .sub {
+      font-size: 13.5px;
+      color: var(--bt-color-text-secondary);
+      margin-top: 8px;
+      max-width: 820px;
+      line-height: 1.6;
+    }
+
+    .sub code,
+    .sub b {
+      font-weight: 700;
+      color: var(--bt-color-action);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      margin-top: 18px;
+      padding: 14px 16px;
+      background: var(--bt-color-surface);
+      border: 1px solid var(--bt-color-border);
+      border-radius: 14px;
+      font-size: 12px;
+      color: var(--bt-color-text-secondary);
+    }
+
+    .legend .g {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend b {
+      font-weight: 800;
+      color: var(--bt-color-text);
+    }
+
+    .lg-d {
+      width: 26px;
+      height: 17px;
+      border-radius: 3px;
+      background: linear-gradient(150deg, var(--bt-color-brand-subtle), var(--bt-color-action-subtle));
+      border: 1px solid var(--bt-color-border);
+    }
+
+    .lg-p {
+      width: 11px;
+      height: 19px;
+      border-radius: 3px;
+      background: linear-gradient(150deg, var(--bt-color-brand-subtle), var(--bt-color-action-subtle));
+      border: 1px solid var(--bt-color-border);
+    }
+
+    .lg-star {
+      color: var(--bt-color-warning);
+      font-weight: 800
+    }
+
+    .lane {
+      background: var(--bt-color-surface);
+      border: 1px solid var(--bt-color-border);
+      border-radius: 16px;
+      padding: 16px 18px 20px;
+      margin-top: 18px;
+    }
+
+    .lane--admin {
+      background: var(--bt-color-surface-sunken);
+    }
+
+    .lane__h {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .lane__id {
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      background: var(--bt-color-action);
+      border-radius: 8px;
+      padding: 3px 9px;
+      letter-spacing: .02em;
+    }
+
+    .lane--admin .lane__id {
+      background: var(--bt-mist-700);
+    }
+
+    .lane__h h3 {
+      font-size: 16px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -.01em;
+      color: var(--bt-color-text);
+    }
+
+    .persona {
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      background: var(--bt-color-brand);
+      border-radius: 999px;
+      padding: 2px 10px;
+    }
+
+    .persona.admin {
+      background: var(--bt-mist-700);
+    }
+
+    .prio {
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--bt-color-danger);
+      background: var(--bt-color-danger-bg);
+      border-radius: 999px;
+      padding: 2px 9px;
+    }
+
+    .lane__sum {
+      font-size: 12.5px;
+      color: var(--bt-color-text-secondary);
+      margin: 8px 0 14px;
+      line-height: 1.55;
+      max-width: 1000px;
+    }
+
+    .lane__sum b {
+      color: var(--bt-color-text);
+      font-weight: 800;
+    }
+
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px 26px;
+    }
+
+    .wf {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wf__cap {
+      font-size: 12px;
+      color: var(--bt-color-text-secondary);
+      white-space: nowrap;
+    }
+
+    .wf__cap b {
+      color: var(--bt-color-text);
+      font-weight: 800;
+    }
+
+    .devs {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .dev {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dev__lbl {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--bt-color-text-tertiary);
+      letter-spacing: .02em;
+    }
+
+    .slot {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--bt-color-border);
+      border-radius: 10px;
+      background: var(--bt-color-surface);
+      box-shadow: var(--bt-shadow-md);
+    }
+
+    .slot--d {
+      width: 320px;
+      height: 200px;
+    }
+
+    .slot--d iframe {
+      width: 1280px;
+      height: 800px;
+      border: 0;
+      transform: scale(.25);
+      transform-origin: top left;
+      pointer-events: none;
+    }
+
+    .slot--p {
+      width: 93px;
+      height: 201px;
+      border-radius: 14px;
+    }
+
+    .slot--p iframe {
+      width: 375px;
+      height: 812px;
+      border: 0;
+      transform: scale(.2475);
+      transform-origin: top left;
+      pointer-events: none;
+    }
+
+    .slot--na {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--bt-color-text-tertiary);
+      background: var(--bt-color-surface-sunken);
+      border-style: dashed;
+      box-shadow: none;
+      text-align: center;
+    }
+
+    .dev--na .dev__lbl {
+      opacity: .5
+    }
+
+    .reg {
+      margin-top: 32px;
+      background: var(--bt-color-surface);
+      border: 1px solid var(--bt-color-border);
+      border-radius: 16px;
+      padding: 18px 20px;
+    }
+
+    .reg h2 {
+      font-size: 17px;
+      font-weight: 800;
+      margin: 0 0 4px;
+      color: var(--bt-color-text);
+    }
+
+    .reg p {
+      font-size: 12.5px;
+      color: var(--bt-color-text-secondary);
+      margin: 0 0 12px;
+      line-height: 1.55;
+    }
+
+    .reg table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .reg th,
+    .reg td {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--bt-color-border);
+      vertical-align: top;
+    }
+
+    .reg th {
+      font-weight: 800;
+      color: var(--bt-color-text-secondary);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .reg td code {
+      font-weight: 800;
+      color: var(--bt-color-action);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="eyebrow">BloomTalk · 와이어플로우 (틀 · 시나리오 단계)</div>
+      <h1>시나리오별 화면 구성 — 데스크탑 + 앱뷰 나란히</h1>
+      <p class="sub">화상 모의 소개팅 + AI 코칭 서비스. <b>데스크탑 웹 우선 · 앱뷰 지원</b>이라 각 화면을 <code>데스크탑</code>과 <code>모바일(앱뷰)</code> 두
+        버전으로 나란히 배치했다. 각 노드는 아직 실제 화면이 아니라 배치·정보구조만 담은 <b>스켈레톤 목업</b>(<code>mockups/</code>)을 iframe으로 축소 삽입한 것. 이번 단계는
+        화살표·분기 없이 <b>시나리오(S1~S9)</b>로 화면만 나눈다 — 유저플로우 연결과 실제 화면 대체는 와이어프레임 확정 후 진행.</p>
+      <div class="legend">
+        <span class="g"><span class="lg-d"></span><b>데스크탑</b> = <code>mockups/desktop/SC-xx.html</code></span>
+        <span class="g"><span class="lg-p"></span><b>모바일(앱뷰)</b> = <code>mockups/phone/SC-xx.html</code></span>
+        <span class="g"><span class="lg-star">⭐</span> 핵심·크리티컬 시나리오</span>
+        <span class="g"><b>관리자</b> = 데스크탑 웹 전용(앱뷰 없음)</span>
+      </div>
+    </header>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S1</span>
+        <h3>온보딩 — 가입·동의·프로필·얼굴상·설문</h3>
+        <span class="persona">신규 사용자</span>
+        <span class="prio">P0</span>
+      </div>
+      <p class="lane__sum">3초 소셜 로그인 → 연령 확인 → <b>목적별</b> 개인정보 동의 → 기본 프로필 → 실시간 얼굴 촬영으로 얼굴상 태그 → 이상형·성향 설문 → 주 단위 가능
+        시간대. 성공 기준: 프로필 + 기본 온도 36.5°.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-01</b> 로그인 · 회원가입</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-01.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-01.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-02</b> 연령 확인</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-02.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-02.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-03</b> 목적별 개인정보 동의</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-03.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-03.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-04</b> 기본 프로필 등록</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-04.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-04.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-05</b> 실시간 얼굴 촬영 · 얼굴상 태그</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-05.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-05.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-06</b> 이상형 · 대화 성향 설문</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-06.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-06.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-07</b> 가능 시간대 서베이</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-07.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-07.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S2</span>
+        <h3>매칭 — 트랙 선택·조건 필터·수락</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0</span>
+      </div>
+      <p class="lane__sum">AI 챗봇 / 실사용자 화상 트랙 선택 → 필수 조건 필터(시간·나이·차단) + 다차원 점수 → 매칭 대기 큐 → 성립 시 양측 수락. 화상 30분은 실사용자 트랙
+        전용.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-08</b> 매칭 트랙 선택</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-08.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-08.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-09</b> 매칭 대기 (큐)</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-09.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-09.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-10</b> 매칭 성립 · 수락</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-10.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-10.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S3</span>
+        <h3>실사용자 화상 세션 — 대기방·30분·실시간 코칭</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0 ⭐</span>
+      </div>
+      <p class="lane__sum">상황형 대기방(장소 자동 배정·기기 점검·동의 게이트) → 30분 WebRTC 화상 → <b>본인 화면에만</b> 실시간 코칭(표정·발화·침묵 단계 개입·질문 카드).
+        ⚠️ 크리티컬 패스.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-11</b> 상황형 대기방 · 기기 점검</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-11.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-11.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-12</b> 화상 세션 (30분) · 실시간 코칭</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-12.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-12.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-13</b> 침묵 개입 · 질문 카드</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-13.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-13.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S4</span>
+        <h3>세션 종료 — 상호 평가·AI 리포트</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0</span>
+      </div>
+      <p class="lane__sum">원본 영상 미저장·지표만 집계 → 행동 기반 상호 평가(<b>상호성 게이트</b>: 상대 평가 제출 후 내 평가 열람) → 레이더 리포트(AI 분석 vs 상대
+        평가·근거 인용) → 사랑의 온도 갱신.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-14</b> 세션 종료 · 상호 평가</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-14.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-14.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-15</b> AI 세션 리포트 (레이더)</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-15.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-15.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S5</span>
+        <h3>연락처 교환 — 애프터 5분·상호 동의</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0</span>
+      </div>
+      <p class="lane__sum">만족스러운 세션 후 <b>양측 동의 시에만</b> 5분 화상 연장 → 인스타·카톡 아이디 상호 공개(내부 쪽지 채널). 한쪽만 동의 시 거절 여부 비표시.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-16</b> 애프터 · 5분 화상 연장</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-16.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-16.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-17</b> 연락처 교환 · 쪽지 채널</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-17.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-17.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S6</span>
+        <h3>AI 가상 상대 — 챗봇 연습</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0</span>
+      </div>
+      <p class="lane__sum">대기 없이 즉시 연습하는 <b>텍스트 챗봇</b>(소개팅 전/후 단계·말투 페르소나). 12시간 무응답 시 시간대별 멘트로 1회 선톡. 화상 트랙은 P2 보류.</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-18</b> AI 가상 상대 챗봇</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-18.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-18.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S7</span>
+        <h3>홈 · 성장 — 대시보드·뱃지·마이</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0 · P1</span>
+      </div>
+      <p class="lane__sum">홈(오늘의 연습·예약) → 성장 대시보드(누적 그래프·강점/보완 키워드·성장 뱃지) → 마이페이지(사랑의 온도 이력·동의 철회).</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-19</b> 홈 · 오늘의 연습</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-19.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-19.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-20</b> 성장 대시보드 · 그래프 · 뱃지</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-20.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-20.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-21</b> 마이페이지 · 사랑의 온도</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-21.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-21.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__h">
+        <span class="lane__id">S8</span>
+        <h3>안전 · 알림 — 신고·차단·노쇼</h3>
+        <span class="persona">사용자</span>
+        <span class="prio">P0 · P1</span>
+      </div>
+      <p class="lane__sum">세션 중 실시간 신고·즉시 종료 → 차단(매칭 후보 제외). 노쇼·직전 취소는 사랑의 온도 차감 + 노쇼 패널티(6개월 갱신). 알림
+        센터(매칭·리마인드·리포트·선톡).</p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-22</b> 신고 · 차단</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-22.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-22.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-23</b> 알림 센터</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-23.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev"><span class="dev__lbl">모바일(앱뷰)</span>
+              <div class="slot slot--p"><iframe src="mockups/phone/SC-23.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="lane lane--admin">
+      <div class="lane__h">
+        <span class="lane__id">S9</span>
+        <h3>관리자 — 회원·신고·정책</h3>
+        <span class="persona admin">운영자 (웹 전용)</span>
+        <span class="prio">P1</span>
+      </div>
+      <p class="lane__sum">회원/신고 관리·제재(AI 감지만으로 영구정지 금지) · 매칭/코칭 정책 가중치 · 상황형 배경 · 얼굴상 연예인·질문 풀 관리. 관리자 화면은 데스크탑 웹 전용.
+      </p>
+      <div class="grid">
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-40</b> 관리자 · 대시보드</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-40.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev dev--na"><span class="dev__lbl">모바일</span>
+              <div class="slot slot--p slot--na">웹 전용</div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-41</b> 관리자 · 신고 · 회원 관리</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-41.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev dev--na"><span class="dev__lbl">모바일</span>
+              <div class="slot slot--p slot--na">웹 전용</div>
+            </div>
+          </div>
+        </figure>
+        <figure class="wf">
+          <figcaption class="wf__cap"><b>SC-42</b> 관리자 · 정책 설정</figcaption>
+          <div class="devs">
+            <div class="dev"><span class="dev__lbl">데스크탑</span>
+              <div class="slot slot--d"><iframe src="mockups/desktop/SC-42.html" scrolling="no" loading="lazy"></iframe>
+              </div>
+            </div>
+            <div class="dev dev--na"><span class="dev__lbl">모바일</span>
+              <div class="slot slot--p slot--na">웹 전용</div>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="reg">
+      <h2>화면 레지스트리 (SC-xx) · 목업 소스</h2>
+      <p>각 화면의 스켈레톤 목업 위치와 등장 시나리오. 실제 화면은 이 목록을 기준으로 <code>design-system</code>을 적용해 순차 제작한다(중복 사본 금지). 신규 화면 추가 시
+        <code>mockups/desktop</code>·<code>mockups/phone</code>에 같은 ID로 추가하고 본 레지스트리를 갱신한다.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>화면</th>
+            <th>시나리오</th>
+            <th>디바이스</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SC-01</code></td>
+            <td>로그인 · 회원가입</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-02</code></td>
+            <td>연령 확인</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-03</code></td>
+            <td>목적별 개인정보 동의</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-04</code></td>
+            <td>기본 프로필 등록</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-05</code></td>
+            <td>실시간 얼굴 촬영 · 얼굴상 태그</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-06</code></td>
+            <td>이상형 · 대화 성향 설문</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-07</code></td>
+            <td>가능 시간대 서베이</td>
+            <td>S1</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-08</code></td>
+            <td>매칭 트랙 선택</td>
+            <td>S2</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-09</code></td>
+            <td>매칭 대기 (큐)</td>
+            <td>S2</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-10</code></td>
+            <td>매칭 성립 · 수락</td>
+            <td>S2</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-11</code></td>
+            <td>상황형 대기방 · 기기 점검</td>
+            <td>S3</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-12</code></td>
+            <td>화상 세션 (30분) · 실시간 코칭</td>
+            <td>S3</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-13</code></td>
+            <td>침묵 개입 · 질문 카드</td>
+            <td>S3</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-14</code></td>
+            <td>세션 종료 · 상호 평가</td>
+            <td>S4</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-15</code></td>
+            <td>AI 세션 리포트 (레이더)</td>
+            <td>S4</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-16</code></td>
+            <td>애프터 · 5분 화상 연장</td>
+            <td>S5</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-17</code></td>
+            <td>연락처 교환 · 쪽지 채널</td>
+            <td>S5</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-18</code></td>
+            <td>AI 가상 상대 챗봇</td>
+            <td>S6</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-19</code></td>
+            <td>홈 · 오늘의 연습</td>
+            <td>S7</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-20</code></td>
+            <td>성장 대시보드 · 그래프 · 뱃지</td>
+            <td>S7</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-21</code></td>
+            <td>마이페이지 · 사랑의 온도</td>
+            <td>S7</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-22</code></td>
+            <td>신고 · 차단</td>
+            <td>S8</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-23</code></td>
+            <td>알림 센터</td>
+            <td>S8</td>
+            <td>데스크탑 · 모바일</td>
+          </tr>
+          <tr>
+            <td><code>SC-40</code></td>
+            <td>관리자 · 대시보드</td>
+            <td>S9</td>
+            <td>데스크탑</td>
+          </tr>
+          <tr>
+            <td><code>SC-41</code></td>
+            <td>관리자 · 신고 · 회원 관리</td>
+            <td>S9</td>
+            <td>데스크탑</td>
+          </tr>
+          <tr>
+            <td><code>SC-42</code></td>
+            <td>관리자 · 정책 설정</td>
+            <td>S9</td>
+            <td>데스크탑</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </div>
+</body>
+
+</html>

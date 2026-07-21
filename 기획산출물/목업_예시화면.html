@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BloomTalk 목업 예시화면 v1.0 — 핵심 5화면 (고충실도)</title>
+<link rel="stylesheet" href="../design-system/tokens.css">
+<link rel="stylesheet" href="../design-system/components.css">
+<style>
+  /* ---- 목업 문서 셸(산출물 프레임) — 서비스 화면 아님 ---- */
+  body { margin: 0; padding: var(--bt-space-8) var(--bt-space-6); }
+  .doc { max-width: 1080px; margin: 0 auto; }
+  .doc-head { margin-bottom: var(--bt-space-8); }
+  .mock { margin-bottom: var(--bt-space-16); }
+  .mock > h2 { font-size: var(--bt-text-h3); font-weight: var(--bt-weight-semibold); letter-spacing: var(--bt-tracking-heading); margin: 0 0 var(--bt-space-2); }
+  .mock > .mock-note { font-size: var(--bt-text-caption); color: var(--bt-color-text-secondary); line-height: var(--bt-lh-caption); margin: 0 0 var(--bt-space-4); max-width: 78ch; }
+  .stage { border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-2xl); overflow: hidden; box-shadow: var(--bt-shadow-md); }
+  .stage--pad { padding: var(--bt-space-8); background: var(--bt-color-bg); display: flex; justify-content: center; }
+
+  /* ---- ① 화상 세션 (다크 고정) ---- */
+  .session { position: relative; height: 560px; background: var(--bt-color-bg); padding: var(--bt-space-4); display: flex; flex-direction: column; gap: var(--bt-space-3); }
+  .session-top { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); }
+  .video-stage { position: relative; flex: 1; border-radius: var(--bt-radius-lg); overflow: hidden;
+    background: linear-gradient(135deg, #2A2E3C 0%, #1C1F27 55%, #23283A 100%); }
+  .video-stage .peer-hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--bt-color-text-tertiary); font-size: var(--bt-text-sm); }
+  .pip { position: absolute; top: var(--bt-space-4); right: var(--bt-space-4); width: 176px; height: 112px;
+    border-radius: var(--bt-radius-sm); background: linear-gradient(135deg, #343B4E, #262B38);
+    border: 1px solid var(--bt-color-border-glass); display: grid; place-items: center;
+    color: var(--bt-color-text-tertiary); font-size: var(--bt-text-caption); }
+  .overlay-coach { position: absolute; left: var(--bt-space-4); bottom: 88px; }
+  .overlay-question { position: absolute; right: var(--bt-space-4); bottom: 88px; }
+  .overlay-callbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--bt-space-4); }
+
+  /* ---- ② 리포트 ---- */
+  .report { background: var(--bt-color-bg); padding: var(--bt-space-8); display: grid; grid-template-columns: 1fr 1.2fr; gap: var(--bt-space-5); }
+  .report .span2 { grid-column: 1 / -1; }
+  .legend { display: flex; gap: var(--bt-space-4); font-size: var(--bt-text-caption); color: var(--bt-color-text-secondary); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .metric { display: grid; grid-template-columns: 130px 1fr 56px; align-items: center; gap: var(--bt-space-3); padding: var(--bt-space-2) 0; }
+  .metric + .metric { border-top: 1px solid var(--bt-color-border); }
+
+  /* ---- ③ 매칭 카드 ---- */
+  .match-card { width: 400px; }
+  .countdown { display: flex; align-items: center; justify-content: space-between; font-size: var(--bt-text-caption); color: var(--bt-color-text-secondary); margin: var(--bt-space-4) 0 var(--bt-space-2); }
+
+  /* ---- ⑤ 대시보드 ---- */
+  .dash { background: var(--bt-color-bg); padding: var(--bt-space-8); display: grid; grid-template-columns: 320px 1fr; gap: var(--bt-space-5); align-items: start; }
+  .dash .span2 { grid-column: 1 / -1; }
+</style>
+</head>
+<body class="bt-root">
+<div class="doc">
+
+<div class="doc-head">
+  <div class="bt-overline">기획 산출물 · 고충실도 목업</div>
+  <h1 class="bt-h1" style="margin:4px 0 8px">목업 예시화면 v1.0 — 핵심 5화면</h1>
+  <p class="bt-body-sm bt-muted" style="margin:0; line-height:var(--bt-lh-sm)">
+    <code>design-system/tokens.css + components.css</code>를 그대로 링크해 구현 시 코드가 곧 목업이 되도록 했다.
+    나머지 화면은 <b>와이어프레임.html + 디자인 시스템 컴포넌트</b> 조합으로 바로 구현한다(개발착수_권장사항 §1.2).
+    더미 데이터·닉네임은 전부 가상이다.
+  </p>
+</div>
+
+<!-- ================================================================
+     ① 화상 세션 — 다크 고정 (DESIGN_SYSTEM §7.3)
+     ================================================================ -->
+<section class="mock">
+  <h2>① 화상 세션 <span class="bt-badge bt-badge--info">SESSION-01/02 · COACH · SILENCE</span> <span class="bt-badge">다크 고정</span></h2>
+  <p class="mock-note">
+    상대 영상이 주인공 — 오버레이는 가장자리만 점유하고 전체를 덮지 않는다. 코치 토스트는 한 번에 1개·자동 소멸·hedge 화법.
+    침묵 30초 상태(질문 카드 노출)를 가정한 장면. 마이크/카메라 끔은 회색, 빨강은 종료뿐.
+  </p>
+  <div class="stage">
+    <div class="session" data-theme="dark">
+      <div class="session-top">
+        <span class="bt-timer"><span class="bt-timer__dot"></span><span class="bt-numeric">24:31</span> 남음</span>
+        <span class="bt-chip bt-chip--tag bt-chip--static">🎯 오늘의 목표 · 확장 질문 만들기</span>
+        <span class="bt-badge bt-badge--success">● 연결 안정</span>
+      </div>
+      <div class="video-stage">
+        <div class="peer-hint">상대 영상 (원본 미저장 · 분석 지표만 처리)</div>
+        <div class="pip">내 화면</div>
+
+        <div class="overlay-coach">
+          <div class="bt-coach" role="status" aria-live="polite">
+            <div class="bt-coach__icon">🌸</div>
+            <div class="bt-coach__body">
+              <div class="bt-coach__title">코치</div>
+              <div class="bt-coach__text">상대방 화면을 조금 더 바라봐 보세요</div>
+              <span class="bt-hedge" style="margin-top:4px">AI 추정 · 나에게만 보여요</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overlay-question">
+          <div class="bt-question-card">
+            <div class="bt-body-sm" style="font-weight:var(--bt-weight-semibold)">잠깐 조용하네요 — 이런 얘기는 어때요?</div>
+            <button class="bt-question-card__option">요즘 주말엔 주로 뭐 하면서 보내세요?</button>
+            <button class="bt-question-card__option">최근에 재밌게 본 콘텐츠 있어요?</button>
+            <button class="bt-question-card__option">반려동물 키워보신 적 있어요?</button>
+            <span class="bt-micro">무시해도 괜찮아요 · 침묵도 대화의 일부예요</span>
+          </div>
+        </div>
+
+        <div class="overlay-callbar">
+          <div class="bt-call-bar">
+            <button class="bt-icon-btn bt-icon-btn--on" aria-label="마이크 켜짐">🎤</button>
+            <button class="bt-icon-btn bt-icon-btn--off" aria-label="카메라 꺼짐">📷</button>
+            <button class="bt-icon-btn" aria-label="대화 주제 도움 요청">💡</button>
+            <button class="bt-icon-btn" aria-label="신고">🚩</button>
+            <button class="bt-icon-btn bt-icon-btn--lg bt-icon-btn--end" aria-label="세션 종료">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     ② AI 세션 리포트
+     ================================================================ -->
+<section class="mock">
+  <h2>② AI 세션 리포트 <span class="bt-badge bt-badge--info">REPORT-01/01-1/02/04</span></h2>
+  <p class="mock-note">
+    레이더: AI 분석(브랜드 블루) vs 상대 평가(그린) — 상대 평가 제출 완료 상태. 이슈 카드는 맥락 요약 + 근거 + 대체 제안 구조(REPORT-01-1).
+    숫자는 항상 근거 문장과 함께(원칙 1). 이슈 0건 세션은 이슈 카드 대신 "주의 표현이 없었어요" 콜아웃으로 대체(D-14).
+  </p>
+  <div class="stage"><div class="report">
+
+    <div class="bt-card">
+      <div class="bt-card__head">
+        <div class="bt-card__title">대화 행동 분석</div>
+        <span class="bt-hedge">외모·매력 평가 아님</span>
+      </div>
+      <svg viewBox="0 0 300 268" role="img" aria-label="대화 행동 6축 레이더 차트" style="width:100%; max-width:320px; display:block; margin:0 auto">
+        <g stroke="var(--bt-color-border)" fill="none">
+          <polygon points="150,30 236.6,80 236.6,180 150,230 63.4,180 63.4,80"/>
+          <polygon points="150,63 207.7,96.3 207.7,163.7 150,197 92.3,163.7 92.3,96.3"/>
+          <polygon points="150,97 178.9,113.5 178.9,146.5 150,163 121.1,146.5 121.1,113.5"/>
+          <line x1="150" y1="130" x2="150" y2="30"/><line x1="150" y1="130" x2="236.6" y2="80"/>
+          <line x1="150" y1="130" x2="236.6" y2="180"/><line x1="150" y1="130" x2="150" y2="230"/>
+          <line x1="150" y1="130" x2="63.4" y2="180"/><line x1="150" y1="130" x2="63.4" y2="80"/>
+        </g>
+        <polygon points="150,50 206.3,97.5 210.6,165 150,185 85.1,167.5 98.1,100"
+                 fill="var(--bt-color-brand)" fill-opacity="0.18" stroke="var(--bt-color-brand)" stroke-width="2"/>
+        <polygon points="150,60 214.9,92.5 219.3,170 150,200 76.4,172.5 93.7,97.5"
+                 fill="var(--bt-color-success-marker)" fill-opacity="0.14" stroke="var(--bt-color-success-marker)" stroke-width="2"/>
+        <g font-size="11" fill="var(--bt-color-text-secondary)" text-anchor="middle">
+          <text x="150" y="20">대화 흐름</text><text x="258" y="76">질문 균형</text><text x="258" y="196">경청</text>
+          <text x="150" y="248">리액션</text><text x="42" y="196">매너</text><text x="42" y="76">비언어 표현</text>
+        </g>
+      </svg>
+      <div class="legend" style="justify-content:center; margin-top:var(--bt-space-2)">
+        <span><i style="background:var(--bt-color-brand)"></i>AI 분석</span>
+        <span><i style="background:var(--bt-color-success-marker)"></i>상대 평가</span>
+      </div>
+    </div>
+
+    <div class="bt-card">
+      <div class="bt-card__head"><div class="bt-card__title">핵심 요약</div></div>
+      <div class="bt-stack" style="gap:var(--bt-space-3)">
+        <div>
+          <div class="bt-body-sm" style="font-weight:var(--bt-weight-semibold); color:var(--bt-color-success)">잘한 점 3</div>
+          <ul class="bt-body-sm bt-muted" style="margin:4px 0 0; padding-left:18px">
+            <li>상대 말이 끝난 뒤 답하는 흐름이 안정적이었어요</li>
+            <li>확장 질문으로 이어진 비율 35% — 지난 세션보다 늘었어요</li>
+            <li>상대가 "편안했던 순간"으로 초반 아이스브레이킹을 꼽았어요</li>
+          </ul>
+        </div>
+        <div>
+          <div class="bt-body-sm" style="font-weight:var(--bt-weight-semibold); color:var(--bt-color-warning)">개선점 2</div>
+          <ul class="bt-body-sm bt-muted" style="margin:4px 0 0; padding-left:18px">
+            <li>상대가 취미를 말한 뒤 바로 본인 이야기로 전환한 구간이 3회 있었어요</li>
+            <li>본인 발화 비율 68% — 목표(균형)보다 높았어요</li>
+          </ul>
+        </div>
+        <div class="bt-callout">
+          <span class="bt-callout__icon">🎯</span>
+          <div><b>다음 세션 미션</b> · 상대 이야기에 한 번 더 머무르기 — 되묻는 질문 1회 만들어보기</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bt-card span2">
+      <div class="bt-card__head">
+        <div class="bt-card__title">주의가 필요했던 순간 <span class="bt-badge bt-badge--warning">1건</span></div>
+        <span class="bt-hedge">발췌 저장 동의 시에만 원문 표시</span>
+      </div>
+      <div class="bt-callout bt-callout--warning" style="align-items:flex-start">
+        <span class="bt-callout__icon">⚠</span>
+        <div style="line-height:var(--bt-lh-sm)">
+          <b>[감지: 결혼·출산 압박 표현 · 12분 34초]</b><br>
+          맥락 요약 — 상대가 직장 이야기를 하던 중 결혼 계획으로 화제를 전환하셨어요.<br>
+          <span class="bt-muted">근거 발언(전후 요약): 직장 적응 이야기 → "결혼은 언제쯤 하고 싶으세요?" → 상대 답변이 짧아지고 화제가 끊겼어요.</span><br>
+          <b>대체 제안</b> · "앞으로 어떤 삶을 살고 싶은지 궁금해요"
+        </div>
+      </div>
+    </div>
+
+    <div class="bt-card span2">
+      <div class="bt-card__head"><div class="bt-card__title">행동 지표 근거</div><span class="bt-hedge">지표만 저장 · 원본 미저장</span></div>
+      <div class="metric"><span class="bt-body-sm">발화 비율 (나:상대)</span><div class="bt-progress"><div class="bt-progress__fill" style="--value:68"></div></div><span class="bt-body-sm bt-numeric" style="text-align:right">68:32</span></div>
+      <div class="metric"><span class="bt-body-sm">시선 유지 비율</span><div class="bt-progress"><div class="bt-progress__fill" style="--value:57"></div></div><span class="bt-body-sm bt-numeric" style="text-align:right">57%</span></div>
+      <div class="metric"><span class="bt-body-sm">확장 질문 비율</span><div class="bt-progress"><div class="bt-progress__fill" style="--value:35"></div></div><span class="bt-body-sm bt-numeric" style="text-align:right">35%</span></div>
+      <div class="metric"><span class="bt-body-sm">필러워드 (사후 안내)</span><div class="bt-progress"><div class="bt-progress__fill" style="--value:22"></div></div><span class="bt-body-sm bt-numeric" style="text-align:right">14회</span></div>
+    </div>
+
+  </div></div>
+</section>
+
+<!-- ================================================================
+     ③ 매칭 카드
+     ================================================================ -->
+<section class="mock">
+  <h2>③ 매칭 카드 <span class="bt-badge bt-badge--info">MATCH-03/06 · D-21 근거 복원</span></h2>
+  <p class="mock-note">
+    상대 공개 정보는 닉네임·연령대·키·얼굴상뿐(최소 공개 원칙). 매칭 근거 = 점수 상위 기여 2개 항목의 문장 템플릿.
+    거절해도 상대에게 거절 사실은 통지되지 않는다.
+  </p>
+  <div class="stage stage--pad">
+    <div class="bt-card match-card">
+      <div class="bt-card__head">
+        <div class="bt-card__title">연습 상대를 찾았어요</div>
+        <span class="bt-badge bt-badge--info">화상 30분</span>
+      </div>
+      <div style="display:flex; gap:var(--bt-space-4); align-items:center">
+        <div class="bt-avatar bt-avatar--lg bt-avatar--round" style="display:grid; place-items:center; font-size:24px">🙂<span class="bt-avatar__status bt-avatar__status--online"></span></div>
+        <div>
+          <div class="bt-body-lg" style="font-weight:var(--bt-weight-semibold)">고요한하루</div>
+          <div class="bt-caption">20대 후반 · 172cm</div>
+          <div class="bt-cluster" style="margin-top:6px">
+            <span class="bt-chip bt-chip--tag bt-chip--static">🐱 고양이상</span>
+            <span class="bt-chip bt-chip--tag bt-chip--static">차분한 인상</span>
+          </div>
+        </div>
+      </div>
+      <div class="bt-callout" style="margin-top:var(--bt-space-4)">
+        <span class="bt-callout__icon">🌱</span>
+        <div><b>이렇게 잘 맞아요</b><br>· 연습 목표가 같아요 — "확장 질문 만들기"<br>· 화요일 저녁 시간대가 겹쳐요</div>
+      </div>
+      <div class="countdown">
+        <span>수락 제한 시간</span>
+        <span class="bt-numeric" style="font-weight:var(--bt-weight-semibold); color:var(--bt-color-warning)">04:32</span>
+      </div>
+      <div class="bt-progress"><div class="bt-progress__fill" style="--value:76; background:var(--bt-color-warning-marker)"></div></div>
+      <div class="bt-stack" style="gap:var(--bt-space-2); margin-top:var(--bt-space-5)">
+        <button class="bt-btn bt-btn--primary bt-btn--block">수락하고 예약하기 <span class="bt-btn__trailing">→</span></button>
+        <button class="bt-btn bt-btn--ghost bt-btn--block">이번엔 넘어갈게요</button>
+      </div>
+      <p class="bt-caption" style="margin:var(--bt-space-3) 0 0; text-align:center">세션 1시간 이전까지는 패널티 없이 취소할 수 있어요</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     ④ 온보딩 — 목적별 동의
+     ================================================================ -->
+<section class="mock">
+  <h2>④ 목적별 개인정보 동의 <span class="bt-badge bt-badge--info">AUTH-03</span></h2>
+  <p class="mock-note">
+    전체 동의 일괄 체크 없음 — 항목별 토글 + 처리 기준을 행 안에 노출. 선택 동의를 모두 꺼도 다음으로 진행 가능하며,
+    꺼진 항목이 무엇을 비활성화하는지 그 자리에서 알려준다.
+  </p>
+  <div class="stage stage--pad">
+    <div class="bt-card" style="width:560px">
+      <div class="bt-steps" style="margin-bottom:var(--bt-space-5)">
+        <div class="bt-steps__dot is-done">✓</div><div class="bt-steps__line"></div>
+        <div class="bt-steps__dot is-active">2</div><div class="bt-steps__line"></div>
+        <div class="bt-steps__dot">3</div><div class="bt-steps__line"></div>
+        <div class="bt-steps__dot">4</div><div class="bt-steps__line"></div>
+        <div class="bt-steps__dot">5</div>
+      </div>
+      <div class="bt-card__title" style="margin-bottom:4px">어디까지 분석할지 직접 정해주세요</div>
+      <p class="bt-body-sm bt-muted" style="margin:0 0 var(--bt-space-4)">각 항목은 언제든 마이페이지에서 철회할 수 있어요.</p>
+
+      <div class="bt-callout bt-callout--success" style="margin-bottom:var(--bt-space-2)">
+        <span class="bt-callout__icon">✓</span>
+        <div>선택 항목을 모두 꺼도 <b>기본 화상 연습은 그대로 이용</b>할 수 있어요.</div>
+      </div>
+
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">이용약관·개인정보 처리 <span class="bt-badge bt-badge--danger">필수</span></div>
+          <div class="bt-consent__desc">계정 운영 · 연령 확인 · 신고 대응에 사용해요</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox" checked><span class="bt-switch__track"></span></label>
+      </div>
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">얼굴 촬영·얼굴상 분석 <span class="bt-badge">선택</span></div>
+          <div class="bt-consent__desc">분석 완료 즉시 원본 사진을 삭제해요 · 끄면 얼굴상 태그가 만들어지지 않아요</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox" checked><span class="bt-switch__track"></span></label>
+      </div>
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">세션 중 표정·시선 분석 <span class="bt-badge">선택</span></div>
+          <div class="bt-consent__desc">영상 원본은 저장하지 않고 지표만 남겨요 · 끄면 표정 코칭을 받을 수 없어요</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox" checked><span class="bt-switch__track"></span></label>
+      </div>
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">세션 중 음성·대화 분석 <span class="bt-badge">선택</span></div>
+          <div class="bt-consent__desc">끄면 대화 흐름 코칭과 리포트 문장 인용이 빠져요</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox"><span class="bt-switch__track"></span></label>
+      </div>
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">리포트 근거 발언 발췌 저장 <span class="bt-badge">선택</span></div>
+          <div class="bt-consent__desc">주의 표현 전후 발언만 90일 보관 후 삭제해요 (리포트 근거 인용용)</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox"><span class="bt-switch__track"></span></label>
+      </div>
+      <div class="bt-consent">
+        <div class="bt-consent__main">
+          <div class="bt-consent__title">누적 성장 리포트 저장 <span class="bt-badge">선택</span></div>
+          <div class="bt-consent__desc">점수·키워드·통계값만 저장해요</div>
+        </div>
+        <label class="bt-switch"><input class="bt-switch__input" type="checkbox" checked><span class="bt-switch__track"></span></label>
+      </div>
+
+      <button class="bt-btn bt-btn--primary bt-btn--block bt-btn--lg" style="margin-top:var(--bt-space-5)">동의하고 계속하기</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================
+     ⑤ 성장 대시보드
+     ================================================================ -->
+<section class="mock">
+  <h2>⑤ 성장 대시보드 <span class="bt-badge bt-badge--info">GROWTH-01 · SURVEY-03</span></h2>
+  <p class="mock-note">
+    레벨은 우열이 아닌 성장 지표로 표현 — 링 숫자는 "다음 레벨까지 진행률"이고 항상 사유 문장을 동반한다.
+    히스토리 행 클릭 → 해당 세션 리포트(②). P1 영역(그래프·키워드·뱃지)은 자리만 표시.
+  </p>
+  <div class="stage"><div class="dash">
+
+    <div class="bt-card">
+      <div class="bt-card__head"><div class="bt-card__title">연습 레벨</div><span class="bt-hedge">나에게만 보여요</span></div>
+      <div style="display:flex; gap:var(--bt-space-4); align-items:center">
+        <div class="bt-ring" style="--value:62; --size:88px">
+          <div class="bt-ring__label"><span class="bt-ring__value">Lv.3</span><span class="bt-ring__unit">62%</span></div>
+        </div>
+        <div class="bt-body-sm bt-muted" style="line-height:var(--bt-lh-sm)">
+          다음 레벨까지 62% —<br>최근 2세션에서 <b style="color:var(--bt-color-success)">경청 지표가 올랐어요</b>
+        </div>
+      </div>
+      <div class="bt-callout bt-callout--warning" style="margin-top:var(--bt-space-4)">
+        <span class="bt-callout__icon">🕐</span>
+        <div>직전 취소 1회 — 패널티는 <b>2027년 1월</b>에 사라져요</div>
+      </div>
+    </div>
+
+    <div class="bt-card">
+      <div class="bt-card__head"><div class="bt-card__title">이번 주</div></div>
+      <div class="bt-cluster" style="gap:var(--bt-space-3)">
+        <div class="bt-card--inset bt-card" style="flex:1; text-align:center">
+          <div class="bt-h2 bt-numeric">3</div><div class="bt-caption">완료한 세션</div>
+        </div>
+        <div class="bt-card--inset bt-card" style="flex:1; text-align:center">
+          <div class="bt-h2 bt-numeric">35%</div><div class="bt-caption">확장 질문 비율<br>(목표 달성 ✓)</div>
+        </div>
+        <div class="bt-card--inset bt-card" style="flex:1.4; text-align:center">
+          <div class="bt-body" style="font-weight:var(--bt-weight-semibold)">화 19:00</div>
+          <div class="bt-caption">다음 세션 · 고요한하루</div>
+          <span class="bt-badge bt-badge--success" style="margin-top:4px">예약 확정</span>
+        </div>
+      </div>
+      <div class="bt-cluster" style="margin-top:var(--bt-space-4)">
+        <span class="bt-badge bt-badge--success">🌱 첫 연습 완료</span>
+        <span class="bt-badge bt-badge--success">👂 경청 향상</span>
+        <span class="bt-badge">🔒 균형 잡힌 대화</span>
+        <span class="bt-caption" style="width:100%">뱃지 상세(GROWTH-04)는 P1 — 행동 개선 조건만 사용</span>
+      </div>
+    </div>
+
+    <div class="bt-card span2">
+      <div class="bt-card__head"><div class="bt-card__title">연습 기록</div><span class="bt-caption">최근 30일</span></div>
+      <div class="bt-stack" style="gap:var(--bt-space-2)">
+        <button class="bt-row">
+          <div class="bt-ring bt-ring--sm" style="--value:78"><div class="bt-ring__label"><span class="bt-ring__value bt-numeric">78</span></div></div>
+          <div class="bt-row__main">
+            <div class="bt-row__title">고요한하루 님과 화상 연습</div>
+            <div class="bt-row__meta">7월 18일 · 목표: 확장 질문 만들기 · 상대 평가 완료</div>
+          </div>
+          <span class="bt-badge bt-badge--success">리포트 보기</span>
+        </button>
+        <button class="bt-row">
+          <div class="bt-ring bt-ring--sm" style="--value:64"><div class="bt-ring__label"><span class="bt-ring__value bt-numeric">64</span></div></div>
+          <div class="bt-row__main">
+            <div class="bt-row__title">달빛산책 님과 화상 연습</div>
+            <div class="bt-row__meta">7월 15일 · 목표: 말 끊지 않기 · 상대 평가 대기 중 (48시간 후 AI 분석으로 확정)</div>
+          </div>
+          <span class="bt-badge bt-badge--warning">평가 대기</span>
+        </button>
+        <button class="bt-row">
+          <div class="bt-avatar bt-avatar--sm" style="display:grid; place-items:center">🤖</div>
+          <div class="bt-row__main">
+            <div class="bt-row__title">AI 상대와 채팅 연습 (소개팅 전)</div>
+            <div class="bt-row__meta">7월 13일 · 페르소나: 차분한 말투 · 보통 난이도</div>
+          </div>
+          <span class="bt-badge">대화 보기</span>
+        </button>
+      </div>
+      <div class="bt-empty" style="padding:var(--bt-space-6); border:1px dashed var(--bt-color-border); border-radius:var(--bt-radius-lg); margin-top:var(--bt-space-4)">
+        <div class="bt-empty__title" style="font-size:var(--bt-text-sm)">누적 성장 그래프 · 행동 키워드</div>
+        <div class="bt-empty__text">GROWTH-02 · GROWTH-03 (P1) — 5주차 여유 시 이 영역에 추가</div>
+      </div>
+    </div>
+
+  </div></div>
+</section>
+
+<p class="bt-caption" style="margin-bottom:var(--bt-space-10)">— 끝. 라이트/다크 검증: 세션 화면은 자체 다크 고정이며, 문서 전체는 OS 테마를 따른다(tokens.css). </p>
+</div>
+</body>
+</html>

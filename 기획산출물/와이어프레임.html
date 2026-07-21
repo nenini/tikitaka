@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BloomTalk 와이어프레임 v1.0 — P0 전 화면 (저충실도)</title>
+<style>
+  /* 저충실도 의도적 무채색 — 시각 디자인은 design-system/ 과 목업_예시화면.html 참조 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Pretendard, -apple-system, "Malgun Gothic", sans-serif; background: #ECEDEF; color: #222; padding: 32px; }
+  h1 { font-size: 26px; margin-bottom: 8px; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 28px; line-height: 1.6; }
+  h2 { font-size: 19px; margin: 44px 0 16px; padding-bottom: 8px; border-bottom: 2px solid #444; }
+  table { border-collapse: collapse; background: #fff; font-size: 13px; width: 100%; max-width: 880px; }
+  th, td { border: 1px solid #ccc; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f2f2f2; }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .wf { width: 400px; }
+  .wf--wide { width: 660px; }
+  .wf h3 { font-size: 14px; margin-bottom: 6px; }
+  .wf h3 .id { color: #888; font-weight: 400; font-size: 12px; }
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: #ddd; color: #444; vertical-align: 1px; }
+  .tag--dark { background: #333; color: #eee; }
+  .fr { background: #fff; border: 2px solid #555; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+  .fr--dark { background: #4a4a4a; border-color: #222; }
+  .fr--dark .bx { background: #5c5c5c; border-color: #888; color: #eee; }
+  .fr--dark .bx--ghost { background: transparent; color: #ccc; }
+  .bx { background: #f0f0f0; border: 1px dashed #999; border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.45; color: #333; }
+  .bx--solid { border-style: solid; background: #e2e2e2; font-weight: 600; text-align: center; }
+  .bx--btn { border-style: solid; background: #cfcfcf; font-weight: 700; text-align: center; border-radius: 999px; }
+  .bx--ghost { border: none; background: transparent; color: #777; font-size: 11px; padding: 2px 4px; }
+  .bx--media { min-height: 90px; display: flex; align-items: center; justify-content: center; color: #777; background: repeating-linear-gradient(45deg,#ececec,#ececec 8px,#f6f6f6 8px,#f6f6f6 16px); }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .row > .n { flex: none; }
+  .note { font-size: 11px; line-height: 1.5; color: #7a5c00; background: #FFF7DB; border-left: 3px solid #E6B800; padding: 6px 9px; margin-top: 6px; border-radius: 0 6px 6px 0; }
+  .note b { color: #5c4500; }
+  small.cap { color: #888; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>와이어프레임 v1.0 — P0 전 화면 (저충실도)</h1>
+<p class="meta">
+  근거: 기능명세서_v2.md · 유저플로우.md · 작성일 2026-07-19<br>
+  레이아웃·정보 배치·분기만 정의한다. <b>색·타이포·컴포넌트 상세는 design-system/, 고충실도는 목업_예시화면.html(핵심 5화면)</b> 참조.<br>
+  플랫폼: 웹 반응형 · <b>데스크톱 우선</b>. 세션·대기방 화면은 <b>다크 고정</b>(DESIGN_SYSTEM §7.3).
+  P1 요소는 회색 주석으로만 표기(구현 시 자리 확보용).
+</p>
+
+<!-- ============================================================ -->
+<h2>0. 화면 목록 (IA) — 기능명세서 v2 미작성 §23 대체</h2>
+<table>
+  <tr><th>#</th><th>화면</th><th>기능 ID</th><th>테마</th><th>진입 경로</th></tr>
+  <tr><td colspan="5" style="background:#e8e8e8"><b>A. 온보딩</b> (최초 1회, 순차 진행 · 진행 스텝 표시)</td></tr>
+  <tr><td>01</td><td>랜딩 · 로그인</td><td>AUTH-01</td><td>라이트</td><td>최초 방문</td></tr>
+  <tr><td>02</td><td>회원가입 · 성인 확인</td><td>AUTH-01, AUTH-02</td><td>라이트</td><td>01</td></tr>
+  <tr><td>03</td><td>목적별 개인정보 동의</td><td>AUTH-03</td><td>라이트</td><td>02</td></tr>
+  <tr><td>04</td><td>기본 프로필 등록</td><td>PROFILE-01</td><td>라이트</td><td>03</td></tr>
+  <tr><td>05</td><td>실시간 얼굴 촬영 / 05b 얼굴상 태그 결과</td><td>PROFILE-02, PROFILE-03</td><td>라이트</td><td>04 (얼굴 동의자만)</td></tr>
+  <tr><td>06</td><td>설문 3종 (이상형·성향·연습 목표)</td><td>SURVEY-01/02, PROFILE-05</td><td>라이트</td><td>05 또는 04</td></tr>
+  <tr><td>07</td><td>가능 시간대 입력</td><td>MATCH-02-1</td><td>라이트</td><td>06</td></tr>
+  <tr><td colspan="5" style="background:#e8e8e8"><b>B. 홈 · 매칭</b></td></tr>
+  <tr><td>08</td><td>홈 (매칭 트랙 선택)</td><td>MATCH-01</td><td>라이트</td><td>온보딩 완료 / 로그인</td></tr>
+  <tr><td>09</td><td>매칭 대기 · 매칭 카드 · 수락</td><td>MATCH-02/03/06</td><td>라이트</td><td>08 실사용자 트랙</td></tr>
+  <tr><td>10</td><td>AI 챗봇 대화 (페르소나 설정 포함)</td><td>AI-DATE-01/02</td><td>라이트</td><td>08 AI 트랙</td></tr>
+  <tr><td colspan="5" style="background:#e8e8e8"><b>C. 세션</b> (다크 고정)</td></tr>
+  <tr><td>11</td><td>상황형 대기방</td><td>ROOM-01/03</td><td><b>다크</b></td><td>세션 시각 도래</td></tr>
+  <tr><td>12</td><td>화상 세션 (코칭·침묵 개입 오버레이)</td><td>SESSION-01/02, COACH-01/02/04, SILENCE-01/02</td><td><b>다크</b></td><td>11</td></tr>
+  <tr><td>13</td><td>신고 모달 (세션 중)</td><td>MODERATION-01</td><td><b>다크</b></td><td>12 오버레이</td></tr>
+  <tr><td colspan="5" style="background:#e8e8e8"><b>D. 세션 후</b></td></tr>
+  <tr><td>14</td><td>상호 행동 평가</td><td>RESULT-01/02</td><td>라이트</td><td>세션 종료</td></tr>
+  <tr><td>15</td><td>5분 연장 요청 · 연락처 공개</td><td>CONTACT-01/02</td><td>라이트(모달)/다크(연장 화상)</td><td>14 제출 후</td></tr>
+  <tr><td>16</td><td>AI 세션 리포트</td><td>REPORT-01/01-1/02/04</td><td>라이트</td><td>리포트 알림 / 17</td></tr>
+  <tr><td colspan="5" style="background:#e8e8e8"><b>E. 마이 · 공통</b></td></tr>
+  <tr><td>17</td><td>성장 대시보드 · 세션 히스토리</td><td>GROWTH-01, SURVEY-03</td><td>라이트</td><td>글로벌 내비</td></tr>
+  <tr><td>18</td><td>알림 목록</td><td>NOTIFY-01</td><td>라이트</td><td>글로벌 내비</td></tr>
+  <tr><td>19</td><td>마이페이지 (프로필·동의 관리·차단 목록)</td><td>PROFILE-01, AUTH-03 철회, MODERATION-02</td><td>라이트</td><td>글로벌 내비</td></tr>
+</table>
+<p class="note" style="max-width:880px">글로벌 내비게이션(데스크톱 상단 바 / 모바일 하단 bt-nav): <b>홈 · 성장 · [매칭 시작 FAB] · 알림 · 마이</b>. 세션·대기방 화면에서는 내비 숨김.</p>
+
+<!-- ============================================================ -->
+<h2>A. 온보딩</h2>
+<div class="grid">
+
+<div class="wf">
+  <h3>01 랜딩 · 로그인 <span class="id">AUTH-01</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">로고 · 태그라인 "Practice, Connect, Bloom"</div>
+    <div class="bx bx--media">서비스 소개 히어로<br>(연습 도구임을 명시 — "매칭 아님")</div>
+    <div class="bx bx--btn">이메일로 시작하기</div>
+    <div class="bx bx--btn">소셜 로그인 (OAuth2)</div>
+    <div class="bx bx--ghost">이미 계정이 있어요 → 로그인 폼 토글 · 비밀번호 재설정 링크</div>
+  </div>
+</div>
+
+<div class="wf">
+  <h3>02 회원가입 · 성인 확인 <span class="id">AUTH-01 · AUTH-02</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">스텝 표시 ●○○○○ (1/5 계정)</div>
+    <div class="bx">이메일 입력 <small class="cap">(중복 시 인라인 에러)</small></div>
+    <div class="bx">비밀번호 / 비밀번호 확인</div>
+    <div class="bx">생년월일 입력 → 성인 여부 판정</div>
+    <div class="bx bx--btn">다음</div>
+  </div>
+  <p class="note"><b>◆ 미성년:</b> 전용 차단 화면으로 이동(재시도 불가 안내). 연령 상한은 없음(20~30대 타겟은 매칭 필터로).</p>
+</div>
+
+<div class="wf">
+  <h3>03 목적별 동의 <span class="id">AUTH-03</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">스텝 ●●○○○ (2/5 동의)</div>
+    <div class="bx bx--solid">[필수] 이용약관·개인정보 처리 — 토글</div>
+    <div class="bx">[선택] 얼굴 촬영·얼굴상 분석 — 토글 + 처리기준("분석 후 원본 삭제")</div>
+    <div class="bx">[선택] 세션 표정·시선 분석 — 토글 + "원본 영상 미저장"</div>
+    <div class="bx">[선택] 음성·대화 분석 — 토글</div>
+    <div class="bx">[선택] 리포트 근거 발언 발췌 저장 — 토글 <small class="cap">(D-20, 보관 90일)</small></div>
+    <div class="bx">[선택] 누적 성장 리포트 저장 — 토글</div>
+    <div class="bx bx--btn">동의하고 계속</div>
+  </div>
+  <p class="note">전체 동의 일괄 체크박스 <b>없음</b>(디자인 원칙). 선택 전부 꺼도 진행 가능 — 꺼진 항목은 어떤 기능이 빠지는지 행 안에 명시. 목업 ④ 참조.</p>
+</div>
+
+<div class="wf">
+  <h3>04 기본 프로필 <span class="id">PROFILE-01</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">스텝 ●●●○○ (3/5 프로필)</div>
+    <div class="bx">닉네임 · 연령대 · 키 <small class="cap">(상대 공개 그룹으로 묶어 표시)</small></div>
+    <div class="bx">지역(시·구) · 선호 대상 · 직업 <small class="cap">(내부 매칭 전용 — "상대에게 비공개" 라벨)</small></div>
+    <div class="bx">실명 · 전화번호 <small class="cap">(운영 전용 — 비공개 라벨)</small></div>
+    <div class="bx bx--btn">다음</div>
+  </div>
+  <p class="note">공개 범위 3단계를 <b>입력 그룹 자체로 분리</b>해 "누구에게 보이는가"를 입력 시점에 인지시킨다(§4.1).</p>
+</div>
+
+<div class="wf">
+  <h3>05 실시간 얼굴 촬영 <span class="id">PROFILE-02</span> <span class="tag">얼굴 동의자만</span></h3>
+  <div class="fr">
+    <div class="bx bx--media">카메라 프리뷰 (갤러리 업로드 없음)<br>얼굴 가이드라인 원형 오버레이</div>
+    <div class="bx bx--ghost">상태 안내: 밝기 부족 / 얼굴 미감지 / 다중 얼굴 / 가림 → 재촬영 유도</div>
+    <div class="row"><div class="bx bx--btn">촬영</div><div class="bx bx--btn">건너뛰기(동의 철회)</div></div>
+  </div>
+</div>
+
+<div class="wf">
+  <h3>05b 얼굴상 태그 결과 <span class="id">PROFILE-03</span></h3>
+  <div class="fr">
+    <div class="bx bx--solid">태그 칩 최대 2개 (예: 강아지상 · 순한 인상)</div>
+    <div class="bx">"강아지상은 이런 분위기예요 (예: OOO, OOO)" <small class="cap">— 텍스트만, 이미지 없음(D-09)</small></div>
+    <div class="bx">오락성 태그 고지 문구 ("객관적 사실이 아니에요")</div>
+    <div class="bx">태그 공개 여부 토글</div>
+    <div class="row"><div class="bx bx--btn">재촬영</div><div class="bx bx--btn">다음</div></div>
+  </div>
+  <p class="note">외모 점수·매력 등급 요소 <b>어떤 형태로도 금지</b>(디자인 원칙 1).</p>
+</div>
+
+<div class="wf">
+  <h3>06 설문 3종 <span class="id">SURVEY-01 · SURVEY-02 · PROFILE-05</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">스텝 ●●●●○ (4/5 설문) — 3개 탭/서브스텝</div>
+    <div class="bx">(a) 보여주고 싶은 모습 — 칩 다중 선택</div>
+    <div class="bx">(a) 원하는 상대 모습 + 선호 얼굴상 — 칩</div>
+    <div class="bx">(b) 대화 성향 진단 문항 → 주도형/균형형/반응형</div>
+    <div class="bx">(c) 이번 세션 연습 목표 — 칩 + 직접 입력</div>
+    <div class="bx bx--btn">다음</div>
+  </div>
+</div>
+
+<div class="wf">
+  <h3>07 가능 시간대 <span class="id">MATCH-02-1</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">스텝 ●●●●● (5/5 일정)</div>
+    <div class="bx bx--media">주간 그리드 (요일 × 시간대 블록 드래그 선택)</div>
+    <div class="bx bx--ghost">"시간대가 넓을수록 매칭이 빨라져요"</div>
+    <div class="bx bx--btn">완료 → 홈으로</div>
+  </div>
+  <p class="note">완료 시 <b>연습 레벨 0</b> 부여(진단 설문 없음, SURVEY-03). 홈에서 레벨 0 상태 노출.</p>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<h2>B. 홈 · 매칭</h2>
+<div class="grid">
+
+<div class="wf wf--wide">
+  <h3>08 홈 — 매칭 트랙 선택 <span class="id">MATCH-01</span></h3>
+  <div class="fr">
+    <div class="row">
+      <div class="bx bx--ghost n" style="width:150px">글로벌 내비<br>홈·성장·알림·마이</div>
+      <div class="bx bx--ghost">인사 + 연습 레벨 배지 + 이번 주 세션 예약 현황</div>
+    </div>
+    <div class="row">
+      <div class="bx bx--solid" style="min-height:110px">🧑 실사용자 화상 세션<br><small class="cap">30분 화상 + 실시간 코칭<br>[매칭 시작하기] (primary)</small></div>
+      <div class="bx bx--solid" style="min-height:110px">🤖 AI 가상 상대 (채팅)<br><small class="cap">대기 없이 즉시 · 24시간<br>[대화 시작] (secondary)</small></div>
+    </div>
+    <div class="bx">예정된 세션 카드 (있을 때): 일시 · 상대 닉네임 · [취소] <small class="cap">취소 정책 문구 동반</small></div>
+    <div class="bx bx--ghost">최근 리포트 1건 미리보기 → 16으로</div>
+  </div>
+  <p class="note">동시 진행 매칭 1개 제한(§6) — 진행 중이면 실사용자 카드가 "대기 중" 상태로 전환되고 시작 버튼 비활성.</p>
+</div>
+
+<div class="wf">
+  <h3>09 매칭 대기 · 카드 · 수락 <span class="id">MATCH-02/03/06</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">상태 1 — 대기: 스피너 + "조건에 맞는 상대를 찾고 있어요" + ◆ 지연 시: "시간대를 넓히면 빨라져요" + [대기 취소]</div>
+    <div class="bx bx--solid">상태 2 — 매칭 카드 (WebSocket match-found)</div>
+    <div class="bx">아바타(비실사) · 닉네임 · 연령대 · 키 · 얼굴상 칩</div>
+    <div class="bx">매칭 근거 2줄 (D-21 복원: "연습 목표가 같아요 · 화요일 저녁이 겹쳐요")</div>
+    <div class="bx bx--ghost">수락 제한 타이머 (카운트다운)</div>
+    <div class="row"><div class="bx bx--btn">수락</div><div class="bx bx--btn">거절</div></div>
+  </div>
+  <p class="note"><b>◆ 거절/시간초과:</b> 큐 재등록. <b>◆ 양측 수락:</b> 확정 + 알림(NOTIFY-01) + 홈 예약 카드 생성. 고충실도는 목업 ③.</p>
+</div>
+
+<div class="wf">
+  <h3>10 AI 챗봇 <span class="id">AI-DATE-01/02</span></h3>
+  <div class="fr">
+    <div class="bx">진입 시트: 단계 선택 (소개팅 전 / 후) + 페르소나 — 말투(중심) · 난이도 · 성향 · 반응 · 주제</div>
+    <div class="bx bx--media">채팅 타임라인 (좌: 봇 / 우: 나)</div>
+    <div class="bx bx--ghost">선톡 도착 배지 (12시간 무응답 1회 한정 · 야간 보류)</div>
+    <div class="bx">메시지 입력 바 + 전송</div>
+  </div>
+  <p class="note">화상 요소 없음(텍스트 전용, §7). 페르소나 변경은 대화 초기화 경고 후.</p>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<h2>C. 세션 <span class="tag tag--dark">다크 고정</span></h2>
+<div class="grid">
+
+<div class="wf">
+  <h3>11 상황형 대기방 <span class="id">ROOM-01 · ROOM-03</span> <span class="tag tag--dark">다크</span></h3>
+  <div class="fr fr--dark">
+    <div class="bx bx--ghost">장소 배경 (시간대 자동: 카페/식당/라운지) + 장소명 라벨</div>
+    <div class="bx bx--media">내 카메라 프리뷰 + 마이크 레벨 미터</div>
+    <div class="bx">체크리스트: 30분 규칙 · 코칭은 나에게만 · 동의 상태 요약(껐으면 "코칭 미제공" 표시) · 침묵 개입 정책 · 신고 방법</div>
+    <div class="bx">이번 세션 목표 확인 (PROFILE-05) + 코칭 강도 선택 (COACH-04: 흐름우선/균형/적극)</div>
+    <div class="bx bx--btn">준비 완료 (양측 완료 시 자동 입장)</div>
+  </div>
+  <p class="note"><b>◆ 기기 오류:</b> 장치 선택 드롭다운 + 재시도. 환경음(ROOM-02)은 P1 — 볼륨 슬라이더 자리만 확보.</p>
+</div>
+
+<div class="wf wf--wide">
+  <h3>12 화상 세션 <span class="id">SESSION-01/02 · COACH-01/02/04 · SILENCE-01/02</span> <span class="tag tag--dark">다크</span></h3>
+  <div class="fr fr--dark" style="min-height:340px">
+    <div class="row">
+      <div class="bx bx--ghost n" style="width:130px">타이머 24:31 ①<br><small>10·5·1분 전 색 변화</small></div>
+      <div class="bx bx--ghost">세션 목표 칩 (본인 전용)</div>
+      <div class="bx bx--ghost n" style="width:110px">네트워크 상태 ②</div>
+    </div>
+    <div class="row" style="min-height:170px">
+      <div class="bx bx--media" style="flex:3">상대 영상 (주인공 — 오버레이가 가리지 않는 영역)</div>
+      <div class="col n" style="width:180px; display:flex; flex-direction:column; gap:8px">
+        <div class="bx bx--media" style="min-height:70px">내 영상 PiP</div>
+        <div class="bx">③ 질문 카드 (침묵 30초+)<br><small class="cap">선택지 3개 · 글래스</small></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="bx n" style="flex:2">④ 코치 토스트 (좌하단 · 한 번에 1개 · 자동 소멸)<br><small class="cap">"~해 보일 수 있어요" hedge 표기</small></div>
+      <div class="bx bx--btn n" style="flex:3">⑤ 컨트롤 바: 마이크 · 카메라 · 💡도움(SILENCE-02) · 신고 · [통화 종료]</div>
+    </div>
+  </div>
+  <p class="note">① 타이머 상시 노출 ② 재연결 시도 표시 ③ 침묵 15–20초엔 작은 주제 버튼만(같은 자리) ④ 코칭은 <b>동의자에게만</b>, 전체 화면 절대 안 덮음 ⑤ 마이크/카메라 끔 = 회색(빨강 금지), 종료만 빨강. 고충실도는 목업 ①.</p>
+</div>
+
+<div class="wf">
+  <h3>13 신고 모달 <span class="id">MODERATION-01</span> <span class="tag tag--dark">다크</span></h3>
+  <div class="fr fr--dark">
+    <div class="bx">유형 선택: 성적 발언 / 욕설·비하 / 혐오·차별 / 개인정보 요구 / 외부 만남 강요 / 캡처·녹화 의심 / 노출 / 기타</div>
+    <div class="bx">상세 입력 (선택)</div>
+    <div class="row"><div class="bx bx--btn">신고만 하기</div><div class="bx bx--btn">신고 + 즉시 종료</div></div>
+    <div class="bx bx--ghost">취소</div>
+  </div>
+  <p class="note">심각 유형 선택 시 "즉시 종료" 강조. 제출 후 세션 지속 여부 분기(유저플로우 F3).</p>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<h2>D. 세션 후</h2>
+<div class="grid">
+
+<div class="wf">
+  <h3>14 상호 행동 평가 <span class="id">RESULT-01/02</span></h3>
+  <div class="fr">
+    <div class="bx bx--ghost">"세션이 끝났어요" + 상대 닉네임 (외모·조건 평가 아님 명시)</div>
+    <div class="bx">6항목 × 1~5 레이팅: 편안함 / 질문 연결성 / 경청 / 리액션 / 균형 / 매너</div>
+    <div class="bx">서술형 3칸 (선택): 잘한 행동 / 편안했던 순간 / 개선 제안</div>
+    <div class="bx bx--ghost">신고·차단 링크 (하단 소극 배치)</div>
+    <div class="bx bx--btn">제출 → 15 (연장 의사)로</div>
+  </div>
+  <p class="note"><b>상호성 게이트:</b> 미제출 상태로 리포트(16) 진입 시 '상대 평가' 영역 잠금 + "평가를 제출하면 열려요" 안내.</p>
+</div>
+
+<div class="wf">
+  <h3>15 5분 연장 · 연락처 공개 <span class="id">CONTACT-01/02</span></h3>
+  <div class="fr">
+    <div class="bx bx--solid">모달 1 — "5분 더 이야기할까요?" [좋아요 / 괜찮아요]</div>
+    <div class="bx bx--ghost">◆ 양측 승인 → 5분 화상 연장(12 레이아웃 재사용, 타이머 5:00)</div>
+    <div class="bx bx--solid">모달 2 — 연락처 공개 동의 (인스타 / 카톡 ID 선택 입력)</div>
+    <div class="bx">◆ 양측 동의 → 공개 카드: "상대가 인스타를 공개했어요: @xxx" (1회성, D-17)</div>
+    <div class="bx bx--ghost">◆ 한쪽 거절 → 아무 것도 표시하지 않고 리포트로 (거절 사실 비노출)</div>
+  </div>
+</div>
+
+<div class="wf wf--wide">
+  <h3>16 AI 세션 리포트 <span class="id">REPORT-01/01-1/02/04</span></h3>
+  <div class="fr">
+    <div class="row">
+      <div class="bx bx--media n" style="flex:2">레이더 차트 6축<br>AI 분석(브랜드 블루) vs 상대 평가(그린)<br><small class="cap">상대 평가 잠금 상태 지원(게이트)</small></div>
+      <div class="bx n" style="flex:3">핵심 요약 (REPORT-04)<br>잘한 점 3 · 개선점 2 · 상대 긍정 행동 · AI/상대 견해차 · 다음 미션 1~3</div>
+    </div>
+    <div class="bx">이슈 카드 목록 (REPORT-01-1): [유형 · 타임스탬프] 맥락 요약 → 근거 발언 3~4문장(발췌 동의자만) → 대체 제안<br><small class="cap">◆ 이슈 0건: "주의 표현이 없었어요" + 행동 지표 개선점으로 대체(D-14)</small></div>
+    <div class="bx">행동 근거 지표 (REPORT-02): 발화 비율 · 시선 유지 · 미소 · 침묵 · 말 끊기 위치 · 필러워드(사후 전용)</div>
+    <div class="bx bx--ghost">P1 자리: 주의 표현 목록(REPORT-05) · 주제 시각화(TOPIC-01)</div>
+    <div class="bx bx--btn">성장 대시보드에서 보기</div>
+  </div>
+  <p class="note">점수 숫자 단독 노출 금지 — 반드시 근거 문장 동반(디자인 원칙 1). 고충실도는 목업 ②.</p>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<h2>E. 마이 · 공통</h2>
+<div class="grid">
+
+<div class="wf wf--wide">
+  <h3>17 성장 대시보드 <span class="id">GROWTH-01 · SURVEY-03</span></h3>
+  <div class="fr">
+    <div class="row">
+      <div class="bx n" style="flex:1">연습 레벨 카드<br><small class="cap">"성장 지표예요 — 우열이 아니에요" · 레벨 변화 사유(최근 세션·패널티)</small></div>
+      <div class="bx n" style="flex:2">이번 주 요약: 완료 세션 수 · 다음 예약 · 최근 목표 달성</div>
+    </div>
+    <div class="bx bx--solid">세션 히스토리 리스트 (GROWTH-01 · P0): 날짜 · 상대 유형(실사용자/AI) · 목표 · 결과 → 각 행 클릭 시 리포트(16)</div>
+    <div class="bx bx--ghost">P1 자리: 누적 그래프(GROWTH-02) · 키워드(GROWTH-03) · 뱃지(GROWTH-04)</div>
+  </div>
+  <p class="note">고충실도는 목업 ⑤. 레벨 정확 수치는 <b>본인에게만</b> — 상대 화면 어디에도 렌더링하지 않는다.</p>
+</div>
+
+<div class="wf">
+  <h3>18 알림 목록 <span class="id">NOTIFY-01</span></h3>
+  <div class="fr">
+    <div class="bx">매칭 성립 (수락 CTA + 취소 가능 기간)</div>
+    <div class="bx">세션 리마인드 2h/1h/10m · 상대 취소(대체 매칭/챗봇 CTA)</div>
+    <div class="bx">리포트 생성 완료 · 연락처 공개 완료 · 챗봇 선톡</div>
+    <div class="bx bx--ghost">읽음 처리 · 전체 삭제</div>
+  </div>
+</div>
+
+<div class="wf">
+  <h3>19 마이페이지 <span class="id">AUTH-03 철회 · MODERATION-02</span></h3>
+  <div class="fr">
+    <div class="bx">프로필 수정 (공개 범위 라벨 유지) · 가능 시간대 수정</div>
+    <div class="bx bx--solid">동의 관리: 03 화면 재사용 — 철회 시 "신규 분석 중단" 즉시 반영 + 기존 분석 데이터 삭제 요청 버튼</div>
+    <div class="bx">차단 목록 (해제 가능) · 노쇼/패널티 현황 (6개월 소멸 시점 표시)</div>
+    <div class="bx bx--ghost">로그아웃 · 계정 탈퇴 (확인 모달 2단계)</div>
+  </div>
+</div>
+
+</div>
+
+<p class="meta" style="margin-top:48px">— 끝. P1 화면(관리자, 세션 미션, 뱃지 상세 등)은 4주차 백로그에서 별도 와이어프레임으로 추가한다.</p>
+</body>
+</html>

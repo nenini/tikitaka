@@ -1,0 +1,82 @@
+/* ==========================================================================
+   BloomTalk — 목업 스켈레톤(틀) 공용 스타일
+   각 화면 목업은 "실제 디자인"이 아니라 배치·정보구조만 보여주는 로파이 틀.
+   색/타이포는 design-system/tokens.css 를 참조한다(경로는 각 파일에서 link).
+   데스크탑(d-*) / 폰(p-*) 두 가지 디바이스 프레임을 제공한다.
+   ※ 이 목업들은 와이어플로우에서 0.25배로 축소 삽입되므로, 글자를 크게 잡는다.
+   ========================================================================== */
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--bt-font-sans);
+  color:var(--bt-color-text);
+  background:var(--bt-color-surface-sunken);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- 스켈레톤 원자(placeholder) ---------------------------------------- */
+:root{
+  --sk-bar:#d8dae0;          /* 텍스트 라인 자리 */
+  --sk-bar-strong:#b4b7c0;
+  --sk-box:#e8e9ec;          /* 블록 자리 */
+  --sk-box-line:#d8dae0;
+}
+.sk-line{height:14px;border-radius:999px;background:var(--sk-bar);}
+.sk-line.strong{background:var(--sk-bar-strong)}
+.sk-line.w90{width:90%}.sk-line.w80{width:80%}.sk-line.w70{width:70%}
+.sk-line.w60{width:60%}.sk-line.w50{width:50%}.sk-line.w40{width:40%}
+.sk-line.w30{width:30%}.sk-line.w25{width:25%}.sk-line.tall{height:20px}
+.sk-box{background:var(--sk-box);border:1px dashed var(--sk-box-line);border-radius:14px;}
+.sk-circle{border-radius:50%;background:var(--sk-box);border:1px dashed var(--sk-box-line);flex:none}
+.sk-chip{height:34px;border-radius:999px;background:var(--sk-box);border:1px solid var(--sk-box-line);
+         display:inline-flex;align-items:center;padding:0 18px;font-size:20px;color:var(--bt-color-text-secondary)}
+.sk-btn{height:56px;border-radius:16px;background:var(--bt-color-action);color:#fff;
+        display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.sk-btn.ghost{background:transparent;border:2px solid var(--bt-color-border-strong);color:var(--bt-color-text-secondary)}
+.sk-card{background:var(--bt-color-surface);border:1px solid var(--bt-color-border);
+         border-radius:20px;padding:22px;box-shadow:var(--bt-shadow-sm)}
+
+/* 화면 이름 태그(축소해도 읽히게 크게) */
+.sk-title{font-size:38px;font-weight:800;letter-spacing:-.02em;color:var(--bt-color-text);margin:0}
+.sk-sub{font-size:22px;color:var(--bt-color-text-secondary);margin:10px 0 0;line-height:1.4}
+.sk-id{display:inline-block;font-size:20px;font-weight:800;color:var(--bt-color-action);
+       background:var(--bt-color-action-subtle);padding:4px 14px;border-radius:999px;margin-bottom:14px}
+.sk-fill{background:linear-gradient(150deg,var(--bt-color-brand-subtle),var(--bt-color-action-subtle));
+         border:1px solid var(--bt-color-border);border-radius:18px;
+         display:flex;align-items:center;justify-content:center;color:var(--bt-color-action);
+         font-size:24px;font-weight:700;text-align:center}
+.stack{display:flex;flex-direction:column}
+.row{display:flex}
+.gap-2{gap:8px}.gap-3{gap:12px}.gap-4{gap:16px}.gap-6{gap:24px}
+.grow{flex:1}.center{align-items:center}.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+
+/* ======================= 데스크탑 프레임 ================================= */
+.d-frame{width:1280px;height:800px;background:var(--bt-color-bg);display:flex;flex-direction:column;overflow:hidden}
+.d-topbar{height:72px;flex:none;background:var(--bt-color-surface);border-bottom:1px solid var(--bt-color-border);
+          display:flex;align-items:center;gap:20px;padding:0 40px}
+.d-logo{font-size:26px;font-weight:800;color:var(--bt-color-action);letter-spacing:-.02em}
+.d-nav{display:flex;gap:10px;margin-left:24px}
+.d-nav .sk-chip{height:40px;font-size:19px}
+.d-topbar .sk-circle{width:44px;height:44px;margin-left:auto}
+.d-body{flex:1;padding:40px;overflow:hidden;display:flex;flex-direction:column;gap:24px}
+.d-hd{display:flex;flex-direction:column;gap:2px}
+
+/* ======================= 폰(앱뷰) 프레임 ================================ */
+.p-frame{width:375px;height:812px;background:var(--bt-color-bg);display:flex;flex-direction:column;
+         overflow:hidden;position:relative}
+.p-notch{height:44px;flex:none;display:flex;align-items:center;justify-content:center}
+.p-notch::after{content:"";width:130px;height:22px;background:#101216;border-radius:999px}
+.p-topbar{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px;
+          border-bottom:1px solid var(--bt-color-border);background:var(--bt-color-surface)}
+.p-topbar .sk-title{font-size:26px}
+.p-body{flex:1;padding:20px;overflow:hidden;display:flex;flex-direction:column;gap:16px}
+.p-tabbar{height:72px;flex:none;background:var(--bt-color-surface);border-top:1px solid var(--bt-color-border);
+          display:flex;align-items:center;justify-content:space-around;padding:0 8px}
+.p-tab{display:flex;flex-direction:column;align-items:center;gap:6px}
+.p-tab .sk-circle{width:30px;height:30px}
+.p-tab .sk-line{width:34px;height:8px}
+
+/* 다크 고정(화상 세션·대기방) */
+.is-dark{--sk-bar:#3a3d46;--sk-bar-strong:#4a4e58;--sk-box:#23262e;--sk-box-line:#3a3d46}
