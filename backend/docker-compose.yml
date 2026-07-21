@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-date}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false"
       DB_USERNAME: ${MYSQL_USER:-date}
       DB_PASSWORD: ${MYSQL_PASSWORD:-date}
