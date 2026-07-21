@@ -138,6 +138,8 @@ const gazeAwayStartedSchema = behaviorEventSchema(
     rollDelta: nullableFiniteNumberSchema,
     centerDeltaX: nullableFiniteNumberSchema,
     centerDeltaY: nullableFiniteNumberSchema,
+    gazeHorizontalDelta: nullableFiniteNumberSchema.optional(),
+    gazeVerticalDelta: nullableFiniteNumberSchema.optional(),
   },
 );
 
@@ -157,6 +159,8 @@ const prolongedGazeAwaySchema = behaviorEventSchema(
     activeDurationMs: nonNegativeFiniteNumberSchema,
     yawDelta: nullableFiniteNumberSchema,
     pitchDelta: nullableFiniteNumberSchema,
+    gazeHorizontalDelta: nullableFiniteNumberSchema.optional(),
+    gazeVerticalDelta: nullableFiniteNumberSchema.optional(),
   },
 );
 
@@ -213,6 +217,27 @@ const lowExpressionActivityEndedSchema = behaviorEventSchema(
   },
 );
 
+const stiffExpressionStartedSchema = behaviorEventSchema(
+  "STIFF_EXPRESSION_STARTED",
+  "EXPRESSION_ACTIVITY_DETECTOR",
+  {
+    ...startedPayloadShape,
+    activityScore: unitScoreSchema,
+    baselineActivityScore: unitScoreSchema.nullable(),
+    windowMs: z.number().positive(),
+  },
+);
+
+const stiffExpressionEndedSchema = behaviorEventSchema(
+  "STIFF_EXPRESSION_ENDED",
+  "EXPRESSION_ACTIVITY_DETECTOR",
+  {
+    ...endedPayloadShape,
+    activityScore: unitScoreSchema,
+    terminationReason: z.enum(EPISODE_TERMINATION_REASONS),
+  },
+);
+
 export const visionBehaviorEventSchema = z.discriminatedUnion("eventType", [
   faceMissingStartedSchema,
   faceMissingEndedSchema,
@@ -231,6 +256,8 @@ export const visionBehaviorEventSchema = z.discriminatedUnion("eventType", [
   nodEventSchema,
   lowExpressionActivityStartedSchema,
   lowExpressionActivityEndedSchema,
+  stiffExpressionStartedSchema,
+  stiffExpressionEndedSchema,
 ]);
 
 export const visionMetricSnapshotSchema = eventEnvelopeSchema
@@ -259,6 +286,10 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
             yawDelta: nullableFiniteNumberSchema,
             pitchDelta: nullableFiniteNumberSchema,
             rollDelta: nullableFiniteNumberSchema,
+            eyeGazeScore: unitScoreSchema.nullable().optional(),
+            gazeHorizontalDelta: nullableFiniteNumberSchema.optional(),
+            gazeVerticalDelta: nullableFiniteNumberSchema.optional(),
+            stiffExpressionActive: z.boolean().optional(),
           })
           .strict(),
         performance: z
@@ -296,4 +327,3 @@ export const visionEventSchema = z.union([
   visionBehaviorEventSchema,
   visionMetricSnapshotSchema,
 ]);
-

@@ -8,6 +8,8 @@ import type {
   NormalizedFaceBox,
   NormalizedFaceFrame,
   NormalizedFaceGeometry,
+  NormalizedEyeGaze,
+  NormalizedEyePosition,
   PerformanceProfile,
 } from "./NormalizedFaceFrame.js";
 
@@ -16,6 +18,22 @@ const UPPER_LIP_CENTER_INDEX = 13;
 const CHIN_INDEX = 152;
 const MOUTH_CORNER_LEFT_INDEX = 61;
 const MOUTH_CORNER_RIGHT_INDEX = 291;
+
+// Indices follow MediaPipe's official Face Landmarker eye/iris connections.
+const LEFT_EYE = {
+  cornerStart: 362,
+  cornerEnd: 263,
+  upperLid: 386,
+  lowerLid: 374,
+  irisRing: [474, 475, 476, 477],
+} as const;
+const RIGHT_EYE = {
+  cornerStart: 33,
+  cornerEnd: 133,
+  upperLid: 159,
+  lowerLid: 145,
+  irisRing: [469, 470, 471, 472],
+} as const;
 
 export interface FaceFrameNormalizationInput {
   readonly frameId: number;
@@ -36,6 +54,113 @@ export interface FaceFrameNormalizationInput {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+interface EyeLandmarkDefinition {
+  readonly cornerStart: number;
+  readonly cornerEnd: number;
+  readonly upperLid: number;
+  readonly lowerLid: number;
+  readonly irisRing: readonly number[];
+}
+
+function projectRatio(
+  point: FaceLandmarkPoint,
+  start: FaceLandmarkPoint,
+  end: FaceLandmarkPoint,
+): number | null {
+  const axisX = end.x - start.x;
+  const axisY = end.y - start.y;
+  const squaredLength = axisX * axisX + axisY * axisY;
+  if (squaredLength <= Number.EPSILON) return null;
+  return clamp(
+    ((point.x - start.x) * axisX + (point.y - start.y) * axisY) /
+      squaredLength,
+    0,
+    1,
+  );
+}
+
+function computeEyePosition(
+  landmarks: readonly FaceLandmarkPoint[],
+  definition: EyeLandmarkDefinition,
+): NormalizedEyePosition | null {
+  const cornerStart = landmarks[definition.cornerStart];
+  const cornerEnd = landmarks[definition.cornerEnd];
+  const upperLid = landmarks[definition.upperLid];
+  const lowerLid = landmarks[definition.lowerLid];
+  const irisPoints = definition.irisRing.map((index) => landmarks[index]);
+  if (
+    cornerStart === undefined ||
+    cornerEnd === undefined ||
+    upperLid === undefined ||
+    lowerLid === undefined ||
+    irisPoints.some((point) => point === undefined)
+  ) {
+    return null;
+  }
+
+  const definedIrisPoints = irisPoints.filter(
+    (point): point is FaceLandmarkPoint => point !== undefined,
+  );
+  const irisCenter: FaceLandmarkPoint = {
+    x:
+      definedIrisPoints.reduce((sum, point) => sum + point.x, 0) /
+      definedIrisPoints.length,
+    y:
+      definedIrisPoints.reduce((sum, point) => sum + point.y, 0) /
+      definedIrisPoints.length,
+    z:
+      definedIrisPoints.reduce((sum, point) => sum + point.z, 0) /
+      definedIrisPoints.length,
+  };
+  const horizontalRatio = projectRatio(irisCenter, cornerStart, cornerEnd);
+  const verticalRatio = projectRatio(irisCenter, upperLid, lowerLid);
+  if (horizontalRatio === null || verticalRatio === null) return null;
+  return { horizontalRatio, verticalRatio };
+}
+
+/**
+ * Normalizes iris position inside each eye. This is an attention proxy only:
+ * MediaPipe iris tracking does not infer the actual point a person is viewing.
+ */
+export function computeNormalizedEyeGaze(
+  landmarks: readonly FaceLandmarkPoint[],
+): NormalizedEyeGaze {
+  const left = computeEyePosition(landmarks, LEFT_EYE);
+  const right = computeEyePosition(landmarks, RIGHT_EYE);
+  const available = [left, right].filter(
+    (eye): eye is NormalizedEyePosition => eye !== null,
+  );
+  const horizontalRatio =
+    available.length === 0
+      ? null
+      : available.reduce((sum, eye) => sum + eye.horizontalRatio, 0) /
+        available.length;
+  const verticalRatio =
+    available.length === 0
+      ? null
+      : available.reduce((sum, eye) => sum + eye.verticalRatio, 0) /
+        available.length;
+  const binocularAgreementScore =
+    left === null || right === null
+      ? null
+      : clamp(
+          1 -
+            Math.max(
+              Math.abs(left.horizontalRatio - right.horizontalRatio),
+              Math.abs(left.verticalRatio - right.verticalRatio),
+            ),
+          0,
+          1,
+        );
+  return {
+    left,
+    right,
+    horizontalRatio,
+    verticalRatio,
+    binocularAgreementScore,
+  };
 }
 
 /** Computes a normalized bounding box without exposing landmark arrays. */
@@ -126,6 +251,7 @@ export class FaceFrameNormalizer {
 
     const pose = estimateHeadPose(primary.transformationMatrix);
     const geometry = this.computeGeometry(primary.landmarks, box);
+    const eyeGaze = computeNormalizedEyeGaze(primary.landmarks);
 
     // Displacement across multiple faces is not identity-stable, so it is reset.
     this.previousLandmarks =
@@ -140,6 +266,7 @@ export class FaceFrameNormalizer {
       roll: pose?.roll ?? null,
       blendshapes: primary.blendshapes,
       geometry,
+      eyeGaze,
     });
   }
 

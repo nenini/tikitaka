@@ -49,7 +49,10 @@ function terminationReason(
   return "ANALYSIS_UNAVAILABLE";
 }
 
-/** Detects sustained low observable motion, not a facial expression or emotion. */
+/**
+ * Detects sustained low observable facial motion as a conservative
+ * stiff-expression proxy; it does not infer emotion, tension, or interest.
+ */
 export class ExpressionActivityDetector
   implements
     VisionDetector<NormalizedFaceFrame, ExpressionActivityDetectorState>
@@ -160,7 +163,7 @@ export class ExpressionActivityDetector
         this.transition("ACTIVE", now);
         events.push(
           this.eventFactory.createBehaviorEvent(
-            "LOW_EXPRESSION_ACTIVITY_STARTED",
+            "STIFF_EXPRESSION_STARTED",
             {
               confidence: this.config.defaultEventConfidence,
               episodeId: this.episodeId,
@@ -256,7 +259,7 @@ export class ExpressionActivityDetector
     // have to infer pairing from timestamps.
     const start = this.activeSinceMs ?? now;
     const event = this.eventFactory.createBehaviorEvent(
-      "LOW_EXPRESSION_ACTIVITY_ENDED",
+      "STIFF_EXPRESSION_ENDED",
       {
         confidence: this.config.defaultEventConfidence,
         episodeId: this.episodeId,

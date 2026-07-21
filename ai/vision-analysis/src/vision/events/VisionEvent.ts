@@ -21,6 +21,8 @@ export const VISION_BEHAVIOR_EVENT_TYPES = [
   "NOD_EVENT",
   "LOW_EXPRESSION_ACTIVITY_STARTED",
   "LOW_EXPRESSION_ACTIVITY_ENDED",
+  "STIFF_EXPRESSION_STARTED",
+  "STIFF_EXPRESSION_ENDED",
 ] as const;
 
 export type VisionBehaviorEventType =
@@ -86,6 +88,8 @@ export interface VisionBehaviorPayloadMap {
     readonly rollDelta: number | null;
     readonly centerDeltaX: number | null;
     readonly centerDeltaY: number | null;
+    readonly gazeHorizontalDelta?: number | null;
+    readonly gazeVerticalDelta?: number | null;
   };
   readonly GAZE_AWAY_ENDED: EndedPayload & {
     readonly terminationReason: EpisodeTerminationReason;
@@ -94,6 +98,8 @@ export interface VisionBehaviorPayloadMap {
     readonly activeDurationMs: number;
     readonly yawDelta: number | null;
     readonly pitchDelta: number | null;
+    readonly gazeHorizontalDelta?: number | null;
+    readonly gazeVerticalDelta?: number | null;
   };
   readonly SMILE_STARTED: StartedPayload & {
     readonly smileScore: number;
@@ -116,6 +122,15 @@ export interface VisionBehaviorPayloadMap {
     readonly windowMs: number;
   };
   readonly LOW_EXPRESSION_ACTIVITY_ENDED: EndedPayload & {
+    readonly activityScore: number;
+    readonly terminationReason: EpisodeTerminationReason;
+  };
+  readonly STIFF_EXPRESSION_STARTED: StartedPayload & {
+    readonly activityScore: number;
+    readonly baselineActivityScore: number | null;
+    readonly windowMs: number;
+  };
+  readonly STIFF_EXPRESSION_ENDED: EndedPayload & {
     readonly activityScore: number;
     readonly terminationReason: EpisodeTerminationReason;
   };
@@ -167,6 +182,10 @@ export interface VisionMetricSnapshotPayload {
     readonly yawDelta: number | null;
     readonly pitchDelta: number | null;
     readonly rollDelta: number | null;
+    readonly eyeGazeScore?: number | null;
+    readonly gazeHorizontalDelta?: number | null;
+    readonly gazeVerticalDelta?: number | null;
+    readonly stiffExpressionActive?: boolean;
   };
   readonly performance: {
     readonly profile: PerformanceProfile;
@@ -183,4 +202,3 @@ export type VisionMetricSnapshot = VisionEventEnvelope<"VISION_METRIC_SNAPSHOT">
 };
 
 export type VisionEvent = VisionBehaviorEvent | VisionMetricSnapshot;
-

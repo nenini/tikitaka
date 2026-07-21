@@ -22,6 +22,8 @@ interface BaselineSample {
   readonly faceAreaRatio: number;
   readonly faceCenterX: number;
   readonly faceCenterY: number;
+  readonly eyeGazeHorizontalRatio: number | null;
+  readonly eyeGazeVerticalRatio: number | null;
   readonly blendshapes: Readonly<Record<string, number>>;
 }
 
@@ -62,6 +64,8 @@ function emptyBaseline(status: VisionBaseline["status"] = "NOT_STARTED"): Vision
     faceAreaRatio: 0.15,
     faceCenterX: 0.5,
     faceCenterY: 0.5,
+    eyeGazeHorizontalRatio: 0.5,
+    eyeGazeVerticalRatio: 0.5,
     mouthSmileLeft: 0,
     mouthSmileRight: 0,
     blendshapeMeans: {},
@@ -92,6 +96,7 @@ export class BaselineCalibrator {
   constructor(
     private readonly config: VisionConfig["calibration"],
     private readonly activityConfig: VisionConfig["expressionActivity"],
+    private readonly attentionConfig: VisionConfig["screenAttention"],
   ) {}
 
   update(frame: NormalizedFaceFrame, quality: FaceQualityDecision): BaselineCalibrationState {
@@ -144,6 +149,7 @@ export class BaselineCalibrator {
         ...this.activityConfig.blendshapeNames,
       ]);
       for (const name of names) selected[name] = face.blendshapes[name] ?? 0;
+      const eyeGazeUsable = this.isEyeGazeUsable(face);
       this.samples.push({
         timestampMs: frame.sessionElapsedMs,
         yaw: face.yaw,
@@ -152,6 +158,12 @@ export class BaselineCalibrator {
         faceAreaRatio: face.box.areaRatio,
         faceCenterX: face.box.centerX,
         faceCenterY: face.box.centerY,
+        eyeGazeHorizontalRatio: eyeGazeUsable
+          ? face.eyeGaze.horizontalRatio
+          : null,
+        eyeGazeVerticalRatio: eyeGazeUsable
+          ? face.eyeGaze.verticalRatio
+          : null,
         blendshapes: selected,
       });
     } else {
@@ -231,6 +243,12 @@ export class BaselineCalibrator {
       faceAreaRatio: median(this.samples.map((sample) => sample.faceAreaRatio)),
       faceCenterX: median(this.samples.map((sample) => sample.faceCenterX)),
       faceCenterY: median(this.samples.map((sample) => sample.faceCenterY)),
+      eyeGazeHorizontalRatio: this.medianNullable(
+        this.samples.map((sample) => sample.eyeGazeHorizontalRatio),
+      ),
+      eyeGazeVerticalRatio: this.medianNullable(
+        this.samples.map((sample) => sample.eyeGazeVerticalRatio),
+      ),
       mouthSmileLeft: means["mouthSmileLeft"] ?? 0,
       mouthSmileRight: means["mouthSmileRight"] ?? 0,
       blendshapeMeans: means,
@@ -260,6 +278,27 @@ export class BaselineCalibrator {
     }
     this.previousActivityFace = face;
     this.lastActivityAtMs = timestampMs;
+  }
+
+  private isEyeGazeUsable(face: NormalizedPrimaryFace): boolean {
+    const gaze = face.eyeGaze;
+    const maximumBlink = Math.max(
+      face.blendshapes["eyeBlinkLeft"] ?? 0,
+      face.blendshapes["eyeBlinkRight"] ?? 0,
+    );
+    return (
+      gaze.horizontalRatio !== null &&
+      gaze.verticalRatio !== null &&
+      gaze.binocularAgreementScore !== null &&
+      gaze.binocularAgreementScore >=
+        this.attentionConfig.minimumBinocularAgreementScore &&
+      maximumBlink <= this.attentionConfig.maximumEyeBlinkScore
+    );
+  }
+
+  private medianNullable(values: readonly (number | null)[]): number | null {
+    const available = values.filter((value): value is number => value !== null);
+    return available.length === 0 ? null : median(available);
   }
 
   private refreshActivityBaseline(): void {

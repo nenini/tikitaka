@@ -17,10 +17,11 @@ export interface VisionBaseline {
   readonly faceAreaRatio: number;
   readonly faceCenterX: number;
   readonly faceCenterY: number;
+  readonly eyeGazeHorizontalRatio: number | null;
+  readonly eyeGazeVerticalRatio: number | null;
   readonly mouthSmileLeft: number;
   readonly mouthSmileRight: number;
   readonly blendshapeMeans: Readonly<Record<string, number>>;
   readonly blendshapeMedianAbsoluteDeviations: Readonly<Record<string, number>>;
   readonly expressionActivityScore: number | null;
 }
-

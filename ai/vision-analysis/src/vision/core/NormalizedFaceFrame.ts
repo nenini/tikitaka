@@ -19,6 +19,22 @@ export interface NormalizedFaceGeometry {
   readonly landmarkDisplacementScore: number | null;
 }
 
+export interface NormalizedEyePosition {
+  /** Iris position from the image-left eye corner (0) to image-right (1). */
+  readonly horizontalRatio: number;
+  /** Iris position from the upper eyelid (0) to the lower eyelid (1). */
+  readonly verticalRatio: number;
+}
+
+/** Privacy-safe iris summaries; no raw eye landmarks leave the normalizer. */
+export interface NormalizedEyeGaze {
+  readonly left: NormalizedEyePosition | null;
+  readonly right: NormalizedEyePosition | null;
+  readonly horizontalRatio: number | null;
+  readonly verticalRatio: number | null;
+  readonly binocularAgreementScore: number | null;
+}
+
 export interface NormalizedPrimaryFace {
   readonly box: NormalizedFaceBox;
   readonly yaw: number | null;
@@ -26,6 +42,7 @@ export interface NormalizedPrimaryFace {
   readonly roll: number | null;
   readonly blendshapes: Readonly<Record<string, number>>;
   readonly geometry: NormalizedFaceGeometry;
+  readonly eyeGaze: NormalizedEyeGaze;
 }
 
 export interface NormalizedFaceFrame {

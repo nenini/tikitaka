@@ -188,6 +188,12 @@ export const visionConfigSchema = z
         centerXRecoveryDelta: unitScoreSchema,
         centerYEntryDelta: unitScoreSchema,
         centerYRecoveryDelta: unitScoreSchema,
+        gazeHorizontalEntryDelta: unitScoreSchema,
+        gazeHorizontalRecoveryDelta: unitScoreSchema,
+        gazeVerticalEntryDelta: unitScoreSchema,
+        gazeVerticalRecoveryDelta: unitScoreSchema,
+        maximumEyeBlinkScore: unitScoreSchema,
+        minimumBinocularAgreementScore: unitScoreSchema,
         awayMinimumDurationMs: z.number().int().positive(),
         recoveryMinimumDurationMs: z.number().int().positive(),
         prolongedDurationMs: z.number().int().positive(),
@@ -202,6 +208,8 @@ export const visionConfigSchema = z
           [attention.pitchEntryDegrees, attention.pitchRecoveryDegrees, "pitchRecoveryDegrees"],
           [attention.centerXEntryDelta, attention.centerXRecoveryDelta, "centerXRecoveryDelta"],
           [attention.centerYEntryDelta, attention.centerYRecoveryDelta, "centerYRecoveryDelta"],
+          [attention.gazeHorizontalEntryDelta, attention.gazeHorizontalRecoveryDelta, "gazeHorizontalRecoveryDelta"],
+          [attention.gazeVerticalEntryDelta, attention.gazeVerticalRecoveryDelta, "gazeVerticalRecoveryDelta"],
         ];
 
         for (const [entry, recovery, path] of comparisons) {

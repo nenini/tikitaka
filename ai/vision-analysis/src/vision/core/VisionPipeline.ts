@@ -105,6 +105,7 @@ export class VisionPipeline {
     this.calibrator = new BaselineCalibrator(
       config.calibration,
       config.expressionActivity,
+      config.screenAttention,
     );
     this.screenAttention =
       options.detectorOverrides?.screenAttention ??
@@ -396,6 +397,18 @@ export class VisionPipeline {
           "smoothedPitchDelta",
         ),
         rollDelta: this.readNullableNumber(screenState, "rollDelta"),
+        eyeGazeScore: this.readNullableNumber(screenState, "eyeGazeScore"),
+        gazeHorizontalDelta: this.readNullableNumber(
+          screenState,
+          "smoothedGazeHorizontalDelta",
+        ),
+        gazeVerticalDelta: this.readNullableNumber(
+          screenState,
+          "smoothedGazeVerticalDelta",
+        ),
+        stiffExpressionActive: ["ACTIVE", "RECOVERING"].includes(
+          this.readString(activityState, "state") ?? "",
+        ),
       },
       performance: {
         profile: frame.processing.performanceProfile,
@@ -425,5 +438,10 @@ export class VisionPipeline {
     // degrade to null instead of breaking the entire snapshot.
     const value = Reflect.get(state, key);
     return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  private readString(state: object, key: string): string | null {
+    const value = Reflect.get(state, key);
+    return typeof value === "string" ? value : null;
   }
 }

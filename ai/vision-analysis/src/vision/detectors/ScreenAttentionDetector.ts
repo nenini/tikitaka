@@ -17,6 +17,11 @@ export interface ScreenAttentionDetectorState {
   readonly rollDelta: number | null;
   readonly centerDeltaX: number | null;
   readonly centerDeltaY: number | null;
+  readonly rawGazeHorizontalDelta: number | null;
+  readonly rawGazeVerticalDelta: number | null;
+  readonly smoothedGazeHorizontalDelta: number | null;
+  readonly smoothedGazeVerticalDelta: number | null;
+  readonly eyeGazeScore: number | null;
   readonly screenFacingScore: number | null;
   readonly stateSinceMs: number | null;
   readonly activeSinceMs: number | null;
@@ -29,7 +34,10 @@ function terminationReason(reason: DetectorSuspensionContext["reason"]): Episode
   return "ANALYSIS_UNAVAILABLE";
 }
 
-/** Detects sustained screen/camera-direction departure; it does not claim eye contact. */
+/**
+ * Detects sustained screen-facing departure using head, face-center, and iris
+ * proxies. It does not claim the exact point or person being viewed.
+ */
 export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFrame, ScreenAttentionDetectorState> {
   readonly name = "ScreenAttentionDetector";
   private state: ScreenAttentionStateName = "WAITING_FOR_BASELINE";
@@ -40,11 +48,15 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
   private cooldownUntilMs = 0;
   private readonly yawFilter: EmaFilter;
   private readonly pitchFilter: EmaFilter;
+  private readonly gazeHorizontalFilter: EmaFilter;
+  private readonly gazeVerticalFilter: EmaFilter;
   private snapshot: ScreenAttentionDetectorState = this.emptyState();
 
   constructor(private readonly config: VisionConfig["screenAttention"], private readonly eventFactory: VisionEventFactory) {
     this.yawFilter = new EmaFilter(config.emaAlpha);
     this.pitchFilter = new EmaFilter(config.emaAlpha);
+    this.gazeHorizontalFilter = new EmaFilter(config.emaAlpha);
+    this.gazeVerticalFilter = new EmaFilter(config.emaAlpha);
   }
 
   update(frame: NormalizedFaceFrame, context: VisionDetectorContext): readonly VisionBehaviorEvent[] {
@@ -65,12 +77,52 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
     const roll = face.roll === null ? null : face.roll - baseline.roll;
     const centerX = face.box.centerX - baseline.faceCenterX;
     const centerY = face.box.centerY - baseline.faceCenterY;
+    const maximumBlink = Math.max(
+      face.blendshapes["eyeBlinkLeft"] ?? 0,
+      face.blendshapes["eyeBlinkRight"] ?? 0,
+    );
+    const gazeReliable =
+      face.eyeGaze.horizontalRatio !== null &&
+      face.eyeGaze.verticalRatio !== null &&
+      face.eyeGaze.binocularAgreementScore !== null &&
+      face.eyeGaze.binocularAgreementScore >=
+        this.config.minimumBinocularAgreementScore &&
+      maximumBlink <= this.config.maximumEyeBlinkScore;
+    // Blinked or mutually inconsistent eyes are excluded instead of being
+    // interpreted as looking away.
+    const rawGazeHorizontal =
+      gazeReliable && baseline.eyeGazeHorizontalRatio !== null
+        ? (face.eyeGaze.horizontalRatio ?? 0) -
+          baseline.eyeGazeHorizontalRatio
+        : null;
+    const rawGazeVertical =
+      gazeReliable && baseline.eyeGazeVerticalRatio !== null
+        ? (face.eyeGaze.verticalRatio ?? 0) - baseline.eyeGazeVerticalRatio
+        : null;
+    const gazeHorizontal =
+      rawGazeHorizontal === null
+        ? null
+        : this.gazeHorizontalFilter.update(rawGazeHorizontal);
+    const gazeVertical =
+      rawGazeVertical === null
+        ? null
+        : this.gazeVerticalFilter.update(rawGazeVertical);
     const entry = (yaw !== null && Math.abs(yaw) > this.config.yawEntryDegrees) ||
       (pitch !== null && Math.abs(pitch) > this.config.pitchEntryDegrees) ||
-      Math.abs(centerX) > this.config.centerXEntryDelta || Math.abs(centerY) > this.config.centerYEntryDelta;
+      Math.abs(centerX) > this.config.centerXEntryDelta ||
+      Math.abs(centerY) > this.config.centerYEntryDelta ||
+      (gazeHorizontal !== null &&
+        Math.abs(gazeHorizontal) > this.config.gazeHorizontalEntryDelta) ||
+      (gazeVertical !== null &&
+        Math.abs(gazeVertical) > this.config.gazeVerticalEntryDelta);
     const recovered = (yaw === null || Math.abs(yaw) < this.config.yawRecoveryDegrees) &&
       (pitch === null || Math.abs(pitch) < this.config.pitchRecoveryDegrees) &&
-      Math.abs(centerX) < this.config.centerXRecoveryDelta && Math.abs(centerY) < this.config.centerYRecoveryDelta;
+      Math.abs(centerX) < this.config.centerXRecoveryDelta &&
+      Math.abs(centerY) < this.config.centerYRecoveryDelta &&
+      (gazeHorizontal === null ||
+        Math.abs(gazeHorizontal) < this.config.gazeHorizontalRecoveryDelta) &&
+      (gazeVertical === null ||
+        Math.abs(gazeVertical) < this.config.gazeVerticalRecoveryDelta);
     const now = frame.sessionElapsedMs;
     const events: VisionBehaviorEvent[] = [];
 
@@ -86,7 +138,16 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
         events.push(this.eventFactory.createBehaviorEvent("GAZE_AWAY_STARTED", {
           confidence: this.config.defaultEventConfidence,
           episodeId: this.episodeId,
-          payload: { observedStartElapsedMs: this.activeSinceMs ?? now, yawDelta: yaw, pitchDelta: pitch, rollDelta: roll, centerDeltaX: centerX, centerDeltaY: centerY },
+          payload: {
+            observedStartElapsedMs: this.activeSinceMs ?? now,
+            yawDelta: yaw,
+            pitchDelta: pitch,
+            rollDelta: roll,
+            centerDeltaX: centerX,
+            centerDeltaY: centerY,
+            gazeHorizontalDelta: gazeHorizontal,
+            gazeVerticalDelta: gazeVertical,
+          },
         }));
       }
     } else if (this.state === "AWAY_ACTIVE") {
@@ -95,7 +156,13 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
         events.push(this.eventFactory.createBehaviorEvent("PROLONGED_GAZE_AWAY", {
           confidence: this.config.defaultEventConfidence,
           episodeId: this.episodeId,
-          payload: { activeDurationMs: now - (this.activeSinceMs ?? now), yawDelta: yaw, pitchDelta: pitch },
+          payload: {
+            activeDurationMs: now - (this.activeSinceMs ?? now),
+            yawDelta: yaw,
+            pitchDelta: pitch,
+            gazeHorizontalDelta: gazeHorizontal,
+            gazeVerticalDelta: gazeVertical,
+          },
         }));
       }
       if (recovered) this.transition("RECOVERY_CANDIDATE", now);
@@ -113,11 +180,25 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
       Math.abs(pitch ?? 0) / this.config.pitchEntryDegrees,
       Math.abs(centerX) / this.config.centerXEntryDelta,
       Math.abs(centerY) / this.config.centerYEntryDelta,
+      Math.abs(gazeHorizontal ?? 0) / this.config.gazeHorizontalEntryDelta,
+      Math.abs(gazeVertical ?? 0) / this.config.gazeVerticalEntryDelta,
+    );
+    const maximumGazeRatio = Math.max(
+      Math.abs(gazeHorizontal ?? 0) / this.config.gazeHorizontalEntryDelta,
+      Math.abs(gazeVertical ?? 0) / this.config.gazeVerticalEntryDelta,
     );
     this.snapshot = {
       state: this.state, rawYawDelta: rawYaw, rawPitchDelta: rawPitch,
       smoothedYawDelta: yaw, smoothedPitchDelta: pitch, rollDelta: roll,
       centerDeltaX: centerX, centerDeltaY: centerY,
+      rawGazeHorizontalDelta: rawGazeHorizontal,
+      rawGazeVerticalDelta: rawGazeVertical,
+      smoothedGazeHorizontalDelta: gazeHorizontal,
+      smoothedGazeVerticalDelta: gazeVertical,
+      eyeGazeScore:
+        gazeHorizontal === null && gazeVertical === null
+          ? null
+          : Math.max(0, Math.min(1, 1 - maximumGazeRatio)),
       screenFacingScore: Math.max(0, Math.min(1, 1 - maximumRatio)),
       stateSinceMs: this.stateSinceMs, activeSinceMs: this.activeSinceMs,
       prolongedEmitted: this.prolongedEmitted,
@@ -129,6 +210,8 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
     const events = this.activeSinceMs === null ? [] : [this.endEpisode(context.sessionElapsedMs, terminationReason(context.reason))];
     this.yawFilter.reset();
     this.pitchFilter.reset();
+    this.gazeHorizontalFilter.reset();
+    this.gazeVerticalFilter.reset();
     this.state = "WAITING_FOR_BASELINE";
     this.stateSinceMs = null;
     this.snapshot = this.emptyState();
@@ -139,6 +222,7 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
 
   reset(): void {
     this.yawFilter.reset(); this.pitchFilter.reset();
+    this.gazeHorizontalFilter.reset(); this.gazeVerticalFilter.reset();
     this.state = "WAITING_FOR_BASELINE"; this.stateSinceMs = null; this.activeSinceMs = null;
     this.episodeId = null; this.prolongedEmitted = false; this.cooldownUntilMs = 0; this.snapshot = this.emptyState();
   }
@@ -156,6 +240,24 @@ export class ScreenAttentionDetector implements VisionDetector<NormalizedFaceFra
   }
 
   private emptyState(): ScreenAttentionDetectorState {
-    return { state: this.state, rawYawDelta: null, rawPitchDelta: null, smoothedYawDelta: null, smoothedPitchDelta: null, rollDelta: null, centerDeltaX: null, centerDeltaY: null, screenFacingScore: null, stateSinceMs: this.stateSinceMs, activeSinceMs: this.activeSinceMs, prolongedEmitted: this.prolongedEmitted };
+    return {
+      state: this.state,
+      rawYawDelta: null,
+      rawPitchDelta: null,
+      smoothedYawDelta: null,
+      smoothedPitchDelta: null,
+      rollDelta: null,
+      centerDeltaX: null,
+      centerDeltaY: null,
+      rawGazeHorizontalDelta: null,
+      rawGazeVerticalDelta: null,
+      smoothedGazeHorizontalDelta: null,
+      smoothedGazeVerticalDelta: null,
+      eyeGazeScore: null,
+      screenFacingScore: null,
+      stateSinceMs: this.stateSinceMs,
+      activeSinceMs: this.activeSinceMs,
+      prolongedEmitted: this.prolongedEmitted,
+    };
   }
 }
