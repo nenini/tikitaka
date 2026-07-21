@@ -16,3 +16,6 @@ coverage/
 # Large local MediaPipe runtime assets
 *.task
 *.wasm
+
+# Local diagnostic demo is never committed with the product package.
+demo/
