@@ -63,6 +63,25 @@ cp .env.example .env
 
 별도 지정이 없으면 `local` 프로파일이 활성화됩니다. 테스트는 `@ActiveProfiles("test")`를 통해 `test` 프로파일을 사용합니다.
 
+공통 JPA 설정은 `application.yml`에서 관리합니다.
+
+- OSIV 비활성화
+- Hibernate SQL 포맷 적용
+- 기본 batch fetch 크기 100
+- JDBC 시간대 `Asia/Seoul`
+- JPA Auditing 활성화
+
+엔티티에서 생성·수정 시각이 필요하면 `BaseEntity`를 상속합니다.
+
+```java
+@Entity
+public class Example extends BaseEntity {
+    // fields
+}
+```
+
+상속한 테이블에는 `created_at`, `updated_at` 컬럼이 필요합니다. 현재 로컬 설정은 `ddl-auto: validate`이므로 운영할 스키마나 마이그레이션에도 두 컬럼을 직접 반영해야 합니다.
+
 ## Docker Compose로 전체 실행
 
 백엔드와 MySQL을 함께 빌드하고 실행합니다.
@@ -175,6 +194,8 @@ Linux/macOS:
 - [x] Swagger UI 및 OpenAPI 명세 구성
 - [x] 성공·오류 공통 API 응답 구성
 - [x] 검증·비즈니스·404·서버 오류 전역 예외 처리 구성
+- [x] 공통 JPA 설정 및 Auditing 구성
+- [x] 생성·수정 시각 공통 `BaseEntity` 구성
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
 - [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
 - [ ] 도메인별 API 명세 작성
