@@ -2,6 +2,7 @@ import type { Clock } from "../../common/Clock.js";
 import { toIsoTimestamp } from "../../common/Clock.js";
 import type { SequenceGenerator } from "../../common/SequenceGenerator.js";
 import type { SessionTimeline } from "../../common/SessionTimeline.js";
+import type { SessionTimePoint } from "../../common/SessionTimeline.js";
 import type { UuidFactory } from "../../common/ClientInstanceId.js";
 import type {
   VisionBehaviorEventFor,
@@ -60,6 +61,10 @@ export interface CreateMetricSnapshotOptions {
 }
 
 export class VisionEventFactory {
+  // The override exists only during one synchronous pipeline call and is restored
+  // in finally, so detector order cannot leak timing state into the next frame.
+  private scopedTimePoint: SessionTimePoint | null = null;
+
   constructor(
     private readonly identity: VisionEventIdentity,
     private readonly versions: VisionEventVersions,
@@ -71,6 +76,30 @@ export class VisionEventFactory {
 
   createEpisodeId(): string {
     return this.uuidFactory();
+  }
+
+  /** Keeps every event produced for one frame on the frame's captured timeline. */
+  withTimePoint<T>(timePoint: SessionTimePoint, operation: () => T): T {
+    if (
+      !Number.isFinite(timePoint.sessionElapsedMs) ||
+      timePoint.sessionElapsedMs < 0 ||
+      !Number.isFinite(timePoint.clientMonotonicMs) ||
+      timePoint.clientMonotonicMs < 0
+    ) {
+      throw new RangeError("event time point must contain non-negative finite values");
+    }
+    const previous = this.scopedTimePoint;
+    this.scopedTimePoint = { ...timePoint };
+    try {
+      return operation();
+    } finally {
+      this.scopedTimePoint = previous;
+    }
+  }
+
+  resetSequence(): void {
+    // Sequence numbers are session-scoped and restart only during explicit cleanup.
+    this.sequence.reset();
   }
 
   createBehaviorEvent<TEventType extends VisionBehaviorEventType>(
@@ -101,7 +130,8 @@ export class VisionEventFactory {
     eventType: TEventType,
     confidence: number,
   ): Omit<VisionEventEnvelope<TEventType>, "source"> {
-    const timePoint = this.timeline.now();
+    // Frame-scoped time wins over wall-time sampling to keep a multi-event frame exact.
+    const timePoint = this.scopedTimePoint ?? this.timeline.now();
 
     return {
       eventId: this.uuidFactory(),
@@ -120,4 +150,3 @@ export class VisionEventFactory {
     };
   }
 }
-
