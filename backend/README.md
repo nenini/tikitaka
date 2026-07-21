@@ -86,6 +86,12 @@ docker compose logs -f backend
 
 기본 접속 주소는 `http://localhost:8080`입니다. MySQL health check가 통과한 후 백엔드가 시작됩니다.
 
+애플리케이션 상태 확인:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
 컨테이너 종료:
 
 ```bash
@@ -158,9 +164,12 @@ Linux/macOS:
 - [x] Docker 빌드 컨텍스트 제외 설정
 - [x] `.env` 및 `.env.example` 구성
 - [x] 로컬 생성 파일과 비밀정보 Git 제외 설정
+- [x] UTF-8 인코딩과 graceful shutdown 공통 설정
+- [x] Actuator health/info 상태 확인 엔드포인트 구성
+- [x] EditorConfig 코드 스타일 기본 규칙 구성
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
 - [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
-- [ ] API 문서화 및 상태 확인 엔드포인트 구성
+- [ ] API 문서화 구성
 - [ ] CI 환경의 빌드·테스트 자동화
 
 ## 현재 검증 결과
