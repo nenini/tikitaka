@@ -92,6 +92,11 @@ docker compose logs -f backend
 curl http://localhost:8080/actuator/health
 ```
 
+Swagger UI와 OpenAPI 명세:
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
 컨테이너 종료:
 
 ```bash
@@ -167,9 +172,12 @@ Linux/macOS:
 - [x] UTF-8 인코딩과 graceful shutdown 공통 설정
 - [x] Actuator health/info 상태 확인 엔드포인트 구성
 - [x] EditorConfig 코드 스타일 기본 규칙 구성
+- [x] Swagger UI 및 OpenAPI 명세 구성
+- [x] 성공·오류 공통 API 응답 구성
+- [x] 검증·비즈니스·404·서버 오류 전역 예외 처리 구성
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
 - [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
-- [ ] API 문서화 구성
+- [ ] 도메인별 API 명세 작성
 - [ ] CI 환경의 빌드·테스트 자동화
 
 ## 현재 검증 결과
