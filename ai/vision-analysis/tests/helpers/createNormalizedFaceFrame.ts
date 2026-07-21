@@ -14,6 +14,7 @@ export interface NormalizedFrameOptions {
   readonly centerX?: number;
   readonly centerY?: number;
   readonly blendshapes?: Readonly<Record<string, number>>;
+  readonly landmarkDisplacementScore?: number | null;
 }
 
 export function createNormalizedFaceFrame(
@@ -54,7 +55,8 @@ export function createNormalizedFaceFrame(
             mouthCornerLiftLeft: 0,
             mouthCornerLiftRight: 0,
             noseToChinVerticalRatio: 0.3,
-            landmarkDisplacementScore: null,
+            landmarkDisplacementScore:
+              options.landmarkDisplacementScore ?? null,
           },
         }
       : null,

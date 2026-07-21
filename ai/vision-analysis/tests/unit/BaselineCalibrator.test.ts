@@ -7,7 +7,10 @@ const usable = { usable: true, confidence: 0.9, reasons: [] } as const;
 
 describe("BaselineCalibrator", () => {
   it("uses only usable frames and becomes ready after duration and frame gates", () => {
-    const calibrator = new BaselineCalibrator(defaultVisionConfig.calibration);
+    const calibrator = new BaselineCalibrator(
+      defaultVisionConfig.calibration,
+      defaultVisionConfig.expressionActivity,
+    );
     for (let timestampMs = 0; timestampMs <= 5_000; timestampMs += 200) {
       calibrator.update(createNormalizedFaceFrame({
         timestampMs,
@@ -23,10 +26,40 @@ describe("BaselineCalibrator", () => {
   });
 
   it("falls back when wall time expires without enough usable data", () => {
-    const calibrator = new BaselineCalibrator(defaultVisionConfig.calibration);
+    const calibrator = new BaselineCalibrator(
+      defaultVisionConfig.calibration,
+      defaultVisionConfig.expressionActivity,
+    );
     calibrator.update(createNormalizedFaceFrame({ timestampMs: 0 }), { usable: false, confidence: 0.9, reasons: ["LOW_LIGHT"] });
     const state = calibrator.update(createNormalizedFaceFrame({ timestampMs: 10_000 }), { usable: false, confidence: 0.9, reasons: ["LOW_LIGHT"] });
     expect(state.status).toBe("FALLBACK");
     expect(state.excludedFrameCount).toBe(2);
+  });
+
+  it("continues usable-only activity calibration after pose baseline is ready", () => {
+    const calibrator = new BaselineCalibrator(
+      defaultVisionConfig.calibration,
+      {
+        ...defaultVisionConfig.expressionActivity,
+        blendshapeNames: ["jawOpen"],
+        blendshapeWeight: 1,
+        landmarkWeight: 0,
+      },
+    );
+
+    for (let timestampMs = 0; timestampMs <= 20_000; timestampMs += 200) {
+      calibrator.update(
+        createNormalizedFaceFrame({
+          timestampMs,
+          blendshapes: { jawOpen: timestampMs % 400 === 0 ? 0 : 0.2 },
+        }),
+        usable,
+      );
+    }
+
+    const baseline = calibrator.getBaseline();
+    expect(baseline.status).toBe("READY");
+    expect(baseline.expressionActivityScore).not.toBeNull();
+    expect(baseline.expressionActivityScore).toBeCloseTo(0.2);
   });
 });
