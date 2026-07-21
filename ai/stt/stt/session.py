@@ -100,3 +100,38 @@ class SpeakerStream:
         self._buffer = self._buffer[last_end:]  # 소비 구간 제거
         self._offset += last_end
         return events
+
+
+class SessionSttRunner:
+    """공유 엔진 위에서 여러 화자 스트림을 관리한다. 공통 시간축은 세션 시작 기준."""
+
+    def __init__(
+        self,
+        engine: SttEngine,
+        *,
+        session_id: str,
+        vad_opts: VadOptions,
+        end_silence_ms: int = 700,
+        min_confidence: float = 0.5,
+    ) -> None:
+        self.engine = engine
+        self.session_id = session_id
+        self._opts = dict(
+            vad_opts=vad_opts, end_silence_ms=end_silence_ms, min_confidence=min_confidence
+        )
+        self._streams: Dict[str, SpeakerStream] = {}
+
+    def stream(self, speaker_id: str) -> SpeakerStream:
+        if speaker_id not in self._streams:
+            self._streams[speaker_id] = SpeakerStream(
+                self.engine, session_id=self.session_id, speaker_id=speaker_id, **self._opts
+            )
+        return self._streams[speaker_id]
+
+    def feed(self, speaker_id: str, audio: np.ndarray) -> List[TranscriptEvent]:
+        return self.stream(speaker_id).feed(audio)
+
+    def flush_utterance(
+        self, speaker_id: str, utterance: np.ndarray, start_ms: int
+    ) -> List[TranscriptEvent]:
+        return self.stream(speaker_id).flush_utterance(utterance, start_ms)
