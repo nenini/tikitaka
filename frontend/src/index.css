@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+/* BloomTalk 디자인 시스템 (SSOT). 순서: 토큰 → 컴포넌트 */
+@import './design-system/tokens.css';
+@import './design-system/components.css';
+
+/* =========================================================================
+   Tailwind ↔ 디자인 시스템 브릿지
+   --bt-* semantic 토큰을 Tailwind @theme 에 매핑한다.
+   `@theme inline` 은 유틸리티에 값(var(--bt-*))을 그대로 인라인하므로,
+   [data-theme="dark"] 에서 토큰이 바뀌면 Tailwind 유틸리티도 자동으로 따라간다.
+
+   → 인라인 Tailwind 유틸(bg-action, text-danger, rounded-xl …)을 쓰되
+     값은 항상 디자인 시스템 토큰에서 나온다. (raw 색상 유틸은 쓰지 말 것)
+   ========================================================================= */
+@theme inline {
+  /* 색 — semantic */
+  --color-bg: var(--bt-color-bg);
+  --color-surface: var(--bt-color-surface);
+  --color-surface-sunken: var(--bt-color-surface-sunken);
+  --color-ink: var(--bt-color-text);
+  --color-muted: var(--bt-color-text-secondary);
+  --color-faint: var(--bt-color-text-tertiary);
+  --color-line: var(--bt-color-border);
+
+  --color-brand: var(--bt-color-brand);
+  --color-action: var(--bt-color-action);
+  --color-action-hover: var(--bt-color-action-hover);
+  --color-link: var(--bt-color-text-link);
+
+  --color-success: var(--bt-color-success);
+  --color-warning: var(--bt-color-warning);
+  --color-danger: var(--bt-color-danger);
+  --color-like: var(--bt-color-like);
+
+  /* 라운드 — 디자인 시스템 스케일로 덮어쓴다 */
+  --radius-sm: var(--bt-radius-sm);
+  --radius-md: var(--bt-radius-md);
+  --radius-lg: var(--bt-radius-lg);
+  --radius-xl: var(--bt-radius-xl);
+  --radius-2xl: var(--bt-radius-2xl);
+
+  /* 서체 */
+  --font-sans: var(--bt-font-sans);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
