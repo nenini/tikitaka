@@ -255,24 +255,78 @@ export const visionConfigSchema = z
       }),
     expressionActivity: z
       .object({
+        blendshapeNames: z.array(z.string().min(1)).min(1),
+        blendshapeWeight: unitScoreSchema,
+        landmarkWeight: unitScoreSchema,
         windowMs: z.number().int().positive(),
         warmupMs: z.number().int().positive(),
+        minimumWindowSamples: z.number().int().positive(),
         lowMinimumDurationMs: z.number().int().positive(),
         recoveryMinimumDurationMs: z.number().int().positive(),
         fallbackLowThreshold: unitScoreSchema,
+        fallbackRecoveryThreshold: unitScoreSchema,
         baselineLowRatio: z.number().positive().max(1),
+        baselineRecoveryRatio: z.number().positive(),
         emaAlpha: z.number().positive().max(1),
+        defaultEventConfidence: unitScoreSchema,
       })
-      .strict(),
+      .strict()
+      .superRefine((activity, context) => {
+        if (
+          Math.abs(
+            activity.blendshapeWeight + activity.landmarkWeight - 1,
+          ) > 0.000001
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["landmarkWeight"],
+            message: "activity weights must sum to 1",
+          });
+        }
+
+        if (
+          activity.fallbackRecoveryThreshold <=
+          activity.fallbackLowThreshold
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["fallbackRecoveryThreshold"],
+            message: "recovery threshold must exceed the low threshold",
+          });
+        }
+
+        if (activity.baselineRecoveryRatio <= activity.baselineLowRatio) {
+          context.addIssue({
+            code: "custom",
+            path: ["baselineRecoveryRatio"],
+            message: "baseline recovery ratio must exceed the low ratio",
+          });
+        }
+
+        if (activity.warmupMs > activity.windowMs) {
+          context.addIssue({
+            code: "custom",
+            path: ["warmupMs"],
+            message: "warmup cannot exceed the rolling window duration",
+          });
+        }
+      }),
     nod: z
       .object({
         enabledByDefault: z.boolean(),
+        downwardPitchSign: z.union([z.literal(-1), z.literal(1)]),
         minimumAmplitudeDegrees: z.number().positive(),
         maximumAmplitudeDegrees: z.number().positive(),
         returnToleranceDegrees: z.number().positive(),
+        minimumReversalDegrees: z.number().positive(),
+        minimumDownstrokeMs: z.number().int().positive(),
+        minimumUpstrokeMs: z.number().int().positive(),
+        maximumDownHoldMs: z.number().int().positive(),
         minimumDurationMs: z.number().int().positive(),
         maximumDurationMs: z.number().int().positive(),
         cooldownMs: z.number().int().positive(),
+        emaAlpha: z.number().positive().max(1),
+        defaultEventConfidence: unitScoreSchema,
       })
       .strict()
       .superRefine((nod, context) => {
@@ -289,6 +343,15 @@ export const visionConfigSchema = z
             code: "custom",
             path: ["maximumDurationMs"],
             message: "maximum duration must exceed minimum duration",
+          });
+        }
+
+
+        if (nod.maximumDownHoldMs >= nod.maximumDurationMs) {
+          context.addIssue({
+            code: "custom",
+            path: ["maximumDownHoldMs"],
+            message: "maximum down hold must be shorter than maximum duration",
           });
         }
       }),

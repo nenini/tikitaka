@@ -1,5 +1,10 @@
 import type { VisionConfig } from "../config/VisionConfig.js";
-import type { FaceQualityDecision, NormalizedFaceFrame } from "../core/NormalizedFaceFrame.js";
+import type {
+  FaceQualityDecision,
+  NormalizedFaceFrame,
+  NormalizedPrimaryFace,
+} from "../core/NormalizedFaceFrame.js";
+import { computeExpressionActivityScore } from "../detectors/ExpressionActivityScore.js";
 import type { VisionBaseline } from "./VisionBaseline.js";
 
 const BLENDSHAPES = [
@@ -70,19 +75,35 @@ function emptyBaseline(status: VisionBaseline["status"] = "NOT_STARTED"): Vision
  * No image, embedding, landmark array, or full blendshape vector is retained.
  */
 export class BaselineCalibrator {
+  // Pose samples stop growing once the primary baseline is ready.
   private readonly samples: BaselineSample[] = [];
   private baseline: VisionBaseline = emptyBaseline();
   private startedAtMs: number | null = null;
   private lastUsableAtMs: number | null = null;
   private usableDurationMs = 0;
   private excludedFrameCount = 0;
+  // Expression activity continues for the longer configured duration, then its
+  // temporary samples are released while the scalar baseline remains in memory.
+  private readonly activityScores: number[] = [];
+  private previousActivityFace: NormalizedPrimaryFace | null = null;
+  private lastActivityAtMs: number | null = null;
+  private activityUsableDurationMs = 0;
 
-  constructor(private readonly config: VisionConfig["calibration"]) {}
+  constructor(
+    private readonly config: VisionConfig["calibration"],
+    private readonly activityConfig: VisionConfig["expressionActivity"],
+  ) {}
 
   update(frame: NormalizedFaceFrame, quality: FaceQualityDecision): BaselineCalibrationState {
-    if (this.baseline.status === "READY" || this.baseline.status === "FALLBACK") return this.getState(frame.sessionElapsedMs);
+    // Fallback is terminal for this session; silently recalibrating later would
+    // move detector thresholds while an interview is already in progress.
+    if (this.baseline.status === "FALLBACK") {
+      return this.getState(frame.sessionElapsedMs);
+    }
     this.startedAtMs ??= frame.sessionElapsedMs;
     const face = frame.primaryFace;
+    // Calibration is stricter than general analysis: it requires one centered,
+    // fully observable face with complete pose values.
     const valid = quality.usable && frame.faceCount === 1 && face !== null &&
       face.yaw !== null && face.pitch !== null && face.roll !== null &&
       face.box.inFrameRatio >= this.config.minimumInFrameRatio &&
@@ -90,14 +111,39 @@ export class BaselineCalibrator {
       Math.abs(face.pitch) <= this.config.maximumAbsolutePitchDegrees &&
       Math.abs(face.roll) <= this.config.maximumAbsoluteRollDegrees;
 
-    if (valid && face !== null && face.yaw !== null && face.pitch !== null && face.roll !== null) {
+    if (
+      valid &&
+      face !== null &&
+      face.yaw !== null &&
+      face.pitch !== null &&
+      face.roll !== null
+    ) {
+      if (
+        this.baseline.status === "READY" &&
+        this.baseline.expressionActivityScore !== null
+      ) {
+        // Both baseline stages are complete, so no more face-derived samples are retained.
+        return this.getState(frame.sessionElapsedMs);
+      }
+      this.collectActivitySample(face, frame.sessionElapsedMs);
+
+      if (this.baseline.status === "READY") {
+        // Pose is already stable; only the longer activity stage may still update.
+        this.refreshActivityBaseline();
+        return this.getState(frame.sessionElapsedMs);
+      }
+
       if (this.lastUsableAtMs !== null) {
         // Large gaps mean unusable periods and must not count as calibration time.
         this.usableDurationMs += Math.min(500, Math.max(0, frame.sessionElapsedMs - this.lastUsableAtMs));
       }
       this.lastUsableAtMs = frame.sessionElapsedMs;
       const selected: Record<string, number> = {};
-      for (const name of BLENDSHAPES) selected[name] = face.blendshapes[name] ?? 0;
+      const names = new Set<string>([
+        ...BLENDSHAPES,
+        ...this.activityConfig.blendshapeNames,
+      ]);
+      for (const name of names) selected[name] = face.blendshapes[name] ?? 0;
       this.samples.push({
         timestampMs: frame.sessionElapsedMs,
         yaw: face.yaw,
@@ -111,12 +157,20 @@ export class BaselineCalibrator {
     } else {
       this.excludedFrameCount += 1;
       this.lastUsableAtMs = null;
+      this.previousActivityFace = null;
+      this.lastActivityAtMs = null;
+
+      if (this.baseline.status === "READY") {
+        return this.getState(frame.sessionElapsedMs);
+      }
     }
 
     const wallDurationMs = frame.sessionElapsedMs - this.startedAtMs;
     if (this.samples.length >= this.config.minimumUsableFrames && this.usableDurationMs >= this.config.targetUsableDurationMs) {
+      // Both frame count and usable time are required to avoid burst-only calibration.
       this.baseline = this.computeBaseline(frame.sessionElapsedMs);
     } else if (wallDurationMs >= this.config.maximumWallDurationMs) {
+      // Wall timeout is distinct from READY so detectors can expose fallback usage.
       this.baseline = { ...emptyBaseline("FALLBACK"), calibratedAtSessionElapsedMs: frame.sessionElapsedMs };
     } else {
       this.baseline = { ...emptyBaseline("COLLECTING"), usableFrameCount: this.samples.length };
@@ -144,15 +198,21 @@ export class BaselineCalibrator {
   }
 
   reset(): void {
+    // Baseline values and all source samples are session-only data.
     this.samples.length = 0;
     this.baseline = emptyBaseline();
     this.startedAtMs = null;
     this.lastUsableAtMs = null;
     this.usableDurationMs = 0;
     this.excludedFrameCount = 0;
+    this.activityScores.length = 0;
+    this.previousActivityFace = null;
+    this.lastActivityAtMs = null;
+    this.activityUsableDurationMs = 0;
   }
 
   private computeBaseline(timestampMs: number): VisionBaseline {
+    // Robust summaries reduce the influence of short pose or expression spikes.
     const means: Record<string, number> = {};
     const deviations: Record<string, number> = {};
     for (const name of BLENDSHAPES) {
@@ -175,7 +235,58 @@ export class BaselineCalibrator {
       mouthSmileRight: means["mouthSmileRight"] ?? 0,
       blendshapeMeans: means,
       blendshapeMedianAbsoluteDeviations: deviations,
-      expressionActivityScore: null,
+      expressionActivityScore: this.getActivityBaselineScore(),
     };
+  }
+
+  private collectActivitySample(
+    face: NormalizedPrimaryFace,
+    timestampMs: number,
+  ): void {
+    const score = computeExpressionActivityScore(
+      this.previousActivityFace,
+      face,
+      this.activityConfig,
+    );
+    if (score !== null) {
+      this.activityScores.push(score);
+      if (this.lastActivityAtMs !== null) {
+        // Long gaps are excluded so quality failures cannot satisfy calibration time.
+        this.activityUsableDurationMs += Math.min(
+          500,
+          Math.max(0, timestampMs - this.lastActivityAtMs),
+        );
+      }
+    }
+    this.previousActivityFace = face;
+    this.lastActivityAtMs = timestampMs;
+  }
+
+  private refreshActivityBaseline(): void {
+    const activityScore = this.getActivityBaselineScore();
+    if (
+      activityScore !== null &&
+      this.baseline.expressionActivityScore === null
+    ) {
+      // Freeze one scalar activity baseline and immediately release its samples.
+      this.baseline = {
+        ...this.baseline,
+        expressionActivityScore: activityScore,
+      };
+      this.activityScores.length = 0;
+      this.previousActivityFace = null;
+      this.lastActivityAtMs = null;
+    }
+  }
+
+  private getActivityBaselineScore(): number | null {
+    // Duration plus sample count prevents a sparse stream from becoming baseline.
+    if (
+      this.activityUsableDurationMs < this.config.activityBaselineDurationMs ||
+      this.activityScores.length < this.config.minimumUsableFrames
+    ) {
+      return null;
+    }
+    return trimmedMean(this.activityScores, this.config.trimRatio);
   }
 }
