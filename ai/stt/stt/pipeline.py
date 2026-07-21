@@ -69,3 +69,63 @@ class SttEngine:
             print(f"[stt] {device} 초기화 실패 ({exc!r}) → CPU(int8) 폴백")
             self.model = WhisperModel(model_size, device="cpu", compute_type="int8")
             self.device = "cpu"
+
+    def transcribe_chunk(
+        self,
+        audio: np.ndarray,
+        *,
+        session_id: str,
+        speaker_id: str,
+        session_elapsed_ms: int,
+        seq_start: int = 0,
+        is_final: bool = True,
+        vad_filter: bool = False,
+        min_confidence: float = 0.5,
+    ) -> List[TranscriptEvent]:
+        """오디오 청크(float32 mono 16kHz)를 STT하여 TranscriptEvent 리스트 반환.
+
+        타임스탬프는 청크 시작 시각(session_elapsed_ms) + 세그먼트 상대시각으로 절대화한다.
+        무음/노이즈에서 흔한 whisper 환각("감사합니다" 등)은 no_speech_prob·confidence로 거른다.
+        """
+        segments, info = self.model.transcribe(
+            audio,
+            language=self.language,
+            beam_size=5,
+            vad_filter=vad_filter,  # 무음 구간 스킵 (기본 False: 상위에서 이미 VAD 게이팅)
+            vad_parameters=dict(min_silence_duration_ms=500),
+            no_speech_threshold=0.6,
+            log_prob_threshold=-1.0,
+            condition_on_previous_text=False,  # 청크 간 환각 전파 방지
+        )
+
+        events: List[TranscriptEvent] = []
+        seq = seq_start
+        for seg in segments:
+            text = seg.text.strip()
+            if not text:
+                continue
+            # 무음 확률이 높거나(환각 의심) 신뢰도가 낮으면 버린다
+            if getattr(seg, "no_speech_prob", 0.0) > 0.6:
+                continue
+            confidence = round(min(max(math.exp(seg.avg_logprob), 0.0), 1.0), 2)
+            if confidence < min_confidence:
+                continue
+            payload = TranscriptPayload(
+                text=text,
+                is_final=is_final,
+                language=info.language,
+                segment_start_ms=session_elapsed_ms + int(seg.start * 1000),
+                segment_end_ms=session_elapsed_ms + int(seg.end * 1000),
+            )
+            events.append(
+                TranscriptEvent(
+                    session_id=session_id,
+                    speaker_id=speaker_id,
+                    seq=seq,
+                    session_elapsed_ms=session_elapsed_ms,
+                    confidence=confidence,
+                    payload=payload,
+                )
+            )
+            seq += 1
+        return events
