@@ -1,0 +1,12 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# 모델·오디오 캐시 (커밋 금지)
+*.wav
+*.mp3
+*.bin
+models/
