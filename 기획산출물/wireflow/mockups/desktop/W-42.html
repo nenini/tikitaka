@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>W-42 · 관리자 · 정책 설정 (데스크탑)</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../ui.css"></head>
+<body><div class="d-frame">
+  <div class="appbar"><span class="logo">BloomTalk</span><span class="badge gray">ADMIN</span>
+    <div class="right"><span class="tiny">운영자 · admin@bloomtalk</span><div class="av s">A</div></div></div>
+  <div class="admin-body">
+    <div class="side"><div class="grp">운영</div><a class="">대시보드</a><a class="">신고 관리</a><a class="">회원 관리</a><div class="grp">정책</div><a class="on">정책 설정</a><a class="">사전 데이터</a><a class="">리포트</a></div>
+    <div class="admin-main">
+  <div class="row jb ac"><h1 class="h1">정책 설정</h1><a class="btn sm">변경 사항 저장</a></div>
+  <div class="row g16 f1">
+    <div class="col g12 f1">
+      <div class="card col g10"><span class="h3">매칭 점수 가중치</span>
+        <div class="col g4"><div class="row jb"><span class="tiny">연습 목표 유사도</span><span class="tiny"><b>30%</b></span></div>
+            <div class="slider"><i style="width:78%"></i><b style="left:76%"></b></div></div><div class="col g4"><div class="row jb"><span class="tiny">대화 성향 보완성</span><span class="tiny"><b>25%</b></span></div>
+            <div class="slider"><i style="width:65%"></i><b style="left:63%"></b></div></div><div class="col g4"><div class="row jb"><span class="tiny">관심사 유사도</span><span class="tiny"><b>20%</b></span></div>
+            <div class="slider"><i style="width:52%"></i><b style="left:50%"></b></div></div><div class="col g4"><div class="row jb"><span class="tiny">일정 적합도</span><span class="tiny"><b>15%</b></span></div>
+            <div class="slider"><i style="width:39%"></i><b style="left:37%"></b></div></div><div class="col g4"><div class="row jb"><span class="tiny">선호 분위기 적합도</span><span class="tiny"><b>10%</b></span></div>
+            <div class="slider"><i style="width:26%"></i><b style="left:24%"></b></div></div>
+        <div class="banner wa"><span>⚠️</span><span><b>관심사 유사도 20%는 현재 입력 데이터가 없습니다</b> — PROFILE-04가 P2로 내려가 산출 불가. 가중치 재분배 필요(D-01).</span></div>
+      </div>
+      <div class="card col g10"><span class="h3">노쇼 · 취소 패널티</span>
+        <div class="row g10"><div class="field f1"><label>대기 허용 시간</label><div class="input"><span>5분</span></div></div>
+          <div class="field f1"><label>패널티 소멸 주기</label><div class="input"><span>6개월</span></div></div>
+          <div class="field f1"><label>취소 패널티 기준</label><div class="input"><span>세션 1시간 전</span></div></div></div>
+      </div>
+    </div>
+    <div class="col g12 f1">
+      <div class="card col g10"><span class="h3">AI 코칭 정책</span>
+        <div class="field"><label>코칭 개입 주기</label><div class="seg"><span>10분</span><span class="on">5분</span><span>3분</span></div></div>
+        <div class="field"><label>침묵 개입 임계값 (초)</label>
+          <div class="row g8"><div class="input f1"><span>10 / 15 / 30 / 45</span></div></div>
+          <span class="tiny">0–10초 개입 없음 · 15–20초 주제 버튼 · 30초 질문 카드 · 45초+ 맥락 기반</span></div>
+        <div class="field"><label>분석 모델 버전</label><div class="input"><span>face-landmarker v1.2 · stt-stream v0.9</span></div></div>
+      </div>
+      <div class="card col g10"><span class="h3">상황형 배경 (시간대별 자동 배정)</span>
+        <table class="tbl">
+          <thead><tr><th>시간대</th><th>테마</th><th>환경음</th></tr></thead>
+          <tbody>
+            <tr><td class="num">11:00–12:00</td><td>☕ 카페</td><td><span class="badge ok">ON</span></td></tr>
+            <tr><td class="num">12:00–13:00</td><td>🍽 점심 식당</td><td><span class="badge ok">ON</span></td></tr>
+            <tr><td class="num">18:00–19:00</td><td>🍽 저녁 식당</td><td><span class="badge ok">ON</span></td></tr>
+            <tr><td class="num">21:00–</td><td>🌙 야간 라운지</td><td><span class="badge gray">OFF</span></td></tr>
+          </tbody></table></div>
+      <div class="card col g8"><span class="h3">사전 데이터</span>
+        <div class="row g6 wrap"><span class="chip">얼굴상 태그 12종</span><span class="chip">연예인 예시 34명</span>
+          <span class="chip">질문 풀 86개</span><span class="chip">부적절 표현 사전 240어</span></div>
+        <div class="banner wa"><span>⚠️</span><span>질문 풀의 <b>'종교'</b> 주제가 민감 주제와 충돌 — D-11 검토 필요</span></div></div>
+    </div>
+  </div></div>
+  </div>
+</div></body></html>

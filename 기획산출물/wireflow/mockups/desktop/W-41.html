@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>W-41 · 관리자 · 신고 · 회원 관리 (데스크탑)</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../ui.css"></head>
+<body><div class="d-frame">
+  <div class="appbar"><span class="logo">BloomTalk</span><span class="badge gray">ADMIN</span>
+    <div class="right"><span class="tiny">운영자 · admin@bloomtalk</span><div class="av s">A</div></div></div>
+  <div class="admin-body">
+    <div class="side"><div class="grp">운영</div><a class="">대시보드</a><a class="on">신고 관리</a><a class="">회원 관리</a><div class="grp">정책</div><a class="">정책 설정</a><a class="">사전 데이터</a><a class="">리포트</a></div>
+    <div class="admin-main">
+  <div class="row jb ac"><h1 class="h1">신고 관리</h1>
+    <div class="row g6"><span class="chip on">전체 5</span><span class="chip">접수 3</span><span class="chip">검토 중 1</span><span class="chip">완료 1</span></div></div>
+  <div class="row g16 f1">
+    <div class="card col f1" style="padding:0;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>유형</th><th>신고자</th><th>피신고자</th><th>세션</th><th>접수</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr style="background:var(--bt-color-action-subtle)"><td class="num">#2041</td><td><span class="badge no">성적 발언</span></td>
+            <td class="num">user_2204</td><td class="num">user_8812</td><td class="num">S-8871</td><td class="num">10분 전</td><td><span class="badge wa">검토 중</span></td></tr>
+          <tr><td class="num">#2040</td><td><span class="badge no">욕설·비하</span></td><td class="num">user_1190</td>
+            <td class="num">user_7734</td><td class="num">S-8869</td><td class="num">42분 전</td><td><span class="badge gray">접수</span></td></tr>
+          <tr><td class="num">#2039</td><td><span class="badge gray">개인정보 요구</span></td><td class="num">user_3312</td>
+            <td class="num">user_9120</td><td class="num">S-8865</td><td class="num">2시간 전</td><td><span class="badge gray">접수</span></td></tr>
+          <tr><td class="num">#2038</td><td><span class="badge gray">기타</span></td><td class="num">user_5540</td>
+            <td class="num">user_4471</td><td class="num">S-8860</td><td class="num">5시간 전</td><td><span class="badge ok">완료</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col g12" style="width:400px">
+      <div class="card col g10">
+        <div class="row jb ac"><b style="font-size:14px">#2041 상세</b><span class="badge no">심각 유형</span></div>
+        <div class="lrow"><span class="tt">유형</span><span class="rt">성적 발언</span></div>
+        <div class="lrow"><span class="tt">피신고자</span><span class="rt">user_8812 · 누적 신고 2회</span></div>
+        <div class="lrow"><span class="tt">세션</span><span class="rt">S-8871 · 신고 즉시 종료됨</span></div>
+        <div class="col g4"><span class="tiny"><b>신고자 설명</b></span>
+          <div class="input ta" style="height:60px"><span class="tiny">대화 중 반복적으로 불쾌한 질문을 했습니다…</span></div></div>
+        <div class="col g4"><span class="tiny"><b>자동 감지 기록 (참고 · 별도 경로)</b></span>
+          <span class="tiny">SAFETY-01 룰 감지 3건 · 12:04 / 18:22 / 24:51</span></div>
+      </div>
+      <div class="card col g8"><span class="h3">제재 적용</span>
+        <div class="radio"><span class="rd"></span><b style="font-size:12.5px">주의</b></div>
+        <div class="radio on"><span class="rd"></span><b style="font-size:12.5px">매칭 제한 7일</b></div>
+        <div class="radio"><span class="rd"></span><b style="font-size:12.5px">서비스 정지 30일</b></div>
+        <div class="radio"><span class="rd"></span><b style="font-size:12.5px">영구 이용 제한</b></div>
+        <div class="banner wa"><span>⚠️</span><span><b>AI 감지 결과만으로 영구 정지 금지.</b> 단계적 제재를 우선 검토하세요.</span></div>
+        <div class="row g8"><a class="btn ghost f1 sm">반려</a><a class="btn f1 sm">제재 적용</a></div>
+      </div>
+    </div>
+  </div></div>
+  </div>
+</div></body></html>

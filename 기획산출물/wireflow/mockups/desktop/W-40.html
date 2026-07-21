@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+<title>W-40 · 관리자 · 대시보드 (데스크탑)</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../ui.css"></head>
+<body><div class="d-frame">
+  <div class="appbar"><span class="logo">BloomTalk</span><span class="badge gray">ADMIN</span>
+    <div class="right"><span class="tiny">운영자 · admin@bloomtalk</span><div class="av s">A</div></div></div>
+  <div class="admin-body">
+    <div class="side"><div class="grp">운영</div><a class="on">대시보드</a><a class="">신고 관리</a><a class="">회원 관리</a><div class="grp">정책</div><a class="">정책 설정</a><a class="">사전 데이터</a><a class="">리포트</a></div>
+    <div class="admin-main">
+  <div class="row jb ac"><h1 class="h1">운영 대시보드</h1><span class="chip">2026-07-21 기준</span></div>
+  <div class="row g12">
+    <div class="card col g6 f1"><span class="h3">신규 가입</span>
+        <div class="row ae g8"><span style="font-size:26px;font-weight:800;letter-spacing:-.02em">34</span>
+        <span class="badge ok">▲ 12%</span></div></div><div class="card col g6 f1"><span class="h3">진행 중 세션</span>
+        <div class="row ae g8"><span style="font-size:26px;font-weight:800;letter-spacing:-.02em">7</span>
+        <span class="badge ">실시간</span></div></div><div class="card col g6 f1"><span class="h3">미처리 신고</span>
+        <div class="row ae g8"><span style="font-size:26px;font-weight:800;letter-spacing:-.02em">5</span>
+        <span class="badge no">▲ 2</span></div></div><div class="card col g6 f1"><span class="h3">오늘 노쇼율</span>
+        <div class="row ae g8"><span style="font-size:26px;font-weight:800;letter-spacing:-.02em">4.2%</span>
+        <span class="badge ok">▼ 0.8%p</span></div></div>
+  </div>
+  <div class="row g16 f1">
+    <div class="card col g10 f1">
+      <div class="row jb ac"><span class="h3">최근 신고</span><a class="btn ghost sm">전체 보기</a></div>
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>유형</th><th>피신고자</th><th>접수</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td class="num">#2041</td><td><span class="badge no">성적 발언</span></td><td>user_8812</td><td class="num">10분 전</td><td><span class="badge wa">검토 중</span></td></tr>
+          <tr><td class="num">#2040</td><td><span class="badge no">욕설·비하</span></td><td>user_7734</td><td class="num">42분 전</td><td><span class="badge gray">접수</span></td></tr>
+          <tr><td class="num">#2039</td><td><span class="badge gray">개인정보 요구</span></td><td>user_9120</td><td class="num">2시간 전</td><td><span class="badge gray">접수</span></td></tr>
+          <tr><td class="num">#2038</td><td><span class="badge gray">기타</span></td><td>user_4471</td><td class="num">5시간 전</td><td><span class="badge ok">처리 완료</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col g12" style="width:340px">
+      <div class="card col g8"><span class="h3">세션 지표 (오늘)</span>
+        <div class="row jb"><span class="tiny">예정</span><span class="tiny"><b>18</b></span></div>
+        <div class="row jb"><span class="tiny">완료</span><span class="tiny"><b>11</b></span></div>
+        <div class="row jb"><span class="tiny">취소</span><span class="tiny"><b>2</b></span></div>
+        <div class="row jb"><span class="tiny">WebRTC 연결 실패</span><span class="tiny"><b>1</b></span></div>
+      </div>
+      <div class="card col g8"><span class="h3">자동 감지 (신고와 분리)</span>
+        <div class="row jb"><span class="tiny">룰 기반 감지</span><span class="tiny"><b>23</b></span></div>
+        <div class="row jb"><span class="tiny">LLM 분류</span><span class="tiny"><b>9</b></span></div>
+        <div class="banner wa"><span>⚠️</span><span>자동 감지만으로 <b>계정 정지 불가</b> — 운영자 검토 필수</span></div>
+      </div>
+    </div>
+  </div></div>
+  </div>
+</div></body></html>
