@@ -1,0 +1,18 @@
+# Installed dependencies
+node_modules/
+
+# Build and test output
+dist/
+coverage/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Large local MediaPipe runtime assets
+*.task
+*.wasm
