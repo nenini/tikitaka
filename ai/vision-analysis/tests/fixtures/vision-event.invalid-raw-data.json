@@ -1,0 +1,45 @@
+{
+  "eventId": "1ba268b7-d0ce-42ae-b2f4-cd78af569a7d",
+  "eventType": "VISION_METRIC_SNAPSHOT",
+  "version": 1,
+  "kind": "metric",
+  "sessionId": "session-123",
+  "userId": "user-a",
+  "clientInstanceId": "76a06bb5-2022-4126-a0f0-e370369e2459",
+  "seq": 126,
+  "sessionElapsedMs": 185000,
+  "clientMonotonicMs": 924221.5,
+  "occurredAt": "2026-07-20T10:30:01.600Z",
+  "confidence": 0.91,
+  "source": "VISION_PIPELINE",
+  "modelVersion": "mediapipe-face-landmarker-v1",
+  "ruleVersion": "vision-rule-v1",
+  "rawLandmarks": [[0.1, 0.2, 0.3]],
+  "payload": {
+    "quality": {
+      "usable": true,
+      "reasons": [],
+      "faceDetected": true,
+      "faceCount": 1,
+      "faceBoxRatio": 0.17,
+      "brightnessScore": 0.72,
+      "blurScore": 0.81
+    },
+    "metrics": {
+      "screenFacingScore": 0.86,
+      "smileScore": 0.31,
+      "expressionActivityScore": 0.44,
+      "yawDelta": 4.2,
+      "pitchDelta": -1.3,
+      "rollDelta": 0.8
+    },
+    "performance": {
+      "profile": "HIGH",
+      "targetFps": 5,
+      "actualFps": 4.8,
+      "meanProcessingMs": 52.4,
+      "droppedFramesSinceLastSnapshot": 0
+    }
+  }
+}
+
