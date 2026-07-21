@@ -5,7 +5,7 @@ import type { VisionBaseline } from "../../src/vision/calibration/VisionBaseline
 import { createDetectorEventFactory } from "../helpers/createDetectorTestKit.js";
 import { createNormalizedFaceFrame } from "../helpers/createNormalizedFaceFrame.js";
 
-const baseline: VisionBaseline = { status: "READY", usableFrameCount: 20, calibratedAtSessionElapsedMs: 5_000, yaw: 0, pitch: 0, roll: 0, faceAreaRatio: 0.2, faceCenterX: 0.5, faceCenterY: 0.5, mouthSmileLeft: 0.05, mouthSmileRight: 0.05, blendshapeMeans: { mouthSmileLeft: 0.05, mouthSmileRight: 0.05, cheekSquintLeft: 0, cheekSquintRight: 0 }, blendshapeMedianAbsoluteDeviations: {}, expressionActivityScore: null };
+const baseline: VisionBaseline = { status: "READY", usableFrameCount: 20, calibratedAtSessionElapsedMs: 5_000, yaw: 0, pitch: 0, roll: 0, faceAreaRatio: 0.2, faceCenterX: 0.5, faceCenterY: 0.5, eyeGazeHorizontalRatio: 0.5, eyeGazeVerticalRatio: 0.5, mouthSmileLeft: 0.05, mouthSmileRight: 0.05, blendshapeMeans: { mouthSmileLeft: 0.05, mouthSmileRight: 0.05, cheekSquintLeft: 0, cheekSquintRight: 0 }, blendshapeMedianAbsoluteDeviations: {}, expressionActivityScore: null };
 const context = { quality: { usable: true, confidence: 0.9, reasons: [] } as const, baseline, performanceProfile: "HIGH" as const };
 const smile = { mouthSmileLeft: 0.7, mouthSmileRight: 0.7, cheekSquintLeft: 0.3, cheekSquintRight: 0.3 };
 

@@ -10,6 +10,7 @@ describe("BaselineCalibrator", () => {
     const calibrator = new BaselineCalibrator(
       defaultVisionConfig.calibration,
       defaultVisionConfig.expressionActivity,
+      defaultVisionConfig.screenAttention,
     );
     for (let timestampMs = 0; timestampMs <= 5_000; timestampMs += 200) {
       calibrator.update(createNormalizedFaceFrame({
@@ -23,12 +24,15 @@ describe("BaselineCalibrator", () => {
     expect(state.status).toBe("READY");
     expect(state.baseline.yaw).toBe(3);
     expect(state.baseline.mouthSmileLeft).toBeCloseTo(0.1);
+    expect(state.baseline.eyeGazeHorizontalRatio).toBeCloseTo(0.5);
+    expect(state.baseline.eyeGazeVerticalRatio).toBeCloseTo(0.5);
   });
 
   it("falls back when wall time expires without enough usable data", () => {
     const calibrator = new BaselineCalibrator(
       defaultVisionConfig.calibration,
       defaultVisionConfig.expressionActivity,
+      defaultVisionConfig.screenAttention,
     );
     calibrator.update(createNormalizedFaceFrame({ timestampMs: 0 }), { usable: false, confidence: 0.9, reasons: ["LOW_LIGHT"] });
     const state = calibrator.update(createNormalizedFaceFrame({ timestampMs: 10_000 }), { usable: false, confidence: 0.9, reasons: ["LOW_LIGHT"] });
@@ -45,6 +49,7 @@ describe("BaselineCalibrator", () => {
         blendshapeWeight: 1,
         landmarkWeight: 0,
       },
+      defaultVisionConfig.screenAttention,
     );
 
     for (let timestampMs = 0; timestampMs <= 20_000; timestampMs += 200) {

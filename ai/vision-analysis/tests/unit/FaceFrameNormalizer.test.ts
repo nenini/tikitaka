@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeFaceBox,
+  computeNormalizedEyeGaze,
   FaceFrameNormalizer,
   selectPrimaryFaceBox,
 } from "../../src/vision/core/FaceFrameNormalizer.js";
@@ -24,6 +25,20 @@ function createLandmarks(offsetX = 0): FaceLandmarkPoint[] {
   landmarks[61] = { x: 0.4 + offsetX, y: 0.55, z: 0 };
   landmarks[152] = { x: 0.5 + offsetX, y: 0.7, z: 0 };
   landmarks[291] = { x: 0.6 + offsetX, y: 0.55, z: 0 };
+  landmarks[33] = { x: 0.35 + offsetX, y: 0.4, z: 0 };
+  landmarks[133] = { x: 0.45 + offsetX, y: 0.4, z: 0 };
+  landmarks[159] = { x: 0.4 + offsetX, y: 0.38, z: 0 };
+  landmarks[145] = { x: 0.4 + offsetX, y: 0.42, z: 0 };
+  landmarks[362] = { x: 0.55 + offsetX, y: 0.4, z: 0 };
+  landmarks[263] = { x: 0.65 + offsetX, y: 0.4, z: 0 };
+  landmarks[386] = { x: 0.6 + offsetX, y: 0.38, z: 0 };
+  landmarks[374] = { x: 0.6 + offsetX, y: 0.42, z: 0 };
+  for (const index of [469, 470, 471, 472]) {
+    landmarks[index] = { x: 0.4 + offsetX, y: 0.4, z: 0 };
+  }
+  for (const index of [474, 475, 476, 477]) {
+    landmarks[index] = { x: 0.6 + offsetX, y: 0.4, z: 0 };
+  }
   return landmarks;
 }
 
@@ -77,6 +92,8 @@ describe("FaceFrameNormalizer", () => {
     expect(frame.primaryFace?.blendshapes["mouthSmileLeft"]).toBe(0.2);
     expect(frame.primaryFace?.geometry.noseToChinVerticalRatio).toBeCloseTo(0.5);
     expect(frame.primaryFace?.geometry.landmarkDisplacementScore).toBeNull();
+    expect(frame.primaryFace?.eyeGaze.horizontalRatio).toBeCloseTo(0.5);
+    expect(frame.primaryFace?.eyeGaze.verticalRatio).toBeCloseTo(0.5);
     expect("landmarks" in (frame.primaryFace ?? {})).toBe(false);
   });
 
@@ -97,6 +114,20 @@ describe("FaceFrameNormalizer", () => {
 });
 
 describe("face box helpers", () => {
+  it("normalizes binocular iris position without exposing raw landmarks", () => {
+    const landmarks = createLandmarks();
+    for (const index of [469, 470, 471, 472, 474, 475, 476, 477]) {
+      const point = landmarks[index];
+      if (point !== undefined) landmarks[index] = { ...point, x: point.x + 0.02 };
+    }
+
+    const gaze = computeNormalizedEyeGaze(landmarks);
+
+    expect(gaze.horizontalRatio).toBeCloseTo(0.7);
+    expect(gaze.verticalRatio).toBeCloseTo(0.5);
+    expect(gaze.binocularAgreementScore).toBeCloseTo(1);
+  });
+
   it("calculates how much of an out-of-frame face remains visible", () => {
     const box = computeFaceBox([
       { x: -0.1, y: 0.2, z: 0 },

@@ -16,6 +16,8 @@ const baseline: VisionBaseline = {
   faceAreaRatio: 0.2,
   faceCenterX: 0.5,
   faceCenterY: 0.5,
+  eyeGazeHorizontalRatio: 0.5,
+  eyeGazeVerticalRatio: 0.5,
   mouthSmileLeft: 0,
   mouthSmileRight: 0,
   blendshapeMeans: {},

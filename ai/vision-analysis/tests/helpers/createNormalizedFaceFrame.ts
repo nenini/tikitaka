@@ -1,4 +1,7 @@
-import type { NormalizedFaceFrame } from "../../src/vision/core/NormalizedFaceFrame.js";
+import type {
+  NormalizedEyeGaze,
+  NormalizedFaceFrame,
+} from "../../src/vision/core/NormalizedFaceFrame.js";
 
 export interface NormalizedFrameOptions {
   readonly timestampMs?: number;
@@ -15,6 +18,7 @@ export interface NormalizedFrameOptions {
   readonly centerY?: number;
   readonly blendshapes?: Readonly<Record<string, number>>;
   readonly landmarkDisplacementScore?: number | null;
+  readonly eyeGaze?: NormalizedEyeGaze;
 }
 
 export function createNormalizedFaceFrame(
@@ -57,6 +61,19 @@ export function createNormalizedFaceFrame(
             noseToChinVerticalRatio: 0.3,
             landmarkDisplacementScore:
               options.landmarkDisplacementScore ?? null,
+          },
+          eyeGaze: options.eyeGaze ?? {
+            left: {
+              horizontalRatio: 0.5,
+              verticalRatio: 0.5,
+            },
+            right: {
+              horizontalRatio: 0.5,
+              verticalRatio: 0.5,
+            },
+            horizontalRatio: 0.5,
+            verticalRatio: 0.5,
+            binocularAgreementScore: 1,
           },
         }
       : null,

@@ -6,7 +6,11 @@ import { VisionEventFactory } from "../../src/vision/events/VisionEventFactory.j
 export function createDetectorEventFactory(): VisionEventFactory {
   const clock = new SystemClock();
   return new VisionEventFactory(
-    { sessionId: "test-session", userId: "test-user", clientInstanceId: "test-client" },
+    {
+      sessionId: "test-session",
+      userId: "test-user",
+      clientInstanceId: "76a06bb5-2022-4126-a0f0-e370369e2459",
+    },
     { modelVersion: "test-model", ruleVersion: "test-rules" },
     new SessionTimeline({ sessionElapsedMsAtSync: 0, clientMonotonicMsAtSync: performance.now() }, clock),
     clock,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { VisionBaseline } from "../../src/vision/calibration/VisionBaseline.js";
 import { defaultVisionConfig } from "../../src/vision/config/defaultVisionConfig.js";
 import { ExpressionActivityDetector } from "../../src/vision/detectors/ExpressionActivityDetector.js";
+import { visionBehaviorEventSchema } from "../../src/vision/events/VisionEventSchema.js";
 import { createDetectorEventFactory } from "../helpers/createDetectorTestKit.js";
 import { createNormalizedFaceFrame } from "../helpers/createNormalizedFaceFrame.js";
 
@@ -16,6 +17,8 @@ const baseline: VisionBaseline = {
   faceAreaRatio: 0.2,
   faceCenterX: 0.5,
   faceCenterY: 0.5,
+  eyeGazeHorizontalRatio: 0.5,
+  eyeGazeVerticalRatio: 0.5,
   mouthSmileLeft: 0,
   mouthSmileRight: 0,
   blendshapeMeans: {},
@@ -60,8 +63,9 @@ describe("ExpressionActivityDetector", () => {
       usableContext,
     );
     expect(started.map((event) => event.eventType)).toEqual([
-      "LOW_EXPRESSION_ACTIVITY_STARTED",
+      "STIFF_EXPRESSION_STARTED",
     ]);
+    expect(visionBehaviorEventSchema.parse(started[0])).toEqual(started[0]);
 
     detector.update(
       createNormalizedFaceFrame({
@@ -80,8 +84,9 @@ describe("ExpressionActivityDetector", () => {
       usableContext,
     );
     expect(ended.map((event) => event.eventType)).toEqual([
-      "LOW_EXPRESSION_ACTIVITY_ENDED",
+      "STIFF_EXPRESSION_ENDED",
     ]);
+    expect(visionBehaviorEventSchema.parse(ended[0])).toEqual(ended[0]);
   });
 
   it("clears candidate samples across an unusable gap", () => {
