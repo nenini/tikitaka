@@ -167,9 +167,43 @@ export DB_PASSWORD=date
 
 `.env`는 Docker Compose가 자동으로 읽지만, `bootRun`으로 직접 실행할 때는 운영체제 환경변수로 별도 설정해야 합니다.
 
-현재 로컬 JPA 설정은 `ddl-auto: validate`입니다. 애플리케이션이 엔티티에 필요한 테이블을 자동 생성하지 않으므로 DB 스키마가 코드와 일치해야 합니다.
+로컬 MySQL 스키마는 Flyway가 관리하고 JPA는 `ddl-auto: validate`로 Entity와 실제 테이블의 일치 여부만 검사합니다.
 
-비밀번호 재설정 기능을 사용하려면 `src/main/resources/db/schema/password_reset_tokens.sql`을 MySQL에 먼저 적용해야 합니다.
+현재 마이그레이션:
+
+```text
+src/main/resources/db/migration/
+├── V1__create_initial_schema.sql
+└── V2__create_password_reset_tokens.sql
+```
+
+- 빈 DB에서는 V1과 V2가 순서대로 실행됩니다.
+- 기존 ERD 테이블이 있는 DB에서는 첫 실행 시 V1 상태로 baseline을 등록하고 V2부터 실행합니다.
+- 적용 결과는 DB의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
+
+기존 DB를 처음 연결하기 전에는 반드시 백업하고, 현재 스키마가 V1 ERD와 일치하는지 확인해야 합니다. `baseline-on-migrate`는 기존 스키마가 올바르다고 간주할 뿐 V1과 전체 구조를 비교하지 않습니다.
+
+### Flyway 관리 규칙
+
+1. 이미 공유 DB에 적용된 migration 파일은 수정하거나 삭제하지 않습니다.
+2. 스키마 변경마다 다음 버전의 새 파일을 추가합니다.
+3. 파일명은 `V{버전}__{설명}.sql` 형식을 사용합니다.
+4. Entity 변경과 이를 반영하는 migration을 같은 작업에 포함합니다.
+5. migration은 로컬 DB와 테스트 DB에서 검증한 뒤 병합합니다.
+6. 운영 데이터가 있는 컬럼 변경은 데이터 보존 SQL까지 함께 작성합니다.
+
+예를 들어 사용자 테이블에 닉네임을 추가하면 기존 V1을 수정하지 않고 다음 파일을 만듭니다.
+
+```text
+V3__add_nickname_to_users.sql
+```
+
+```sql
+ALTER TABLE `users`
+    ADD COLUMN `nickname` VARCHAR(50) NULL;
+```
+
+적용된 migration을 수정하면 Flyway checksum 검증이 실패합니다. 수정이 필요하면 기존 파일 대신 새로운 migration에서 변경 사항을 추가합니다.
 
 ### 비밀번호 재설정 API
 
@@ -236,8 +270,8 @@ Linux/macOS:
 - [x] 생성·수정 시각 공통 `BaseEntity` 구성
 - [x] 이메일 기반 비밀번호 재설정 및 일회용 토큰 구성
 - [x] 비밀번호 정책 검증 및 기존 Refresh Token 폐기
+- [x] Flyway 초기 스키마 및 버전별 migration 구성
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
-- [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
 - [ ] 도메인별 API 명세 작성
 - [ ] CI 환경의 빌드·테스트 자동화
 
