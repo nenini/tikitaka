@@ -191,7 +191,7 @@
       <div class="eyebrow">BloomTalk · 와이어플로우</div>
       <h1>유저플로우 v1.2 — 전 화면 목업 연결 완료</h1>
       <p class="sub">근거: <code>기획산출물/유저플로우.md v1.2</code> · <code>기능명세서_v3.md</code> · <code>소개팅 서비스 ERD.sql</code>. <b>F1~F6 + 관리자 전 레인의 29개 화면</b>을 제작해 연결했다. 각 노드는 <b>데스크탑(1280×800)</b>과 <b>앱뷰(375×812)</b>를 나란히 띄운다(관리자는 웹 전용). 레인 하단 <b>데이터 구성요소</b>에 UI 요소 · 데이터 소스(table.field) · API · 실시간 이벤트 · 상태 enum · 지켜야 할 규칙을 정리했다 — 백엔드·프론트엔드가 여기서 필요한 데이터 구조를 바로 확인할 수 있다. 각 목업은 <code>mockups/</code>에서 단독으로도 열린다.</p>
-      <div class="banner">⚠️ <b>F6(AI 화상 트랙)은 아직 승인되지 않은 제안이다.</b> 현행 <code>기능명세서_v3.md</code>의 확정은 <b>D-04 = AI 화상 트랙 P2 보류</b>. 부결되면 <b>F6 레인 전체와 F2 트랙 1의 "AI 화상" 분기를 되돌려야 한다.</b> 또한 F6은 <b>ERD에 반영돼 있지 않다</b> — <code>sessions.sessionType</code> 확장 + AI 설정·턴 로그 테이블이 추가로 필요하다(W-21 · W-23 명세 참조).</div>
+      <div class="banner" style="background:var(--bt-color-info-bg);border-color:var(--bt-blue-200);color:var(--bt-color-info)">✅ <b>F6(AI 화상 트랙) 기능 승인 확정</b>(구 D-04 보류 해제) — 정식 P1 범위에 포함. 다만 F6은 아직 <b>ERD에 반영돼 있지 않다</b> — <code>sessions.sessionType</code>에 AI_VIDEO 추가 + AI 설정·턴 로그 테이블 신설이 필요하다(W-21 · W-23 명세 참조).</div>
       <div class="legend">
         <span class="g"><span class="lg-d"></span><span class="lg-p"></span><b>데스크탑 + 앱뷰</b> 나란히</span>
         <span class="g"><span class="lg-dec"></span><b>다이아몬드</b> = 분기</span>
@@ -376,7 +376,7 @@
           <div class="dev"><span class="dvl">앱뷰</span><div class="slot slot--p zoom" data-s="W-09" data-dev="p" title="W-09 앱뷰 크게 보기"><iframe src="mockups/phone/W-09.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
         </div>
       </figure><span class="arr"><span>→</span></span><div class="dec">양측 수락?</div><div class="split"><div class="path"><span class="lbl n">⚠ 거절·초과</span><span class="arr"><span>→</span></span><span class="chip jump">큐 재등록</span></div><div class="path"><span class="lbl y">양측 수락</span><span class="chip meta">세션 확정</span><span class="arr"><span>→</span></span><figure class="scr scr--live">
-        <figcaption class="scr__cap"><b>W-18</b> 알림 센터</figcaption>
+        <figcaption class="scr__cap"><b>W-18</b> 알림 (헤더 벨 플로팅 → 전체보기)</figcaption>
         <div class="devs">
           <div class="dev"><span class="dvl">데스크탑</span><div class="slot slot--d zoom" data-s="W-18" data-dev="d" title="W-18 데스크탑 크게 보기"><iframe src="mockups/desktop/W-18.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
           <div class="dev"><span class="dvl">앱뷰</span><div class="slot slot--p zoom" data-s="W-18" data-dev="p" title="W-18 앱뷰 크게 보기"><iframe src="mockups/phone/W-18.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
@@ -396,8 +396,8 @@
     </details><details class="sp">
       <summary><b>W-08b</b> 매칭 트랙 선택 <span class="sp__cnt">구성요소 5 · 데이터 3 · API 3</span></summary>
       <div class="sp__b">
-        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>트랙 3카드(실사용자·AI화상·AI챗봇)</li><li>트랙별 메타 칩(소요시간·대기여부·코칭범위·평가·연락처)</li><li>동시 진행 1개 제한 안내</li><li>트랙별 CTA</li><li>AI화상 카드의 P1 결정대기 뱃지</li></ul></div>
-        <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>match_requests.status (진행 중 WAITING 존재 여부 → 중복 차단)</li><li>user_consents + consent_types.code = VOICE (AI 화상 진입 가능 여부 선판정)</li><li>chatbot_personas (챗봇 진입 시 선택 목록)</li></ul></div>
+        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>트랙 3카드(실사용자·AI화상·AI챗봇)</li><li>트랙별 메타 칩(소요시간·대기여부·코칭범위·평가)</li><li>동시 진행 1개 제한 안내</li><li>트랙별 CTA</li><li>AI화상 카드 = P1 정식(승인됨)</li></ul></div>
+        <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>match_requests.status (진행 중 WAITING 존재 여부 → 중복 차단)</li><li>user_consents(VOICE 통합 필수 동의로 충족 → AI 화상 진입 가능)</li><li>chatbot_conversations (챗봇 진입)</li></ul></div>
         <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>POST /api/match/requests — 실사용자 큐 등록</li><li>POST /api/ai-sessions — AI 화상 세션 생성</li><li>POST /api/chatbot/conversations — 챗봇 대화 생성</li></ul></div>
         
         <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>match_requests.status = WAITING | MATCHED | CANCELLED | EXPIRED</li></ul></div>
@@ -424,14 +424,14 @@
         <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li>⚠️ <b>매칭 근거 비공개(D-21)</b> — match_pairs 의 점수 필드(total·goal·conversation·schedule·preference)는 <b>응답 DTO에서 반드시 제외</b></li><li>공개 필드는 <b>닉네임·연령대·얼굴상</b>뿐 — 실명·전화·지역·<b>키 노출 금지</b>(키 미수집)</li><li><b>내 세션 목표는 온보딩 '고치고 싶은 점(고민)'을 그대로 표시</b>(사용자 지시) · 데스크탑·앱뷰 모두 노출</li><li>'차분한 인상' 등 상대 인상 칩은 표시하지 않는다(사용자 지시) · 한쪽 거절·초과 시 큐 재등록(사용자 선택)</li></ul></div>
       </div>
     </details><details class="sp">
-      <summary><b>W-18</b> 알림 센터 <span class="sp__cnt">구성요소 4 · 데이터 1 · API 3</span></summary>
+      <summary><b>W-18</b> 알림 (헤더 벨 플로팅 → 전체보기) <span class="sp__cnt">구성요소 4 · 데이터 1 · API 4</span></summary>
       <div class="sp__b">
-        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>타입 필터 탭</li><li>알림 행(아이콘·제목·본문·상대시각)</li><li>미읽음 하이라이트</li><li>탭하면 relatedType/Id 로 딥링크</li></ul></div>
+        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>헤더 벨 아이콘 + 미읽음 뱃지</li><li>벨 클릭 시 플로팅 팝오버(최근 알림 4~5건)</li><li>알림 행(아이콘·제목·본문·상대시각)</li><li>팝오버 하단 '전체 보기' → 알림 페이지</li></ul></div>
         <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>notifications.notificationId · userId · notificationType · title · content · relatedType · relatedId · isRead · sentAt · readAt</li></ul></div>
-        <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>GET /api/notifications?type=&cursor=</li><li>PATCH /api/notifications/{id}/read</li><li>PATCH /api/notifications/read-all</li></ul></div>
-        <div class="sp__g sp--ws"><span class="sp__k">실시간 이벤트</span><ul><li>notification.created</li></ul></div>
-        <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>notificationType = MATCH_FOUND | MATCH_DEADLINE | MATCH_CONFIRMED | SESSION_REMINDER_2H · _1H · _10M | PARTNER_CANCELLED | NO_SHOW_PENALTY | REPORT_READY | CONTACT_OPENED | CHATBOT_PING</li><li>relatedType = MATCH_PAIR | SESSION | REPORT | CONVERSATION</li></ul></div>
-        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li>매칭 알림에는 <b>취소 가능 기간 안내</b>를 함께 넣는다(§20)</li><li>리마인드는 2시간·1시간·10분 전 3회</li></ul></div>
+        <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>GET /api/notifications?limit=5 (팝오버)</li><li>GET /api/notifications?cursor= (전체 페이지)</li><li>PATCH /api/notifications/{id}/read</li><li>PATCH /api/notifications/read-all</li></ul></div>
+        <div class="sp__g sp--ws"><span class="sp__k">실시간 이벤트</span><ul><li>notification.created — 벨 뱃지 실시간 증가 + 인앱 토스트</li></ul></div>
+        <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>notificationType = MATCH_FOUND | MATCH_DEADLINE | MATCH_CONFIRMED | SESSION_REMINDER_2H · _1H · _10M | PARTNER_CANCELLED | NO_SHOW_PENALTY | REPORT_READY | CHATBOT_PING</li><li>relatedType = MATCH_PAIR | SESSION | REPORT | CONVERSATION</li></ul></div>
+        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li>⚠️ <b>알림은 헤더 벨 클릭 시 플로팅 팝오버로 표시</b>(사용자 지시) — 팝오버는 최근 몇 건만, <b>'전체 보기'를 눌러야 알림 페이지로 이동</b></li><li>실시간 알림은 벨 뱃지 + <b>인앱 토스트/푸시</b>로 전달 · 매칭 알림에는 취소 가능 기간 안내 동봉(§20)</li><li>리마인드는 2시간·1시간·10분 전 3회 · relatedType/Id로 딥링크</li><li>⚠️ (선택) 헤더 벨로 통합 시 모바일 하단 '알림' 탭은 중복 — 탭 구성 재검토 필요</li></ul></div>
       </div>
     </details></div>
   </section>
@@ -575,7 +575,7 @@
     </details><details class="sp">
       <summary><b>W-19</b> 마이페이지 (동의 관리) <span class="sp__cnt">구성요소 6 · 데이터 5 · API 5</span></summary>
       <div class="sp__b">
-        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>프로필 요약 + 온도</li><li>얼굴상 태그</li><li>내 설문 요약(인상·선호 얼굴상·고민)</li><li>통합 필수 동의 + 얼굴(선택) 동의</li><li>참여 기록(세션·노쇼·취소)</li><li>계정(차단 목록·재촬영·탈퇴)</li></ul></div>
+        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>프로필 요약 + 온도</li><li>얼굴상 태그</li><li>내 설문 요약(인상·선호 얼굴상·<b>개선 목표</b>)</li><li>통합 필수 동의 + 얼굴(선택) 동의</li><li>참여 기록(세션·노쇼·취소)</li><li>계정(차단 목록·재촬영·탈퇴)</li></ul></div>
         <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>user_profiles.* · user_face_tags · user_love_temperatures.*</li><li>user_consents.consented · withdrawnAt + consent_types.isRequired (통합 필수 1건 + 얼굴 선택 1건)</li><li>attendance_penalties.penaltyType · expiresAt</li><li>user_blocks</li><li>users.accountStatus · withdrawnAt</li></ul></div>
         <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>GET /api/me</li><li>PATCH /api/me/consents/{FACE_ANALYSIS} { consented:false } — 얼굴 철회</li><li>DELETE /api/me/analysis-data — 기존 분석 데이터 삭제</li><li>GET /api/me/blocks</li><li>DELETE /api/me — 탈퇴</li></ul></div>
         
@@ -608,14 +608,14 @@
         </div>
       </figure><span class="arr"><span>→</span></span><div class="dec">12시간 무응답?</div><div class="split"><div class="path"><span class="lbl alt">아니오</span><span class="chip jump">대화 계속</span></div><div class="path"><span class="lbl y">예 (1회 한정)</span><div class="dec">야간 00–09시?</div><div class="split"><div class="path"><span class="lbl n">예</span><div class="note">발송 보류 · 아침까지</div></div><div class="path"><span class="lbl y">아니오</span><span class="chip meta">시간대별 선톡 1회 · 재발송 없음</span></div></div></div></div><span class="chip end">홈</span></div></div></div>
     <div class="specs"><div class="specs__t">데이터 구성요소 — 백엔드 · 프론트엔드 참조</div><details class="sp">
-      <summary><b>W-10</b> 챗봇 페르소나 설정 (+최초 지역 입력) <span class="sp__cnt">구성요소 7 · 데이터 3 · API 3</span></summary>
+      <summary><b>W-10</b> 챗봇 페르소나 설정 (+최초 지역 입력) <span class="sp__cnt">구성요소 4 · 데이터 3 · API 2</span></summary>
       <div class="sp__b">
-        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>최초 이용 지역 입력(시·도/구·군)</li><li>연습 단계 2택(전/후)</li><li>말투 선택</li><li>난이도 세그먼트</li><li>성향</li><li>반응 정도</li><li>선톡 정책 안내</li></ul></div>
-        <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>user_profiles.regionCity · regionDistrict — <b>챗봇 최초 이용 시 여기서 수집</b>(온보딩에서 이관)</li><li>chatbot_personas.name · speechStyle · difficulty · personality · reactionLevel · systemPrompt</li><li>chatbot_conversations.chatbotPersonaId · conversationStage · status</li></ul></div>
-        <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>PATCH /api/me/profile { regionCity, regionDistrict } (최초 1회)</li><li>GET /api/chatbot/personas</li><li>POST /api/chatbot/conversations { personaId, stage }</li></ul></div>
+        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>최초 이용 지역 입력(시·도/구·군)</li><li>연습 단계 2택(소개팅 전/후)</li><li>성향 3택(적극적·중간·내향적)</li><li>선톡 정책 안내</li></ul></div>
+        <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>user_profiles.regionCity · regionDistrict — <b>챗봇 최초 이용 시 여기서 수집</b>(온보딩에서 이관)</li><li>chatbot_personas.personality (성향) · systemPrompt (성향+단계로 조립)</li><li>chatbot_conversations.chatbotPersonaId · conversationStage · status</li></ul></div>
+        <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>PATCH /api/me/profile { regionCity, regionDistrict } (최초 1회)</li><li>POST /api/chatbot/conversations { stage, personality }</li></ul></div>
         
-        <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>conversationStage = BEFORE_DATE | AFTER_DATE</li><li>difficulty = EASY | NORMAL | REAL</li><li>reactionLevel = FRIENDLY | NEUTRAL | LOW</li></ul></div>
-        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li><b>지역은 챗봇 최초 이용 시에만 수집</b>(사용자 지시) — 이미 입력했으면 이 카드를 건너뛴다. 상대에게 공개하지 않음</li><li>페르소나는 <b>말투 설정이 중심</b> · 단계에 따라 오프닝 프롬프트가 달라진다</li><li>⚠️ systemPrompt 는 <b>클라이언트에 내려보내지 않는다</b> — 서버에서만 LLM에 주입</li><li>챗봇은 텍스트 전용 — STT·TTS·아바타 범위 밖</li></ul></div>
+        <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>conversationStage = BEFORE_DATE | AFTER_DATE</li><li>personality = ACTIVE | MIDDLE | INTROVERTED</li></ul></div>
+        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li>⚠️ <b>말투·대화 난이도·반응 정도 항목 제거</b>(사용자 지시) — 수집 항목은 <b>지역 · 연습 단계 · 성향</b> 3가지만</li><li>⚠️ 이에 따라 <code>chatbot_personas</code>의 speechStyle·difficulty·reactionLevel 은 <b>사용하지 않음</b> — 성향(personality)만 페르소나 입력으로 남긴다(ERD 축소 검토)</li><li><b>지역은 챗봇 최초 이용 시에만 수집</b> — 이미 입력했으면 카드를 건너뛴다. 상대 비공개</li><li>성향+단계로 서버가 systemPrompt 조립 · systemPrompt 는 클라이언트에 내려보내지 않는다 · 챗봇은 텍스트 전용</li></ul></div>
       </div>
     </details><details class="sp">
       <summary><b>W-10b</b> 챗봇 대화 <span class="sp__cnt">구성요소 6 · 데이터 2 · API 3</span></summary>
@@ -630,15 +630,15 @@
     </details></div>
   </section>
 
-  <section class="lane lane--warn">
+  <section class="lane">
     <div class="lane__h">
       <span class="lane__id">F6</span><h3>AI 화상 소개팅 연습 (이모지 + TTS)</h3>
       <span class="persona">사용자</span>
-      <span class="prio prio--warn">P1 제안</span>
+      <span class="prio">P1 · 승인됨</span>
       
       <span class="tag-live">목업 연결됨</span>
     </div>
-    <p class="lane__sum">⚠️ <b>D-04 재결정 전제 · 명세 미반영.</b> 현행 확정은 <b>AI 화상 트랙 P2 보류</b>다. 부결되면 <b>F6 전체와 F2의 AI 화상 분기를 되돌린다.</b></p>
+    <p class="lane__sum">✅ <b>AI 화상 트랙 승인 확정</b>(구 D-04 보류 해제). AI가 TTS 음성 + 이모지로 반응하고 사용자는 음성으로 답한다(아바타 없음). 세션 화면은 <b>내 화면 중심</b>이며, 대기 중 실사용자 매칭 성립은 <b>화면에 표시하지 않고 인앱 토스트·푸시로만</b> 알린다.</p>
 <div class="trk"><div class="trk__t">트랙 1 · 진입 게이트 (음성 동의 = 필수)</div><div class="track"><div class="flow"><span class="chip start">트랙 선택: AI 화상</span><span class="arr"><span>→</span></span><div class="dec">음성 동의 + 마이크?</div><div class="split"><div class="path"><span class="lbl n">⚠ 마이크 오류</span><div class="note">점검 · 재시도</div><span class="chip jump">재검사</span></div><div class="path"><span class="lbl n">⚠ 음성 미동의</span><span class="chip end stop">트랙 이용 불가</span><span class="arr"><span>→</span></span><span class="chip jump">F5 안내</span></div><div class="path"><span class="lbl y">통과</span><div class="dec">카메라 켜기?</div><div class="split"><div class="path"><span class="lbl y">켬 + 표정 동의</span><span class="chip meta">풀 모드 · 표정 + 대화</span></div><div class="path"><span class="lbl alt">끔 / 미동의</span><span class="chip meta">음성 전용 · 대화만</span></div></div></div></div><span class="arr"><span>→</span></span><figure class="scr scr--live">
         <figcaption class="scr__cap"><b>W-21</b> AI 화상 설정</figcaption>
         <div class="devs">
@@ -653,12 +653,12 @@
           <div class="dev"><span class="dvl">앱뷰</span><div class="slot slot--p zoom" data-s="W-22" data-dev="p" title="W-22 앱뷰 크게 보기"><iframe src="mockups/phone/W-22.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
         </div>
       </figure><span class="arr"><i>'실제 사람이 아닙니다' 상시 고지</i><span>→</span></span><figure class="scr scr--live">
-        <figcaption class="scr__cap"><b>W-23</b> AI 화상 세션 (이모지+TTS)</figcaption>
+        <figcaption class="scr__cap"><b>W-23</b> AI 화상 세션 (내 화면 중심 · 이모지+TTS)</figcaption>
         <div class="devs">
           <div class="dev"><span class="dvl">데스크탑</span><div class="slot slot--d zoom" data-s="W-23" data-dev="d" title="W-23 데스크탑 크게 보기"><iframe src="mockups/desktop/W-23.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
           <div class="dev"><span class="dvl">앱뷰</span><div class="slot slot--p zoom" data-s="W-23" data-dev="p" title="W-23 앱뷰 크게 보기"><iframe src="mockups/phone/W-23.html" scrolling="no" loading="lazy"></iframe><span class="zi">⤢</span></div></div>
         </div>
-      </figure><div class="note"><b>AI 발화</b> TTS + 이모지(😊😐🤔) ↔ <b>내 발화</b> 음성 · 실시간 STT · 침묵 15초+ 는 AI가 먼저 질문</div><span class="arr"><span>→</span></span><div class="split"><div class="path"><span class="lbl y">타이머 종료</span><span class="chip jump">트랙 3</span></div><div class="path"><span class="lbl alt">◆ 조기 종료</span><div class="dec">확인 모달</div><div class="split"><div class="path"><span class="lbl alt">취소</span><span class="chip jump">계속</span></div><div class="path"><span class="lbl y">종료</span><span class="chip jump">트랙 3</span></div></div></div><div class="path"><span class="lbl alt">⚠ 매칭 성립 알림</span><div class="note"><b>알림만 · 세션 유지</b><br>수락은 종료 후</div><span class="chip jump">계속</span></div></div></div></div></div>
+      </figure><div class="note"><b>AI 발화</b> TTS + 이모지(😊😐🤔) ↔ <b>내 발화</b> 음성 · 실시간 STT · 침묵 15초+ 는 AI가 먼저 질문</div><span class="arr"><span>→</span></span><div class="split"><div class="path"><span class="lbl y">타이머 종료</span><span class="chip jump">트랙 3</span></div><div class="path"><span class="lbl alt">◆ 조기 종료</span><div class="dec">확인 모달</div><div class="split"><div class="path"><span class="lbl alt">취소</span><span class="chip jump">계속</span></div><div class="path"><span class="lbl y">종료</span><span class="chip jump">트랙 3</span></div></div></div><div class="path"><span class="lbl alt">실사용자 매칭 성립</span><div class="note"><b>화면에 표시하지 않고 인앱 토스트·푸시로만</b><br>세션 유지 · 수락은 종료 후</div><span class="chip jump">계속</span></div></div></div></div></div>
 <div class="trk"><div class="trk__t">트랙 3 · 종료 → AI 단독 리포트 → 복귀</div><div class="track"><div class="flow"><span class="chip meta">지표 집계 · 음성 원본 즉시 삭제</span><span class="arr"><span>→</span></span><figure class="scr scr--live">
         <figcaption class="scr__cap"><b>W-24</b> AI 단독 리포트</figcaption>
         <div class="devs">
@@ -693,14 +693,14 @@
         <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li><b>'상대는 실제 사람이 아닙니다'를 대기방·세션 화면 모두에 상시 노출</b></li><li>마이크는 필수 · 카메라는 선택 — 마이크 실패 시 진입 불가</li><li>노쇼·패널티 개념이 없다(F3와 다름)</li></ul></div>
       </div>
     </details><details class="sp">
-      <summary><b>W-23</b> AI 화상 세션 (이모지+TTS) <span class="sp__cnt">구성요소 10 · 데이터 3 · API 2</span></summary>
+      <summary><b>W-23</b> AI 화상 세션 (내 화면 중심 · 이모지+TTS) <span class="sp__cnt">구성요소 9 · 데이터 3 · API 2</span></summary>
       <div class="sp__b">
-        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li>이모지 리액션 스테이지</li><li>TTS 재생 파형</li><li>AI 발화 자막</li><li>내 발화 실시간 STT</li><li>타이머</li><li>모드 뱃지</li><li>코칭 토스트</li><li>실사용자 매칭 성립 토스트</li><li>실시간 지표 패널</li><li>컨트롤</li></ul></div>
+        <div class="sp__g "><span class="sp__k">UI 구성요소</span><ul><li><b>내 화면(음성 인식)을 주 화면으로 크게</b></li><li>AI 이모지 리액션(작은 사이드 스테이지)</li><li>TTS 재생 파형</li><li>AI 발화 자막</li><li>내 발화 실시간 STT</li><li>타이머·모드 뱃지</li><li>코칭 토스트</li><li>실시간 지표 패널</li><li>컨트롤</li></ul></div>
         <div class="sp__g sp--db"><span class="sp__k">데이터 소스 (table.field)</span><ul><li>coaching_events (F3와 동일 스키마 재사용)</li><li>session_metric_summaries (F3와 동일 파이프라인)</li><li>⚠️ <b>ERD 미반영</b> — AI 턴 로그 필요: turnIndex · speaker(AI|USER) · text · emotion · ttsUrl · startedAt</li></ul></div>
         <div class="sp__g sp--api"><span class="sp__k">API 엔드포인트 (제안)</span><ul><li>POST /api/ai-sessions/{id}/turns — 턴 기록</li><li>WS 스트리밍 STT(실시간 인식)</li></ul></div>
-        <div class="sp__g sp--ws"><span class="sp__k">실시간 이벤트</span><ul><li>ai.turn — AI 발화 + emotion</li><li>stt.partial / stt.final — 내 발화 인식</li><li>coaching.message</li><li>match-found — <b>토스트만</b> 표시, 세션 유지</li></ul></div>
+        <div class="sp__g sp--ws"><span class="sp__k">실시간 이벤트</span><ul><li>ai.turn — AI 발화 + emotion</li><li>stt.partial / stt.final — 내 발화 인식</li><li>coaching.message</li><li>match-found — <b>세션 화면에 표시하지 않고</b> 인앱 토스트·푸시로만</li></ul></div>
         <div class="sp__g sp--st"><span class="sp__k">상태 · enum</span><ul><li>emotion = POSITIVE(😊) | NEUTRAL(😐) | AWKWARD(🤔)</li><li>speaker = AI | USER</li></ul></div>
-        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li><b>음성 원본은 세션 종료 즉시 삭제</b> — 지표·텍스트만 남긴다(§22)</li><li>침묵 개입은 F3의 4단계가 아니라 <b>AI가 먼저 질문</b>하는 1단계로 축약(15초+)</li><li>🔔 실사용자 매칭이 성립해도 <b>세션을 끊지 않는다</b> — 알림만 띄우고 수락은 종료 후</li><li>아바타·얼굴 렌더링 없음(AI-DATE-03 제외 유지)</li></ul></div>
+        <div class="sp__g sp--rule"><span class="sp__k">규칙 · 주의</span><ul><li>⚠️ <b>내 화면이 크게 나오도록</b> 배치(사용자 지시) — AI는 이모지라 큰 영상이 필요 없고, 사용자가 자기 표정·태도를 보며 연습하는 게 목적. AI 이모지는 사이드 보조</li><li>⚠️ <b>세션 화면 내 '매칭 성립 알림' 제거</b>(사용자 지시) — 실사용자 매칭 성립은 <b>인앱 토스트·푸시로만</b> 알리고 세션은 유지, 수락은 종료 후</li><li><b>음성 원본은 세션 종료 즉시 삭제</b> · 침묵 개입은 AI가 먼저 질문(1단계) · 아바타·얼굴 렌더링 없음</li></ul></div>
       </div>
     </details><details class="sp">
       <summary><b>W-24</b> AI 단독 리포트 <span class="sp__cnt">구성요소 6 · 데이터 4 · API 1</span></summary>
@@ -812,11 +812,11 @@
         <tr class="is-live"><td><code>W-15</code></td><td>5분 화상 연장 (직접 연락처 교환)</td><td>CONTACT-01</td><td>F4</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-16</code></td><td>AI 세션 리포트</td><td>REPORT-01 · 01-1 · 02 · 04</td><td>F4</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-17</code></td><td>성장 대시보드</td><td>GROWTH-01</td><td>F4 · F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
-        <tr class="is-live"><td><code>W-18</code></td><td>알림 센터</td><td>NOTIFY-01</td><td>F2</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
+        <tr class="is-live"><td><code>W-18</code></td><td>알림 (헤더 벨 플로팅 → 전체보기)</td><td>NOTIFY-01</td><td>F2</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-19</code></td><td>마이페이지 (동의 관리)</td><td>PROFILE · AUTH-03</td><td>—</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
-        <tr class="is-live"><td><code>W-21</code></td><td>AI 화상 설정</td><td>F6 제안</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
-        <tr class="is-live"><td><code>W-22</code></td><td>AI 대기방</td><td>F6 제안</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
-        <tr class="is-live"><td><code>W-23</code></td><td>AI 화상 세션 (이모지+TTS)</td><td>F6 제안</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
+        <tr class="is-live"><td><code>W-21</code></td><td>AI 화상 설정</td><td>F6 · P1</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
+        <tr class="is-live"><td><code>W-22</code></td><td>AI 대기방</td><td>F6 · P1</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
+        <tr class="is-live"><td><code>W-23</code></td><td>AI 화상 세션 (내 화면 중심 · 이모지+TTS)</td><td>F6 · P1</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-24</code></td><td>AI 단독 리포트</td><td>REPORT-01 변형</td><td>F6</td><td>데스크탑 · 앱뷰</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-40</code></td><td>관리자 · 대시보드</td><td>§21</td><td>AD</td><td>데스크탑</td><td><span class="mk mk--live">연결됨</span></td></tr>
         <tr class="is-live"><td><code>W-41</code></td><td>관리자 · 신고 · 회원</td><td>MODERATION-03</td><td>AD</td><td>데스크탑</td><td><span class="mk mk--live">연결됨</span></td></tr>
@@ -854,7 +854,7 @@
   <script>
   (function () {
     var ORDER = ["W-01","W-02","W-02b","W-04","W-05","W-05b","W-06","W-08","W-08b","W-09","W-09b","W-10","W-10b","W-11","W-12","W-13","W-14","W-15","W-16","W-17","W-18","W-19","W-21","W-22","W-23","W-24","W-40","W-41","W-42"];
-    var NAMES = {"W-01":"랜딩 · 로그인","W-02":"계정 만들기 (이메일/소셜 + 단일 필수 동의)","W-02b":"본인 인증 (KYC · Mock)","W-04":"기본 프로필 (닉네임·성별·선호연령)","W-05":"실시간 얼굴 촬영 (선택 동의)","W-05b":"얼굴상 태그 결과 (1순위·항상 공개)","W-06":"설문 (인상·선호 얼굴상·고민)","W-08":"홈 (예정 세션·온도)","W-08b":"매칭 트랙 선택","W-09":"매칭 카드","W-09b":"매칭 대기 큐","W-10":"챗봇 페르소나 설정 (+최초 지역 입력)","W-10b":"챗봇 대화","W-11":"상황형 대기방 · 기기 점검","W-12":"화상 세션 (30분·침묵 추천 질문 포함)","W-13":"신고","W-14":"상호 평가","W-15":"5분 화상 연장 (직접 연락처 교환)","W-16":"AI 세션 리포트","W-17":"성장 대시보드","W-18":"알림 센터","W-19":"마이페이지 (동의 관리)","W-21":"AI 화상 설정","W-22":"AI 대기방","W-23":"AI 화상 세션 (이모지+TTS)","W-24":"AI 단독 리포트","W-40":"관리자 · 대시보드","W-41":"관리자 · 신고 · 회원","W-42":"관리자 · 정책 설정"};
+    var NAMES = {"W-01":"랜딩 · 로그인","W-02":"계정 만들기 (이메일/소셜 + 단일 필수 동의)","W-02b":"본인 인증 (KYC · Mock)","W-04":"기본 프로필 (닉네임·성별·선호연령)","W-05":"실시간 얼굴 촬영 (선택 동의)","W-05b":"얼굴상 태그 결과 (1순위·항상 공개)","W-06":"설문 (인상·선호 얼굴상·고민)","W-08":"홈 (예정 세션·온도)","W-08b":"매칭 트랙 선택","W-09":"매칭 카드","W-09b":"매칭 대기 큐","W-10":"챗봇 페르소나 설정 (+최초 지역 입력)","W-10b":"챗봇 대화","W-11":"상황형 대기방 · 기기 점검","W-12":"화상 세션 (30분·침묵 추천 질문 포함)","W-13":"신고","W-14":"상호 평가","W-15":"5분 화상 연장 (직접 연락처 교환)","W-16":"AI 세션 리포트","W-17":"성장 대시보드","W-18":"알림 (헤더 벨 플로팅 → 전체보기)","W-19":"마이페이지 (동의 관리)","W-21":"AI 화상 설정","W-22":"AI 대기방","W-23":"AI 화상 세션 (내 화면 중심 · 이모지+TTS)","W-24":"AI 단독 리포트","W-40":"관리자 · 대시보드","W-41":"관리자 · 신고 · 회원","W-42":"관리자 · 정책 설정"};
     var WEBONLY = ["W-40","W-41","W-42"];
     var lb = document.getElementById('lb'), stage = document.getElementById('lbStage'),
         frame = document.getElementById('lbFrame'), scaleEl = document.getElementById('lbScale');

@@ -1,23 +1,36 @@
 <!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
-<title>W-18 · 알림 센터 (모바일)</title>
+<title>W-18 (모바일)</title>
 <link rel="stylesheet" href="../../design-system/tokens.css">
 <link rel="stylesheet" href="../ui.css"></head>
 <body><div class="p-frame">
   <div class="notch"></div>
-  <div class="pbar"><span class="back">‹</span><h1>알림 센터</h1></div>
-  <div class="pbody">
-
-  <div class="row g4 wrap"><span class="chip on">전체</span><span class="chip">매칭</span><span class="chip">세션</span></div>
-  <div class="card col f1">
-    <div class="lrow unread"><span style="font-size:17px">💘</span><div class="col f1"><span class="tt">매칭 성립</span>
-      <span class="ss">유월님 · 5분 안에 수락</span></div><span class="rt">방금</span></div>
-    <div class="lrow unread"><span style="font-size:17px">⏰</span><div class="col f1"><span class="tt">세션 1시간 전</span>
-      <span class="ss">오늘 19:00</span></div><span class="rt">10분</span></div>
-    <div class="lrow"><span style="font-size:17px">📊</span><div class="col f1"><span class="tt">리포트 준비 완료</span>
-      <span class="ss">6회차 세션</span></div><span class="rt">2일</span></div>
-    <div class="lrow"><span style="font-size:17px">🙅</span><div class="col f1"><span class="tt">상대 취소</span>
-      <span class="ss">내 온도 영향 없음</span></div><span class="rt">3일</span></div>
+  <div class="pbar"><h1 style="flex:1">홈</h1>
+    <span style="font-size:20px;position:relative">🔔<span style="position:absolute;top:-3px;right:-5px;min-width:14px;height:14px;padding:0 3px;border-radius:999px;background:var(--bt-color-danger-fill);color:#fff;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center">2</span></span></div>
+  <div class="pbody" style="position:relative">
+    <div style="opacity:.4;pointer-events:none">
+      <div class="card col g8"><span class="h3">사랑의 온도</span>
+        <div class="row ae g6"><span class="temp">38.2<small>°</small></span><span class="badge ok">▲ 1.7</span></div>
+        <div class="meter warm"><i style="width:52%"></i></div></div>
+      <div class="card col g8"><span class="h3">예정된 세션</span>
+        <div class="row g8 ac"><div class="av m">유</div><div class="col g4"><b style="font-size:14px">유월</b><span class="tiny">오늘 19:00</span></div></div></div>
+    </div>
+    <div style="position:fixed;inset:0;background:rgba(15,17,22,.10);z-index:15"></div>
+    <div style="position:fixed;top:96px;left:12px;right:12px;z-index:20;background:var(--bt-color-surface);
+                border:1px solid var(--bt-color-border);border-radius:16px;box-shadow:0 18px 50px rgba(15,17,22,.3);overflow:hidden">
+      <div class="row jb ac" style="padding:12px 14px;border-bottom:1px solid var(--bt-color-border)">
+        <div class="row g6 ac"><b style="font-size:13px">알림</b><span class="badge no">2</span></div>
+        <span class="tiny"><b>모두 읽음</b></span></div>
+      <div class="col">
+  <div class="lrow unread" style="padding:11px 14px;margin:0"><span style="font-size:17px">💘</span>
+    <div class="col f1"><span class="tt">매칭이 성립했어요</span><span class="ss">유월님과 매칭 · 5분 안에 수락</span></div><span class="rt">방금</span></div>
+  <div class="lrow unread" style="padding:11px 14px;margin:0"><span style="font-size:17px">⏰</span>
+    <div class="col f1"><span class="tt">세션 1시간 전이에요</span><span class="ss">오늘 19:00 · 지금 취소 시 패널티</span></div><span class="rt">10분</span></div>
+  <div class="lrow" style="padding:11px 14px;margin:0"><span style="font-size:17px">📊</span>
+    <div class="col f1"><span class="tt">리포트가 준비됐어요</span><span class="ss">6회차 세션 리포트</span></div><span class="rt">2일</span></div>
+  <div class="lrow" style="padding:11px 14px;margin:0"><span style="font-size:17px">🙅</span>
+    <div class="col f1"><span class="tt">상대가 세션을 취소했어요</span><span class="ss">내 온도·패널티 영향 없음</span></div><span class="rt">3일</span></div></div>
+      <a class="btn ghost block" style="border:0;border-top:1px solid var(--bt-color-border);border-radius:0;height:44px">전체 보기 →</a>
+    </div>
   </div>
-  </div>
-<div class="tabbar"><div class=""><i>🏠</i>홈</div><div class=""><i>💘</i>매칭</div><div class=""><i>📊</i>리포트</div><div class="on"><i>🔔</i>알림</div></div>
+  <div class="tabbar"><div class="on"><i>🏠</i>홈</div><div><i>💘</i>매칭</div><div><i>📊</i>리포트</div><div><i>🔔</i>알림</div></div>
 </div></body></html>
