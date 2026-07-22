@@ -70,7 +70,11 @@ class BackendApplicationTests {
 		HttpResponse<String> response = get("/v3/api-docs");
 
 		assertThat(response.statusCode()).isEqualTo(200);
-		assertThat(response.body()).contains("\"title\":\"Backend API\"");
+		assertThat(response.body())
+				.contains("\"title\":\"DATE Backend API\"")
+				.contains("\"summary\":\"로그인\"")
+				.contains("\"summary\":\"내 정보 조회\"")
+				.contains("\"BearerAuth\"");
 	}
 
 	@Test
