@@ -87,6 +87,10 @@ public class User {
 		this.lastLoginAt = LocalDateTime.now();
 	}
 
+	public void changePassword(String passwordHash) {
+		this.passwordHash = passwordHash;
+	}
+
 	public boolean isActive() {
 		return accountStatus == AccountStatus.ACTIVE && withdrawnAt == null;
 	}

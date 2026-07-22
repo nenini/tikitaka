@@ -15,36 +15,33 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "refresh_tokens")
-public class RefreshToken {
+@Table(name = "password_reset_tokens")
+public class PasswordResetToken {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "refreshTokenId")
+	@Column(name = "passwordResetTokenId")
 	private Long id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "userId", nullable = false)
 	private User user;
 
-	@Column(name = "tokenHash", nullable = false)
+	@Column(name = "tokenHash", nullable = false, unique = true, length = 64)
 	private String tokenHash;
 
 	@Column(name = "expiresAt", nullable = false)
 	private LocalDateTime expiresAt;
 
-	@Column(name = "revokedAt")
-	private LocalDateTime revokedAt;
+	@Column(name = "usedAt")
+	private LocalDateTime usedAt;
 
 	@Column(name = "createdAt", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
-	@Column(name = "lastUsedAt")
-	private LocalDateTime lastUsedAt;
-
-	protected RefreshToken() {
+	protected PasswordResetToken() {
 	}
 
-	public RefreshToken(User user, String tokenHash, LocalDateTime expiresAt) {
+	public PasswordResetToken(User user, String tokenHash, LocalDateTime expiresAt) {
 		this.user = user;
 		this.tokenHash = tokenHash;
 		this.expiresAt = expiresAt;
@@ -55,20 +52,12 @@ public class RefreshToken {
 		this.createdAt = LocalDateTime.now();
 	}
 
-	public void markUsed() {
-		this.lastUsedAt = LocalDateTime.now();
-	}
-
-	public void revoke() {
-		this.revokedAt = LocalDateTime.now();
-	}
-
-	public void revokeAt(LocalDateTime revokedAt) {
-		this.revokedAt = revokedAt;
-	}
-
 	public boolean isUsable(LocalDateTime now) {
-		return revokedAt == null && expiresAt.isAfter(now);
+		return usedAt == null && expiresAt.isAfter(now);
+	}
+
+	public void markUsed(LocalDateTime now) {
+		this.usedAt = now;
 	}
 
 	public User getUser() {

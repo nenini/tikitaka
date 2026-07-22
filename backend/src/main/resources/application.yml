@@ -11,6 +11,21 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   jpa:
     open-in-view: false
     properties:
@@ -30,6 +45,9 @@ server:
       force: true
 
 management:
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:
@@ -54,3 +72,7 @@ auth:
     secret: ${JWT_SECRET:date-service-local-development-secret-key-change-me-please}
     access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:1800}
     refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:1209600}
+  password-reset:
+    token-validity-seconds: ${PASSWORD_RESET_TOKEN_VALIDITY_SECONDS:900}
+    url: ${PASSWORD_RESET_URL:http://localhost:3000/password-reset}
+    from: ${MAIL_FROM:no-reply@date.local}

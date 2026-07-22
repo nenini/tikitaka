@@ -50,6 +50,15 @@ cp .env.example .env
 | `MYSQL_USER` | `date` | 애플리케이션 DB 사용자 |
 | `MYSQL_PASSWORD` | - | 애플리케이션 DB 비밀번호 |
 | `MYSQL_ROOT_PASSWORD` | - | MySQL root 비밀번호 |
+| `PASSWORD_RESET_TOKEN_VALIDITY_SECONDS` | `900` | 비밀번호 재설정 토큰 유효시간(초) |
+| `PASSWORD_RESET_URL` | `http://localhost:3000/password-reset` | 이메일에 포함할 프론트엔드 재설정 주소 |
+| `MAIL_FROM` | `no-reply@date.local` | 발신 이메일 주소 |
+| `MAIL_HOST` | `localhost` | SMTP 서버 주소 |
+| `MAIL_PORT` | `1025` | SMTP 서버 포트 |
+| `MAIL_USERNAME` | - | SMTP 사용자 이름 |
+| `MAIL_PASSWORD` | - | SMTP 비밀번호 |
+| `MAIL_SMTP_AUTH` | `false` | SMTP 인증 사용 여부 |
+| `MAIL_SMTP_STARTTLS` | `false` | STARTTLS 사용 여부 |
 
 `.env`에는 실제 비밀번호를 입력하고 Git에 추가하지 않습니다. `.env.example`에는 실제 비밀번호를 작성하지 않습니다.
 
@@ -160,6 +169,35 @@ export DB_PASSWORD=date
 
 현재 로컬 JPA 설정은 `ddl-auto: validate`입니다. 애플리케이션이 엔티티에 필요한 테이블을 자동 생성하지 않으므로 DB 스키마가 코드와 일치해야 합니다.
 
+비밀번호 재설정 기능을 사용하려면 `src/main/resources/db/schema/password_reset_tokens.sql`을 MySQL에 먼저 적용해야 합니다.
+
+### 비밀번호 재설정 API
+
+재설정 이메일 요청은 가입 여부와 관계없이 항상 동일한 `202 Accepted` 응답을 반환합니다.
+
+```http
+POST /api/v1/auth/password/reset-request
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+
+이메일 링크에서 받은 일회용 토큰과 새 비밀번호를 전달합니다.
+
+```http
+PATCH /api/v1/auth/password/reset
+Content-Type: application/json
+
+{
+  "token": "one-time-reset-token",
+  "newPassword": "newPassword123!"
+}
+```
+
+비밀번호는 8~64자이며 영문, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다. 재설정 성공 시 해당 사용자의 기존 Refresh Token이 모두 폐기됩니다.
+
 ## 테스트
 
 테스트는 외부 MySQL이 아닌 인메모리 H2를 사용합니다.
@@ -196,6 +234,8 @@ Linux/macOS:
 - [x] 검증·비즈니스·404·서버 오류 전역 예외 처리 구성
 - [x] 공통 JPA 설정 및 Auditing 구성
 - [x] 생성·수정 시각 공통 `BaseEntity` 구성
+- [x] 이메일 기반 비밀번호 재설정 및 일회용 토큰 구성
+- [x] 비밀번호 정책 검증 및 기존 Refresh Token 폐기
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
 - [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
 - [ ] 도메인별 API 명세 작성
