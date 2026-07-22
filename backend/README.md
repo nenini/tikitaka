@@ -114,6 +114,24 @@ docker compose logs -f backend
 
 기본 접속 주소는 `http://localhost:8080`입니다. MySQL health check가 통과한 후 백엔드가 시작됩니다.
 
+### Docker 개발 모드: 코드 저장 시 자동 반영
+
+개발 모드는 Compose Watch로 `src` 변경 파일을 백엔드 컨테이너에 동기화하고 Gradle 캐시는 Docker 볼륨에 보관합니다.
+소스 저장을 감지하면 MySQL은 유지한 채 백엔드 컨테이너만 재시작하고 `bootRun`이 변경 코드를 다시 컴파일합니다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml watch
+```
+
+실행 후 Java 또는 설정 파일을 저장하면 변경 사항이 자동 반영됩니다. `build.gradle`이나 `settings.gradle`을 변경하면 개발 이미지를 자동으로 다시 빌드합니다.
+종료하려면 `Ctrl+C`를 누른 뒤 다음 명령을 실행합니다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
+MySQL의 `mysql-data` 볼륨은 삭제되지 않습니다. DB까지 초기화해야 할 때만 `down`에 `--volumes`를 추가합니다.
+
 애플리케이션 상태 확인:
 
 ```bash
