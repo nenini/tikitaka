@@ -1,35 +1,40 @@
 <!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
-<title>W-11 · 상황형 대기방 (데스크탑)</title>
+<title>W-11 · 상황형 대기방 · 기기 점검 (데스크탑)</title>
 <link rel="stylesheet" href="../../design-system/tokens.css">
 <link rel="stylesheet" href="../ui.css"></head>
 <body><div class="d-frame is-dark">
-<div class="appbar"><span class="logo">BloomTalk</span><div class="right"><span class="chip">상황형 대기방</span></div></div>
+<div class="appbar"><span class="logo">BloomTalk</span><div class="right"><span class="chip">상황형 대기방 · 기기 점검</span></div></div>
   <div class="body">
 
   <div class="row g16 f1">
     <div class="col g12 f1">
       <div class="row jb ac"><div class="row g8 ac"><span class="chip">🍽 저녁 식당</span><span class="tiny" style="color:rgba(255,255,255,.6)">18~19시 자동 배정</span></div>
         <span class="timer">19:00 시작 · 02:41 전</span></div>
-      <div class="tile f1" style="min-height:330px"><span class="ph">👤</span><span class="name">내 화면 (미리보기)</span></div>
-      <div class="ctrl"><div class="cbtn">🎥</div><div class="cbtn">🎙</div><div class="cbtn">🔊</div><div class="cbtn off">⚙️</div></div>
+      <div class="tile f1" style="position:relative;min-height:300px"><span class="ph">🙂</span>
+        <div class="cam-guide" style="width:210px;height:270px"></div>
+        <span class="name">카메라 · 원 안에 얼굴을 맞춰주세요</span>
+        <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%)"><span class="chip ok">✓ 얼굴 인식됨</span></div>
+      </div>
     </div>
-    <div class="col g12" style="width:360px">
+    <div class="col g12" style="width:380px">
+      <div class="col g4"><h2 class="h2" style="color:#fff">입장 전 기기를 점검해요</h2>
+        <p class="tiny" style="color:rgba(255,255,255,.6)">카메라·스피커·마이크를 한 번에 확인하세요.</p></div>
       <div class="card col g10">
-        <span class="h3" style="color:var(--bt-mist-300)">기기 점검</span>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">카메라 정상 · FaceTime HD</span></div>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">마이크 정상 · 입력 감지됨</span></div>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">스피커 정상</span></div>
-        <div class="row g8 ac"><span class="dot wa"></span><span class="tiny" style="color:#fff">네트워크 보통 · TURN 경유</span></div>
+        <div class="row jb ac"><div class="row g8 ac"><span style="font-size:18px">🎥</span><b style="font-size:13.5px;color:#fff">카메라</b></div>
+          <span class="badge ok">정상</span></div>
+        <span class="tiny" style="color:rgba(255,255,255,.6)">원 안에 얼굴이 또렷하게 잡혔어요.</span>
       </div>
       <div class="card col g10">
-        <span class="h3" style="color:var(--bt-mist-300)">분석 동의 상태</span>
-        <div class="row jb ac"><span class="tiny" style="color:#fff">표정·시선 분석</span><span class="badge ok">동의</span></div>
-        <div class="row jb ac"><span class="tiny" style="color:#fff">음성·대화 분석</span><span class="badge ok">동의</span></div>
-        <p class="tiny" style="color:rgba(255,255,255,.55)">미동의 항목은 코칭이 제공되지 않고 리포트가 축소판으로 생성돼요.</p>
+        <div class="row jb ac"><div class="row g8 ac"><span style="font-size:18px">🔊</span><b style="font-size:13.5px;color:#fff">스피커</b></div>
+          <a class="btn dark sm">🔈 테스트음 재생</a></div>
+        <div class="wave" style="height:20px"><i style="height:8px"></i><i style="height:15px"></i><i style="height:20px"></i><i style="height:12px"></i><i style="height:17px"></i><i style="height:9px"></i></div>
+        <span class="tiny" style="color:rgba(255,255,255,.6)">소리가 들리면 정상이에요.</span>
       </div>
-      <div class="card col g8">
-        <span class="h3" style="color:var(--bt-mist-300)">이번 세션 목표</span>
-        <div class="row g6 wrap"><span class="chip on">질문·리액션 균형</span><span class="chip on">말 끊지 않기</span></div>
+      <div class="card col g10">
+        <div class="row jb ac"><div class="row g8 ac"><span style="font-size:18px">🎙</span><b style="font-size:13.5px;color:#fff">마이크</b></div>
+          <span class="badge ok">입력 감지</span></div>
+        <div class="meter"><i style="width:64%"></i></div>
+        <span class="tiny" style="color:rgba(255,255,255,.6)">"안녕하세요"라고 말해보세요 — 막대가 움직이면 정상.</span>
       </div>
       <div class="banner in"><span>ℹ️</span><span>AI 코칭은 <b>나에게만</b> 보여요 · 침묵 10초까지는 개입하지 않아요 · 언제든 신고·퇴장할 수 있어요</span></div>
       <div class="row g8 ac mta"><span class="dot off"></span><span class="tiny" style="color:rgba(255,255,255,.7)">상대 입장 대기 중…</span></div>

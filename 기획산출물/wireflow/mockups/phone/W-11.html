@@ -1,22 +1,21 @@
 <!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
-<title>W-11 · 상황형 대기방 (모바일)</title>
+<title>W-11 · 상황형 대기방 · 기기 점검 (모바일)</title>
 <link rel="stylesheet" href="../../design-system/tokens.css">
 <link rel="stylesheet" href="../ui.css"></head>
 <body><div class="p-frame is-dark">
   <div class="notch"></div>
-  <div class="pbar"><span class="back">‹</span><h1>상황형 대기방</h1></div>
+  <div class="pbar"><span class="back">‹</span><h1>상황형 대기방 · 기기 점검</h1></div>
   <div class="pbody">
 
   <div class="row jb ac"><span class="chip">🍽 저녁 식당</span><span class="timer">02:41 전</span></div>
-  <div class="tile" style="height:210px"><span class="ph">👤</span><span class="name">내 화면</span></div>
-  <div class="ctrl"><div class="cbtn">🎥</div><div class="cbtn">🎙</div><div class="cbtn">🔊</div></div>
-  <div class="card col g6">
-    <span class="h3" style="color:var(--bt-mist-300)">기기 점검</span>
-    <div class="row g6 ac"><span class="dot"></span><span class="tiny" style="color:#fff">카메라·마이크 정상</span></div>
-    <div class="row g6 ac"><span class="dot wa"></span><span class="tiny" style="color:#fff">네트워크 보통</span></div>
+  <div class="tile" style="height:200px;position:relative"><span class="ph">🙂</span>
+    <div class="cam-guide" style="width:130px;height:165px"></div>
+    <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%)"><span class="chip ok">✓ 얼굴 인식됨</span></div>
   </div>
-  <div class="card col g6"><span class="h3" style="color:var(--bt-mist-300)">세션 목표</span>
-    <div class="row g4 wrap"><span class="chip on">질문·리액션 균형</span></div></div>
+  <div class="card col g6"><div class="row jb ac"><b style="font-size:12.5px;color:#fff">🎥 카메라</b><span class="badge ok">정상</span></div></div>
+  <div class="card col g6"><div class="row jb ac"><b style="font-size:12.5px;color:#fff">🔊 스피커</b><a class="btn dark sm">테스트음</a></div></div>
+  <div class="card col g6"><div class="row jb ac"><b style="font-size:12.5px;color:#fff">🎙 마이크</b><span class="badge ok">입력 감지</span></div>
+    <div class="meter"><i style="width:64%"></i></div></div>
   <div class="banner in"><span>ℹ️</span><span>코칭은 <b>나에게만</b> 보여요</span></div>
   <a class="btn block lg mta">입장하기</a>
   </div>

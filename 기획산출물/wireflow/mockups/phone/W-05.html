@@ -7,17 +7,19 @@
   <div class="pbar"><span class="back">‹</span><h1>실시간 얼굴 촬영</h1></div>
   <div class="pbody">
 
-  <div class="tile f1" style="position:relative"><span class="ph">🙂</span>
-    <div class="cam-guide" style="width:190px;height:240px"></div>
-    <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%)"><span class="chip">원 안에 맞춰주세요</span></div>
+  <div class="tile f1" style="position:relative;filter:blur(2px);opacity:.5"><span class="ph">🙂</span>
+    <div class="cam-guide" style="width:180px;height:230px"></div></div>
+  <div style="position:fixed;inset:0;display:flex;align-items:flex-end;background:rgba(0,0,0,.6);z-index:9">
+    <div class="card" style="width:100%;background:var(--bt-mist-900);border-color:rgba(255,255,255,.14);border-radius:20px 20px 0 0">
+      <div class="col g8">
+        <span style="font-size:30px">📸</span>
+        <h2 class="h2" style="color:#fff">얼굴 촬영·분석 동의 <span class="badge gray">선택</span></h2>
+        <p class="tiny" style="color:rgba(255,255,255,.7)">동의 안 해도 기본 연습은 이용 가능 · 원본 즉시 삭제</p>
+        <div class="row g6 ac"><span class="dot"></span><span class="tiny" style="color:#fff">조명·얼굴 수·각도·크기 자동 점검</span></div>
+        <div class="row g8"><a class="btn dark f1">건너뛰기</a><a class="btn f1" style="flex:2">동의하고 촬영</a></div>
+      </div>
+    </div>
   </div>
-  <div class="card col g6">
-    <div class="row g6 ac"><span class="dot"></span><span class="tiny" style="color:#fff">얼굴 1명 · 정면 양호</span></div>
-    <div class="row g6 ac"><span class="dot wa"></span><span class="tiny" style="color:#fff">조명이 조금 어두워요</span></div>
-  </div>
-  <p class="tiny" style="color:rgba(255,255,255,.6)">갤러리 업로드 불가 · 재시도 1/3</p>
-  <a class="btn block lg">촬영하기</a>
-  <a class="btn dark block">건너뛰기</a>
   </div>
 
 </div></body></html>

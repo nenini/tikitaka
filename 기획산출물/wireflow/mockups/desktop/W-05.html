@@ -6,24 +6,31 @@
 <div class="appbar"><span class="logo">BloomTalk</span><div class="right"><span class="chip">실시간 얼굴 촬영</span></div></div>
   <div class="body">
 
-  <div class="row g16 f1">
+  <div class="row g16 f1" style="filter:blur(2px);opacity:.45">
     <div class="tile f1" style="position:relative"><span class="ph">🙂</span>
-      <div class="cam-guide" style="width:260px;height:330px"></div>
-      <span class="name">카메라 미리보기</span>
-      <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%)"><span class="chip">얼굴을 원 안에 맞춰주세요</span></div>
-    </div>
-    <div class="col g12" style="width:360px">
-      <div class="col g4"><h2 class="h2" style="color:#fff">얼굴을 촬영해주세요</h2>
-        <p class="tiny" style="color:rgba(255,255,255,.65)">과도한 보정을 막기 위해 <b>갤러리 업로드 없이 실시간 촬영만</b> 지원해요.</p></div>
-      <div class="card col g8">
-        <span class="h3" style="color:var(--bt-mist-300)">촬영 조건</span>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">얼굴 1명 감지됨</span></div>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">정면 각도 양호</span></div>
-        <div class="row g8 ac"><span class="dot wa"></span><span class="tiny" style="color:#fff">조명이 조금 어두워요</span></div>
-        <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">가림 없음</span></div>
+      <div class="cam-guide" style="width:260px;height:330px"></div><span class="name">카메라 미리보기</span></div>
+    <div class="col g12" style="width:360px"><h2 class="h2" style="color:#fff">얼굴을 촬영해주세요</h2>
+  <div class="card col g8">
+    <span class="h3" style="color:var(--bt-mist-300)">촬영 조건</span>
+    <div class="row g8 ac"><span class="dot wa"></span><span class="tiny" style="color:#fff">조명이 조금 어두워요</span></div>
+    <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">얼굴 수 1명 (정상)</span></div>
+    <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">각도 정면 양호</span></div>
+    <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">크기 적절 (원 안에 꽉 참)</span></div>
+  </div></div>
+  </div>
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:9">
+    <div class="card" style="width:460px;background:var(--bt-mist-900);border-color:rgba(255,255,255,.14)">
+      <div class="col g10">
+        <div class="col g4"><span style="font-size:34px">📸</span>
+          <h2 class="h2" style="color:#fff">얼굴 촬영·분석에 동의해 주세요 <span class="badge gray">선택</span></h2>
+          <p class="tiny" style="color:rgba(255,255,255,.7)">얼굴상 태그 분석을 위해 카메라로 얼굴을 촬영해요. 동의하지 않아도 <b>기본 연습은 그대로 이용</b>할 수 있어요.</p></div>
+        <div class="col g6">
+          <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">실시간 촬영만 · 갤러리 업로드 불가</span></div>
+          <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">분석 완료 후 <b>원본 이미지 즉시 삭제</b></span></div>
+          <div class="row g8 ac"><span class="dot"></span><span class="tiny" style="color:#fff">외모 점수가 아닌 재미용 분위기 태그</span></div>
+        </div>
+        <div class="row g8"><a class="btn dark f1">건너뛰기</a><a class="btn f1" style="flex:2">동의하고 촬영</a></div>
       </div>
-      <div class="banner wa"><span>📸</span><span>재시도 <b>1 / 3</b> · 3회를 초과하면 얼굴상 없이 진행하고, 나중에 마이페이지에서 다시 찍을 수 있어요.</span></div>
-      <div class="col g8 mta"><a class="btn block lg">촬영하기</a><a class="btn dark block">이 단계 건너뛰기</a></div>
     </div>
   </div>
   </div>
