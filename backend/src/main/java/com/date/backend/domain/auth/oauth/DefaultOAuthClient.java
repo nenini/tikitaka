@@ -4,6 +4,7 @@ import com.date.backend.domain.auth.domain.OAuthProvider;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -28,10 +29,12 @@ public class DefaultOAuthClient implements OAuthClient {
 	private static final String NAVER_USERINFO_URI = "https://openapi.naver.com/v1/nid/me";
 
 	private final OAuthProperties properties;
+	private final ObjectMapper objectMapper;
 	private final RestClient restClient = RestClient.create();
 
-	public DefaultOAuthClient(OAuthProperties properties) {
+	public DefaultOAuthClient(OAuthProperties properties, ObjectMapper objectMapper) {
 		this.properties = properties;
+		this.objectMapper = objectMapper;
 	}
 
 	@Override
@@ -62,8 +65,8 @@ public class DefaultOAuthClient implements OAuthClient {
 		} catch (BusinessException exception) {
 			throw exception;
 		} catch (RuntimeException exception) {
-			log.warn("OAuth authentication failed unexpectedly. provider={}, exception={}",
-					provider, exception.getClass().getSimpleName());
+			log.warn("OAuth authentication failed unexpectedly. provider={}, exception={}, message={}",
+					provider, exception.getClass().getSimpleName(), exception.getMessage());
 			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 	}
@@ -86,12 +89,13 @@ public class DefaultOAuthClient implements OAuthClient {
 
 		JsonNode response;
 		try {
-			response = restClient.post()
+			String responseBody = restClient.post()
 					.uri(provider == OAuthProvider.GOOGLE ? GOOGLE_TOKEN_URI : NAVER_TOKEN_URI)
 					.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 					.body(form)
 					.retrieve()
-					.body(JsonNode.class);
+					.body(String.class);
+			response = parseJson(responseBody);
 		} catch (RestClientResponseException exception) {
 			logProviderFailure(provider, "token_exchange", exception);
 			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
@@ -121,13 +125,23 @@ public class DefaultOAuthClient implements OAuthClient {
 
 	private JsonNode userInfo(OAuthProvider provider, String uri, String accessToken) {
 		try {
-			return restClient.get()
+			String responseBody = restClient.get()
 					.uri(uri)
 					.headers(headers -> headers.setBearerAuth(accessToken))
 					.retrieve()
-					.body(JsonNode.class);
+					.body(String.class);
+			return parseJson(responseBody);
 		} catch (RestClientResponseException exception) {
 			logProviderFailure(provider, "user_info", exception);
+			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+		}
+	}
+
+	private JsonNode parseJson(String responseBody) {
+		try {
+			return objectMapper.readTree(responseBody);
+		} catch (Exception exception) {
+			log.warn("OAuth provider returned an unreadable JSON response.");
 			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 	}
