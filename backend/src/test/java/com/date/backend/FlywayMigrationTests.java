@@ -30,7 +30,7 @@ class FlywayMigrationTests {
 		Integer userTableCount = tableCount("USERS");
 		Integer passwordResetTableCount = tableCount("PASSWORD_RESET_TOKENS");
 
-		assertThat(migrationCount).isEqualTo(2);
+		assertThat(migrationCount).isEqualTo(3);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 	}
