@@ -1,12 +1,21 @@
-FROM eclipse-temurin:21-jdk AS builder
+FROM eclipse-temurin:21-jdk AS development
 
 WORKDIR /workspace
 
 COPY gradle gradle
 COPY gradlew build.gradle settings.gradle ./
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
+RUN sed -i 's/\r$//' gradlew \
+    && chmod +x gradlew \
+    && ./gradlew dependencies --no-daemon
 
 COPY src src
+
+EXPOSE 8080
+
+CMD ["./gradlew", "bootRun", "--no-daemon"]
+
+FROM development AS builder
+
 RUN ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre

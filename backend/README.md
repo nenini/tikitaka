@@ -50,6 +50,15 @@ cp .env.example .env
 | `MYSQL_USER` | `date` | 애플리케이션 DB 사용자 |
 | `MYSQL_PASSWORD` | - | 애플리케이션 DB 비밀번호 |
 | `MYSQL_ROOT_PASSWORD` | - | MySQL root 비밀번호 |
+| `PASSWORD_RESET_TOKEN_VALIDITY_SECONDS` | `900` | 비밀번호 재설정 토큰 유효시간(초) |
+| `PASSWORD_RESET_URL` | `http://localhost:3000/password-reset` | 이메일에 포함할 프론트엔드 재설정 주소 |
+| `MAIL_FROM` | `no-reply@date.local` | 발신 이메일 주소 |
+| `MAIL_HOST` | `localhost` | SMTP 서버 주소 |
+| `MAIL_PORT` | `1025` | SMTP 서버 포트 |
+| `MAIL_USERNAME` | - | SMTP 사용자 이름 |
+| `MAIL_PASSWORD` | - | SMTP 비밀번호 |
+| `MAIL_SMTP_AUTH` | `false` | SMTP 인증 사용 여부 |
+| `MAIL_SMTP_STARTTLS` | `false` | STARTTLS 사용 여부 |
 
 `.env`에는 실제 비밀번호를 입력하고 Git에 추가하지 않습니다. `.env.example`에는 실제 비밀번호를 작성하지 않습니다.
 
@@ -105,6 +114,24 @@ docker compose logs -f backend
 
 기본 접속 주소는 `http://localhost:8080`입니다. MySQL health check가 통과한 후 백엔드가 시작됩니다.
 
+### Docker 개발 모드: 코드 저장 시 자동 반영
+
+개발 모드는 Compose Watch로 `src` 변경 파일을 백엔드 컨테이너에 동기화하고 Gradle 캐시는 Docker 볼륨에 보관합니다.
+소스 저장을 감지하면 MySQL은 유지한 채 백엔드 컨테이너만 재시작하고 `bootRun`이 변경 코드를 다시 컴파일합니다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml watch
+```
+
+실행 후 Java 또는 설정 파일을 저장하면 변경 사항이 자동 반영됩니다. `build.gradle`이나 `settings.gradle`을 변경하면 개발 이미지를 자동으로 다시 빌드합니다.
+종료하려면 `Ctrl+C`를 누른 뒤 다음 명령을 실행합니다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
+MySQL의 `mysql-data` 볼륨은 삭제되지 않습니다. DB까지 초기화해야 할 때만 `down`에 `--volumes`를 추가합니다.
+
 애플리케이션 상태 확인:
 
 ```bash
@@ -158,7 +185,86 @@ export DB_PASSWORD=date
 
 `.env`는 Docker Compose가 자동으로 읽지만, `bootRun`으로 직접 실행할 때는 운영체제 환경변수로 별도 설정해야 합니다.
 
-현재 로컬 JPA 설정은 `ddl-auto: validate`입니다. 애플리케이션이 엔티티에 필요한 테이블을 자동 생성하지 않으므로 DB 스키마가 코드와 일치해야 합니다.
+로컬 MySQL 스키마는 Flyway가 관리하고 JPA는 `ddl-auto: validate`로 Entity와 실제 테이블의 일치 여부만 검사합니다.
+
+현재 마이그레이션:
+
+```text
+src/main/resources/db/migration/
+├── V1__create_initial_schema.sql
+└── V2__create_password_reset_tokens.sql
+```
+
+- 빈 DB에서는 V1과 V2가 순서대로 실행됩니다.
+- 기존 ERD 테이블이 있는 DB에서는 첫 실행 시 V1 상태로 baseline을 등록하고 V2부터 실행합니다.
+- 적용 결과는 DB의 `flyway_schema_history` 테이블에서 확인할 수 있습니다.
+
+기존 DB를 처음 연결하기 전에는 반드시 백업하고, 현재 스키마가 V1 ERD와 일치하는지 확인해야 합니다. `baseline-on-migrate`는 기존 스키마가 올바르다고 간주할 뿐 V1과 전체 구조를 비교하지 않습니다.
+
+### Flyway 관리 규칙
+
+1. 이미 공유 DB에 적용된 migration 파일은 수정하거나 삭제하지 않습니다.
+2. 스키마 변경마다 다음 버전의 새 파일을 추가합니다.
+3. 파일명은 `V{버전}__{설명}.sql` 형식을 사용합니다.
+4. Entity 변경과 이를 반영하는 migration을 같은 작업에 포함합니다.
+5. migration은 로컬 DB와 테스트 DB에서 검증한 뒤 병합합니다.
+6. 운영 데이터가 있는 컬럼 변경은 데이터 보존 SQL까지 함께 작성합니다.
+
+예를 들어 사용자 테이블에 닉네임을 추가하면 기존 V1을 수정하지 않고 다음 파일을 만듭니다.
+
+```text
+V3__add_nickname_to_users.sql
+```
+
+```sql
+ALTER TABLE `users`
+    ADD COLUMN `nickname` VARCHAR(50) NULL;
+```
+
+적용된 migration을 수정하면 Flyway checksum 검증이 실패합니다. 수정이 필요하면 기존 파일 대신 새로운 migration에서 변경 사항을 추가합니다.
+
+### 비밀번호 재설정 API
+
+재설정 이메일 요청은 가입 여부와 관계없이 항상 동일한 `202 Accepted` 응답을 반환합니다.
+
+```http
+POST /api/v1/auth/password/reset-request
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+```
+
+이메일 링크에서 받은 일회용 토큰과 새 비밀번호를 전달합니다.
+
+```http
+PATCH /api/v1/auth/password/reset
+Content-Type: application/json
+
+{
+  "token": "one-time-reset-token",
+  "newPassword": "newPassword123!"
+}
+```
+
+비밀번호는 8~64자이며 영문, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다. 재설정 성공 시 해당 사용자의 기존 Refresh Token이 모두 폐기됩니다.
+
+### 회원 탈퇴 API
+
+Access Token과 현재 비밀번호로 본인 여부를 다시 확인한 후 계정을 소프트 삭제합니다.
+
+```http
+DELETE /api/v1/auth/account
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "password": "currentPassword123!"
+}
+```
+
+탈퇴 시 `accountStatus`를 `WITHDRAWN`으로 변경하고 `withdrawnAt`을 기록합니다. 사용자 레코드와 개인정보를 즉시 물리 삭제하지 않으며, 모든 Refresh Token과 미사용 비밀번호 재설정 토큰을 폐기합니다. 기존 Access Token도 계정 상태 검사로 보호 API에서 즉시 차단됩니다. 후속 개인정보 익명화·삭제 작업은 `UserWithdrawnEvent`를 구독해 연결합니다.
 
 ## 테스트
 
@@ -196,8 +302,12 @@ Linux/macOS:
 - [x] 검증·비즈니스·404·서버 오류 전역 예외 처리 구성
 - [x] 공통 JPA 설정 및 Auditing 구성
 - [x] 생성·수정 시각 공통 `BaseEntity` 구성
+- [x] 이메일 기반 비밀번호 재설정 및 일회용 토큰 구성
+- [x] 비밀번호 정책 검증 및 기존 Refresh Token 폐기
+- [x] Flyway 초기 스키마 및 버전별 migration 구성
+- [x] 비밀번호 재확인 기반 회원 탈퇴 및 인증 세션 무효화
+- [x] 개인정보 후속 처리를 위한 탈퇴 이벤트 연결
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
-- [ ] DB 마이그레이션 도구(Flyway 또는 Liquibase) 도입
 - [ ] 도메인별 API 명세 작성
 - [ ] CI 환경의 빌드·테스트 자동화
 

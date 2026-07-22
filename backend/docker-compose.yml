@@ -29,12 +29,27 @@ services:
       DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-date}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false"
       DB_USERNAME: ${MYSQL_USER:-date}
       DB_PASSWORD: ${MYSQL_PASSWORD:-date}
+      JWT_SECRET: ${JWT_SECRET:-date-service-local-development-secret-key-change-me-please}
+      JWT_ACCESS_TOKEN_VALIDITY_SECONDS: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:-1800}
+      JWT_REFRESH_TOKEN_VALIDITY_SECONDS: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:-1209600}
+      PASSWORD_RESET_TOKEN_VALIDITY_SECONDS: ${PASSWORD_RESET_TOKEN_VALIDITY_SECONDS:-900}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:3000/password-reset}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@date.local}
+      MAIL_HOST: ${MAIL_HOST:-host.docker.internal}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
+      MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
       TZ: Asia/Seoul
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
       mysql:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   mysql-data:
