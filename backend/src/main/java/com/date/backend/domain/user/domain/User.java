@@ -91,6 +91,11 @@ public class User {
 		this.passwordHash = passwordHash;
 	}
 
+	public void withdraw(LocalDateTime withdrawnAt) {
+		this.accountStatus = AccountStatus.WITHDRAWN;
+		this.withdrawnAt = withdrawnAt;
+	}
+
 	public boolean isActive() {
 		return accountStatus == AccountStatus.ACTIVE && withdrawnAt == null;
 	}
@@ -125,5 +130,9 @@ public class User {
 
 	public UserRole getRole() {
 		return role;
+	}
+
+	public LocalDateTime getWithdrawnAt() {
+		return withdrawnAt;
 	}
 }

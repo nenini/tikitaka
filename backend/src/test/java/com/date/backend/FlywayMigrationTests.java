@@ -23,7 +23,8 @@ class FlywayMigrationTests {
 	@Test
 	void migrationsCreateSchemaAndHistory() {
 		Integer migrationCount = jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE",
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL",
 				Integer.class
 		);
 		Integer userTableCount = tableCount("USERS");
@@ -36,7 +37,8 @@ class FlywayMigrationTests {
 
 	private Integer tableCount(String tableName) {
 		return jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?",
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+						+ "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = ?",
 				Integer.class,
 				tableName
 		);

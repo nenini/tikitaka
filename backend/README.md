@@ -232,6 +232,22 @@ Content-Type: application/json
 
 비밀번호는 8~64자이며 영문, 숫자, 특수문자를 각각 하나 이상 포함해야 합니다. 재설정 성공 시 해당 사용자의 기존 Refresh Token이 모두 폐기됩니다.
 
+### 회원 탈퇴 API
+
+Access Token과 현재 비밀번호로 본인 여부를 다시 확인한 후 계정을 소프트 삭제합니다.
+
+```http
+DELETE /api/v1/auth/account
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "password": "currentPassword123!"
+}
+```
+
+탈퇴 시 `accountStatus`를 `WITHDRAWN`으로 변경하고 `withdrawnAt`을 기록합니다. 사용자 레코드와 개인정보를 즉시 물리 삭제하지 않으며, 모든 Refresh Token과 미사용 비밀번호 재설정 토큰을 폐기합니다. 기존 Access Token도 계정 상태 검사로 보호 API에서 즉시 차단됩니다. 후속 개인정보 익명화·삭제 작업은 `UserWithdrawnEvent`를 구독해 연결합니다.
+
 ## 테스트
 
 테스트는 외부 MySQL이 아닌 인메모리 H2를 사용합니다.
@@ -271,6 +287,8 @@ Linux/macOS:
 - [x] 이메일 기반 비밀번호 재설정 및 일회용 토큰 구성
 - [x] 비밀번호 정책 검증 및 기존 Refresh Token 폐기
 - [x] Flyway 초기 스키마 및 버전별 migration 구성
+- [x] 비밀번호 재확인 기반 회원 탈퇴 및 인증 세션 무효화
+- [x] 개인정보 후속 처리를 위한 탈퇴 이벤트 연결
 - [ ] 도메인 엔티티 및 비즈니스 기능 구현
 - [ ] 도메인별 API 명세 작성
 - [ ] CI 환경의 빌드·테스트 자동화

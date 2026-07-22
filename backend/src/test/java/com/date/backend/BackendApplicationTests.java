@@ -192,6 +192,40 @@ class BackendApplicationTests {
 		assertThat(response.body()).contains("\"code\":\"INVALID_PASSWORD_RESET_TOKEN\"");
 	}
 
+	@Test
+	void authenticatedUserCanWithdrawAndAllSessionsBecomeInvalid() throws Exception {
+		String email = "withdraw-" + UUID.randomUUID() + "@example.com";
+		HttpResponse<String> signupResponse = signup(email, "password123!");
+		JsonNode tokenData = objectMapper.readTree(signupResponse.body()).path("data");
+		String accessToken = tokenData.path("accessToken").asText();
+		String refreshToken = tokenData.path("refreshToken").asText();
+
+		HttpResponse<String> wrongPasswordResponse = delete(
+				"/api/v1/auth/account",
+				"{\"password\":\"wrongPassword123!\"}",
+				accessToken
+		);
+		assertThat(wrongPasswordResponse.statusCode()).isEqualTo(401);
+		assertThat(get("/api/v1/users/me", accessToken).statusCode()).isEqualTo(200);
+
+		HttpResponse<String> withdrawResponse = delete(
+				"/api/v1/auth/account",
+				"{\"password\":\"password123!\"}",
+				accessToken
+		);
+		assertThat(withdrawResponse.statusCode()).isEqualTo(200);
+
+		User withdrawnUser = userRepository.findByEmail(email).orElseThrow();
+		assertThat(withdrawnUser.getAccountStatus().name()).isEqualTo("WITHDRAWN");
+		assertThat(withdrawnUser.getWithdrawnAt()).isNotNull();
+		assertThat(login(email, "password123!").statusCode()).isEqualTo(403);
+		assertThat(get("/api/v1/users/me", accessToken).statusCode()).isEqualTo(403);
+		assertThat(post(
+				"/api/v1/auth/refresh",
+				"{\"refreshToken\":\"" + refreshToken + "\"}"
+		).statusCode()).isEqualTo(401);
+	}
+
 	private HttpResponse<String> signup(String email, String password) throws Exception {
 		String body = """
 				{
@@ -259,6 +293,17 @@ class BackendApplicationTests {
 				.uri(URI.create("http://localhost:" + port + path))
 				.header("Content-Type", "application/json")
 				.method("PATCH", HttpRequest.BodyPublishers.ofString(body))
+				.build();
+
+		return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+	}
+
+	private HttpResponse<String> delete(String path, String body, String accessToken) throws Exception {
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create("http://localhost:" + port + path))
+				.header("Content-Type", "application/json")
+				.header("Authorization", "Bearer " + accessToken)
+				.method("DELETE", HttpRequest.BodyPublishers.ofString(body))
 				.build();
 
 		return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());

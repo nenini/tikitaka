@@ -9,9 +9,14 @@ import com.date.backend.domain.auth.dto.PasswordResetRequest;
 import com.date.backend.domain.auth.dto.LogoutRequest;
 import com.date.backend.domain.auth.dto.RefreshTokenRequest;
 import com.date.backend.domain.auth.dto.SignupRequest;
+import com.date.backend.domain.auth.dto.WithdrawAccountRequest;
+import com.date.backend.domain.user.application.UserAccountService;
 import com.date.backend.global.api.ApiResponse;
+import com.date.backend.global.security.AuthUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,10 +29,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 	private final AuthService authService;
 	private final PasswordResetService passwordResetService;
+	private final UserAccountService userAccountService;
 
-	public AuthController(AuthService authService, PasswordResetService passwordResetService) {
+	public AuthController(
+			AuthService authService,
+			PasswordResetService passwordResetService,
+			UserAccountService userAccountService
+	) {
 		this.authService = authService;
 		this.passwordResetService = passwordResetService;
+		this.userAccountService = userAccountService;
 	}
 
 	@PostMapping("/signup")
@@ -62,6 +73,15 @@ public class AuthController {
 	@PatchMapping("/password/reset")
 	public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest request) {
 		passwordResetService.reset(request.token(), request.newPassword());
+		return ApiResponse.successWithoutData();
+	}
+
+	@DeleteMapping("/account")
+	public ApiResponse<Void> withdrawAccount(
+			@AuthenticationPrincipal AuthUser authUser,
+			@Valid @RequestBody WithdrawAccountRequest request
+	) {
+		userAccountService.withdraw(authUser.userId(), request.password());
 		return ApiResponse.successWithoutData();
 	}
 }
