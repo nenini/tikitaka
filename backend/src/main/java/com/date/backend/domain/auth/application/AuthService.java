@@ -1,10 +1,10 @@
 package com.date.backend.domain.auth.application;
 
 import com.date.backend.domain.auth.domain.RefreshToken;
-import com.date.backend.domain.auth.dto.AuthTokenResponse;
-import com.date.backend.domain.auth.dto.LoginRequest;
-import com.date.backend.domain.auth.dto.SignupRequest;
-import com.date.backend.domain.auth.dto.UserResponse;
+import com.date.backend.domain.auth.dto.request.LoginRequest;
+import com.date.backend.domain.auth.dto.request.SignupRequest;
+import com.date.backend.domain.auth.dto.response.AuthTokenResponse;
+import com.date.backend.domain.auth.dto.response.UserResponse;
 import com.date.backend.domain.auth.repository.RefreshTokenRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;

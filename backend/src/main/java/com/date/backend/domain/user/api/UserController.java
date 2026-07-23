@@ -1,7 +1,7 @@
 package com.date.backend.domain.user.api;
 
 import com.date.backend.domain.auth.application.AuthService;
-import com.date.backend.domain.auth.dto.UserResponse;
+import com.date.backend.domain.auth.dto.response.UserResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;

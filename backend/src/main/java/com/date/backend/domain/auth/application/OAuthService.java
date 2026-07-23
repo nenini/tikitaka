@@ -2,7 +2,7 @@ package com.date.backend.domain.auth.application;
 
 import com.date.backend.domain.auth.domain.OAuthAccount;
 import com.date.backend.domain.auth.domain.OAuthProvider;
-import com.date.backend.domain.auth.dto.AuthTokenResponse;
+import com.date.backend.domain.auth.dto.response.AuthTokenResponse;
 import com.date.backend.domain.auth.oauth.OAuthClient;
 import com.date.backend.domain.auth.oauth.OAuthUserInfo;
 import com.date.backend.domain.auth.repository.OAuthAccountRepository;
