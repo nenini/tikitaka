@@ -12,4 +12,6 @@ public interface PreferredTraitRepository extends JpaRepository<PreferredTrait, 
 	List<PreferredTrait> findAllByUserIdOrderByTrait_DisplayOrderAsc(Long userId);
 
 	void deleteAllByUserId(Long userId);
+
+	boolean existsByUserId(Long userId);
 }

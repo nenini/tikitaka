@@ -10,4 +10,6 @@ public interface PreferredFaceTagRepository extends JpaRepository<PreferredFaceT
 
 	@EntityGraph(attributePaths = "faceTag")
 	Optional<PreferredFaceTag> findByUserId(Long userId);
+
+	boolean existsByUserId(Long userId);
 }

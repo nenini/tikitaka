@@ -12,4 +12,6 @@ public interface UserTraitRepository extends JpaRepository<UserTrait, Long> {
 	List<UserTrait> findAllByUserIdOrderByTrait_DisplayOrderAsc(Long userId);
 
 	void deleteAllByUserId(Long userId);
+
+	boolean existsByUserId(Long userId);
 }

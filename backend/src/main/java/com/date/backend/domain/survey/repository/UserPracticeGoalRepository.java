@@ -10,4 +10,6 @@ public interface UserPracticeGoalRepository extends JpaRepository<UserPracticeGo
 
 	@EntityGraph(attributePaths = "practiceGoal")
 	List<UserPracticeGoal> findAllByUserIdAndActiveTrueOrderByPracticeGoal_DisplayOrderAsc(Long userId);
+
+	boolean existsByUserIdAndActiveTrue(Long userId);
 }
