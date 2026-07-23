@@ -10,7 +10,8 @@ import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.CommonErrorCode;
+import com.date.backend.global.exception.code.ProfileErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,7 +77,7 @@ class ProfileServiceTest {
 				BusinessException.class
 		);
 
-		assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE_NICKNAME);
+		assertThat(exception.getErrorCode()).isEqualTo(ProfileErrorCode.DUPLICATE_NICKNAME);
 	}
 
 	@Test
@@ -101,7 +102,7 @@ class ProfileServiceTest {
 				BusinessException.class
 		);
 
-		assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT);
+		assertThat(exception.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_INPUT);
 	}
 
 	@Test

@@ -1,7 +1,7 @@
 package com.date.backend.domain.auth.domain;
 
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 
 import java.util.Locale;
 
@@ -13,7 +13,7 @@ public enum OAuthProvider {
 		try {
 			return valueOf(value.toUpperCase(Locale.ROOT));
 		} catch (RuntimeException exception) {
-			throw new BusinessException(ErrorCode.UNSUPPORTED_OAUTH_PROVIDER);
+			throw new BusinessException(AuthErrorCode.UNSUPPORTED_OAUTH_PROVIDER);
 		}
 	}
 }

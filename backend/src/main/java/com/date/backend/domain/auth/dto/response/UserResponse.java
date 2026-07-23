@@ -1,4 +1,4 @@
-package com.date.backend.domain.auth.dto;
+package com.date.backend.domain.auth.dto.response;
 
 import com.date.backend.domain.user.domain.AccountStatus;
 import com.date.backend.domain.user.domain.User;

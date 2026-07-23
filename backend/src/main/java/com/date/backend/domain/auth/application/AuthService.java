@@ -1,15 +1,16 @@
 package com.date.backend.domain.auth.application;
 
 import com.date.backend.domain.auth.domain.RefreshToken;
-import com.date.backend.domain.auth.dto.AuthTokenResponse;
-import com.date.backend.domain.auth.dto.LoginRequest;
-import com.date.backend.domain.auth.dto.SignupRequest;
-import com.date.backend.domain.auth.dto.UserResponse;
+import com.date.backend.domain.auth.dto.request.LoginRequest;
+import com.date.backend.domain.auth.dto.request.SignupRequest;
+import com.date.backend.domain.auth.dto.response.AuthTokenResponse;
+import com.date.backend.domain.auth.dto.response.UserResponse;
 import com.date.backend.domain.auth.repository.RefreshTokenRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
+import com.date.backend.global.exception.code.UserErrorCode;
 import com.date.backend.global.security.JwtProperties;
 import com.date.backend.global.security.JwtTokenProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,7 +52,7 @@ public class AuthService {
 	@Transactional
 	public AuthTokenResponse signup(SignupRequest request) {
 		if (userRepository.existsByEmail(request.email())) {
-			throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+			throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
 		}
 
 		User user = new User(
@@ -69,10 +70,10 @@ public class AuthService {
 	@Transactional
 	public AuthTokenResponse login(LoginRequest request) {
 		User user = userRepository.findByEmail(request.email())
-				.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_CREDENTIALS));
 
 		if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-			throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+			throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
 		}
 		validateActive(user);
 
@@ -83,10 +84,10 @@ public class AuthService {
 	@Transactional
 	public AuthTokenResponse refresh(String refreshTokenValue) {
 		RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(refreshTokenValue))
-				.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_TOKEN));
 
 		if (!refreshToken.isUsable(LocalDateTime.now())) {
-			throw new BusinessException(ErrorCode.INVALID_TOKEN);
+			throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
 		}
 
 		User user = refreshToken.getUser();
@@ -107,7 +108,7 @@ public class AuthService {
 	@Transactional(readOnly = true)
 	public UserResponse getMe(Long userId) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.UNAUTHORIZED));
 		validateActive(user);
 		return UserResponse.from(user);
 	}
@@ -130,7 +131,7 @@ public class AuthService {
 
 	private void validateActive(User user) {
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INACTIVE_ACCOUNT);
+			throw new BusinessException(UserErrorCode.INACTIVE_ACCOUNT);
 		}
 	}
 

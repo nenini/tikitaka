@@ -12,7 +12,7 @@ import com.date.backend.domain.survey.repository.FaceTagCatalogRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.SurveyErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -141,7 +141,7 @@ class SurveyServiceTest {
 				BusinessException.class
 		);
 
-		assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SURVEY_ALREADY_EXISTS);
+		assertThat(exception.getErrorCode()).isEqualTo(SurveyErrorCode.SURVEY_ALREADY_EXISTS);
 	}
 
 	@Test
@@ -167,7 +167,7 @@ class SurveyServiceTest {
 				BusinessException.class
 		);
 
-		assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_SURVEY_OPTION);
+		assertThat(exception.getErrorCode()).isEqualTo(SurveyErrorCode.INVALID_SURVEY_OPTION);
 	}
 
 	@Test
@@ -184,8 +184,8 @@ class SurveyServiceTest {
 				BusinessException.class
 		);
 
-		assertThat(getException.getErrorCode()).isEqualTo(ErrorCode.SURVEY_NOT_FOUND);
-		assertThat(updateException.getErrorCode()).isEqualTo(ErrorCode.SURVEY_NOT_FOUND);
+		assertThat(getException.getErrorCode()).isEqualTo(SurveyErrorCode.SURVEY_NOT_FOUND);
+		assertThat(updateException.getErrorCode()).isEqualTo(SurveyErrorCode.SURVEY_NOT_FOUND);
 	}
 
 	private SurveySaveRequest request(

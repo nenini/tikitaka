@@ -1,4 +1,4 @@
-package com.date.backend.domain.auth.dto;
+package com.date.backend.domain.auth.dto.request;
 
 import com.date.backend.domain.auth.password.PasswordPolicy;
 import jakarta.validation.constraints.NotBlank;

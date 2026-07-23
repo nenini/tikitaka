@@ -2,7 +2,7 @@ package com.date.backend.domain.auth.oauth;
 
 import com.date.backend.domain.auth.domain.OAuthProvider;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -38,7 +38,7 @@ public class OAuthStateService {
 				|| !MessageDigest.isEqual(
 				queryState.getBytes(StandardCharsets.UTF_8),
 				cookieState.getBytes(StandardCharsets.UTF_8))) {
-			throw new BusinessException(ErrorCode.INVALID_OAUTH_STATE);
+			throw new BusinessException(AuthErrorCode.INVALID_OAUTH_STATE);
 		}
 	}
 

@@ -25,7 +25,9 @@ import com.date.backend.domain.survey.repository.TraitCatalogRepository;
 import com.date.backend.domain.survey.repository.UserPracticeGoalRepository;
 import com.date.backend.domain.survey.repository.UserTraitRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.CommonErrorCode;
+import com.date.backend.global.exception.code.ProfileErrorCode;
+import com.date.backend.global.exception.code.SurveyErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,7 +92,7 @@ public class SurveyService {
 		Profile profile = getProfile(userId);
 		validateRequest(request);
 		if (hasAnyAnswer(userId)) {
-			throw new BusinessException(ErrorCode.SURVEY_ALREADY_EXISTS);
+			throw new BusinessException(SurveyErrorCode.SURVEY_ALREADY_EXISTS);
 		}
 
 		ResolvedOptions options = resolveOptions(profile, request);
@@ -160,9 +162,9 @@ public class SurveyService {
 
 	private SurveyAnswers getSurveyAnswers(Long userId) {
 		PreferredAgeRange preferredAgeRange = preferredAgeRangeRepository.findByUserId(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.SURVEY_NOT_FOUND));
+				.orElseThrow(() -> new BusinessException(SurveyErrorCode.SURVEY_NOT_FOUND));
 		PreferredFaceTag preferredFaceTag = preferredFaceTagRepository.findByUserId(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.SURVEY_NOT_FOUND));
+				.orElseThrow(() -> new BusinessException(SurveyErrorCode.SURVEY_NOT_FOUND));
 		List<PreferredTrait> preferredTraits = preferredTraitRepository
 				.findAllByUserIdOrderByTrait_DisplayOrderAsc(userId);
 		List<UserTrait> userTraits = userTraitRepository
@@ -173,7 +175,7 @@ public class SurveyService {
 		if (preferredTraits.size() != REQUIRED_TRAIT_COUNT
 				|| userTraits.size() != REQUIRED_TRAIT_COUNT
 				|| practiceGoals.isEmpty()) {
-			throw new BusinessException(ErrorCode.SURVEY_NOT_FOUND);
+			throw new BusinessException(SurveyErrorCode.SURVEY_NOT_FOUND);
 		}
 
 		return new SurveyAnswers(
@@ -188,7 +190,7 @@ public class SurveyService {
 	private ResolvedOptions resolveOptions(Profile profile, SurveySaveRequest request) {
 		FaceTagCatalog faceTag = faceTagCatalogRepository
 				.findByIdAndActiveTrue(request.preferredFaceTagId())
-				.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_SURVEY_OPTION));
+				.orElseThrow(() -> new BusinessException(SurveyErrorCode.INVALID_SURVEY_OPTION));
 		validateFaceTagGender(profile.getGender(), faceTag);
 
 		List<TraitCatalog> preferredTraits = traitCatalogRepository
@@ -207,7 +209,7 @@ public class SurveyService {
 		if (preferredTraits.size() != REQUIRED_TRAIT_COUNT
 				|| userTraits.size() != REQUIRED_TRAIT_COUNT
 				|| practiceGoals.size() != request.practiceGoalIds().size()) {
-			throw new BusinessException(ErrorCode.INVALID_SURVEY_OPTION);
+			throw new BusinessException(SurveyErrorCode.INVALID_SURVEY_OPTION);
 		}
 
 		return new ResolvedOptions(faceTag, preferredTraits, userTraits, practiceGoals);
@@ -217,7 +219,7 @@ public class SurveyService {
 		ApplicableGender preferredGender = getPreferredGender(userGender);
 		if (faceTag.getApplicableGender() != ApplicableGender.ALL
 				&& faceTag.getApplicableGender() != preferredGender) {
-			throw new BusinessException(ErrorCode.INVALID_SURVEY_OPTION);
+			throw new BusinessException(SurveyErrorCode.INVALID_SURVEY_OPTION);
 		}
 	}
 
@@ -238,7 +240,7 @@ public class SurveyService {
 				|| request.minPreferredAge() <= 0
 				|| request.maxPreferredAge() < request.minPreferredAge()
 				|| !hasDistinctPositiveIds(request.practiceGoalIds())) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT);
+			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
 		}
 	}
 
@@ -265,7 +267,7 @@ public class SurveyService {
 
 	private Profile getProfile(Long userId) {
 		return profileRepository.findById(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.PROFILE_NOT_FOUND));
+				.orElseThrow(() -> new BusinessException(ProfileErrorCode.PROFILE_NOT_FOUND));
 	}
 
 	private List<PreferredTrait> toPreferredTraits(

@@ -2,7 +2,7 @@ package com.date.backend.domain.auth.oauth;
 
 import com.date.backend.domain.auth.domain.OAuthProvider;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -67,7 +67,7 @@ public class DefaultOAuthClient implements OAuthClient {
 		} catch (RuntimeException exception) {
 			log.warn("OAuth authentication failed unexpectedly. provider={}, exception={}, message={}",
 					provider, exception.getClass().getSimpleName(), exception.getMessage());
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 	}
 
@@ -98,11 +98,11 @@ public class DefaultOAuthClient implements OAuthClient {
 			response = parseJson(responseBody);
 		} catch (RestClientResponseException exception) {
 			logProviderFailure(provider, "token_exchange", exception);
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 		String accessToken = text(response, "access_token");
 		if (accessToken == null) {
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 		return accessToken;
 	}
@@ -110,7 +110,7 @@ public class DefaultOAuthClient implements OAuthClient {
 	private OAuthUserInfo googleUserInfo(String accessToken) {
 		JsonNode response = userInfo(OAuthProvider.GOOGLE, GOOGLE_USERINFO_URI, accessToken);
 		if (!response.path("email_verified").asBoolean(false)) {
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 		return requiredUserInfo(response, "sub");
 	}
@@ -118,7 +118,7 @@ public class DefaultOAuthClient implements OAuthClient {
 	private OAuthUserInfo naverUserInfo(String accessToken) {
 		JsonNode root = userInfo(OAuthProvider.NAVER, NAVER_USERINFO_URI, accessToken);
 		if (!"00".equals(root.path("resultcode").asText())) {
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 		return requiredUserInfo(root.path("response"), "id");
 	}
@@ -133,7 +133,7 @@ public class DefaultOAuthClient implements OAuthClient {
 			return parseJson(responseBody);
 		} catch (RestClientResponseException exception) {
 			logProviderFailure(provider, "user_info", exception);
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 	}
 
@@ -142,7 +142,7 @@ public class DefaultOAuthClient implements OAuthClient {
 			return objectMapper.readTree(responseBody);
 		} catch (Exception exception) {
 			log.warn("OAuth provider returned an unreadable JSON response.");
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 	}
 
@@ -165,7 +165,7 @@ public class DefaultOAuthClient implements OAuthClient {
 		String email = text(response, "email");
 		String name = text(response, "name");
 		if (id == null || email == null || !email.contains("@")) {
-			throw new BusinessException(ErrorCode.OAUTH_AUTHENTICATION_FAILED);
+			throw new BusinessException(AuthErrorCode.OAUTH_AUTHENTICATION_FAILED);
 		}
 		email = email.trim().toLowerCase(Locale.ROOT);
 		if (name == null) {
@@ -177,7 +177,7 @@ public class DefaultOAuthClient implements OAuthClient {
 	private OAuthProperties.Provider configured(OAuthProvider provider) {
 		OAuthProperties.Provider config = properties.get(provider);
 		if (config == null || !config.isConfigured()) {
-			throw new BusinessException(ErrorCode.OAUTH_NOT_CONFIGURED);
+			throw new BusinessException(AuthErrorCode.OAUTH_NOT_CONFIGURED);
 		}
 		return config;
 	}

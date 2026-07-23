@@ -8,7 +8,7 @@ import com.date.backend.domain.auth.repository.RefreshTokenRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,15 +60,15 @@ public class PasswordResetService {
 	public void reset(String rawToken, String newPassword) {
 		LocalDateTime now = LocalDateTime.now();
 		PasswordResetToken resetToken = passwordResetTokenRepository.findByTokenHash(hash(rawToken))
-				.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_PASSWORD_RESET_TOKEN));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_PASSWORD_RESET_TOKEN));
 
 		if (!resetToken.isUsable(now)) {
-			throw new BusinessException(ErrorCode.INVALID_PASSWORD_RESET_TOKEN);
+			throw new BusinessException(AuthErrorCode.INVALID_PASSWORD_RESET_TOKEN);
 		}
 
 		User user = resetToken.getUser();
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INVALID_PASSWORD_RESET_TOKEN);
+			throw new BusinessException(AuthErrorCode.INVALID_PASSWORD_RESET_TOKEN);
 		}
 
 		user.changePassword(passwordEncoder.encode(newPassword));
