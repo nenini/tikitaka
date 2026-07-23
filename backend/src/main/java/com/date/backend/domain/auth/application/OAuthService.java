@@ -2,14 +2,14 @@ package com.date.backend.domain.auth.application;
 
 import com.date.backend.domain.auth.domain.OAuthAccount;
 import com.date.backend.domain.auth.domain.OAuthProvider;
-import com.date.backend.domain.auth.dto.AuthTokenResponse;
+import com.date.backend.domain.auth.dto.response.AuthTokenResponse;
 import com.date.backend.domain.auth.oauth.OAuthClient;
 import com.date.backend.domain.auth.oauth.OAuthUserInfo;
 import com.date.backend.domain.auth.repository.OAuthAccountRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.UserErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +47,7 @@ public class OAuthService {
 				.orElseGet(() -> linkOrCreate(provider, userInfo));
 
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INACTIVE_ACCOUNT);
+			throw new BusinessException(UserErrorCode.INACTIVE_ACCOUNT);
 		}
 		user.recordLogin();
 		return authService.issueTokens(user);
@@ -58,7 +58,7 @@ public class OAuthService {
 				.orElseGet(() -> userRepository.save(
 						User.oauthUser(userInfo.email(), userInfo.name())));
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INACTIVE_ACCOUNT);
+			throw new BusinessException(UserErrorCode.INACTIVE_ACCOUNT);
 		}
 		oauthAccountRepository.save(new OAuthAccount(user, provider, userInfo.providerUserId()));
 		return user;

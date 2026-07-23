@@ -1,4 +1,4 @@
-package com.date.backend.domain.auth.dto;
+package com.date.backend.domain.auth.dto.response;
 
 public record AuthTokenResponse(
 		String tokenType,

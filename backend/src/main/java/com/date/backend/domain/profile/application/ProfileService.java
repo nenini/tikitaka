@@ -11,7 +11,10 @@ import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
+import com.date.backend.global.exception.code.CommonErrorCode;
+import com.date.backend.global.exception.code.ProfileErrorCode;
+import com.date.backend.global.exception.code.UserErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,12 +39,12 @@ public class ProfileService {
 	public ProfileResponse create(Long userId, ProfileCreateRequest request) {
 		validateActiveUser(userId);
 		if (profileRepository.existsById(userId)) {
-			throw new BusinessException(ErrorCode.PROFILE_ALREADY_EXISTS);
+			throw new BusinessException(ProfileErrorCode.PROFILE_ALREADY_EXISTS);
 		}
 
 		String nickname = normalizeNickname(request.nickname());
 		if (profileRepository.existsByNickname(nickname)) {
-			throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+			throw new BusinessException(ProfileErrorCode.DUPLICATE_NICKNAME);
 		}
 
 		Profile profile = new Profile(
@@ -60,7 +63,7 @@ public class ProfileService {
 	@Transactional
 	public ProfileResponse update(Long userId, ProfileUpdateRequest request) {
 		if (request.hasNoChanges()) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT);
+			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
 		}
 
 		Profile profile = getProfile(userId);
@@ -74,7 +77,7 @@ public class ProfileService {
 
 		if (!nickname.equals(profile.getNickname())
 				&& profileRepository.existsByNicknameAndUserIdNot(nickname, userId)) {
-			throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
+			throw new BusinessException(ProfileErrorCode.DUPLICATE_NICKNAME);
 		}
 
 		profile.update(nickname, gender, regionCity);
@@ -85,7 +88,7 @@ public class ProfileService {
 		Profile profile = getProfile(userId);
 		User user = userRepository.findById(userId)
 				.filter(User::isActive)
-				.orElseThrow(() -> new BusinessException(ErrorCode.PROFILE_NOT_FOUND));
+				.orElseThrow(() -> new BusinessException(ProfileErrorCode.PROFILE_NOT_FOUND));
 
 		int age = Period.between(user.getBirthDate(), LocalDate.now(SERVICE_ZONE_ID)).getYears();
 		return PublicProfileResponse.from(profile, age);
@@ -103,21 +106,21 @@ public class ProfileService {
 
 	private Profile getProfile(Long userId) {
 		return profileRepository.findById(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.PROFILE_NOT_FOUND));
+				.orElseThrow(() -> new BusinessException(ProfileErrorCode.PROFILE_NOT_FOUND));
 	}
 
 	private void validateActiveUser(Long userId) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.UNAUTHORIZED));
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INACTIVE_ACCOUNT);
+			throw new BusinessException(UserErrorCode.INACTIVE_ACCOUNT);
 		}
 	}
 
 	private String normalizeNickname(String nickname) {
 		String normalized = nickname.strip();
 		if (normalized.length() < 2 || normalized.length() > 30) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT);
+			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
 		}
 		return normalized;
 	}
@@ -125,7 +128,7 @@ public class ProfileService {
 	private String normalizeRegionCity(String regionCity) {
 		String normalized = regionCity.strip();
 		if (normalized.isEmpty() || normalized.length() > 50) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT);
+			throw new BusinessException(CommonErrorCode.INVALID_INPUT);
 		}
 		return normalized;
 	}
