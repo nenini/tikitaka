@@ -51,9 +51,9 @@ public class SecurityConfig {
 						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
 						.requestMatchers(
 								"/api/v1/auth/logout",
-								"/api/v1/auth/account",
-								"/api/v1/users/me"
+								"/api/v1/auth/account"
 						).authenticated()
+						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
