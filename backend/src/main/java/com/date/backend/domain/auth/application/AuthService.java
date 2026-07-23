@@ -112,7 +112,7 @@ public class AuthService {
 		return UserResponse.from(user);
 	}
 
-	private AuthTokenResponse issueTokens(User user) {
+	AuthTokenResponse issueTokens(User user) {
 		String accessToken = jwtTokenProvider.createAccessToken(user);
 		String refreshTokenValue = createRefreshTokenValue();
 		LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(jwtProperties.refreshTokenValiditySeconds());

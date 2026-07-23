@@ -34,7 +34,7 @@ public class User {
 	@Column(name = "phoneNumber")
 	private String phoneNumber;
 
-	@Column(name = "birthDate", nullable = false)
+	@Column(name = "birthDate")
 	private LocalDate birthDate;
 
 	@Enumerated(EnumType.STRING)
@@ -69,6 +69,10 @@ public class User {
 		this.realName = realName;
 		this.phoneNumber = phoneNumber;
 		this.birthDate = birthDate;
+	}
+
+	public static User oauthUser(String email, String realName) {
+		return new User(email, null, realName, null, null);
 	}
 
 	@PrePersist

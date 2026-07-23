@@ -316,3 +316,44 @@ Linux/macOS:
 - JDK 21에서 Gradle 컴파일 성공
 - `test` 프로파일과 H2를 사용한 `clean test` 성공
 - Docker 관련 파일은 작성됐으나 현재 작성 환경에 Docker CLI가 없어 실제 이미지 빌드 및 컨테이너 실행은 아직 검증하지 못함
+
+## Google·Naver OAuth2 로그인
+
+OAuth2 로그인은 인가 코드 방식으로 동작합니다. 시작 API는 제공자의 로그인 화면으로 이동시키고, 콜백 API는 제공자 사용자 정보를 확인한 뒤 서비스 JWT를 반환합니다.
+
+```text
+GET /api/v1/auth/oauth2/google
+GET /api/v1/auth/oauth2/google/callback
+GET /api/v1/auth/oauth2/naver
+GET /api/v1/auth/oauth2/naver/callback
+```
+
+Google Cloud Console과 Naver Developers에 다음 콜백 주소를 정확히 등록합니다.
+
+```text
+http://localhost:8080/api/v1/auth/oauth2/google/callback
+http://localhost:8080/api/v1/auth/oauth2/naver/callback
+```
+
+`.env`에 각 제공자에서 발급받은 값을 입력합니다.
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+NAVER_OAUTH_CLIENT_ID=
+NAVER_OAUTH_CLIENT_SECRET=
+```
+
+- Google 동의 항목: `openid`, `email`, `profile`
+- Naver 제공 정보: 회원 고유 ID, 이메일, 이름
+- OAuth 제공자의 Access Token은 저장하지 않습니다.
+- 서비스 Access Token과 Refresh Token만 기존 인증 방식으로 발급합니다.
+- 기존 이메일 회원과 동일한 검증 이메일이면 OAuth 계정을 기존 회원에게 연결합니다.
+- OAuth 신규 회원은 생년월일이 없을 수 있으므로 이후 프로필 완성 단계에서 입력받아야 합니다.
+- CSRF 방지를 위해 OAuth `state`와 HttpOnly, SameSite=Lax 쿠키를 함께 검증합니다.
+
+OAuth 지원을 위한 스키마 변경은 다음 Flyway 파일에서 관리합니다.
+
+```text
+V3__prepare_oauth_accounts.sql
+```

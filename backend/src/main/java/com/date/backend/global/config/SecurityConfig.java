@@ -5,6 +5,7 @@ import com.date.backend.global.security.JwtAuthenticationEntryPoint;
 import com.date.backend.global.security.JwtAuthenticationFilter;
 import com.date.backend.global.security.JwtProperties;
 import com.date.backend.domain.auth.password.PasswordResetProperties;
+import com.date.backend.domain.auth.oauth.OAuthProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,7 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableConfigurationProperties({JwtProperties.class, PasswordResetProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, PasswordResetProperties.class, OAuthProperties.class})
 public class SecurityConfig {
 	private static final String[] PUBLIC_ENDPOINTS = {
 			"/api/v1/auth/signup",
@@ -25,6 +26,7 @@ public class SecurityConfig {
 			"/api/v1/auth/refresh",
 			"/api/v1/auth/password/reset-request",
 			"/api/v1/auth/password/reset",
+			"/api/v1/auth/oauth2/**",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",

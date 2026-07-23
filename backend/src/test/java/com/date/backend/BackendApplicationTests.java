@@ -1,7 +1,13 @@
 package com.date.backend;
 
 import com.date.backend.domain.auth.domain.PasswordResetToken;
+import com.date.backend.domain.auth.application.OAuthService;
+import com.date.backend.domain.auth.domain.OAuthProvider;
+import com.date.backend.domain.auth.dto.AuthTokenResponse;
+import com.date.backend.domain.auth.oauth.OAuthClient;
+import com.date.backend.domain.auth.oauth.OAuthUserInfo;
 import com.date.backend.domain.auth.password.PasswordResetMailSender;
+import com.date.backend.domain.auth.repository.OAuthAccountRepository;
 import com.date.backend.domain.auth.repository.PasswordResetTokenRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
@@ -44,9 +50,15 @@ class BackendApplicationTests {
 	private UserRepository userRepository;
 	@Autowired
 	private PasswordResetTokenRepository passwordResetTokenRepository;
+	@Autowired
+	private OAuthService oauthService;
+	@Autowired
+	private OAuthAccountRepository oauthAccountRepository;
 
 	@MockitoBean
 	private PasswordResetMailSender passwordResetMailSender;
+	@MockitoBean
+	private OAuthClient oauthClient;
 
 	@BeforeEach
 	void clearMailSenderInvocations() {
@@ -55,6 +67,28 @@ class BackendApplicationTests {
 
 	@Test
 	void contextLoads() {
+	}
+
+	@Test
+	void oauthLoginCreatesAccountAndReusesItOnNextLogin() {
+		String providerUserId = "google-" + UUID.randomUUID();
+		String email = "oauth-" + UUID.randomUUID() + "@example.com";
+		OAuthUserInfo userInfo = new OAuthUserInfo(providerUserId, email, "OAuth 사용자");
+		org.mockito.Mockito.when(oauthClient.authenticate(OAuthProvider.GOOGLE, "code", "state"))
+				.thenReturn(userInfo);
+
+		long usersBefore = userRepository.count();
+		long accountsBefore = oauthAccountRepository.count();
+		AuthTokenResponse first = oauthService.login(OAuthProvider.GOOGLE, "code", "state");
+		AuthTokenResponse second = oauthService.login(OAuthProvider.GOOGLE, "code", "state");
+
+		assertThat(first.accessToken()).isNotBlank();
+		assertThat(second.refreshToken()).isNotBlank();
+		assertThat(userRepository.count()).isEqualTo(usersBefore + 1);
+		assertThat(oauthAccountRepository.count()).isEqualTo(accountsBefore + 1);
+		User oauthUser = userRepository.findByEmail(email).orElseThrow();
+		assertThat(oauthUser.getPasswordHash()).isNull();
+		assertThat(oauthUser.getBirthDate()).isNull();
 	}
 
 	@Test
