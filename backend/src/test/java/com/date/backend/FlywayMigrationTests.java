@@ -29,10 +29,14 @@ class FlywayMigrationTests {
 		);
 		Integer userTableCount = tableCount("USERS");
 		Integer passwordResetTableCount = tableCount("PASSWORD_RESET_TOKENS");
+		Integer profileTableCount = tableCount("USER_PROFILES");
+		Integer contactProfileTableCount = tableCount("CONTACT_PROFILES");
 
-		assertThat(migrationCount).isEqualTo(3);
+		assertThat(migrationCount).isEqualTo(4);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
+		assertThat(profileTableCount).isEqualTo(1);
+		assertThat(contactProfileTableCount).isZero();
 	}
 
 	private Integer tableCount(String tableName) {
