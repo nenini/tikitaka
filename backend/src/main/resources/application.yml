@@ -79,3 +79,14 @@ auth:
     token-validity-seconds: ${PASSWORD_RESET_TOKEN_VALIDITY_SECONDS:900}
     url: ${PASSWORD_RESET_URL:http://localhost:3000/password-reset}
     from: ${MAIL_FROM:no-reply@date.local}
+  oauth:
+    state-validity-seconds: ${OAUTH_STATE_VALIDITY_SECONDS:300}
+    secure-cookie: ${OAUTH_SECURE_COOKIE:false}
+    google:
+      client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+      client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth2/google/callback}
+    naver:
+      client-id: ${NAVER_OAUTH_CLIENT_ID:}
+      client-secret: ${NAVER_OAUTH_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth2/naver/callback}

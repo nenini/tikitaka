@@ -1,7 +1,9 @@
 package com.date.backend.domain.auth.api;
 
 import com.date.backend.domain.auth.application.AuthService;
+import com.date.backend.domain.auth.application.OAuthService;
 import com.date.backend.domain.auth.application.PasswordResetService;
+import com.date.backend.domain.auth.domain.OAuthProvider;
 import com.date.backend.domain.auth.dto.AuthTokenResponse;
 import com.date.backend.domain.auth.dto.LoginRequest;
 import com.date.backend.domain.auth.dto.PasswordResetConfirmRequest;
@@ -11,6 +13,7 @@ import com.date.backend.domain.auth.dto.RefreshTokenRequest;
 import com.date.backend.domain.auth.dto.SignupRequest;
 import com.date.backend.domain.auth.dto.WithdrawAccountRequest;
 import com.date.backend.domain.user.application.UserAccountService;
+import com.date.backend.domain.auth.oauth.OAuthStateService;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
@@ -19,12 +22,18 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,15 +44,53 @@ public class AuthController {
 	private final AuthService authService;
 	private final PasswordResetService passwordResetService;
 	private final UserAccountService userAccountService;
+	private final OAuthService oauthService;
+	private final OAuthStateService oauthStateService;
 
 	public AuthController(
 			AuthService authService,
 			PasswordResetService passwordResetService,
-			UserAccountService userAccountService
+			UserAccountService userAccountService,
+			OAuthService oauthService,
+			OAuthStateService oauthStateService
 	) {
 		this.authService = authService;
 		this.passwordResetService = passwordResetService;
 		this.userAccountService = userAccountService;
+		this.oauthService = oauthService;
+		this.oauthStateService = oauthStateService;
+	}
+
+	@GetMapping("/oauth2/{provider}")
+	@Operation(summary = "소셜 로그인 시작", description = "Google 또는 Naver 인증 화면으로 이동합니다. provider에는 google 또는 naver를 입력합니다.")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "302", description = "OAuth 제공자 인증 화면으로 이동")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "지원하지 않는 OAuth 제공자")
+	public ResponseEntity<Void> startOAuth(@PathVariable String provider) {
+		OAuthProvider oauthProvider = OAuthProvider.from(provider);
+		String state = oauthStateService.create(oauthProvider);
+		return ResponseEntity.status(HttpStatus.FOUND)
+				.header(HttpHeaders.SET_COOKIE, oauthStateService.cookie(state).toString())
+				.location(oauthService.authorizationUri(oauthProvider, state))
+				.build();
+	}
+
+	@GetMapping("/oauth2/{provider}/callback")
+	@Operation(summary = "소셜 로그인 콜백", description = "OAuth 제공자의 인가 코드를 검증하고 서비스 Access Token과 Refresh Token을 발급합니다.")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "소셜 로그인 성공")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "유효하지 않은 state 또는 요청값")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "OAuth 인증 실패")
+	public ResponseEntity<ApiResponse<AuthTokenResponse>> oauthCallback(
+			@PathVariable String provider,
+			@RequestParam String code,
+			@RequestParam String state,
+			@CookieValue(name = OAuthStateService.COOKIE_NAME, required = false) String cookieState
+	) {
+		OAuthProvider oauthProvider = OAuthProvider.from(provider);
+		oauthStateService.validate(oauthProvider, state, cookieState);
+		AuthTokenResponse tokens = oauthService.login(oauthProvider, code, state);
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, oauthStateService.clearCookie().toString())
+				.body(ApiResponse.success(tokens));
 	}
 
 	@PostMapping("/signup")
