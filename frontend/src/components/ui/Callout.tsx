@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/shared/lib/cn'
-import { Icon } from '@/components/Icon'
-import type { IconName } from '@/components/Icon'
+import { cn } from '../../shared/lib/cn'
+import { Icon } from '../Icon'
+import type { IconName } from '../Icon'
 
 export type CalloutTone = 'info' | 'success' | 'warning' | 'danger'
 

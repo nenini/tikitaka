@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 export interface HedgeProps extends HTMLAttributes<HTMLSpanElement> {
   children?: ReactNode

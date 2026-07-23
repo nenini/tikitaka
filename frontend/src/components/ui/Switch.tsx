@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 export interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   /** 트랙 옆 라벨 (없으면 aria-label 필수) */
