@@ -8,8 +8,6 @@ import com.date.backend.domain.profile.dto.response.ProfileResponse;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -37,7 +35,7 @@ public class ProfileController implements ProfileSwaggerDocs {
 	@ResponseStatus(HttpStatus.CREATED)
 	public ApiResponse<ProfileResponse> create(
 			@AuthenticationPrincipal AuthUser authUser,
-			@Valid @RequestBody ProfileCreateRequest request
+			@RequestBody ProfileCreateRequest request
 	) {
 		return ApiResponse.success(profileService.create(authUser.userId(), request));
 	}
@@ -52,14 +50,14 @@ public class ProfileController implements ProfileSwaggerDocs {
 	@PatchMapping("/me/profile")
 	public ApiResponse<ProfileResponse> update(
 			@AuthenticationPrincipal AuthUser authUser,
-			@Valid @RequestBody ProfileUpdateRequest request
+			@RequestBody ProfileUpdateRequest request
 	) {
 		return ApiResponse.success(profileService.update(authUser.userId(), request));
 	}
 
 	@Override
 	@GetMapping("/{userId}/public-profile")
-	public ApiResponse<PublicProfileResponse> getPublicProfile(@Positive @PathVariable Long userId) {
+	public ApiResponse<PublicProfileResponse> getPublicProfile(@PathVariable Long userId) {
 		return ApiResponse.success(profileService.getPublicProfile(userId));
 	}
 

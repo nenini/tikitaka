@@ -16,6 +16,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 
 @Tag(name = "Profile", description = "사용자 프로필 등록, 조회, 수정 및 온보딩 상태 API")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
@@ -44,7 +46,7 @@ public interface ProfileSwaggerDocs {
 	})
 	ApiResponse<ProfileResponse> create(
 			@Parameter(hidden = true) AuthUser authUser,
-			ProfileCreateRequest request
+			@Valid ProfileCreateRequest request
 	);
 
 	@Operation(summary = "내 프로필 조회", description = "인증 사용자의 프로필과 온보딩 완료 상태를 조회합니다.")
@@ -83,7 +85,7 @@ public interface ProfileSwaggerDocs {
 	})
 	ApiResponse<ProfileResponse> update(
 			@Parameter(hidden = true) AuthUser authUser,
-			ProfileUpdateRequest request
+			@Valid ProfileUpdateRequest request
 	);
 
 	@Operation(summary = "상대 공개 프로필 조회", description = "상대방의 닉네임, 성별, 지역, 만 나이를 조회합니다.")
@@ -97,7 +99,7 @@ public interface ProfileSwaggerDocs {
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "프로필 없음")
 	})
-	ApiResponse<PublicProfileResponse> getPublicProfile(Long userId);
+	ApiResponse<PublicProfileResponse> getPublicProfile(@Positive Long userId);
 
 	@Operation(summary = "온보딩 완료 상태 조회", description = "프로필 등록, 얼굴 분석, 이상형 설문, 대화 성향 진단을 모두 완료했는지 조회합니다.")
 	@ApiResponses({
