@@ -17,3 +17,6 @@ ALTER TABLE `user_profiles`
 
 ALTER TABLE `user_profiles`
     DROP COLUMN `faceTagsVisible`;
+
+ALTER TABLE `user_profiles`
+    ADD CONSTRAINT `UK_user_profiles_nickname` UNIQUE (`nickname`);
