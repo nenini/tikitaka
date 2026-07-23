@@ -31,12 +31,17 @@ class FlywayMigrationTests {
 		Integer passwordResetTableCount = tableCount("PASSWORD_RESET_TOKENS");
 		Integer profileTableCount = tableCount("USER_PROFILES");
 		Integer contactProfileTableCount = tableCount("CONTACT_PROFILES");
+        Integer activeConsentTypeCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM CONSENT_TYPES WHERE ISACTIVE = TRUE",
+                Integer.class
+        );
 
-		assertThat(migrationCount).isEqualTo(4);
+		assertThat(migrationCount).isEqualTo(5);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
 		assertThat(contactProfileTableCount).isZero();
+		assertThat(activeConsentTypeCount).isEqualTo(2);
 	}
 
 	private Integer tableCount(String tableName) {
