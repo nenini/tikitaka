@@ -23,10 +23,10 @@ public class Profile {
 	private String nickname;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "gender", length = 20)
+	@Column(name = "gender", nullable = false, length = 20)
 	private Gender gender;
 
-	@Column(name = "regionCity", length = 50)
+	@Column(name = "regionCity", nullable = false, length = 50)
 	private String regionCity;
 
 	@Column(name = "onboardingCompleted", nullable = false)
