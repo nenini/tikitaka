@@ -1,6 +1,7 @@
 package com.date.backend.global.exception;
 
 import com.date.backend.global.api.ApiErrorResponse;
+import com.date.backend.global.exception.code.CommonErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -44,7 +45,7 @@ public class GlobalExceptionHandler {
 				.map(this::toFieldError)
 				.toList();
 
-		ErrorCode errorCode = ErrorCode.INVALID_INPUT;
+		ErrorCode errorCode = CommonErrorCode.INVALID_INPUT;
 		ApiErrorResponse body = ApiErrorResponse.of(
 				errorCode.code(),
 				errorCode.message(),
@@ -63,7 +64,7 @@ public class GlobalExceptionHandler {
 			Exception exception,
 			HttpServletRequest request
 	) {
-		return response(ErrorCode.INVALID_INPUT, null, request);
+		return response(CommonErrorCode.INVALID_INPUT, null, request);
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)
@@ -71,7 +72,7 @@ public class GlobalExceptionHandler {
 			HttpMessageNotReadableException exception,
 			HttpServletRequest request
 	) {
-		return response(ErrorCode.INVALID_REQUEST_BODY, null, request);
+		return response(CommonErrorCode.INVALID_REQUEST_BODY, null, request);
 	}
 
 	@ExceptionHandler(NoResourceFoundException.class)
@@ -79,7 +80,7 @@ public class GlobalExceptionHandler {
 			NoResourceFoundException exception,
 			HttpServletRequest request
 	) {
-		return response(ErrorCode.RESOURCE_NOT_FOUND, null, request);
+		return response(CommonErrorCode.RESOURCE_NOT_FOUND, null, request);
 	}
 
 	@ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -87,7 +88,7 @@ public class GlobalExceptionHandler {
 			HttpRequestMethodNotSupportedException exception,
 			HttpServletRequest request
 	) {
-		return response(ErrorCode.METHOD_NOT_ALLOWED, null, request);
+		return response(CommonErrorCode.METHOD_NOT_ALLOWED, null, request);
 	}
 
 	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -95,7 +96,7 @@ public class GlobalExceptionHandler {
 			HttpMediaTypeNotSupportedException exception,
 			HttpServletRequest request
 	) {
-		return response(ErrorCode.UNSUPPORTED_MEDIA_TYPE, null, request);
+		return response(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE, null, request);
 	}
 
 	@ExceptionHandler(Exception.class)
@@ -104,7 +105,7 @@ public class GlobalExceptionHandler {
 			HttpServletRequest request
 	) {
 		log.error("Unhandled exception: {} {}", request.getMethod(), request.getRequestURI(), exception);
-		return response(ErrorCode.INTERNAL_SERVER_ERROR, null, request);
+		return response(CommonErrorCode.INTERNAL_SERVER_ERROR, null, request);
 	}
 
 	private ResponseEntity<ApiErrorResponse> response(

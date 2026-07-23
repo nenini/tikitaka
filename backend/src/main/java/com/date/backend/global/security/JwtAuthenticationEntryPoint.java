@@ -2,6 +2,7 @@ package com.date.backend.global.security;
 
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.AuthenticationException;
@@ -27,7 +28,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 		Object exception = request.getAttribute("auth.exception");
 		ErrorCode errorCode = exception instanceof BusinessException businessException
 				? businessException.getErrorCode()
-				: ErrorCode.UNAUTHORIZED;
+				: AuthErrorCode.UNAUTHORIZED;
 		errorWriter.write(request, response, errorCode);
 	}
 }

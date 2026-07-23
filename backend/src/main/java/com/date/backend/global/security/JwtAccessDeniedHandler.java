@@ -1,6 +1,6 @@
 package com.date.backend.global.security;
 
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,6 +23,6 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 			HttpServletResponse response,
 			AccessDeniedException accessDeniedException
 	) throws IOException {
-		errorWriter.write(request, response, ErrorCode.FORBIDDEN);
+		errorWriter.write(request, response, AuthErrorCode.FORBIDDEN);
 	}
 }

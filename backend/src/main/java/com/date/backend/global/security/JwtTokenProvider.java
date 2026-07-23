@@ -3,7 +3,7 @@ package com.date.backend.global.security;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.domain.UserRole;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -51,12 +51,12 @@ public class JwtTokenProvider {
 	public AuthUser parseAccessToken(String token) {
 		Map<String, Object> claims = parseClaims(token);
 		if (!"access".equals(claims.get("typ"))) {
-			throw new BusinessException(ErrorCode.INVALID_TOKEN);
+			throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
 		}
 
 		long expiresAt = asLong(claims.get("exp"));
 		if (Instant.now().getEpochSecond() >= expiresAt) {
-			throw new BusinessException(ErrorCode.INVALID_TOKEN, "만료된 토큰입니다.");
+			throw new BusinessException(AuthErrorCode.INVALID_TOKEN, "만료된 토큰입니다.");
 		}
 
 		return new AuthUser(
@@ -83,21 +83,21 @@ public class JwtTokenProvider {
 		try {
 			String[] parts = token.split("\\.");
 			if (parts.length != 3) {
-				throw new BusinessException(ErrorCode.INVALID_TOKEN);
+				throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
 			}
 
 			String signingInput = parts[0] + "." + parts[1];
 			byte[] expected = hmac(signingInput.getBytes(StandardCharsets.UTF_8));
 			byte[] actual = BASE64_URL_DECODER.decode(parts[2]);
 			if (!MessageDigest.isEqual(expected, actual)) {
-				throw new BusinessException(ErrorCode.INVALID_TOKEN);
+				throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
 			}
 
 			return objectMapper.readValue(BASE64_URL_DECODER.decode(parts[1]), MAP_TYPE);
 		} catch (BusinessException exception) {
 			throw exception;
 		} catch (Exception exception) {
-			throw new BusinessException(ErrorCode.INVALID_TOKEN);
+			throw new BusinessException(AuthErrorCode.INVALID_TOKEN);
 		}
 	}
 

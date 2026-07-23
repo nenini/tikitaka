@@ -5,7 +5,8 @@ import com.date.backend.domain.auth.repository.RefreshTokenRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
-import com.date.backend.global.exception.ErrorCode;
+import com.date.backend.global.exception.code.AuthErrorCode;
+import com.date.backend.global.exception.code.UserErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,13 +39,13 @@ public class UserAccountService {
 	@Transactional
 	public void withdraw(Long userId, String password) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+				.orElseThrow(() -> new BusinessException(AuthErrorCode.UNAUTHORIZED));
 
 		if (!user.isActive()) {
-			throw new BusinessException(ErrorCode.INACTIVE_ACCOUNT);
+			throw new BusinessException(UserErrorCode.INACTIVE_ACCOUNT);
 		}
 		if (user.getPasswordHash() == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
-			throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+			throw new BusinessException(AuthErrorCode.INVALID_CREDENTIALS);
 		}
 
 		LocalDateTime now = LocalDateTime.now();
