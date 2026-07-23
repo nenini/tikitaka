@@ -3,6 +3,7 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { SessionPage } from '@/features/session/SessionPage'
+import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 
 /**
@@ -17,6 +18,8 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: '/', element: <HomePage /> },
+      // 대기방(기기 점검) → 세션. 대기방을 거쳐 WebRTC 세션으로 진입한다.
+      { path: '/session/:sessionId/room', element: <WaitingRoomPage /> },
       { path: '/session/:sessionId', element: <SessionPage /> },
       // TODO: /profile, /matching, /chatbot, /report/:id, /dashboard, /contact ...
     ],

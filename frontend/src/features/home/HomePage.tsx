@@ -19,13 +19,13 @@ export function HomePage() {
         </button>
       </div>
 
-      <div className="bt-card bt-card--interactive" onClick={() => navigate('/session/demo')}>
+      <div className="bt-card bt-card--interactive" onClick={() => navigate('/session/demo/room')}>
         <div className="bt-card__head">
-          <span className="bt-card__title">데모 세션 열기</span>
+          <span className="bt-card__title">대기방 입장 (기기 점검)</span>
           <span className="bt-badge bt-badge--info">P0</span>
         </div>
         <p className="bt-body-sm bt-muted">
-          WebRTC 화상 세션 화면(다크 고정)으로 이동합니다. 실제 연결은 FE-A 가 구현.
+          카메라·마이크·스피커를 점검하고 세션에 입장합니다. 통과하면 WebRTC 세션(다크 고정)으로 이어져요.
         </p>
       </div>
     </main>
