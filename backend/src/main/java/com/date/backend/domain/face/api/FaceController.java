@@ -2,7 +2,9 @@ package com.date.backend.domain.face.api;
 
 import com.date.backend.domain.face.application.FaceAnalysisResultService;
 import com.date.backend.domain.face.application.FaceAnalysisService;
+import com.date.backend.domain.face.dto.request.FaceAnalysisFailureSubmitRequest;
 import com.date.backend.domain.face.dto.request.FaceAnalysisResultSubmitRequest;
+import com.date.backend.domain.face.dto.response.FaceAnalysisFailureResponse;
 import com.date.backend.domain.face.dto.response.FaceAnalysisRequestResponse;
 import com.date.backend.domain.face.dto.response.FaceAnalysisResultResponse;
 import com.date.backend.global.api.ApiResponse;
@@ -50,6 +52,19 @@ public class FaceController implements FaceSwaggerDocs {
 			@RequestBody FaceAnalysisResultSubmitRequest request
 	) {
 		return ApiResponse.success(faceAnalysisResultService.submitResult(
+				authUser.userId(),
+				analysisRequestId,
+				request
+		));
+	}
+
+	@PostMapping("/{analysisRequestId}/failure")
+	public ApiResponse<FaceAnalysisFailureResponse> submitFailure(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long analysisRequestId,
+			@RequestBody FaceAnalysisFailureSubmitRequest request
+	) {
+		return ApiResponse.success(faceAnalysisService.submitFailure(
 				authUser.userId(),
 				analysisRequestId,
 				request
