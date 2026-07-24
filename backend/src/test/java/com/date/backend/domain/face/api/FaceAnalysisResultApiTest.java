@@ -151,6 +151,68 @@ class FaceAnalysisResultApiTest {
 				.contains("\"code\":\"FACE_ANALYSIS_REQUEST_NOT_PENDING\"");
 	}
 
+	@Test
+	void authenticatedUserCanSubmitFaceAnalysisFailureOnlyOnce() throws Exception {
+		String uniqueValue = UUID.randomUUID().toString();
+		HttpResponse<String> signupResponse = post(
+				"/api/v1/auth/signup",
+				"""
+						{
+						  "email": "face-failure-%s@example.com",
+						  "password": "password123!",
+						  "realName": "실패 테스트 사용자",
+						  "phoneNumber": "010-5678-1234",
+						  "birthDate": "1995-01-01"
+						}
+						""".formatted(uniqueValue)
+		);
+		assertThat(signupResponse.statusCode()).isEqualTo(201);
+		String accessToken = objectMapper.readTree(signupResponse.body())
+				.path("data")
+				.path("accessToken")
+				.asText();
+
+		HttpResponse<String> requestResponse = post(
+				"/api/v1/face-analyses",
+				"{}",
+				accessToken
+		);
+		assertThat(requestResponse.statusCode()).isEqualTo(201);
+		long analysisRequestId = objectMapper.readTree(requestResponse.body())
+				.path("data")
+				.path("analysisRequestId")
+				.asLong();
+		String failureBody = """
+				{
+				  "failureCode": "NO_FACE"
+				}
+				""";
+
+		HttpResponse<String> failureResponse = post(
+				"/api/v1/face-analyses/" + analysisRequestId + "/failure",
+				failureBody,
+				accessToken
+		);
+
+		assertThat(failureResponse.statusCode()).isEqualTo(200);
+		JsonNode failureData =
+				objectMapper.readTree(failureResponse.body()).path("data");
+		assertThat(failureData.path("analysisRequestId").asLong())
+				.isEqualTo(analysisRequestId);
+		assertThat(failureData.path("status").asText()).isEqualTo("FAILED");
+		assertThat(failureData.path("failureCode").asText()).isEqualTo("NO_FACE");
+		assertThat(failureData.path("failedAt").asText()).isNotBlank();
+
+		HttpResponse<String> duplicateResponse = post(
+				"/api/v1/face-analyses/" + analysisRequestId + "/failure",
+				failureBody,
+				accessToken
+		);
+		assertThat(duplicateResponse.statusCode()).isEqualTo(409);
+		assertThat(duplicateResponse.body())
+				.contains("\"code\":\"FACE_ANALYSIS_REQUEST_NOT_PENDING\"");
+	}
+
 	private HttpResponse<String> post(String path, String body) throws Exception {
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(URI.create("http://localhost:" + port + path))

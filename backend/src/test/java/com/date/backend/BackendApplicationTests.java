@@ -110,6 +110,7 @@ class BackendApplicationTests {
 				.contains("\"summary\":\"내 정보 조회\"")
 				.contains("\"summary\":\"얼굴상 분석 요청 생성\"")
 				.contains("\"summary\":\"얼굴상 분석 성공 결과 제출\"")
+				.contains("\"summary\":\"얼굴상 분석 실패 결과 제출\"")
 				.contains("\"summary\":\"내 최신 얼굴상 분석 결과 조회\"")
 				.contains("\"BearerAuth\"");
 	}

@@ -1,14 +1,18 @@
 package com.date.backend.domain.face.application;
 
 import com.date.backend.domain.face.config.FaceAnalysisProperties;
+import com.date.backend.domain.face.domain.FaceAnalysisFailureCode;
 import com.date.backend.domain.face.domain.FaceAnalysisRequest;
 import com.date.backend.domain.face.domain.FaceAnalysisStatus;
+import com.date.backend.domain.face.dto.request.FaceAnalysisFailureSubmitRequest;
+import com.date.backend.domain.face.dto.response.FaceAnalysisFailureResponse;
 import com.date.backend.domain.face.dto.response.FaceAnalysisRequestResponse;
 import com.date.backend.domain.face.repository.FaceAnalysisRequestRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.AuthErrorCode;
+import com.date.backend.global.exception.code.FaceErrorCode;
 import com.date.backend.global.exception.code.UserErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +39,7 @@ import static org.mockito.Mockito.when;
 class FaceAnalysisServiceTest {
 	private static final Long USER_ID = 1L;
 	private static final long REQUEST_VALIDITY_SECONDS = 600L;
+	private static final ZoneId SERVICE_ZONE_ID = ZoneId.of("Asia/Seoul");
 
 	@Mock
 	private FaceAnalysisRequestRepository faceAnalysisRequestRepository;
@@ -105,6 +111,91 @@ class FaceAnalysisServiceTest {
 
 		assertThat(exception.getErrorCode()).isEqualTo(UserErrorCode.INACTIVE_ACCOUNT);
 		verify(faceAnalysisRequestRepository, never()).save(any());
+	}
+
+	@Test
+	void pendingRequestCanBeMarkedAsFailed() {
+		User user = activeUser();
+		FaceAnalysisRequest request = pendingRequest(USER_ID);
+		when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+		when(faceAnalysisRequestRepository.findByIdForUpdate(10L))
+				.thenReturn(Optional.of(request));
+
+		FaceAnalysisFailureResponse response = faceAnalysisService.submitFailure(
+				USER_ID,
+				10L,
+				new FaceAnalysisFailureSubmitRequest(
+						FaceAnalysisFailureCode.NO_FACE
+				)
+		);
+
+		assertThat(response.status()).isEqualTo(FaceAnalysisStatus.FAILED);
+		assertThat(response.failureCode()).isEqualTo(FaceAnalysisFailureCode.NO_FACE);
+		assertThat(response.failedAt()).isNotNull();
+		assertThat(request.getStatus()).isEqualTo(FaceAnalysisStatus.FAILED);
+	}
+
+	@Test
+	void expiredRequestIsMarkedAsExpiredInsteadOfFailed() {
+		User user = activeUser();
+		LocalDateTime now = LocalDateTime.now(SERVICE_ZONE_ID);
+		FaceAnalysisRequest request = new FaceAnalysisRequest(
+				USER_ID,
+				now.minusMinutes(20),
+				now.minusMinutes(10)
+		);
+		when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+		when(faceAnalysisRequestRepository.findByIdForUpdate(10L))
+				.thenReturn(Optional.of(request));
+
+		BusinessException exception = catchThrowableOfType(
+				() -> faceAnalysisService.submitFailure(
+						USER_ID,
+						10L,
+						new FaceAnalysisFailureSubmitRequest(
+								FaceAnalysisFailureCode.LOW_LIGHT
+						)
+				),
+				BusinessException.class
+		);
+
+		assertThat(exception.getErrorCode())
+				.isEqualTo(FaceErrorCode.ANALYSIS_REQUEST_EXPIRED);
+		assertThat(request.getStatus()).isEqualTo(FaceAnalysisStatus.EXPIRED);
+		assertThat(request.getFailureCode()).isNull();
+	}
+
+	@Test
+	void anotherUserCannotSubmitFailure() {
+		User user = activeUser();
+		FaceAnalysisRequest request = pendingRequest(2L);
+		when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+		when(faceAnalysisRequestRepository.findByIdForUpdate(10L))
+				.thenReturn(Optional.of(request));
+
+		BusinessException exception = catchThrowableOfType(
+				() -> faceAnalysisService.submitFailure(
+						USER_ID,
+						10L,
+						new FaceAnalysisFailureSubmitRequest(
+								FaceAnalysisFailureCode.INVALID_IMAGE
+						)
+				),
+				BusinessException.class
+		);
+
+		assertThat(exception.getErrorCode())
+				.isEqualTo(FaceErrorCode.ANALYSIS_REQUEST_FORBIDDEN);
+		assertThat(request.getStatus()).isEqualTo(FaceAnalysisStatus.PENDING);
+	}
+
+	private FaceAnalysisRequest pendingRequest(Long userId) {
+		LocalDateTime now = LocalDateTime.now(SERVICE_ZONE_ID);
+		return new FaceAnalysisRequest(
+				userId,
+				now.minusMinutes(1),
+				now.plusMinutes(9)
+		);
 	}
 
 	private User activeUser() {
