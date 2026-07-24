@@ -1,5 +1,5 @@
 import type { CSSProperties, ElementType, HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 /* ── Stack ── 세로 배치. gap 은 디자인 시스템 스페이싱(px) 기준. */
 export interface StackProps extends HTMLAttributes<HTMLDivElement> {
@@ -30,6 +30,13 @@ export function Cluster({ gap = 8, as: Tag = 'div', className, style, children, 
 }
 
 /* ── VisuallyHidden ── 스크린리더 전용 텍스트 (`.bt-sr-only`). */
-export function VisuallyHidden({ children }: { children: ReactNode }) {
-  return <span className="bt-sr-only">{children}</span>
+export interface VisuallyHiddenProps extends HTMLAttributes<HTMLSpanElement> {
+  children: ReactNode
+}
+export function VisuallyHidden({ className, children, ...rest }: VisuallyHiddenProps) {
+  return (
+    <span className={cn('bt-sr-only', className)} {...rest}>
+      {children}
+    </span>
+  )
 }

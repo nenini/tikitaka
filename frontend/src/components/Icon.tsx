@@ -1,5 +1,5 @@
 import type { ReactNode, SVGProps } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../shared/lib/cn'
 
 /**
  * 인라인 SVG 아이콘 레지스트리.
@@ -8,6 +8,10 @@ import { cn } from '@/shared/lib/cn'
  *
  *   <Icon name="mic" size={19} />
  *   <button className="bt-btn bt-btn--danger"><Icon name="report" size={15} /> 신고</button>
+ *
+ * 네이밍 규칙: **kebab-case 고정** (`camera-flip`, `heart-fill`). 객체 키를 문자열로 관리하므로
+ * snake_case/camelCase 를 섞지 않는다.
+ * 아이콘이 50개를 넘어가면 icons/{navigation,action,status,session}.tsx 로 분할한다.
  */
 
 type Paint = 'stroke' | 'fill'
@@ -27,7 +31,7 @@ const ICONS = {
   chart:       { paint: 'stroke', body: <path d="M6 20V10M12 20V4M18 20v-6" /> },
   user:        { paint: 'stroke', body: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></> },
   bell:        { paint: 'stroke', body: <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" /> },
-  settings:    { paint: 'stroke', body: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2V21a2 2 0 11-4 0v-.1A1.7 1.7 0 004 19.4l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00-1.2-2.9H0m4.6-6A1.7 1.7 0 004 4.6" /></> },
+  settings:    { paint: 'stroke', body: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 003.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h.08a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.08a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" /></> },
 
   // ── actions / arrows ───────────────────────────────────
   'chevron-right':   { paint: 'stroke', body: <path d="M9 6l6 6-6 6" /> },
@@ -60,7 +64,13 @@ const ICONS = {
   chat:        { paint: 'stroke', body: <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /> },
   'phone-end': { paint: 'fill',   body: <path d="M12 9c-1.6 0-3.2.3-4.6.8v3.1c0 .4-.2.8-.6 1-.9.4-1.7 1-2.4 1.7-.2.2-.4.3-.7.3s-.5-.1-.7-.3l-2-2c-.2-.2-.3-.4-.3-.7s.1-.5.3-.7C3.9 9.8 7.8 8.2 12 8.2s8.1 1.6 11 4c.2.2.3.4.3.7s-.1.5-.3.7l-2 2c-.2.2-.4.3-.7.3s-.5-.1-.7-.3c-.7-.7-1.5-1.3-2.4-1.7-.4-.2-.6-.6-.6-1V9.8C15.2 9.3 13.6 9 12 9z" /> },
   clock:       { paint: 'stroke', body: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> },
-  camera_flip: { paint: 'stroke', body: <><path d="M15 10l6-4v12l-6-4M3 6h12v12H3z" /><path d="M7 12a2 2 0 114 0" /></> },
+  'camera-flip': { paint: 'stroke', body: <><path d="M15 10l6-4v12l-6-4M3 6h12v12H3z" /><path d="M6 14a3 3 0 015.2-2M12 10a3 3 0 01-5.2 2" /><path d="M11 11.5L11.4 8M6.6 12.5L6.2 16" /></> },
+  signal:      { paint: 'stroke', body: <path d="M4 20v-4M9 20v-8M14 20V8M19 20V4" /> },
+
+  // ── theme ──────────────────────────────────────────────
+  sun:         { paint: 'stroke', body: <><circle cx="12" cy="12" r="4.5" /><path d="M12 1.5v2.5M12 20v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M1.5 12h2.5M20 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8" /></> },
+  moon:        { paint: 'stroke', body: <path d="M20.5 14.6A8.5 8.5 0 019.4 3.5a8.5 8.5 0 1011.1 11.1z" /> },
+  monitor:     { paint: 'stroke', body: <><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></> },
 
   // ── brand ──────────────────────────────────────────────
   bloom: { paint: 'fill', body: <><ellipse cx="12" cy="5.6" rx="3.3" ry="4.4" /><ellipse cx="12" cy="18.4" rx="3.3" ry="4.4" /><ellipse cx="5.6" cy="12" rx="4.4" ry="3.3" /><ellipse cx="18.4" cy="12" rx="4.4" ry="3.3" /><circle cx="12" cy="12" r="2.4" fill="var(--bt-color-surface)" /></> },
@@ -68,15 +78,23 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS
 
+/** Storybook/갤러리에서 전체 아이콘 그리드를 만들어 시각 검수할 때 사용한다. */
+export const iconNames = Object.keys(ICONS) as IconName[]
+
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name: IconName
   /** px. width=height 로 정사각 렌더 (기본 20) */
   size?: number | string
   /** stroke 아이콘의 선 굵기 (기본 2) */
   strokeWidth?: number
+  /** 의미 있는 아이콘의 접근 가능한 이름. 주면 role="img" 로 노출된다 */
   title?: string
 }
 
+/**
+ * 기본은 **장식용**(aria-hidden). 아이콘에 의미가 있으면 title 이나 aria-label/aria-labelledby 를 준다.
+ * 하나라도 있으면 aria-hidden 을 붙이지 않는다 — 접근 가능한 이름을 주고도 숨겨지는 사고를 막는다.
+ */
 export function Icon({ name, size = 20, strokeWidth = 2, title, className, ...rest }: IconProps) {
   const def = ICONS[name]
   const paint =
@@ -84,15 +102,18 @@ export function Icon({ name, size = 20, strokeWidth = 2, title, className, ...re
       ? { fill: 'none', stroke: 'currentColor', strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
       : { fill: 'currentColor' }
 
+  const accessible = Boolean(title) || Boolean(rest['aria-label']) || Boolean(rest['aria-labelledby'])
+
   return (
     <svg
       viewBox={VIEW_BOX}
       width={size}
       height={size}
       className={cn('bt-icon', className)}
-      role={title ? 'img' : undefined}
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
+      role={accessible ? 'img' : undefined}
+      aria-hidden={accessible ? undefined : true}
+      aria-label={title ?? rest['aria-label']}
+      focusable="false"
       {...paint}
       {...rest}
     >

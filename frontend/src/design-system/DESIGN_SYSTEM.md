@@ -186,11 +186,26 @@ primitive          semantic                컴포넌트
 | **Topic button** | `.bt-topic-btn` | `SILENCE-01` 15–20초 |
 | **Question card** | `.bt-question-card` | `SILENCE-01` 30초+ · `SILENCE-03` |
 | Session timer | `.bt-timer --soon/--last` | `SESSION-02` |
-| List row | `.bt-row` | `GROWTH-01` 연습 기록 |
-| Bottom nav + FAB | `.bt-nav` `.bt-nav__fab` | 전역 |
-| Modal | `.bt-scrim` `.bt-modal` | `MODERATION-01` 신고 |
+| **Connection indicator** | `.bt-conn --connecting/--connected/--unstable/--reconnecting/--disconnected` | `SESSION-01` 네트워크 상태 |
+| List row | `.bt-row`, `.bt-row--control` | `GROWTH-01` 연습 기록 |
+| Bottom nav + FAB | `.bt-nav --with-fab` `.bt-nav__fab` | 전역 |
+| Modal / AlertDialog | `.bt-modal-root` `.bt-scrim` `.bt-modal` | `MODERATION-01` 신고 · 세션 종료 확인 |
+| Screen (레이아웃) | `.bt-screen__header/__content/__footer`, `.bt-skip-link` | 전역 |
 | Consent row | `.bt-consent` | `AUTH-03` 목적별 동의 |
 | Skeleton / Empty | `.bt-skeleton` `.bt-empty` | 전역 |
+
+### 6.1 React 래퍼 사용 규칙
+
+`.bt-*` 클래스를 직접 쓰지 말고 `@/components` 배럴의 래퍼를 쓴다. 클래스 조합에 접근성 계약이 묶여 있다.
+
+| 하지 말 것 | 대신 | 이유 |
+|---|---|---|
+| `<div className="bt-card bt-card--interactive" onClick>` | `<CardButton>` / `<CardLink as={Link}>` | div 는 포커스·Enter/Space 가 없다 |
+| `<ListRow>` 안에 버튼 중첩 | `<ListRow>`(비상호작용) + 내부 버튼 | 버튼 중첩은 유효하지 않은 인터랙션 |
+| `<Field label><input/></Field>` | `<Field label><Input/></Field>` | `Input` 만 컨텍스트에서 id/aria 를 받아간다 |
+| `Segmented` 를 탭으로 사용 | 탭이 필요하면 별도 Tabs 컴포넌트 | `role="tab"` 은 tabpanel·방향키·roving tabIndex 가 전제 |
+| `Modal` 에 이름 없이 사용 | `title` 또는 `aria-label` (타입으로 강제) | 이름 없는 다이얼로그는 탐색 불가 |
+| `useTheme()` 를 Provider 밖에서 | 루트를 `<ThemeProvider>` 로 감싼다 | 상태가 분기되면 토글끼리 어긋난다 |
 
 **레이더 차트**(`REPORT-01`)는 Chart.js로 구현하되 색은 토큰을 주입한다:
 AI 분석 = `--bt-color-brand`(`#5B8BEF`), 상대 평가 = `--bt-color-success-marker`(`#57C97E`).

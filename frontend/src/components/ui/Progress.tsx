@@ -1,5 +1,5 @@
 import type { CSSProperties, HTMLAttributes } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 export interface ProgressProps extends HTMLAttributes<HTMLDivElement> {
   /** 0~100 */
