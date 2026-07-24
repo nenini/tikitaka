@@ -29,6 +29,11 @@ public enum FaceErrorCode implements ErrorCode {
 			"FACE_ANALYSIS_RESULT_ALREADY_EXISTS",
 			"이미 얼굴상 분석 결과가 저장된 요청입니다."
 	),
+	ANALYSIS_RESULT_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"FACE_ANALYSIS_RESULT_NOT_FOUND",
+			"저장된 얼굴상 분석 결과가 없습니다."
+	),
 	INVALID_ANALYSIS_RESULT(
 			HttpStatus.BAD_REQUEST,
 			"INVALID_FACE_ANALYSIS_RESULT",
