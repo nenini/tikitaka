@@ -23,33 +23,76 @@ class FlywayMigrationTests {
 	@Test
 	void migrationsCreateSchemaAndHistory() {
 		Integer migrationCount = jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
-						+ "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL",
-				Integer.class
+			"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+				+ "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL",
+			Integer.class
 		);
-		Integer userTableCount = tableCount("USERS");
-		Integer passwordResetTableCount = tableCount("PASSWORD_RESET_TOKENS");
-		Integer profileTableCount = tableCount("USER_PROFILES");
-		Integer contactProfileTableCount = tableCount("CONTACT_PROFILES");
-        Integer activeConsentTypeCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM CONSENT_TYPES WHERE ISACTIVE = TRUE",
-                Integer.class
-        );
 
-		assertThat(migrationCount).isEqualTo(6);
+		Integer userTableCount = tableCount("USERS");
+		Integer passwordResetTableCount =
+			tableCount("PASSWORD_RESET_TOKENS");
+		Integer profileTableCount =
+			tableCount("USER_PROFILES");
+		Integer contactProfileTableCount =
+			tableCount("CONTACT_PROFILES");
+
+		Integer activeConsentTypeCount = jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM CONSENT_TYPES "
+				+ "WHERE ISACTIVE = TRUE",
+			Integer.class
+		);
+
+		Integer preferredAgeRangeTableCount =
+			tableCount("USER_PREFERRED_AGE_RANGES");
+		Integer preferredFaceTagTableCount =
+			tableCount("USER_PREFERRED_FACE_TAGS");
+		Integer preferredTraitTableCount =
+			tableCount("USER_PREFERRED_TRAITS");
+
+		Integer faceTagCount =
+			rowCount("face_tag_catalog");
+
+		Integer personalityCount = jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM `trait_catalog` "
+				+ "WHERE `traitType` = 'PERSONALITY'",
+			Integer.class
+		);
+
+		Integer practiceGoalCount =
+			rowCount("practice_goal_catalog");
+
+		assertThat(migrationCount).isEqualTo(7);
+
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
 		assertThat(contactProfileTableCount).isZero();
+
 		assertThat(activeConsentTypeCount).isEqualTo(2);
+
+		assertThat(preferredAgeRangeTableCount).isEqualTo(1);
+		assertThat(preferredFaceTagTableCount).isEqualTo(1);
+		assertThat(preferredTraitTableCount).isEqualTo(1);
+
+		assertThat(faceTagCount).isEqualTo(10);
+		assertThat(personalityCount).isEqualTo(11);
+		assertThat(practiceGoalCount).isEqualTo(5);
 	}
 
 	private Integer tableCount(String tableName) {
 		return jdbcTemplate.queryForObject(
-				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
-						+ "WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = ?",
-				Integer.class,
-				tableName
+			"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+				+ "WHERE TABLE_SCHEMA = 'PUBLIC' "
+				+ "AND TABLE_NAME = ?",
+			Integer.class,
+			tableName
+		);
+	}
+
+	private Integer rowCount(String tableName) {
+		return jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM `" + tableName + "`",
+			Integer.class
 		);
 	}
 }
