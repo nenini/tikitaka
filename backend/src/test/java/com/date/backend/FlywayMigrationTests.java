@@ -36,7 +36,7 @@ class FlywayMigrationTests {
                 Integer.class
         );
 
-		assertThat(migrationCount).isEqualTo(5);
+		assertThat(migrationCount).isEqualTo(6);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);

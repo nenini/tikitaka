@@ -1,5 +1,6 @@
 package com.date.backend.domain.consent.api;
 
+import com.date.backend.domain.consent.dto.request.SaveUserConsentsRequest;
 import com.date.backend.domain.consent.dto.response.ConsentTypeResponse;
 import com.date.backend.domain.consent.dto.response.UserConsentStatusResponse;
 import com.date.backend.global.api.ApiResponse;
@@ -36,5 +37,21 @@ public interface ConsentSwaggerDocs {
 	})
 	ApiResponse<List<UserConsentStatusResponse>> getMyConsentStatuses(
 			@Parameter(hidden = true) AuthUser authUser
+	);
+
+	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+	@Operation(
+			summary = "개인정보 및 AI 분석 동의 저장",
+			description = "인증 사용자의 동의 항목별 동의 여부를 신규 저장하거나 최신 상태로 갱신합니다."
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "저장 성공"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "중복 동의 항목 또는 잘못된 요청"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "활성 동의 항목 없음")
+	})
+	ApiResponse<List<UserConsentStatusResponse>> saveMyConsents(
+			@Parameter(hidden = true) AuthUser authUser,
+			SaveUserConsentsRequest request
 	);
 }

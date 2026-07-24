@@ -9,6 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
@@ -45,6 +47,39 @@ public class UserConsent {
 	private LocalDateTime updatedAt;
 
 	protected UserConsent() {
+	}
+
+	public UserConsent(User user, ConsentType consentType, boolean consented, LocalDateTime decidedAt) {
+		this.user = user;
+		this.consentType = consentType;
+		this.consented = consented;
+		this.consentedAt = consented ? decidedAt : null;
+	}
+
+	@PrePersist
+	void prePersist() {
+		LocalDateTime now = LocalDateTime.now();
+		this.createdAt = now;
+		this.updatedAt = now;
+	}
+
+	@PreUpdate
+	void preUpdate() {
+		this.updatedAt = LocalDateTime.now();
+	}
+
+	public void updateDecision(boolean consented, LocalDateTime decidedAt) {
+		if (consented) {
+			this.consented = true;
+			this.consentedAt = decidedAt;
+			this.withdrawnAt = null;
+			return;
+		}
+
+		if (this.consented) {
+			this.withdrawnAt = decidedAt;
+		}
+		this.consented = false;
 	}
 
 	public ConsentType getConsentType() {
