@@ -19,6 +19,13 @@ def test_uncertain_still_returns_one_suggestion() -> None:
     assert result.status is AnalysisStatus.UNCERTAIN
     assert len(result.suggestions) == 1
     assert result.suggestions[0].face_type == "dog"
+    assert result.suggestions[0].relative_score == 0.22
+
+
+def test_group_centered_facenet_policy_uses_calibrated_relative_score_scale() -> None:
+    policy = PredictionPolicy()
+    assert policy.success_threshold == 0.30
+    assert policy.minimum_margin == 0.08
 
 
 def test_success_may_return_two_suggestions() -> None:

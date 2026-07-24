@@ -4,6 +4,7 @@ from collections import Counter
 
 from face_analysis.labels import (
     ANALYSIS_GROUP_LABELS,
+    FACE_TYPE_KO,
     REFERENCE_PEOPLE,
     labels_for_group,
 )
@@ -26,3 +27,7 @@ def test_each_group_has_four_people_per_face_type() -> None:
 def test_analysis_group_is_explicitly_selected() -> None:
     assert labels_for_group("여자") == ANALYSIS_GROUP_LABELS["female"]
     assert labels_for_group("남성") == ANALYSIS_GROUP_LABELS["male"]
+
+
+def test_turtle_uses_the_friendly_entertainment_display_name() -> None:
+    assert FACE_TYPE_KO["turtle"] == "꼬북이상"
