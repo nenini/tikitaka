@@ -27,6 +27,7 @@ public class SecurityConfig {
 			"/api/v1/auth/password/reset-request",
 			"/api/v1/auth/password/reset",
 			"/api/v1/auth/oauth2/**",
+			"/api/v1/consents",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",
