@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -22,9 +22,6 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 
 type Layout = 'split' | 'centered'
-
-/** .bt-btn 은 --_bg/--_fg/--_bd 로 색을 받는다. 브랜드 소셜 버튼은 여기에 주입. */
-type BrandVars = CSSProperties & Record<'--_bg' | '--_fg' | '--_bd', string>
 
 export function LoginPage() {
   const [layout, setLayout] = useState<Layout>('split')
@@ -60,7 +57,7 @@ function HeroPanel() {
       className="relative flex flex-col justify-center overflow-hidden px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16"
       style={{
         background:
-          'linear-gradient(158deg, var(--bt-color-action) 0%, var(--bt-color-brand) 52%, #7DA3F2 100%)',
+          'linear-gradient(158deg, var(--bt-color-action) 0%, var(--bt-color-brand) 52%, var(--bt-blue-400) 100%)',
       }}
     >
       <img
@@ -207,25 +204,30 @@ function LoginCard() {
   )
 }
 
-/** Google · 네이버 소셜 로그인 (브랜드 색은 --_bg/--_fg 로 주입) */
+/**
+ * Google · 네이버 소셜 로그인.
+ * 계약 준수: Button 은 공개 variant(secondary) 로만 스타일한다. 내부 변수(--_bg 등) 주입 금지.
+ * 브랜드색은 접근성 예외(로고타입)인 로고 마크에만 두고, 버튼 자체는 대비가 안전한 secondary 로 둔다.
+ */
 function SocialButtons() {
-  const google: BrandVars = {
-    '--_bg': '#ffffff',
-    '--_fg': '#1f1f1f',
-    '--_bd': 'var(--bt-color-border-strong)',
-  }
-  const naver: BrandVars = { '--_bg': '#03C75A', '--_fg': '#ffffff', '--_bd': 'transparent' }
-
   return (
     <Stack gap={8}>
-      <Button size="lg" block style={google} onClick={() => console.log('TODO(AUTH): Google OAuth')}>
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        onClick={() => console.log('TODO(AUTH): Google OAuth')}
+      >
         <GoogleGlyph />
         Google로 계속하기
       </Button>
-      <Button size="lg" block style={naver} onClick={() => console.log('TODO(AUTH): Naver OAuth')}>
-        <span className="grid h-[18px] w-[18px] place-items-center rounded-[3px] bg-white/25 text-[13px] font-black leading-none">
-          N
-        </span>
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        onClick={() => console.log('TODO(AUTH): Naver OAuth')}
+      >
+        <NaverGlyph />
         네이버로 계속하기
       </Button>
     </Stack>
@@ -283,6 +285,16 @@ function GoogleGlyph() {
         fill="#EA4335"
         d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
       />
+    </svg>
+  )
+}
+
+/** 네이버 로고 마크(로고타입 — 대비 예외). 브랜드 그린은 여기에만 둔다. */
+function NaverGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+      <rect width="18" height="18" rx="4" fill="#03C75A" />
+      <path fill="#fff" d="M10.3 9.35 7.5 5.2H5.2v7.6h2.5V8.65l2.8 4.15h2.3V5.2h-2.5v4.15z" />
     </svg>
   )
 }
