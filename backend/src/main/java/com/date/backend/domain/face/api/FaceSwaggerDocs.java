@@ -1,6 +1,8 @@
 package com.date.backend.domain.face.api;
 
+import com.date.backend.domain.face.dto.request.FaceAnalysisFailureSubmitRequest;
 import com.date.backend.domain.face.dto.request.FaceAnalysisResultSubmitRequest;
+import com.date.backend.domain.face.dto.response.FaceAnalysisFailureResponse;
 import com.date.backend.domain.face.dto.response.FaceAnalysisRequestResponse;
 import com.date.backend.domain.face.dto.response.FaceAnalysisResultResponse;
 import com.date.backend.global.api.ApiResponse;
@@ -151,5 +153,78 @@ public interface FaceSwaggerDocs {
 					)
 			)
 			FaceAnalysisResultSubmitRequest request
+	);
+
+	@Operation(
+			summary = "얼굴상 분석 실패 결과 제출",
+			description = """
+					프론트엔드가 AI 서버에서 받은 분석 실패 코드를 제출합니다.
+					지원 코드는 NO_FACE, MULTIPLE_FACES, LOW_LIGHT, OVEREXPOSED,
+					SEVERE_BLUR, EXTREME_HEAD_POSE, INVALID_IMAGE입니다.
+					요청이 이미 만료됐다면 FAILED로 저장하지 않고 EXPIRED로 변경한 뒤 410을 반환합니다.
+					"""
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "실패 결과 저장 성공",
+					content = @Content(
+							schema = @Schema(implementation = FaceAnalysisFailureResponse.class),
+							examples = @ExampleObject(value = """
+									{
+									  "success": true,
+									  "data": {
+									    "analysisRequestId": 123,
+									    "status": "FAILED",
+									    "failureCode": "NO_FACE",
+									    "failedAt": "2026-07-24T10:30:00"
+									  }
+									}
+									""")
+					)
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "400",
+					description = "실패 코드 누락 또는 지원하지 않는 실패 코드"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "401",
+					description = "인증 실패"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "403",
+					description = "요청 소유자 불일치 또는 비활성화 계정"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "404",
+					description = "분석 요청 없음"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "409",
+					description = "이미 성공 또는 실패 처리된 분석 요청"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "410",
+					description = "만료된 분석 요청"
+			)
+	})
+	ApiResponse<FaceAnalysisFailureResponse> submitFailure(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Positive Long analysisRequestId,
+			@Valid
+			@io.swagger.v3.oas.annotations.parameters.RequestBody(
+					required = true,
+					content = @Content(
+							schema = @Schema(
+									implementation = FaceAnalysisFailureSubmitRequest.class
+							),
+							examples = @ExampleObject(value = """
+									{
+									  "failureCode": "NO_FACE"
+									}
+									""")
+					)
+			)
+			FaceAnalysisFailureSubmitRequest request
 	);
 }
