@@ -116,6 +116,16 @@ public class FaceAnalysisResultService {
 		return FaceAnalysisResultResponse.from(savedResult);
 	}
 
+	public FaceAnalysisResultResponse getMyLatestResult(Long userId) {
+		validateActiveUser(userId);
+		FaceAnalysisResult result = faceAnalysisResultRepository
+				.findFirstByUserIdOrderByAnalyzedAtDescIdDesc(userId)
+				.orElseThrow(() -> new BusinessException(
+						FaceErrorCode.ANALYSIS_RESULT_NOT_FOUND
+				));
+		return FaceAnalysisResultResponse.from(result);
+	}
+
 	private FaceAnalysisRequest getAnalysisRequestForUpdate(Long analysisRequestId) {
 		if (analysisRequestId == null || analysisRequestId <= 0) {
 			throw new BusinessException(FaceErrorCode.ANALYSIS_REQUEST_NOT_FOUND);
