@@ -60,9 +60,9 @@ export function WaitingRoomPage() {
   }
 
   return (
-    <DarkScope className="flex min-h-full flex-col">
+    <DarkScope fill={false} className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/* 앱바 */}
-      <header className="flex items-center justify-between px-5 py-4">
+      <header className="flex shrink-0 items-center justify-between px-5 py-4">
         <Cluster gap={8} style={{ alignItems: 'center' }}>
           <Icon name="bloom" size={22} style={{ color: 'var(--bt-color-brand)' }} />
           <span className="bt-body-sm bt-muted">상황형 대기방 · 기기 점검</span>
@@ -70,9 +70,9 @@ export function WaitingRoomPage() {
         {remainingSec != null && <SessionTimer remainingSec={remainingSec} label="시작까지" />}
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-4 px-5 pb-8 lg:flex-row">
+      <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-4 px-5 pb-8 lg:min-h-0 lg:flex-row lg:pb-5">
         {/* ── 좌: 카메라 미리보기 ── */}
-        <section className="flex flex-1 flex-col gap-3">
+        <section className="flex flex-1 flex-col gap-3 lg:min-h-0">
           <Cluster gap={8} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
             <Cluster gap={8} style={{ alignItems: 'center' }}>
               <TagChip>
@@ -89,109 +89,113 @@ export function WaitingRoomPage() {
           <CameraPreview status={device.camera} videoRef={device.videoRef} />
         </section>
 
-        {/* ── 우: 점검 패널 ── */}
-        <aside className="flex w-full flex-col gap-3 lg:w-[380px]">
-          <div>
+        {/* ── 우: 점검 패널 — 데스크탑은 헤딩/CTA 고정 + 카드 영역만 내부 스크롤 ── */}
+        <aside className="flex w-full flex-col gap-3 lg:min-h-0 lg:w-[380px]">
+          <div className="shrink-0">
             <h1 className="bt-h2">입장 전 기기를 점검해요</h1>
             <p className="bt-body-sm bt-muted mt-1">카메라·스피커·마이크를 한 번에 확인하세요.</p>
           </div>
 
-          {device.errorReason && (
-            <Callout tone="danger">
-              {device.errorReason}
-              <div className="mt-2">
-                <Button variant="secondary" size="sm" leadingIcon="refresh" onClick={device.retry}>
-                  다시 점검
+          {/* 점검 카드 영역 (데스크탑에서만 내부 스크롤) */}
+          <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+            {device.errorReason && (
+              <Callout tone="danger">
+                {device.errorReason}
+                <div className="mt-2">
+                  <Button variant="secondary" size="sm" leadingIcon="refresh" onClick={device.retry}>
+                    다시 점검
+                  </Button>
+                </div>
+              </Callout>
+            )}
+
+            {/* 카메라 */}
+            <DeviceCard icon="camera" label="카메라" status={device.camera}>
+              원 안에 얼굴이 또렷하게 잡혔는지 확인해요.
+            </DeviceCard>
+
+            {/* 스피커 — 사용자가 직접 테스트음으로 확인 */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <Cluster gap={8} style={{ alignItems: 'center' }}>
+                  <Icon name="bell" size={18} />
+                  <b className="bt-body-sm">스피커</b>
+                </Cluster>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leadingIcon="bell"
+                  onClick={device.playTestTone}
+                  disabled={device.speakerPlaying}
+                >
+                  {device.speakerPlaying ? '재생 중…' : '테스트음 재생'}
                 </Button>
               </div>
-            </Callout>
-          )}
-
-          {/* 카메라 */}
-          <DeviceCard icon="camera" label="카메라" status={device.camera}>
-            원 안에 얼굴이 또렷하게 잡혔는지 확인해요.
-          </DeviceCard>
-
-          {/* 스피커 — 사용자가 직접 테스트음으로 확인 */}
-          <Card>
-            <div className="flex items-center justify-between">
-              <Cluster gap={8} style={{ alignItems: 'center' }}>
-                <Icon name="bell" size={18} />
-                <b className="bt-body-sm">스피커</b>
-              </Cluster>
-              <Button
-                variant="secondary"
-                size="sm"
-                leadingIcon="bell"
-                onClick={device.playTestTone}
-                disabled={device.speakerPlaying}
-              >
-                {device.speakerPlaying ? '재생 중…' : '테스트음 재생'}
-              </Button>
-            </div>
-            <SpeakerWave playing={device.speakerPlaying} />
-            <p className="bt-caption bt-muted mt-1">소리가 들리면 정상이에요.</p>
-          </Card>
-
-          {/* 마이크 — 실시간 입력 레벨 */}
-          <Card>
-            <div className="flex items-center justify-between">
-              <Cluster gap={8} style={{ alignItems: 'center' }}>
-                <Icon name="mic" size={18} />
-                <b className="bt-body-sm">마이크</b>
-              </Cluster>
-              <StatusBadge status={device.microphone} />
-            </div>
-            <MicMeter meterRef={device.meterRef} active={device.microphone === 'ready'} />
-            <p className="bt-caption bt-muted mt-1">
-              "안녕하세요"라고 말해보세요 — 막대가 움직이면 정상이에요.
-            </p>
-          </Card>
-
-          {/* 이번 세션 목표 */}
-          {bundle?.practiceGoal && (
-            <Card variant="inset">
-              <span className="bt-caption text-faint">이번 세션 목표</span>
-              <p className="bt-body-sm mt-1">🎯 {bundle.practiceGoal}</p>
+              <SpeakerWave playing={device.speakerPlaying} />
+              <p className="bt-caption bt-muted mt-1">소리가 들리면 정상이에요.</p>
             </Card>
-          )}
 
-          {/* 규칙 안내 배너 */}
-          <Callout tone="info">
-            AI 코칭은 <b>나에게만</b> 보여요 · 침묵 10초까지는 개입하지 않아요 · 언제든 신고·퇴장할 수
-            있어요.
-          </Callout>
+            {/* 마이크 — 실시간 입력 레벨 */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <Cluster gap={8} style={{ alignItems: 'center' }}>
+                  <Icon name="mic" size={18} />
+                  <b className="bt-body-sm">마이크</b>
+                </Cluster>
+                <StatusBadge status={device.microphone} />
+              </div>
+              <MicMeter meterRef={device.meterRef} active={device.microphone === 'ready'} />
+              <p className="bt-caption bt-muted mt-1">
+                "안녕하세요"라고 말해보세요 — 막대가 움직이면 정상이에요.
+              </p>
+            </Card>
 
-          {/* 상대 입장 대기 */}
-          <Cluster gap={8} style={{ alignItems: 'center' }}>
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{
-                background: opponentJoined ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)',
-              }}
-              aria-hidden="true"
-            />
-            <span className="bt-caption bt-muted">
-              {opponentJoined ? '상대가 입장했어요' : '상대 입장 대기 중…'}
-            </span>
-          </Cluster>
+            {/* 이번 세션 목표 */}
+            {bundle?.practiceGoal && (
+              <Card variant="inset">
+                <span className="bt-caption text-faint">이번 세션 목표</span>
+                <p className="bt-body-sm mt-1">🎯 {bundle.practiceGoal}</p>
+              </Card>
+            )}
 
-          {/* 입장 CTA */}
-          <Button
-            variant="primary"
-            block
-            size="lg"
-            loading={joining}
-            disabled={!device.ready || loading}
-            onClick={handleEnter}
-          >
-            {device.ready ? '입장하기' : '기기 점검 중…'}
-          </Button>
-          {!device.ready && !device.errorReason && (
-            <p className="bt-caption text-faint text-center">
-              카메라·마이크가 준비되면 입장할 수 있어요.
-            </p>
-          )}
+            {/* 규칙 안내 배너 */}
+            <Callout tone="info">
+              AI 코칭은 <b>나에게만</b> 보여요 · 침묵 10초까지는 개입하지 않아요 · 언제든 신고·퇴장할 수
+              있어요.
+            </Callout>
+          </div>
+
+          {/* 하단 고정: 상대 입장 대기 + 입장 CTA */}
+          <div className="flex shrink-0 flex-col gap-2">
+            <Cluster gap={8} style={{ alignItems: 'center' }}>
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{
+                  background: opponentJoined ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)',
+                }}
+                aria-hidden="true"
+              />
+              <span className="bt-caption bt-muted">
+                {opponentJoined ? '상대가 입장했어요' : '상대 입장 대기 중…'}
+              </span>
+            </Cluster>
+
+            <Button
+              variant="primary"
+              block
+              size="lg"
+              loading={joining}
+              disabled={!device.ready || loading}
+              onClick={handleEnter}
+            >
+              {device.ready ? '입장하기' : '기기 점검 중…'}
+            </Button>
+            {!device.ready && !device.errorReason && (
+              <p className="bt-caption text-faint text-center">
+                카메라·마이크가 준비되면 입장할 수 있어요.
+              </p>
+            )}
+          </div>
         </aside>
       </div>
     </DarkScope>
@@ -292,7 +296,7 @@ function StatusBadge({ status }: { status: DeviceStatus }) {
     case 'checking':
       return <Badge tone="info">확인 중</Badge>
     case 'error':
-      return <Badge tone="danger">오류</Badge>
+      return <Badge tone="danger">미연결</Badge>
     default:
       return <Badge tone="neutral">대기</Badge>
   }
