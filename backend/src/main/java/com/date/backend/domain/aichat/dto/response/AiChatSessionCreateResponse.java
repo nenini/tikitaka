@@ -1,0 +1,30 @@
+package com.date.backend.domain.aichat.dto.response;
+
+import com.date.backend.domain.aichat.domain.AiChatSession;
+import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
+import com.date.backend.domain.aichat.domain.ChatSessionStatus;
+import com.date.backend.domain.aichat.domain.ConversationStage;
+
+import java.time.LocalDateTime;
+
+public record AiChatSessionCreateResponse(
+		Long sessionId,
+		Long personaId,
+		String personaName,
+		ChatSessionPurpose purpose,
+		ConversationStage stage,
+		ChatSessionStatus status,
+		LocalDateTime createdAt
+) {
+	public static AiChatSessionCreateResponse from(AiChatSession session) {
+		return new AiChatSessionCreateResponse(
+				session.getId(),
+				session.getPersona().getId(),
+				session.getPersona().getName(),
+				session.getPurpose(),
+				session.getStage(),
+				session.getStatus(),
+				session.getCreatedAt()
+		);
+	}
+}
