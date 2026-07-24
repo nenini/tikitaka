@@ -1,0 +1,38 @@
+[project]
+name = "face-analysis"
+version = "0.1.0"
+description = "Privacy-conscious face quality and entertainment face-type analysis"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "deepface==0.0.100",
+    "fastapi==0.139.2",
+    "mediapipe==0.10.21",
+    "numpy==1.26.4",
+    "opencv-python==4.11.0.86",
+    "opencv-python-headless==4.11.0.86",
+    "tensorflow==2.19.1",
+    "tf-keras==2.19.0",
+    "uvicorn==0.51.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2==2.7.0",
+    "pytest>=9,<10",
+    "ruff>=0.12,<1",
+    "torch==2.7.0",
+    "torchvision==0.22.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
