@@ -27,42 +27,44 @@ class FlywayMigrationTests {
 				+ "WHERE \"success\" = TRUE AND \"version\" IS NOT NULL",
 			Integer.class
 		);
-
 		Integer userTableCount = tableCount("USERS");
-		Integer passwordResetTableCount =
-			tableCount("PASSWORD_RESET_TOKENS");
-		Integer profileTableCount =
-			tableCount("USER_PROFILES");
-		Integer contactProfileTableCount =
-			tableCount("CONTACT_PROFILES");
-
+		Integer passwordResetTableCount = tableCount("PASSWORD_RESET_TOKENS");
+		Integer profileTableCount = tableCount("USER_PROFILES");
+		Integer contactProfileTableCount = tableCount("CONTACT_PROFILES");
 		Integer activeConsentTypeCount = jdbcTemplate.queryForObject(
-			"SELECT COUNT(*) FROM CONSENT_TYPES "
-				+ "WHERE ISACTIVE = TRUE",
-			Integer.class
+				"SELECT COUNT(*) FROM CONSENT_TYPES WHERE ISACTIVE = TRUE",
+				Integer.class
 		);
-
-		Integer preferredAgeRangeTableCount =
-			tableCount("USER_PREFERRED_AGE_RANGES");
-		Integer preferredFaceTagTableCount =
-			tableCount("USER_PREFERRED_FACE_TAGS");
-		Integer preferredTraitTableCount =
-			tableCount("USER_PREFERRED_TRAITS");
-
-		Integer faceTagCount =
-			rowCount("face_tag_catalog");
-
+		Integer preferredAgeRangeTableCount = tableCount("USER_PREFERRED_AGE_RANGES");
+		Integer preferredFaceTagTableCount = tableCount("USER_PREFERRED_FACE_TAGS");
+		Integer preferredTraitTableCount = tableCount("USER_PREFERRED_TRAITS");
+		Integer faceAnalysisRequestTableCount = tableCount("FACE_ANALYSIS_REQUESTS");
+		Integer faceAnalysisResultTableCount = tableCount("FACE_ANALYSIS_RESULTS");
+		Integer faceAnalysisResultTagTableCount = tableCount("FACE_ANALYSIS_RESULT_TAGS");
+		Integer faceTagCount = rowCount("face_tag_catalog");
+		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM `face_tag_catalog` "
+						+ "WHERE `code` IN ("
+						+ "'DOG', 'CAT', 'RABBIT', 'FOX', 'DEER', "
+						+ "'TURTLE', 'HAMSTER', 'SNAKE', 'DINOSAUR', 'WOLF'"
+						+ ")",
+				Integer.class
+		);
+		Integer legacyFaceTagCodeCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM `face_tag_catalog` WHERE `code` LIKE '%_FACE'",
+				Integer.class
+		);
+		String turtleFaceName = jdbcTemplate.queryForObject(
+				"SELECT `name` FROM `face_tag_catalog` WHERE `code` = 'TURTLE'",
+				String.class
+		);
 		Integer personalityCount = jdbcTemplate.queryForObject(
-			"SELECT COUNT(*) FROM `trait_catalog` "
-				+ "WHERE `traitType` = 'PERSONALITY'",
-			Integer.class
+				"SELECT COUNT(*) FROM `trait_catalog` WHERE `traitType` = 'PERSONALITY'",
+				Integer.class
 		);
+		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		Integer practiceGoalCount =
-			rowCount("practice_goal_catalog");
-
-		assertThat(migrationCount).isEqualTo(7);
-
+		assertThat(migrationCount).isEqualTo(8);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -73,8 +75,13 @@ class FlywayMigrationTests {
 		assertThat(preferredAgeRangeTableCount).isEqualTo(1);
 		assertThat(preferredFaceTagTableCount).isEqualTo(1);
 		assertThat(preferredTraitTableCount).isEqualTo(1);
-
+		assertThat(faceAnalysisRequestTableCount).isEqualTo(1);
+		assertThat(faceAnalysisResultTableCount).isEqualTo(1);
+		assertThat(faceAnalysisResultTagTableCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
+		assertThat(aiFaceTagCodeCount).isEqualTo(10);
+		assertThat(legacyFaceTagCodeCount).isZero();
+		assertThat(turtleFaceName).isEqualTo("꼬북이상");
 		assertThat(personalityCount).isEqualTo(11);
 		assertThat(practiceGoalCount).isEqualTo(5);
 	}
@@ -86,13 +93,6 @@ class FlywayMigrationTests {
 				+ "AND TABLE_NAME = ?",
 			Integer.class,
 			tableName
-		);
-	}
-
-	private Integer rowCount(String tableName) {
-		return jdbcTemplate.queryForObject(
-			"SELECT COUNT(*) FROM `" + tableName + "`",
-			Integer.class
 		);
 	}
 
