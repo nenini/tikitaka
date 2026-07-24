@@ -27,8 +27,10 @@ class ClassifierConfig:
 
 
 @lru_cache(maxsize=1)
-def load_dinov2_backbone() -> nn.Module:
+def load_dinov2_backbone(torch_hub_dir: str | None = None) -> nn.Module:
     """Download/cache DINOv2 once and reuse the frozen process-local instance."""
+    if torch_hub_dir is not None:
+        torch.hub.set_dir(torch_hub_dir)
     backbone = torch.hub.load(
         DINO_REPOSITORY,
         DINO_MODEL_NAME,

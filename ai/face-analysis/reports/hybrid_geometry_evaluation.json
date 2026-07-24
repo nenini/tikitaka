@@ -1,0 +1,2298 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-23T23:45:51.095718+00:00",
+  "evaluationType": "person-disjoint-grouped-4-fold",
+  "model": "mediapipe-geometry-first-facenet512-tie-break",
+  "dataset": {
+    "eligibleImages": 199,
+    "uniquePeople": 68,
+    "weakLabels": true
+  },
+  "configuration": {
+    "batch_size": 16,
+    "folds": 4,
+    "geometry_temperature": 1.0,
+    "geometry_tie_margin": 0.02,
+    "geometry_weight": 0.8,
+    "facenet_temperature": 0.2,
+    "success_threshold": 0.3,
+    "minimum_margin": 0.08,
+    "second_suggestion_threshold": 0.25
+  },
+  "geometryOnly": {
+    "sampleCount": 199,
+    "top1HitRate": 0.165829,
+    "top2HitRate": 0.256281,
+    "macroF1": 0.161577,
+    "coverage": 0.170854,
+    "abstentionRatio": 0.829146,
+    "confirmedAccuracy": 0.088235,
+    "wrongConfirmedRate": 0.155779,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.140187,
+        "top2HitRate": 0.233645,
+        "macroF1": 0.136194,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            1,
+            1,
+            5,
+            3,
+            0,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            2,
+            1,
+            0,
+            1,
+            2,
+            1,
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            0,
+            0,
+            2,
+            2,
+            1,
+            1,
+            3,
+            0
+          ],
+          [
+            3,
+            0,
+            0,
+            1,
+            3,
+            0,
+            0,
+            2,
+            3
+          ],
+          [
+            2,
+            0,
+            1,
+            1,
+            4,
+            1,
+            2,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            3,
+            0,
+            0,
+            3,
+            2,
+            1,
+            3
+          ],
+          [
+            1,
+            6,
+            1,
+            0,
+            2,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            1,
+            1,
+            1,
+            1,
+            0,
+            4,
+            1
+          ],
+          [
+            1,
+            0,
+            1,
+            5,
+            3,
+            0,
+            1,
+            0,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.076923,
+            "recall": 0.083333,
+            "f1": 0.08,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.090909,
+            "recall": 0.083333,
+            "f1": 0.086957,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.071429,
+            "recall": 0.083333,
+            "f1": 0.076923,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.235294,
+            "recall": 0.333333,
+            "f1": 0.275862,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.333333,
+            "recall": 0.25,
+            "f1": 0.285714,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.333333,
+            "recall": 0.333333,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.090909,
+            "recall": 0.083333,
+            "f1": 0.086957,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.195652,
+        "top2HitRate": 0.282609,
+        "macroF1": 0.190132,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            3,
+            0,
+            1,
+            2,
+            1,
+            0,
+            3,
+            2
+          ],
+          [
+            3,
+            3,
+            2,
+            2,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            3,
+            4,
+            0,
+            2,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            3,
+            1,
+            0,
+            1,
+            3,
+            0,
+            3
+          ],
+          [
+            5,
+            0,
+            2,
+            0,
+            0,
+            1,
+            0,
+            3
+          ],
+          [
+            1,
+            1,
+            1,
+            0,
+            1,
+            3,
+            2,
+            2
+          ],
+          [
+            2,
+            0,
+            1,
+            0,
+            2,
+            1,
+            5,
+            1
+          ],
+          [
+            2,
+            1,
+            1,
+            2,
+            4,
+            0,
+            1,
+            0
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.157895,
+            "recall": 0.25,
+            "f1": 0.193548,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.272727,
+            "recall": 0.272727,
+            "f1": 0.272727,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.307692,
+            "recall": 0.333333,
+            "f1": 0.32,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.333333,
+            "recall": 0.272727,
+            "f1": 0.3,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.454545,
+            "recall": 0.416667,
+            "f1": 0.434783,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "geometryFirstHybrid": {
+    "sampleCount": 199,
+    "top1HitRate": 0.160804,
+    "top2HitRate": 0.271357,
+    "macroF1": 0.149304,
+    "coverage": 0.18593,
+    "abstentionRatio": 0.81407,
+    "confirmedAccuracy": 0.135135,
+    "wrongConfirmedRate": 0.160804,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.158879,
+        "top2HitRate": 0.261682,
+        "macroF1": 0.153042,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            1,
+            1,
+            5,
+            3,
+            0,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            2,
+            0,
+            1,
+            2,
+            1,
+            1,
+            2,
+            2
+          ],
+          [
+            3,
+            0,
+            0,
+            2,
+            1,
+            1,
+            2,
+            3,
+            0
+          ],
+          [
+            2,
+            0,
+            0,
+            1,
+            4,
+            0,
+            0,
+            2,
+            3
+          ],
+          [
+            2,
+            1,
+            1,
+            1,
+            3,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            3,
+            0,
+            0,
+            4,
+            2,
+            0,
+            3
+          ],
+          [
+            1,
+            7,
+            0,
+            0,
+            1,
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            1,
+            0,
+            1,
+            1,
+            0,
+            4,
+            2
+          ],
+          [
+            0,
+            0,
+            1,
+            4,
+            4,
+            0,
+            1,
+            0,
+            2
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.1,
+            "recall": 0.083333,
+            "f1": 0.090909,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.142857,
+            "recall": 0.166667,
+            "f1": 0.153846,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.083333,
+            "recall": 0.083333,
+            "f1": 0.083333,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.1875,
+            "recall": 0.25,
+            "f1": 0.214286,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.363636,
+            "recall": 0.333333,
+            "f1": 0.347826,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.333333,
+            "recall": 0.333333,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.142857,
+            "recall": 0.166667,
+            "f1": 0.153846,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.163043,
+        "top2HitRate": 0.282609,
+        "macroF1": 0.145099,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            4,
+            1,
+            1,
+            1,
+            2,
+            0,
+            2,
+            1
+          ],
+          [
+            3,
+            1,
+            3,
+            1,
+            1,
+            2,
+            0,
+            0
+          ],
+          [
+            2,
+            4,
+            4,
+            0,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            3,
+            1,
+            0,
+            1,
+            4,
+            0,
+            1
+          ],
+          [
+            2,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          [
+            1,
+            1,
+            2,
+            2,
+            0,
+            2,
+            2,
+            1
+          ],
+          [
+            2,
+            0,
+            0,
+            0,
+            2,
+            3,
+            4,
+            1
+          ],
+          [
+            2,
+            0,
+            1,
+            1,
+            3,
+            1,
+            3,
+            0
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.222222,
+            "recall": 0.333333,
+            "f1": 0.266667,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.076923,
+            "recall": 0.090909,
+            "f1": 0.083333,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.266667,
+            "recall": 0.333333,
+            "f1": 0.296296,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.153846,
+            "recall": 0.181818,
+            "f1": 0.166667,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.363636,
+            "recall": 0.333333,
+            "f1": 0.347826,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "facenetBaseline": {
+    "sampleCount": 199,
+    "top1HitRate": 0.175879,
+    "top2HitRate": 0.336683,
+    "macroF1": 0.158842,
+    "coverage": 0.572864,
+    "abstentionRatio": 0.427136,
+    "confirmedAccuracy": 0.219298,
+    "wrongConfirmedRate": 0.447236,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.196262,
+        "top2HitRate": 0.336449,
+        "macroF1": 0.174269,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            0,
+            2,
+            0,
+            2,
+            1,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            8,
+            0,
+            2,
+            0,
+            0,
+            1,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            1,
+            5,
+            1,
+            0,
+            3
+          ],
+          [
+            2,
+            3,
+            1,
+            0,
+            2,
+            1,
+            3,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            2,
+            5,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            1,
+            0,
+            0,
+            2,
+            3,
+            0,
+            3
+          ],
+          [
+            1,
+            0,
+            0,
+            2,
+            1,
+            3,
+            2,
+            2,
+            0
+          ],
+          [
+            1,
+            4,
+            1,
+            2,
+            1,
+            0,
+            0,
+            1,
+            2
+          ],
+          [
+            1,
+            0,
+            0,
+            2,
+            6,
+            0,
+            0,
+            2,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.222222,
+            "recall": 0.166667,
+            "f1": 0.190476,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.421053,
+            "recall": 0.666667,
+            "f1": 0.516129,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.277778,
+            "recall": 0.416667,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.153846,
+            "recall": 0.166667,
+            "f1": 0.16,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.166667,
+            "recall": 0.181818,
+            "f1": 0.173913,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.2,
+            "recall": 0.083333,
+            "f1": 0.117647,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.071429,
+            "recall": 0.083333,
+            "f1": 0.076923,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.152174,
+        "top2HitRate": 0.336957,
+        "macroF1": 0.141486,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            4,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            3,
+            0,
+            1,
+            2,
+            3,
+            0
+          ],
+          [
+            4,
+            2,
+            2,
+            2,
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1,
+            0,
+            3,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            1,
+            3,
+            1,
+            0,
+            1,
+            0,
+            5
+          ],
+          [
+            0,
+            0,
+            3,
+            2,
+            0,
+            2,
+            1,
+            3
+          ],
+          [
+            1,
+            0,
+            1,
+            2,
+            0,
+            0,
+            4,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            1,
+            1,
+            3,
+            4
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.2,
+            "recall": 0.166667,
+            "f1": 0.181818,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.133333,
+            "recall": 0.166667,
+            "f1": 0.148148,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.25,
+            "recall": 0.181818,
+            "f1": 0.210526,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.333333,
+            "recall": 0.333333,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.2,
+            "recall": 0.363636,
+            "f1": 0.258065,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "facenetShortlistGeometry": {
+    "sampleCount": 199,
+    "top1HitRate": 0.175879,
+    "top2HitRate": 0.336683,
+    "macroF1": 0.161263,
+    "coverage": 0.572864,
+    "abstentionRatio": 0.427136,
+    "confirmedAccuracy": 0.219298,
+    "wrongConfirmedRate": 0.447236,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.196262,
+        "top2HitRate": 0.336449,
+        "macroF1": 0.1758,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            0,
+            2,
+            0,
+            2,
+            1,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            8,
+            0,
+            2,
+            0,
+            0,
+            1,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            1,
+            4,
+            1,
+            0,
+            4
+          ],
+          [
+            2,
+            3,
+            1,
+            0,
+            2,
+            1,
+            3,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            2,
+            5,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0,
+            0,
+            2,
+            4,
+            0,
+            3
+          ],
+          [
+            1,
+            0,
+            0,
+            2,
+            1,
+            3,
+            2,
+            2,
+            0
+          ],
+          [
+            1,
+            4,
+            1,
+            2,
+            1,
+            0,
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1,
+            2,
+            2,
+            4,
+            0,
+            0,
+            2,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.25,
+            "recall": 0.166667,
+            "f1": 0.2,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.4,
+            "recall": 0.666667,
+            "f1": 0.5,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.3125,
+            "recall": 0.416667,
+            "f1": 0.357143,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.166667,
+            "recall": 0.166667,
+            "f1": 0.166667,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.153846,
+            "recall": 0.181818,
+            "f1": 0.166667,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.2,
+            "recall": 0.083333,
+            "f1": 0.117647,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.066667,
+            "recall": 0.083333,
+            "f1": 0.074074,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.152174,
+        "top2HitRate": 0.336957,
+        "macroF1": 0.14491,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            4,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            3,
+            0,
+            1,
+            2,
+            3,
+            0
+          ],
+          [
+            3,
+            2,
+            2,
+            2,
+            3,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1,
+            0,
+            3,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            1,
+            4,
+            0,
+            0,
+            1,
+            0,
+            5
+          ],
+          [
+            0,
+            0,
+            3,
+            2,
+            0,
+            3,
+            1,
+            2
+          ],
+          [
+            1,
+            0,
+            1,
+            1,
+            0,
+            1,
+            4,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            2,
+            1,
+            3,
+            3
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.222222,
+            "recall": 0.166667,
+            "f1": 0.190476,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.125,
+            "recall": 0.166667,
+            "f1": 0.142857,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.3,
+            "recall": 0.272727,
+            "f1": 0.285714,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.333333,
+            "recall": 0.333333,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.166667,
+            "recall": 0.272727,
+            "f1": 0.206897,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "comparison": {
+    "top1HitRate": {
+      "facenet": 0.175879,
+      "geometryOnly": 0.165829,
+      "hybrid": 0.160804,
+      "hybridDeltaFromFacenet": -0.015075
+    },
+    "top2HitRate": {
+      "facenet": 0.336683,
+      "geometryOnly": 0.256281,
+      "hybrid": 0.271357,
+      "hybridDeltaFromFacenet": -0.065326
+    },
+    "macroF1": {
+      "facenet": 0.158842,
+      "geometryOnly": 0.161577,
+      "hybrid": 0.149304,
+      "hybridDeltaFromFacenet": -0.009538
+    }
+  },
+  "tieBreakUsage": {
+    "count": 71,
+    "ratio": 0.356784
+  },
+  "facenetShortlistTieBreakUsage": {
+    "count": 16,
+    "ratio": 0.080402
+  },
+  "parameterSweep": {
+    "selectionRule": "top1, then macroF1, then top2; exploratory OOF only",
+    "best": {
+      "geometryTieMargin": 0.12,
+      "geometryWeight": 0.9,
+      "top1HitRate": 0.18593,
+      "top2HitRate": 0.281407,
+      "macroF1": 0.170743,
+      "tieBreakRatio": 0.849246
+    },
+    "candidates": [
+      {
+        "geometryTieMargin": 0.01,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.256281,
+        "macroF1": 0.156048,
+        "tieBreakRatio": 0.19598
+      },
+      {
+        "geometryTieMargin": 0.01,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.271357,
+        "macroF1": 0.160725,
+        "tieBreakRatio": 0.19598
+      },
+      {
+        "geometryTieMargin": 0.01,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.286432,
+        "macroF1": 0.15654,
+        "tieBreakRatio": 0.19598
+      },
+      {
+        "geometryTieMargin": 0.01,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.160804,
+        "top2HitRate": 0.276382,
+        "macroF1": 0.152397,
+        "tieBreakRatio": 0.19598
+      },
+      {
+        "geometryTieMargin": 0.01,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.266332,
+        "macroF1": 0.164582,
+        "tieBreakRatio": 0.19598
+      },
+      {
+        "geometryTieMargin": 0.02,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.261307,
+        "macroF1": 0.159134,
+        "tieBreakRatio": 0.356784
+      },
+      {
+        "geometryTieMargin": 0.02,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.266332,
+        "macroF1": 0.163908,
+        "tieBreakRatio": 0.356784
+      },
+      {
+        "geometryTieMargin": 0.02,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.160804,
+        "top2HitRate": 0.281407,
+        "macroF1": 0.14911,
+        "tieBreakRatio": 0.356784
+      },
+      {
+        "geometryTieMargin": 0.02,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.160804,
+        "top2HitRate": 0.271357,
+        "macroF1": 0.149304,
+        "tieBreakRatio": 0.356784
+      },
+      {
+        "geometryTieMargin": 0.02,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.180905,
+        "top2HitRate": 0.261307,
+        "macroF1": 0.166499,
+        "tieBreakRatio": 0.356784
+      },
+      {
+        "geometryTieMargin": 0.03,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.160804,
+        "top2HitRate": 0.266332,
+        "macroF1": 0.151904,
+        "tieBreakRatio": 0.427136
+      },
+      {
+        "geometryTieMargin": 0.03,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.276382,
+        "macroF1": 0.156144,
+        "tieBreakRatio": 0.427136
+      },
+      {
+        "geometryTieMargin": 0.03,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.155779,
+        "top2HitRate": 0.291457,
+        "macroF1": 0.147533,
+        "tieBreakRatio": 0.427136
+      },
+      {
+        "geometryTieMargin": 0.03,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.155779,
+        "top2HitRate": 0.281407,
+        "macroF1": 0.147574,
+        "tieBreakRatio": 0.427136
+      },
+      {
+        "geometryTieMargin": 0.03,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.18593,
+        "top2HitRate": 0.266332,
+        "macroF1": 0.170454,
+        "tieBreakRatio": 0.427136
+      },
+      {
+        "geometryTieMargin": 0.05,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.276382,
+        "macroF1": 0.138319,
+        "tieBreakRatio": 0.59799
+      },
+      {
+        "geometryTieMargin": 0.05,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.155779,
+        "top2HitRate": 0.296482,
+        "macroF1": 0.148617,
+        "tieBreakRatio": 0.59799
+      },
+      {
+        "geometryTieMargin": 0.05,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.321608,
+        "macroF1": 0.137084,
+        "tieBreakRatio": 0.59799
+      },
+      {
+        "geometryTieMargin": 0.05,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.150754,
+        "top2HitRate": 0.301508,
+        "macroF1": 0.14117,
+        "tieBreakRatio": 0.59799
+      },
+      {
+        "geometryTieMargin": 0.05,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.18593,
+        "top2HitRate": 0.281407,
+        "macroF1": 0.170315,
+        "tieBreakRatio": 0.59799
+      },
+      {
+        "geometryTieMargin": 0.08,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.135678,
+        "top2HitRate": 0.266332,
+        "macroF1": 0.128591,
+        "tieBreakRatio": 0.768844
+      },
+      {
+        "geometryTieMargin": 0.08,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.281407,
+        "macroF1": 0.139791,
+        "tieBreakRatio": 0.768844
+      },
+      {
+        "geometryTieMargin": 0.08,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.140704,
+        "top2HitRate": 0.316583,
+        "macroF1": 0.131899,
+        "tieBreakRatio": 0.768844
+      },
+      {
+        "geometryTieMargin": 0.08,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.155779,
+        "top2HitRate": 0.291457,
+        "macroF1": 0.145063,
+        "tieBreakRatio": 0.768844
+      },
+      {
+        "geometryTieMargin": 0.08,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.18593,
+        "top2HitRate": 0.276382,
+        "macroF1": 0.17011,
+        "tieBreakRatio": 0.768844
+      },
+      {
+        "geometryTieMargin": 0.12,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.140704,
+        "top2HitRate": 0.276382,
+        "macroF1": 0.133619,
+        "tieBreakRatio": 0.849246
+      },
+      {
+        "geometryTieMargin": 0.12,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.150754,
+        "top2HitRate": 0.291457,
+        "macroF1": 0.144894,
+        "tieBreakRatio": 0.849246
+      },
+      {
+        "geometryTieMargin": 0.12,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.140704,
+        "top2HitRate": 0.326633,
+        "macroF1": 0.132857,
+        "tieBreakRatio": 0.849246
+      },
+      {
+        "geometryTieMargin": 0.12,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.155779,
+        "top2HitRate": 0.301508,
+        "macroF1": 0.146157,
+        "tieBreakRatio": 0.849246
+      },
+      {
+        "geometryTieMargin": 0.12,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.18593,
+        "top2HitRate": 0.281407,
+        "macroF1": 0.170743,
+        "tieBreakRatio": 0.849246
+      }
+    ]
+  },
+  "facenetShortlistSweep": {
+    "selectionRule": "preserve FaceNet top2; select top1, then macroF1; exploratory OOF only",
+    "best": {
+      "facenetTieMargin": 0.08,
+      "geometryWeight": 0.9,
+      "top1HitRate": 0.175879,
+      "top2HitRate": 0.336683,
+      "macroF1": 0.16531,
+      "tieBreakRatio": 0.346734,
+      "groups": {
+        "female": {
+          "top1HitRate": 0.168224,
+          "top2HitRate": 0.336449,
+          "macroF1": 0.155273
+        },
+        "male": {
+          "top1HitRate": 0.184783,
+          "top2HitRate": 0.336957,
+          "macroF1": 0.176603
+        }
+      }
+    },
+    "recommendedNoGroupRegression": {
+      "facenetTieMargin": 0.02,
+      "geometryWeight": 0.8,
+      "top1HitRate": 0.175879,
+      "top2HitRate": 0.336683,
+      "macroF1": 0.161263,
+      "tieBreakRatio": 0.080402,
+      "groups": {
+        "female": {
+          "top1HitRate": 0.196262,
+          "top2HitRate": 0.336449,
+          "macroF1": 0.1758
+        },
+        "male": {
+          "top1HitRate": 0.152174,
+          "top2HitRate": 0.336957,
+          "macroF1": 0.14491
+        }
+      }
+    },
+    "candidates": [
+      {
+        "facenetTieMargin": 0.01,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160314,
+        "tieBreakRatio": 0.055276,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.174007
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.01,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160314,
+        "tieBreakRatio": 0.055276,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.174007
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.01,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160314,
+        "tieBreakRatio": 0.055276,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.174007
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.01,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160314,
+        "tieBreakRatio": 0.055276,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.174007
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.01,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160314,
+        "tieBreakRatio": 0.055276,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.174007
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.02,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161263,
+        "tieBreakRatio": 0.080402,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.1758
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.02,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161263,
+        "tieBreakRatio": 0.080402,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.1758
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.02,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161263,
+        "tieBreakRatio": 0.080402,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.1758
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.02,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161263,
+        "tieBreakRatio": 0.080402,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.1758
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.02,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161263,
+        "tieBreakRatio": 0.080402,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.196262,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.1758
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.14491
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.03,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.153852,
+        "tieBreakRatio": 0.120603,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.16297
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.143594
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.03,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.15413,
+        "tieBreakRatio": 0.120603,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.163496
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.143594
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.03,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.15413,
+        "tieBreakRatio": 0.120603,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.163496
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.143594
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.03,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.15413,
+        "tieBreakRatio": 0.120603,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.163496
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.143594
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.03,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.165829,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.15413,
+        "tieBreakRatio": 0.120603,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.163496
+          },
+          "male": {
+            "top1HitRate": 0.152174,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.143594
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.05,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.155705,
+        "tieBreakRatio": 0.19598,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.161135
+          },
+          "male": {
+            "top1HitRate": 0.163043,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.149596
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.05,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.155862,
+        "tieBreakRatio": 0.19598,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.161433
+          },
+          "male": {
+            "top1HitRate": 0.163043,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.149596
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.05,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.155083,
+        "tieBreakRatio": 0.19598,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.15996
+          },
+          "male": {
+            "top1HitRate": 0.163043,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.149596
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.05,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.154906,
+        "tieBreakRatio": 0.19598,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.159626
+          },
+          "male": {
+            "top1HitRate": 0.163043,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.149596
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.05,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.154906,
+        "tieBreakRatio": 0.19598,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.159626
+          },
+          "male": {
+            "top1HitRate": 0.163043,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.149596
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.08,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.164539,
+        "tieBreakRatio": 0.346734,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.17757,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.16281
+          },
+          "male": {
+            "top1HitRate": 0.173913,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.166484
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.08,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.161349,
+        "tieBreakRatio": 0.346734,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.168224,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.156785
+          },
+          "male": {
+            "top1HitRate": 0.173913,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.166484
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.08,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160673,
+        "tieBreakRatio": 0.346734,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.168224,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.155508
+          },
+          "male": {
+            "top1HitRate": 0.173913,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.166484
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.08,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.170854,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.160548,
+        "tieBreakRatio": 0.346734,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.168224,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.155273
+          },
+          "male": {
+            "top1HitRate": 0.173913,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.166484
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.08,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.175879,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.16531,
+        "tieBreakRatio": 0.346734,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.168224,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.155273
+          },
+          "male": {
+            "top1HitRate": 0.184783,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.176603
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.12,
+        "geometryWeight": 0.5,
+        "top1HitRate": 0.150754,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.140805,
+        "tieBreakRatio": 0.492462,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.158879,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.146557
+          },
+          "male": {
+            "top1HitRate": 0.141304,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.134334
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.12,
+        "geometryWeight": 0.6,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.137632,
+        "tieBreakRatio": 0.492462,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.149533,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.140564
+          },
+          "male": {
+            "top1HitRate": 0.141304,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.134334
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.12,
+        "geometryWeight": 0.7,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.137,
+        "tieBreakRatio": 0.492462,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.149533,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.139369
+          },
+          "male": {
+            "top1HitRate": 0.141304,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.134334
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.12,
+        "geometryWeight": 0.8,
+        "top1HitRate": 0.140704,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.132625,
+        "tieBreakRatio": 0.492462,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.149533,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.139157
+          },
+          "male": {
+            "top1HitRate": 0.130435,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.125276
+          }
+        }
+      },
+      {
+        "facenetTieMargin": 0.12,
+        "geometryWeight": 0.9,
+        "top1HitRate": 0.145729,
+        "top2HitRate": 0.336683,
+        "macroF1": 0.136996,
+        "tieBreakRatio": 0.492462,
+        "groups": {
+          "female": {
+            "top1HitRate": 0.149533,
+            "top2HitRate": 0.336449,
+            "macroF1": 0.138631
+          },
+          "male": {
+            "top1HitRate": 0.141304,
+            "top2HitRate": 0.336957,
+            "macroF1": 0.135158
+          }
+        }
+      }
+    ]
+  },
+  "privacy": {
+    "landmarkLifetime": "request-or-startup-memory-only",
+    "persistedLandmarks": false,
+    "persistedGeometryFeatures": false,
+    "persistedEmbeddings": false,
+    "containsIndividualIdentifiers": false
+  },
+  "limitations": [
+    "Celebrity reference categories are weak entertainment labels.",
+    "The upper-face measure uses face-oval top, not a true hairline.",
+    "MediaPipe geometry can still vary with pose and landmark quality.",
+    "Webcam domain performance is not measured by this dataset.",
+    "This report does not establish objective face-type truth."
+  ]
+}

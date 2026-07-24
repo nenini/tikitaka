@@ -23,7 +23,9 @@ from .model import FaceTypeClassifier
 @dataclass(frozen=True)
 class TrainingSample:
     image_path: Path
+    person_id: str
     analysis_group: str
+    face_type: str
     target: int
 
 
@@ -82,7 +84,9 @@ def load_training_samples(data_root: Path, report_path: Path) -> list[TrainingSa
             samples.append(
                 TrainingSample(
                     image_path=image_path,
+                    person_id=str(row["person_id"]),
                     analysis_group=group,
+                    face_type=str(row["face_type"]),
                     target=labels.index(str(row["face_type"])),
                 )
             )

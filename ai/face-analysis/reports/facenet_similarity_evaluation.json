@@ -1,0 +1,1233 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-23T07:37:50.490559+00:00",
+  "evaluationType": "person-disjoint-grouped-4-fold",
+  "model": "deepface-facenet512-group-centered-class-centroid-cosine",
+  "dataset": {
+    "eligibleImages": 199,
+    "uniquePeople": 68,
+    "weakLabels": true
+  },
+  "configuration": {
+    "batch_size": 16,
+    "folds": 4,
+    "similarity_top_k": 4,
+    "similarity_temperature": 0.2,
+    "similarity_scoring_method": "group_centered_class_centroid",
+    "baseline_scoring_method": "person_similarity_mean",
+    "success_threshold": 0.3,
+    "minimum_margin": 0.08,
+    "second_suggestion_threshold": 0.25,
+    "minimum_calibration_coverage": 0.2,
+    "target_confirmed_accuracy": 0.7
+  },
+  "initialPolicy": {
+    "success_threshold": 0.3,
+    "minimum_margin": 0.08,
+    "second_suggestion_threshold": 0.25
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "trainingImages": 150,
+      "validationImages": 49,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "metrics": {
+        "top1HitRate": 0.163265,
+        "top2HitRate": 0.44898,
+        "macroF1": 0.137077,
+        "coverage": 0.653061,
+        "abstentionRatio": 0.346939,
+        "confirmedAccuracy": 0.1875,
+        "wrongConfirmedRate": 0.530612
+      },
+      "baselineMetrics": {
+        "top1HitRate": 0.163265,
+        "top2HitRate": 0.428571,
+        "macroF1": 0.128253,
+        "coverage": 0.0,
+        "abstentionRatio": 1.0,
+        "confirmedAccuracy": null,
+        "wrongConfirmedRate": 0.0
+      }
+    },
+    {
+      "fold": 2,
+      "trainingImages": 149,
+      "validationImages": 50,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "metrics": {
+        "top1HitRate": 0.24,
+        "top2HitRate": 0.28,
+        "macroF1": 0.186975,
+        "coverage": 0.46,
+        "abstentionRatio": 0.54,
+        "confirmedAccuracy": 0.347826,
+        "wrongConfirmedRate": 0.3
+      },
+      "baselineMetrics": {
+        "top1HitRate": 0.18,
+        "top2HitRate": 0.24,
+        "macroF1": 0.14464,
+        "coverage": 0.02,
+        "abstentionRatio": 0.98,
+        "confirmedAccuracy": 0.0,
+        "wrongConfirmedRate": 0.02
+      }
+    },
+    {
+      "fold": 3,
+      "trainingImages": 148,
+      "validationImages": 51,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "metrics": {
+        "top1HitRate": 0.156863,
+        "top2HitRate": 0.215686,
+        "macroF1": 0.136928,
+        "coverage": 0.509804,
+        "abstentionRatio": 0.490196,
+        "confirmedAccuracy": 0.153846,
+        "wrongConfirmedRate": 0.431373
+      },
+      "baselineMetrics": {
+        "top1HitRate": 0.137255,
+        "top2HitRate": 0.235294,
+        "macroF1": 0.128004,
+        "coverage": 0.0,
+        "abstentionRatio": 1.0,
+        "confirmedAccuracy": null,
+        "wrongConfirmedRate": 0.0
+      }
+    },
+    {
+      "fold": 4,
+      "trainingImages": 150,
+      "validationImages": 49,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "metrics": {
+        "top1HitRate": 0.142857,
+        "top2HitRate": 0.408163,
+        "macroF1": 0.083287,
+        "coverage": 0.673469,
+        "abstentionRatio": 0.326531,
+        "confirmedAccuracy": 0.212121,
+        "wrongConfirmedRate": 0.530612
+      },
+      "baselineMetrics": {
+        "top1HitRate": 0.183673,
+        "top2HitRate": 0.346939,
+        "macroF1": 0.16738,
+        "coverage": 0.0,
+        "abstentionRatio": 1.0,
+        "confirmedAccuracy": null,
+        "wrongConfirmedRate": 0.0
+      }
+    }
+  ],
+  "aggregateInitial": {
+    "sampleCount": 199,
+    "top1HitRate": 0.175879,
+    "top2HitRate": 0.336683,
+    "macroF1": 0.158842,
+    "coverage": 0.572864,
+    "abstentionRatio": 0.427136,
+    "confirmedAccuracy": 0.219298,
+    "wrongConfirmedRate": 0.447236,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.196262,
+        "top2HitRate": 0.336449,
+        "macroF1": 0.174269,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            0,
+            2,
+            0,
+            2,
+            1,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            8,
+            0,
+            2,
+            0,
+            0,
+            1,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            1,
+            5,
+            1,
+            0,
+            3
+          ],
+          [
+            2,
+            3,
+            1,
+            0,
+            2,
+            1,
+            3,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            2,
+            5,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            1,
+            0,
+            0,
+            2,
+            3,
+            0,
+            3
+          ],
+          [
+            1,
+            0,
+            0,
+            2,
+            1,
+            3,
+            2,
+            2,
+            0
+          ],
+          [
+            1,
+            4,
+            1,
+            2,
+            1,
+            0,
+            0,
+            1,
+            2
+          ],
+          [
+            1,
+            0,
+            0,
+            2,
+            6,
+            0,
+            0,
+            2,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.222222,
+            "recall": 0.166667,
+            "f1": 0.190476,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.421053,
+            "recall": 0.666667,
+            "f1": 0.516129,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.277778,
+            "recall": 0.416667,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.153846,
+            "recall": 0.166667,
+            "f1": 0.16,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.166667,
+            "recall": 0.181818,
+            "f1": 0.173913,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.2,
+            "recall": 0.083333,
+            "f1": 0.117647,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.071429,
+            "recall": 0.083333,
+            "f1": 0.076923,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.152174,
+        "top2HitRate": 0.336957,
+        "macroF1": 0.141486,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            2,
+            4,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            3,
+            0,
+            1,
+            2,
+            3,
+            0
+          ],
+          [
+            4,
+            2,
+            2,
+            2,
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1,
+            0,
+            3,
+            1,
+            0,
+            4
+          ],
+          [
+            0,
+            1,
+            3,
+            1,
+            0,
+            1,
+            0,
+            5
+          ],
+          [
+            0,
+            0,
+            3,
+            2,
+            0,
+            2,
+            1,
+            3
+          ],
+          [
+            1,
+            0,
+            1,
+            2,
+            0,
+            0,
+            4,
+            4
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            1,
+            1,
+            3,
+            4
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.2,
+            "recall": 0.166667,
+            "f1": 0.181818,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.133333,
+            "recall": 0.166667,
+            "f1": 0.148148,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.25,
+            "recall": 0.181818,
+            "f1": 0.210526,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.333333,
+            "recall": 0.333333,
+            "f1": 0.333333,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.2,
+            "recall": 0.363636,
+            "f1": 0.258065,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "baselineAggregate": {
+    "sampleCount": 199,
+    "top1HitRate": 0.165829,
+    "top2HitRate": 0.311558,
+    "macroF1": 0.150718,
+    "coverage": 0.005025,
+    "abstentionRatio": 0.994975,
+    "confirmedAccuracy": 0.0,
+    "wrongConfirmedRate": 0.005025,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.17757,
+        "top2HitRate": 0.327103,
+        "macroF1": 0.157192,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            0,
+            0,
+            3,
+            0,
+            4,
+            1,
+            1,
+            0,
+            3
+          ],
+          [
+            0,
+            8,
+            2,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            1,
+            1,
+            2,
+            4,
+            1,
+            0,
+            1
+          ],
+          [
+            1,
+            3,
+            3,
+            0,
+            3,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            3,
+            6,
+            0,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            2,
+            4,
+            0,
+            1,
+            0,
+            2,
+            0,
+            3
+          ],
+          [
+            1,
+            0,
+            1,
+            2,
+            3,
+            3,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            2,
+            2,
+            3,
+            2,
+            0,
+            0,
+            2,
+            1
+          ],
+          [
+            0,
+            0,
+            3,
+            2,
+            5,
+            0,
+            0,
+            1,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.533333,
+            "recall": 0.666667,
+            "f1": 0.592593,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.05,
+            "recall": 0.083333,
+            "f1": 0.0625,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.230769,
+            "recall": 0.5,
+            "f1": 0.315789,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.166667,
+            "recall": 0.090909,
+            "f1": 0.117647,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.4,
+            "recall": 0.166667,
+            "f1": 0.235294,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.1,
+            "recall": 0.083333,
+            "f1": 0.090909,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.152174,
+        "top2HitRate": 0.293478,
+        "macroF1": 0.143434,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            0,
+            4,
+            5,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            6,
+            1,
+            0,
+            1,
+            2,
+            0
+          ],
+          [
+            2,
+            2,
+            3,
+            5,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            4,
+            1,
+            0,
+            2,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            7,
+            4,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            3,
+            4,
+            1,
+            2,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            1,
+            3,
+            0,
+            0,
+            6,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            2,
+            2,
+            2,
+            3,
+            2
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.103448,
+            "recall": 0.25,
+            "f1": 0.146341,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.047619,
+            "recall": 0.083333,
+            "f1": 0.060606,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.25,
+            "recall": 0.181818,
+            "f1": 0.210526,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.461538,
+            "recall": 0.5,
+            "f1": 0.48,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.4,
+            "recall": 0.181818,
+            "f1": 0.25,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "comparison": {
+    "baselineScoringMethod": "person_similarity_mean",
+    "candidateScoringMethod": "group_centered_class_centroid",
+    "rankingMetrics": {
+      "top1HitRate": {
+        "baseline": 0.165829,
+        "candidate": 0.175879,
+        "delta": 0.01005
+      },
+      "top2HitRate": {
+        "baseline": 0.311558,
+        "candidate": 0.336683,
+        "delta": 0.025125
+      },
+      "macroF1": {
+        "baseline": 0.150718,
+        "candidate": 0.158842,
+        "delta": 0.008124
+      }
+    },
+    "allRankingMetricsImproved": true
+  },
+  "policySweep": [
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.0,
+      "coverage": 1.0,
+      "abstentionRatio": 0.0,
+      "confirmedAccuracy": 0.175879,
+      "wrongConfirmedRate": 0.824121
+    },
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.01,
+      "coverage": 0.944724,
+      "abstentionRatio": 0.055276,
+      "confirmedAccuracy": 0.180851,
+      "wrongConfirmedRate": 0.773869
+    },
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.02,
+      "coverage": 0.919598,
+      "abstentionRatio": 0.080402,
+      "confirmedAccuracy": 0.185792,
+      "wrongConfirmedRate": 0.748744
+    },
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.03,
+      "coverage": 0.879397,
+      "abstentionRatio": 0.120603,
+      "confirmedAccuracy": 0.182857,
+      "wrongConfirmedRate": 0.718593
+    },
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.05,
+      "coverage": 0.80402,
+      "abstentionRatio": 0.19598,
+      "confirmedAccuracy": 0.1875,
+      "wrongConfirmedRate": 0.653266
+    },
+    {
+      "successThreshold": 0.16,
+      "minimumMargin": 0.08,
+      "coverage": 0.653266,
+      "abstentionRatio": 0.346734,
+      "confirmedAccuracy": 0.215385,
+      "wrongConfirmedRate": 0.512563
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.0,
+      "coverage": 0.994975,
+      "abstentionRatio": 0.005025,
+      "confirmedAccuracy": 0.176768,
+      "wrongConfirmedRate": 0.819095
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.01,
+      "coverage": 0.939698,
+      "abstentionRatio": 0.060302,
+      "confirmedAccuracy": 0.181818,
+      "wrongConfirmedRate": 0.768844
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.02,
+      "coverage": 0.919598,
+      "abstentionRatio": 0.080402,
+      "confirmedAccuracy": 0.185792,
+      "wrongConfirmedRate": 0.748744
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.03,
+      "coverage": 0.879397,
+      "abstentionRatio": 0.120603,
+      "confirmedAccuracy": 0.182857,
+      "wrongConfirmedRate": 0.718593
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.05,
+      "coverage": 0.80402,
+      "abstentionRatio": 0.19598,
+      "confirmedAccuracy": 0.1875,
+      "wrongConfirmedRate": 0.653266
+    },
+    {
+      "successThreshold": 0.18,
+      "minimumMargin": 0.08,
+      "coverage": 0.653266,
+      "abstentionRatio": 0.346734,
+      "confirmedAccuracy": 0.215385,
+      "wrongConfirmedRate": 0.512563
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.0,
+      "coverage": 0.98995,
+      "abstentionRatio": 0.01005,
+      "confirmedAccuracy": 0.177665,
+      "wrongConfirmedRate": 0.81407
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.01,
+      "coverage": 0.939698,
+      "abstentionRatio": 0.060302,
+      "confirmedAccuracy": 0.181818,
+      "wrongConfirmedRate": 0.768844
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.02,
+      "coverage": 0.919598,
+      "abstentionRatio": 0.080402,
+      "confirmedAccuracy": 0.185792,
+      "wrongConfirmedRate": 0.748744
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.03,
+      "coverage": 0.879397,
+      "abstentionRatio": 0.120603,
+      "confirmedAccuracy": 0.182857,
+      "wrongConfirmedRate": 0.718593
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.05,
+      "coverage": 0.80402,
+      "abstentionRatio": 0.19598,
+      "confirmedAccuracy": 0.1875,
+      "wrongConfirmedRate": 0.653266
+    },
+    {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.08,
+      "coverage": 0.653266,
+      "abstentionRatio": 0.346734,
+      "confirmedAccuracy": 0.215385,
+      "wrongConfirmedRate": 0.512563
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.0,
+      "coverage": 0.954774,
+      "abstentionRatio": 0.045226,
+      "confirmedAccuracy": 0.184211,
+      "wrongConfirmedRate": 0.778894
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.01,
+      "coverage": 0.919598,
+      "abstentionRatio": 0.080402,
+      "confirmedAccuracy": 0.185792,
+      "wrongConfirmedRate": 0.748744
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.02,
+      "coverage": 0.914573,
+      "abstentionRatio": 0.085427,
+      "confirmedAccuracy": 0.186813,
+      "wrongConfirmedRate": 0.743719
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.03,
+      "coverage": 0.879397,
+      "abstentionRatio": 0.120603,
+      "confirmedAccuracy": 0.182857,
+      "wrongConfirmedRate": 0.718593
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.05,
+      "coverage": 0.80402,
+      "abstentionRatio": 0.19598,
+      "confirmedAccuracy": 0.1875,
+      "wrongConfirmedRate": 0.653266
+    },
+    {
+      "successThreshold": 0.22,
+      "minimumMargin": 0.08,
+      "coverage": 0.653266,
+      "abstentionRatio": 0.346734,
+      "confirmedAccuracy": 0.215385,
+      "wrongConfirmedRate": 0.512563
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.0,
+      "coverage": 0.864322,
+      "abstentionRatio": 0.135678,
+      "confirmedAccuracy": 0.197674,
+      "wrongConfirmedRate": 0.693467
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.01,
+      "coverage": 0.834171,
+      "abstentionRatio": 0.165829,
+      "confirmedAccuracy": 0.198795,
+      "wrongConfirmedRate": 0.668342
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.02,
+      "coverage": 0.829146,
+      "abstentionRatio": 0.170854,
+      "confirmedAccuracy": 0.2,
+      "wrongConfirmedRate": 0.663317
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.03,
+      "coverage": 0.809045,
+      "abstentionRatio": 0.190955,
+      "confirmedAccuracy": 0.198758,
+      "wrongConfirmedRate": 0.648241
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.05,
+      "coverage": 0.768844,
+      "abstentionRatio": 0.231156,
+      "confirmedAccuracy": 0.196078,
+      "wrongConfirmedRate": 0.61809
+    },
+    {
+      "successThreshold": 0.25,
+      "minimumMargin": 0.08,
+      "coverage": 0.648241,
+      "abstentionRatio": 0.351759,
+      "confirmedAccuracy": 0.217054,
+      "wrongConfirmedRate": 0.507538
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.0,
+      "coverage": 0.688442,
+      "abstentionRatio": 0.311558,
+      "confirmedAccuracy": 0.211679,
+      "wrongConfirmedRate": 0.542714
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.01,
+      "coverage": 0.678392,
+      "abstentionRatio": 0.321608,
+      "confirmedAccuracy": 0.214815,
+      "wrongConfirmedRate": 0.532663
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.02,
+      "coverage": 0.673367,
+      "abstentionRatio": 0.326633,
+      "confirmedAccuracy": 0.216418,
+      "wrongConfirmedRate": 0.527638
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.03,
+      "coverage": 0.658291,
+      "abstentionRatio": 0.341709,
+      "confirmedAccuracy": 0.21374,
+      "wrongConfirmedRate": 0.517588
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.05,
+      "coverage": 0.638191,
+      "abstentionRatio": 0.361809,
+      "confirmedAccuracy": 0.204724,
+      "wrongConfirmedRate": 0.507538
+    },
+    {
+      "successThreshold": 0.3,
+      "minimumMargin": 0.08,
+      "coverage": 0.572864,
+      "abstentionRatio": 0.427136,
+      "confirmedAccuracy": 0.219298,
+      "wrongConfirmedRate": 0.447236
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.0,
+      "coverage": 0.482412,
+      "abstentionRatio": 0.517588,
+      "confirmedAccuracy": 0.229167,
+      "wrongConfirmedRate": 0.371859
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.01,
+      "coverage": 0.482412,
+      "abstentionRatio": 0.517588,
+      "confirmedAccuracy": 0.229167,
+      "wrongConfirmedRate": 0.371859
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.02,
+      "coverage": 0.482412,
+      "abstentionRatio": 0.517588,
+      "confirmedAccuracy": 0.229167,
+      "wrongConfirmedRate": 0.371859
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.03,
+      "coverage": 0.482412,
+      "abstentionRatio": 0.517588,
+      "confirmedAccuracy": 0.229167,
+      "wrongConfirmedRate": 0.371859
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.05,
+      "coverage": 0.477387,
+      "abstentionRatio": 0.522613,
+      "confirmedAccuracy": 0.221053,
+      "wrongConfirmedRate": 0.371859
+    },
+    {
+      "successThreshold": 0.35,
+      "minimumMargin": 0.08,
+      "coverage": 0.452261,
+      "abstentionRatio": 0.547739,
+      "confirmedAccuracy": 0.222222,
+      "wrongConfirmedRate": 0.351759
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.0,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.01,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.02,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.03,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.05,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    },
+    {
+      "successThreshold": 0.45,
+      "minimumMargin": 0.08,
+      "coverage": 0.19598,
+      "abstentionRatio": 0.80402,
+      "confirmedAccuracy": 0.333333,
+      "wrongConfirmedRate": 0.130653
+    }
+  ],
+  "calibration": {
+    "successThreshold": 0.425,
+    "minimumMargin": 0.22,
+    "secondSuggestionThreshold": 0.25,
+    "coverage": 0.201005,
+    "confirmedAccuracy": 0.35,
+    "targetConfirmedAccuracy": 0.7,
+    "targetMet": false,
+    "recommendationAvailable": false,
+    "minimumCoverage": 0.2,
+    "exploratoryOnly": true
+  },
+  "privacy": {
+    "featureLifetime": "process-memory-only",
+    "persistedImageFeatures": false,
+    "persistedPersonCentroids": false,
+    "containsIndividualIdentifiers": false
+  },
+  "limitations": [
+    "FaceNet512 was trained for identity similarity, not face-type truth.",
+    "Celebrity reference categories are weak entertainment labels.",
+    "Only three training people per class are available in each fold.",
+    "The scoring transformation was selected on this exploratory dataset.",
+    "Webcam domain performance is not measured by this dataset.",
+    "This report does not establish production readiness."
+  ]
+}
