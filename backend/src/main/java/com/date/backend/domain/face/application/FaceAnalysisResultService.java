@@ -78,7 +78,7 @@ public class FaceAnalysisResultService {
 		FaceAnalysisRequest analysisRequest = getAnalysisRequestForUpdate(analysisRequestId);
 		validateRequest(analysisRequest, userId);
 
-		LocalDateTime analyzedAt = LocalDateTime.now(SERVICE_ZONE_ID);
+		LocalDateTime analyzedAt = resolveAnalyzedAt(analysisRequest);
 		if (analysisRequest.isExpiredAt(analyzedAt)) {
 			analysisRequest.expire(analyzedAt);
 			throw new FaceAnalysisRequestExpiredException();
@@ -124,6 +124,13 @@ public class FaceAnalysisResultService {
 				.orElseThrow(() -> new BusinessException(
 						FaceErrorCode.ANALYSIS_REQUEST_NOT_FOUND
 				));
+	}
+
+	private LocalDateTime resolveAnalyzedAt(FaceAnalysisRequest analysisRequest) {
+		LocalDateTime now = LocalDateTime.now(SERVICE_ZONE_ID);
+		return now.isBefore(analysisRequest.getCreatedAt())
+				? analysisRequest.getCreatedAt()
+				: now;
 	}
 
 	private void validateRequest(FaceAnalysisRequest analysisRequest, Long userId) {
