@@ -13,6 +13,16 @@ public enum ConsentErrorCode implements ErrorCode {
 			HttpStatus.BAD_REQUEST,
 			"DUPLICATE_CONSENT_TYPE",
 			"동일한 동의 항목을 중복해서 저장할 수 없습니다."
+	),
+	USER_CONSENT_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"USER_CONSENT_NOT_FOUND",
+			"사용자의 동의 이력을 찾을 수 없습니다."
+	),
+	CONSENT_ALREADY_WITHDRAWN(
+			HttpStatus.CONFLICT,
+			"CONSENT_ALREADY_WITHDRAWN",
+			"이미 철회된 동의입니다."
 	);
 
 	private final HttpStatus status;

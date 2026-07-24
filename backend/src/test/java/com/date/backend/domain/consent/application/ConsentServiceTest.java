@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -162,6 +163,62 @@ class ConsentServiceTest {
 								.isEqualTo(ConsentErrorCode.DUPLICATE_CONSENT_TYPE)
 				);
 		verify(userConsentRepository, never()).saveAll(anyList());
+	}
+
+	@Test
+	void withdrawMyConsentRecordsWithdrawalWithoutDeletingHistory() {
+		ConsentType consentType = consentType(
+				2L,
+				"FACE_CAPTURE_CONSENT",
+				"얼굴 촬영 및 분석 동의",
+				"1.0"
+		);
+		UserConsent userConsent = new UserConsent(
+				mock(User.class),
+				consentType,
+				true,
+				LocalDateTime.of(2026, 7, 24, 9, 0)
+		);
+		when(userConsentRepository.findByUser_IdAndConsentType_Id(USER_ID, 2L))
+				.thenReturn(Optional.of(userConsent));
+
+		UserConsentStatusResponse response = consentService.withdrawMyConsent(USER_ID, 2L);
+
+		assertThat(response.consented()).isFalse();
+		assertThat(response.consentedAt()).isEqualTo(LocalDateTime.of(2026, 7, 24, 9, 0));
+		assertThat(response.withdrawnAt()).isNotNull();
+		verify(userConsentRepository).save(userConsent);
+	}
+
+	@Test
+	void alreadyWithdrawnConsentCannotBeWithdrawnAgain() {
+		UserConsent userConsent = new UserConsent(
+				mock(User.class),
+				mock(ConsentType.class),
+				false,
+				LocalDateTime.of(2026, 7, 24, 9, 0)
+		);
+		when(userConsentRepository.findByUser_IdAndConsentType_Id(USER_ID, 2L))
+				.thenReturn(Optional.of(userConsent));
+
+		assertThatThrownBy(() -> consentService.withdrawMyConsent(USER_ID, 2L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ConsentErrorCode.CONSENT_ALREADY_WITHDRAWN)
+				);
+		verify(userConsentRepository, never()).save(userConsent);
+	}
+
+	@Test
+	void consentWithoutUserHistoryCannotBeWithdrawn() {
+		when(userConsentRepository.findByUser_IdAndConsentType_Id(USER_ID, 2L))
+				.thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> consentService.withdrawMyConsent(USER_ID, 2L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ConsentErrorCode.USER_CONSENT_NOT_FOUND)
+				);
 	}
 
 	private ConsentType consentType(Long id, String code, String name, String version) {

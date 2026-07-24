@@ -126,6 +126,22 @@ public class ConsentService {
 				.toList();
 	}
 
+	@Transactional
+	public UserConsentStatusResponse withdrawMyConsent(Long userId, Long consentTypeId) {
+		UserConsent userConsent = userConsentRepository
+				.findByUser_IdAndConsentType_Id(userId, consentTypeId)
+				.orElseThrow(() -> new BusinessException(ConsentErrorCode.USER_CONSENT_NOT_FOUND));
+
+		if (!userConsent.isConsented()) {
+			throw new BusinessException(ConsentErrorCode.CONSENT_ALREADY_WITHDRAWN);
+		}
+
+		userConsent.updateDecision(false, LocalDateTime.now());
+		userConsentRepository.save(userConsent);
+
+		return UserConsentStatusResponse.of(userConsent.getConsentType(), userConsent);
+	}
+
 	private List<ConsentType> getActiveTypes() {
 		return consentTypeRepository.findAllByActiveTrueOrderByIdAsc();
 	}

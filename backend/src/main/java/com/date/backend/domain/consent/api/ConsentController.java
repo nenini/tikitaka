@@ -8,7 +8,9 @@ import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,5 +48,16 @@ public class ConsentController implements ConsentSwaggerDocs {
 			@Valid @RequestBody SaveUserConsentsRequest request
 	) {
 		return ApiResponse.success(consentService.saveMyConsents(authUser.userId(), request));
+	}
+
+	@Override
+	@DeleteMapping("/users/me/consents/{consentTypeId}")
+	public ApiResponse<UserConsentStatusResponse> withdrawMyConsent(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long consentTypeId
+	) {
+		return ApiResponse.success(
+				consentService.withdrawMyConsent(authUser.userId(), consentTypeId)
+		);
 	}
 }

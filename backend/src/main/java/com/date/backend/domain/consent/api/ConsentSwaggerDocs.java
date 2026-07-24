@@ -54,4 +54,20 @@ public interface ConsentSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			SaveUserConsentsRequest request
 	);
+
+	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
+	@Operation(
+			summary = "개인정보 및 AI 분석 동의 철회",
+			description = "동의 이력은 보존하면서 동의 상태를 철회하고 철회 시각을 기록합니다."
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "철회 성공"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "동의 이력 없음"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 철회된 동의")
+	})
+	ApiResponse<UserConsentStatusResponse> withdrawMyConsent(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "철회할 동의 항목 ID", example = "2") Long consentTypeId
+	);
 }
