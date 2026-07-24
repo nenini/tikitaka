@@ -1,8 +1,8 @@
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { Badge, Button, CardHeader, CardLink } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
 
 export function HomePage() {
-  const navigate = useNavigate()
   const { user, logout } = useAuthStore()
 
   return (
@@ -14,20 +14,19 @@ export function HomePage() {
             {user ? `${user.nickname} 님, 반가워요.` : '로그인된 사용자'}
           </p>
         </div>
-        <button className="bt-btn bt-btn--ghost bt-btn--sm" onClick={logout}>
+        <Button variant="ghost" size="sm" onClick={logout}>
           로그아웃
-        </button>
+        </Button>
       </div>
 
-      <div className="bt-card bt-card--interactive" onClick={() => navigate('/session/demo/room')}>
-        <div className="bt-card__head">
-          <span className="bt-card__title">대기방 입장 (기기 점검)</span>
-          <span className="bt-badge bt-badge--info">P0</span>
-        </div>
+
+      {/* div + onClick 이 아니라 실제 링크 — 키보드/스크린리더로도 도달·활성화된다 */}
+      <CardLink as={Link} to="/session/demo/room">
+        <CardHeader title="대기방 입장 (기기 점검)" action={<Badge tone="info">P0</Badge>} />
         <p className="bt-body-sm bt-muted">
           카메라·마이크·스피커를 점검하고 세션에 입장합니다. 통과하면 WebRTC 세션(다크 고정)으로 이어져요.
         </p>
-      </div>
+      </CardLink>
     </main>
   )
 }

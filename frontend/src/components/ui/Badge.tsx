@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 

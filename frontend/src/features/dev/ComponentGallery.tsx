@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
+  AlertDialog,
   Avatar,
   Badge,
+  BottomNav,
   Button,
   CallControls,
   Callout,
@@ -11,6 +13,7 @@ import {
   Chip,
   Cluster,
   CoachToast,
+  ConnectionIndicator,
   ConsentRow,
   DarkScope,
   EmptyState,
@@ -19,12 +22,13 @@ import {
   Icon,
   IconButton,
   Input,
-  ListRow,
+  ListRowButton,
   Modal,
   Progress,
   QuestionCard,
   Rating,
   ScoreRing,
+  Screen,
   Segmented,
   SessionTimer,
   Skeleton,
@@ -33,9 +37,9 @@ import {
   Steps,
   Switch,
   TagChip,
-  Textarea,
   ThemeToggle,
   TopicButton,
+  iconNames,
 } from '@/components'
 
 type Intensity = 'flow' | 'balanced' | 'active'
@@ -51,8 +55,9 @@ export function ComponentGallery() {
   const [cafe, setCafe] = useState(true)
   const [consent, setConsent] = useState({ terms: true, face: true, expr: false, report: true })
   const [modalOpen, setModalOpen] = useState(false)
-  const [micOn, setMicOn] = useState(true)
-  const [camOn, setCamOn] = useState(false)
+  const [alertOpen, setAlertOpen] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [cameraDisabled, setCameraDisabled] = useState(true)
 
   return (
     <main style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px 120px' }}>
@@ -120,8 +125,8 @@ export function ComponentGallery() {
         </Cluster>
         <Cluster gap={16} style={{ marginTop: 16 }}>
           <Avatar size="sm" style={{ background: 'var(--bt-blue-200)' }} />
-          <Avatar status="online" style={{ background: 'var(--bt-blue-300)' }} />
-          <Avatar size="lg" round style={{ background: 'var(--bt-blue-400)' }} />
+          <Avatar name="소연" status="online" style={{ background: 'var(--bt-blue-300)' }} />
+          <Avatar size="lg" round name="민준" style={{ background: 'var(--bt-blue-400)' }} />
           <ScoreRing value={85} unit="Good!" />
           <ScoreRing value={78} small />
           <ScoreRing value={90} small />
@@ -133,18 +138,17 @@ export function ComponentGallery() {
         <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))' }}>
           <Card>
             <Stack>
+              {/* Input 이 Field 컨텍스트를 읽어 id·aria-describedby·aria-invalid 를 자동 연결한다 */}
               <Field label="닉네임" required help="실명은 상대에게 공개되지 않습니다.">
-                {({ id, describedBy }) => (
-                  <Input id={id} aria-describedby={describedBy} placeholder="상대에게 보여질 이름이에요" />
-                )}
+                <Input placeholder="상대에게 보여질 이름이에요" />
               </Field>
               <Field label="한 줄 소개" error="연락처는 상호 동의 후에만 공개할 수 있어요.">
-                {({ id, describedBy, invalid }) => (
-                  <Input id={id} aria-describedby={describedBy} invalid={invalid} defaultValue="010-1234-5678" />
-                )}
+                <Input defaultValue="010-1234-5678" />
               </Field>
-              <Field label="자기소개">
-                {({ id }) => <Textarea id={id} placeholder="어떤 대화를 좋아하세요?" />}
+              {/* 합성 패턴 */}
+              <Field>
+                <Field.Label>자기소개</Field.Label>
+                <Field.Textarea placeholder="어떤 대화를 좋아하세요?" />
               </Field>
             </Stack>
           </Card>
@@ -182,13 +186,13 @@ export function ComponentGallery() {
           <Card>
             <CardHeader title="연습 기록" action={<Button variant="ghost" size="sm">전체 보기</Button>} />
             <Stack gap={8}>
-              <ListRow
+              <ListRowButton
                 leading={<Avatar size="sm" style={{ background: 'var(--bt-blue-200)' }} />}
                 title="소연"
                 meta="05.24 · 12:34 · 30분"
                 trailing={<ScoreRing value={85} small />}
               />
-              <ListRow
+              <ListRowButton
                 leading={<Avatar size="sm" style={{ background: 'var(--bt-blue-300)' }} />}
                 title="민준"
                 meta="05.22 · 18:20 · 30분"
@@ -203,9 +207,14 @@ export function ComponentGallery() {
             </Callout>
             <Callout tone="warning">세션 원본 영상은 저장되지 않아요. 분석 지표만 기록됩니다.</Callout>
             <Callout tone="success">두 분 모두 동의해서 연락처가 공개됐어요.</Callout>
-            <Button variant="secondary" onClick={() => setModalOpen(true)}>
-              신고 모달 열기
-            </Button>
+            <Cluster gap={8}>
+              <Button variant="secondary" onClick={() => setModalOpen(true)}>
+                신고 모달 열기
+              </Button>
+              <Button variant="secondary" onClick={() => setAlertOpen(true)}>
+                확인 다이얼로그
+              </Button>
+            </Cluster>
           </Stack>
         </div>
       </Section>
@@ -262,10 +271,14 @@ export function ComponentGallery() {
       <Section title="세션 UI (항상 다크)">
         <DarkScope fill={false} style={{ borderRadius: 20, padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <SessionTimer remainingSec={24 * 60 + 18} label="남은 시간" />
             <Cluster gap={8}>
-              <SessionTimer remainingSec={4 * 60 + 30} label="5분 남았어요" />
-              <SessionTimer remainingSec={42} label="1분 남았어요" />
+              <SessionTimer remainingSec={24 * 60 + 18} label="남은 시간" />
+              <ConnectionIndicator state="connected" />
+            </Cluster>
+            <Cluster gap={8}>
+              <SessionTimer remainingSec={4 * 60 + 30} label="남은 시간" />
+              <SessionTimer remainingSec={42} label="남은 시간" />
+              <ConnectionIndicator state="reconnecting" />
             </Cluster>
           </div>
 
@@ -274,6 +287,7 @@ export function ComponentGallery() {
               title="가볍게 고개를 끄덕여 보세요"
               text="최근 2분간 리액션이 줄어든 것 같아요."
               hedge
+              onDismiss={() => {}}
             />
             <QuestionCard
               options={[
@@ -293,20 +307,75 @@ export function ComponentGallery() {
 
           <div style={{ display: 'grid', placeItems: 'center', marginTop: 28 }}>
             <CallControls
-              micOn={micOn}
-              camOn={camOn}
-              onToggleMic={() => setMicOn((v) => !v)}
-              onToggleCam={() => setCamOn((v) => !v)}
+              muted={muted}
+              cameraDisabled={cameraDisabled}
+              onToggleMute={() => setMuted((v) => !v)}
+              onToggleCamera={() => setCameraDisabled((v) => !v)}
               onEnd={() => {}}
-              extra={
-                <>
-                  <IconButton icon="help" aria-label="도움 요청" />
-                  <IconButton icon="chat" aria-label="채팅" />
-                </>
-              }
+              beforeEnd={<IconButton icon="chat" aria-label="채팅" />}
+              afterEnd={<IconButton icon="help" aria-label="도움 요청" />}
             />
           </div>
         </DarkScope>
+      </Section>
+
+      <Section title="Screen 레이아웃 (100dvh · 시맨틱 슬롯 · 스킵 링크)">
+        <p className="bt-body-sm bt-muted" style={{ marginBottom: 12 }}>
+          Tab 을 눌러 보세요 — 첫 포커스에서 "본문으로 이동" 스킵 링크가 나타납니다.
+        </p>
+        <div style={{ border: '1px solid var(--bt-color-border)', borderRadius: 16, overflow: 'hidden' }}>
+          <Screen
+            maxWidth={420}
+            contentAs="div"
+            style={{ minHeight: 320 }}
+            header={
+              <Cluster style={{ justifyContent: 'space-between', padding: '12px 20px' }}>
+                <span className="bt-h3">홈</span>
+                <ThemeToggle iconOnly />
+              </Cluster>
+            }
+            footer={
+              <BottomNav
+                leftItems={[
+                  { icon: 'home', label: '홈', to: '/gallery', end: true },
+                  { icon: 'chart', label: '성장', to: '/gallery#growth' },
+                ]}
+                rightItems={[
+                  { icon: 'heart', label: '매칭', to: '/gallery#match' },
+                  { icon: 'user', label: '내 정보', to: '/gallery#me' },
+                ]}
+                fab={{ label: '연습 시작', onClick: () => {} }}
+              />
+            }
+          >
+            <p className="bt-body-sm bt-muted">
+              header/main/footer 가 시맨틱 요소로 렌더되고, 레이아웃 값은 <code>--bt-screen-*</code> CSS
+              변수로 나갑니다. FAB 은 좌우 항목 수와 무관하게 CSS Grid 로 정중앙에 고정됩니다.
+            </p>
+          </Screen>
+        </div>
+      </Section>
+
+      {/* SVG path 는 타입 검사로 형태 오류를 잡을 수 없다 — 전체 그리드로 시각 검수한다. */}
+      <Section title="Icon 레지스트리 시각 검수">
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))' }}>
+          {iconNames.map((name) => (
+            <div
+              key={name}
+              style={{
+                display: 'grid',
+                justifyItems: 'center',
+                gap: 6,
+                padding: 12,
+                border: '1px solid var(--bt-color-border)',
+                borderRadius: 12,
+              }}
+            >
+              <Icon name={name} size={24} />
+              <code className="bt-micro">{name}</code>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Modal
@@ -326,6 +395,17 @@ export function ComponentGallery() {
       >
         신고 내용은 운영팀만 확인하며, 상대에게는 알려지지 않아요. 세션은 즉시 종료됩니다.
       </Modal>
+
+      <AlertDialog
+        open={alertOpen}
+        onCancel={() => setAlertOpen(false)}
+        onConfirm={() => setAlertOpen(false)}
+        title="세션을 종료할까요?"
+        description="지금 종료하면 남은 시간은 복구되지 않고, 분석 리포트는 여기까지의 대화로 만들어져요."
+        tone="danger"
+        confirmLabel="종료하기"
+        confirmIcon="phone-end"
+      />
     </main>
   )
 }
