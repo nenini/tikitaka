@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
 
 export interface StepsProps {
   /** 전체 스텝 수 */
@@ -7,7 +7,7 @@ export interface StepsProps {
   /** 현재 활성 스텝 (1-indexed) */
   current: number
   /** 각 스텝의 라벨(선택). 미완료 스텝은 번호로 표시된다 */
-  labels?: string[]
+  labels?: readonly string[]
   className?: string
 }
 
@@ -32,7 +32,8 @@ export function Steps({ count, current, labels, className }: StepsProps) {
             >
               {done ? '✓' : n}
             </span>
-            {i < steps.length - 1 && <span className="bt-steps__line" />}
+            {/* 연결선은 순수 장식 — list 시맨틱에 끼어들지 않도록 숨긴다 */}
+            {i < steps.length - 1 && <span className="bt-steps__line" aria-hidden="true" />}
           </Fragment>
         )
       })}

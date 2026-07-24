@@ -1,34 +1,98 @@
+import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { cn } from '@/shared/lib/cn'
+import { cn } from '../../shared/lib/cn'
+import { Button } from '../ui/Button'
+import { Skeleton } from '../ui/Skeleton'
 
 export interface QuestionOption {
   id: string
   text: ReactNode
 }
 
+/** 옵션이 비동기로 생성되므로 로딩/빈 결과/생성 실패를 모두 표현할 수 있어야 한다. */
+export type QuestionCardState = 'ready' | 'loading' | 'empty' | 'error'
+
 export interface QuestionCardProps {
-  /** 상단 캡션 (기본: "이런 질문은 어때요? · 나에게만 보여요") */
+  /** 상단 캡션 (기본: "이런 질문은 어때요? · 나에게만 보여요") — 그룹의 접근 가능한 이름이 된다 */
   caption?: ReactNode
-  options: QuestionOption[]
+  options?: readonly QuestionOption[]
   onSelect: (id: string) => void
+  /** 미지정 시 options 유무로 ready/loading 을 추론한다 */
+  state?: QuestionCardState
+  /** 선택된 옵션 (선택 즉시 표시용) */
+  selectedId?: string
+  /** 전체 비활성 (전송 중 등) */
+  disabled?: boolean
+  /** error 상태일 때 재시도 버튼 */
+  onRetry?: () => void
   className?: string
 }
 
 /**
  * 침묵 30초+ 단계의 선택형 질문 카드 (`.bt-question-card`, §11.1).
  * 본인 화면 전용 — 여전히 상대 영상을 가리지 않는다.
+ *
+ * 접근성: 그룹에는 이름이 필요하다. 캡션을 aria-labelledby 로 연결한다.
  */
-export function QuestionCard({ caption, options, onSelect, className }: QuestionCardProps) {
+export function QuestionCard({
+  caption,
+  options,
+  onSelect,
+  state,
+  selectedId,
+  disabled = false,
+  onRetry,
+  className,
+}: QuestionCardProps) {
+  const captionId = `${useId()}-caption`
+  const resolvedState: QuestionCardState = state ?? (options == null ? 'loading' : options.length === 0 ? 'empty' : 'ready')
+
   return (
-    <div className={cn('bt-question-card', className)} role="group">
-      <div className="bt-caption" style={{ color: 'var(--bt-color-text-tertiary)' }}>
+    <div
+      className={cn('bt-question-card', className)}
+      role="group"
+      aria-labelledby={captionId}
+      aria-busy={resolvedState === 'loading' || undefined}
+    >
+      <div className="bt-caption bt-question-card__caption" id={captionId}>
         {caption ?? '이런 질문은 어때요? · 나에게만 보여요'}
       </div>
-      {options.map((opt) => (
-        <button key={opt.id} type="button" className="bt-question-card__option" onClick={() => onSelect(opt.id)}>
-          {opt.text}
-        </button>
-      ))}
+
+      {resolvedState === 'loading' && (
+        <>
+          <Skeleton height={44} />
+          <Skeleton height={44} />
+          <Skeleton height={44} />
+          <span className="bt-sr-only">질문을 만들고 있어요</span>
+        </>
+      )}
+
+      {resolvedState === 'empty' && <p className="bt-question-card__notice">지금은 추천할 질문이 없어요.</p>}
+
+      {resolvedState === 'error' && (
+        <>
+          <p className="bt-question-card__notice">질문을 만들지 못했어요.</p>
+          {onRetry && (
+            <Button variant="tonal" size="sm" leadingIcon="refresh" onClick={onRetry}>
+              다시 시도
+            </Button>
+          )}
+        </>
+      )}
+
+      {resolvedState === 'ready' &&
+        options?.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className="bt-question-card__option"
+            aria-pressed={selectedId === option.id}
+            disabled={disabled}
+            onClick={() => onSelect(option.id)}
+          >
+            {option.text}
+          </button>
+        ))}
     </div>
   )
 }
