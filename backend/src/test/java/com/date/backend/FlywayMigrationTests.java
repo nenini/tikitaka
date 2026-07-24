@@ -95,4 +95,11 @@ class FlywayMigrationTests {
 			Integer.class
 		);
 	}
+
+	private Integer rowCount(String tableName) {
+		return jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM `" + tableName + "`",
+				Integer.class
+		);
+	}
 }

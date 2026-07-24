@@ -56,6 +56,7 @@ public class SecurityConfig {
 								"/api/v1/auth/logout",
 								"/api/v1/auth/account"
 						).authenticated()
+						.requestMatchers("/api/v1/surveys/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)

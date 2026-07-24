@@ -1,0 +1,75 @@
+# Python environments and package outputs
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Python, test, type-check and lint caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.uv-cache/
+.ipynb_checkpoints/
+
+# Local secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+~$*
+
+# Original face photos and generated dataset images
+data/사진데이터/
+data/processed/
+data/crawl/
+**/contact_sheet.*
+
+# Downloaded models, training outputs and inference artifacts
+artifacts/
+models/
+checkpoints/
+runs/
+outputs/
+*.onnx
+*.task
+*.npz
+*.npy
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.keras
+*.h5
+
+# Deprecated crawling and baseline files excluded from the current work
+CRAWLING_PLAN.md
+CRAWLING_RESULT.md
+scripts/crawl_commons.py
+scripts/process_faces.py
+tests/test_crawling.py

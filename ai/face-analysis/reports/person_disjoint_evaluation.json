@@ -1,0 +1,450 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-23T00:39:20.858997+00:00",
+  "evaluationType": "person-disjoint-grouped-4-fold",
+  "model": "dinov2_vits14-frozen-dual-head",
+  "dataset": {
+    "eligibleImages": 199,
+    "uniquePeople": 68,
+    "weakLabels": true
+  },
+  "training": {
+    "epochs": 30,
+    "batch_size": 16,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "seed": 307,
+    "folds": 4,
+    "minimum_calibration_coverage": 0.2,
+    "target_confirmed_accuracy": 0.7
+  },
+  "initialPolicy": {
+    "success_threshold": 0.45,
+    "minimum_margin": 0.08,
+    "second_suggestion_threshold": 0.25
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "trainingImages": 150,
+      "validationImages": 49,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "finalTrainingLoss": 0.728026,
+      "metrics": {
+        "top1HitRate": 0.122449,
+        "top2HitRate": 0.346939,
+        "macroF1": 0.088889,
+        "coverage": 0.265306,
+        "abstentionRatio": 0.734694,
+        "confirmedAccuracy": 0.076923,
+        "wrongConfirmedRate": 0.244898
+      }
+    },
+    {
+      "fold": 2,
+      "trainingImages": 149,
+      "validationImages": 50,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "finalTrainingLoss": 0.741445,
+      "metrics": {
+        "top1HitRate": 0.14,
+        "top2HitRate": 0.26,
+        "macroF1": 0.119748,
+        "coverage": 0.34,
+        "abstentionRatio": 0.66,
+        "confirmedAccuracy": 0.117647,
+        "wrongConfirmedRate": 0.3
+      }
+    },
+    {
+      "fold": 3,
+      "trainingImages": 148,
+      "validationImages": 51,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "finalTrainingLoss": 0.679765,
+      "metrics": {
+        "top1HitRate": 0.078431,
+        "top2HitRate": 0.215686,
+        "macroF1": 0.053408,
+        "coverage": 0.156863,
+        "abstentionRatio": 0.843137,
+        "confirmedAccuracy": 0.0,
+        "wrongConfirmedRate": 0.156863
+      }
+    },
+    {
+      "fold": 4,
+      "trainingImages": 150,
+      "validationImages": 49,
+      "trainingPeople": 51,
+      "validationPeople": 17,
+      "finalTrainingLoss": 0.740558,
+      "metrics": {
+        "top1HitRate": 0.122449,
+        "top2HitRate": 0.326531,
+        "macroF1": 0.10014,
+        "coverage": 0.163265,
+        "abstentionRatio": 0.836735,
+        "confirmedAccuracy": 0.125,
+        "wrongConfirmedRate": 0.142857
+      }
+    }
+  ],
+  "aggregateInitial": {
+    "sampleCount": 199,
+    "top1HitRate": 0.115578,
+    "top2HitRate": 0.286432,
+    "macroF1": 0.106649,
+    "coverage": 0.231156,
+    "abstentionRatio": 0.768844,
+    "confirmedAccuracy": 0.086957,
+    "wrongConfirmedRate": 0.211055,
+    "groups": {
+      "female": {
+        "sampleCount": 107,
+        "top1HitRate": 0.140187,
+        "top2HitRate": 0.224299,
+        "macroF1": 0.130532,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "turtle",
+          "hamster",
+          "snake",
+          "dinosaur"
+        ],
+        "confusionMatrix": [
+          [
+            1,
+            0,
+            1,
+            2,
+            2,
+            3,
+            2,
+            0,
+            1
+          ],
+          [
+            0,
+            1,
+            1,
+            0,
+            2,
+            1,
+            2,
+            4,
+            1
+          ],
+          [
+            1,
+            0,
+            1,
+            0,
+            1,
+            5,
+            2,
+            1,
+            1
+          ],
+          [
+            1,
+            1,
+            0,
+            2,
+            2,
+            2,
+            0,
+            2,
+            2
+          ],
+          [
+            2,
+            2,
+            0,
+            1,
+            2,
+            1,
+            1,
+            1,
+            2
+          ],
+          [
+            2,
+            0,
+            3,
+            1,
+            1,
+            1,
+            1,
+            2,
+            1
+          ],
+          [
+            4,
+            1,
+            1,
+            2,
+            3,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            2,
+            0,
+            2,
+            1,
+            0,
+            6,
+            1
+          ],
+          [
+            1,
+            1,
+            2,
+            1,
+            2,
+            1,
+            1,
+            2,
+            1
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.083333,
+            "recall": 0.083333,
+            "f1": 0.083333,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.166667,
+            "recall": 0.083333,
+            "f1": 0.111111,
+            "support": 12
+          },
+          "rabbit": {
+            "precision": 0.090909,
+            "recall": 0.083333,
+            "f1": 0.086957,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.222222,
+            "recall": 0.166667,
+            "f1": 0.190476,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.117647,
+            "recall": 0.166667,
+            "f1": 0.137931,
+            "support": 12
+          },
+          "turtle": {
+            "precision": 0.066667,
+            "recall": 0.083333,
+            "f1": 0.074074,
+            "support": 12
+          },
+          "hamster": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.333333,
+            "recall": 0.5,
+            "f1": 0.4,
+            "support": 12
+          },
+          "dinosaur": {
+            "precision": 0.1,
+            "recall": 0.083333,
+            "f1": 0.090909,
+            "support": 12
+          }
+        }
+      },
+      "male": {
+        "sampleCount": 92,
+        "top1HitRate": 0.086957,
+        "top2HitRate": 0.358696,
+        "macroF1": 0.07978,
+        "labels": [
+          "dog",
+          "cat",
+          "rabbit",
+          "fox",
+          "deer",
+          "snake",
+          "dinosaur",
+          "wolf"
+        ],
+        "confusionMatrix": [
+          [
+            0,
+            0,
+            2,
+            4,
+            4,
+            1,
+            0,
+            1
+          ],
+          [
+            2,
+            0,
+            2,
+            3,
+            1,
+            3,
+            0,
+            0
+          ],
+          [
+            2,
+            2,
+            1,
+            0,
+            4,
+            2,
+            1,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            5,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            2,
+            1,
+            4,
+            1,
+            0,
+            1,
+            0,
+            2
+          ],
+          [
+            2,
+            2,
+            1,
+            0,
+            2,
+            0,
+            2,
+            2
+          ],
+          [
+            1,
+            2,
+            1,
+            0,
+            1,
+            2,
+            2,
+            3
+          ],
+          [
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            6,
+            0
+          ]
+        ],
+        "classes": {
+          "dog": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 12
+          },
+          "cat": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "rabbit": {
+            "precision": 0.090909,
+            "recall": 0.083333,
+            "f1": 0.086957,
+            "support": 12
+          },
+          "fox": {
+            "precision": 0.357143,
+            "recall": 0.416667,
+            "f1": 0.384615,
+            "support": 12
+          },
+          "deer": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "snake": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          },
+          "dinosaur": {
+            "precision": 0.166667,
+            "recall": 0.166667,
+            "f1": 0.166667,
+            "support": 12
+          },
+          "wolf": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 11
+          }
+        }
+      }
+    }
+  },
+  "calibration": {
+    "successThreshold": 0.25,
+    "minimumMargin": 0.02,
+    "secondSuggestionThreshold": 0.25,
+    "coverage": 0.824121,
+    "confirmedAccuracy": 0.128049,
+    "targetConfirmedAccuracy": 0.7,
+    "targetMet": false,
+    "recommendationAvailable": false,
+    "minimumCoverage": 0.2,
+    "exploratoryOnly": true
+  },
+  "aggregateRecommendedPolicy": null,
+  "limitations": [
+    "Celebrity reference labels are weak labels, not objective ground truth.",
+    "Only four people are available per group-specific class.",
+    "Threshold calibration and reporting use the same out-of-fold predictions.",
+    "Webcam domain performance is not measured by this dataset.",
+    "This report does not establish production readiness."
+  ]
+}
