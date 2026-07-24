@@ -15,7 +15,7 @@ FACE_TYPE_KO = {
     "rabbit": "토끼상",
     "fox": "여우상",
     "deer": "사슴상",
-    "turtle": "거북이상",
+    "turtle": "꼬북이상",
     "hamster": "햄스터상",
     "snake": "뱀상",
     "dinosaur": "공룡상",

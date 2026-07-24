@@ -26,7 +26,7 @@ class AnalysisStatus(StrEnum):
 class Suggestion:
     face_type: str
     face_type_ko: str
-    confidence: float
+    relative_score: float
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class AnalysisResult:
 
 @dataclass(frozen=True)
 class PredictionPolicy:
-    success_threshold: float = 0.45
+    success_threshold: float = 0.30
     minimum_margin: float = 0.08
     second_suggestion_threshold: float = 0.25
 
@@ -56,13 +56,13 @@ class PredictionPolicy:
 
 
 def result_from_probabilities(
-    probabilities: Tensor,
+    probabilities: Tensor | np.ndarray,
     analysis_group: str,
     policy: PredictionPolicy | None = None,
 ) -> AnalysisResult:
     group = normalize_analysis_group(analysis_group)
     labels = labels_for_group(group)
-    values = probabilities.detach().float().cpu().flatten()
+    values = torch.as_tensor(probabilities).detach().float().cpu().flatten()
     if values.numel() != len(labels):
         raise ValueError("Probability count does not match the selected label space.")
     if not torch.isfinite(values).all() or bool((values < 0).any()):
@@ -86,7 +86,7 @@ def result_from_probabilities(
         Suggestion(
             face_type=labels[int(index)],
             face_type_ko=FACE_TYPE_KO[labels[int(index)]],
-            confidence=round(float(score), 6),
+            relative_score=round(float(score), 6),
         )
         for score, index in zip(scores[:suggestion_count], indices[:suggestion_count])
     )
