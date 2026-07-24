@@ -97,6 +97,42 @@ class FaceAnalysisResultServiceTest {
 	}
 
 	@Test
+	void latestResultCanBeRetrievedAfterSubmission() {
+		User user = saveUserWithProfile(Gender.MALE);
+		FaceAnalysisRequest analysisRequest = savePendingRequest(user.getId());
+		faceAnalysisResultService.submitResult(
+				user.getId(),
+				analysisRequest.getId(),
+				validRequest()
+		);
+		entityManager.flush();
+		entityManager.clear();
+
+		FaceAnalysisResultResponse response =
+				faceAnalysisResultService.getMyLatestResult(user.getId());
+
+		assertThat(response.analysisRequestId()).isEqualTo(analysisRequest.getId());
+		assertThat(response.status()).isEqualTo(FaceAnalysisStatus.COMPLETED);
+		assertThat(response.primaryType()).isEqualTo(FaceType.DOG);
+		assertThat(response.tags())
+				.extracting(tag -> tag.code())
+				.containsExactly(FaceType.DOG, FaceType.CAT);
+	}
+
+	@Test
+	void resultNotFoundIsReturnedWhenUserHasNoSavedResult() {
+		User user = saveUserWithProfile(Gender.MALE);
+
+		BusinessException exception = catchThrowableOfType(
+				() -> faceAnalysisResultService.getMyLatestResult(user.getId()),
+				BusinessException.class
+		);
+
+		assertThat(exception.getErrorCode())
+				.isEqualTo(FaceErrorCode.ANALYSIS_RESULT_NOT_FOUND);
+	}
+
+	@Test
 	void anotherUsersRequestCannotBeSubmitted() {
 		User owner = saveUserWithProfile(Gender.MALE);
 		User otherUser = saveUserWithProfile(Gender.FEMALE);

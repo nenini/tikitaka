@@ -77,6 +77,14 @@ class FaceAnalysisResultApiTest {
 		);
 		assertThat(profileResponse.statusCode()).isEqualTo(201);
 
+		HttpResponse<String> emptyResultResponse = get(
+				"/api/v1/users/me/face-analysis",
+				accessToken
+		);
+		assertThat(emptyResultResponse.statusCode()).isEqualTo(404);
+		assertThat(emptyResultResponse.body())
+				.contains("\"code\":\"FACE_ANALYSIS_RESULT_NOT_FOUND\"");
+
 		HttpResponse<String> requestResponse = post(
 				"/api/v1/face-analyses",
 				"{}",
@@ -120,6 +128,19 @@ class FaceAnalysisResultApiTest {
 		assertThat(resultData.path("primaryType").asText()).isEqualTo("DOG");
 		assertThat(resultData.path("tags")).hasSize(2);
 
+		HttpResponse<String> latestResultResponse = get(
+				"/api/v1/users/me/face-analysis",
+				accessToken
+		);
+		assertThat(latestResultResponse.statusCode()).isEqualTo(200);
+		JsonNode latestResultData =
+				objectMapper.readTree(latestResultResponse.body()).path("data");
+		assertThat(latestResultData.path("analysisRequestId").asLong())
+				.isEqualTo(analysisRequestId);
+		assertThat(latestResultData.path("status").asText()).isEqualTo("COMPLETED");
+		assertThat(latestResultData.path("primaryType").asText()).isEqualTo("DOG");
+		assertThat(latestResultData.path("tags")).hasSize(2);
+
 		HttpResponse<String> duplicateResponse = post(
 				"/api/v1/face-analyses/" + analysisRequestId + "/result",
 				resultBody,
@@ -135,6 +156,16 @@ class FaceAnalysisResultApiTest {
 				.uri(URI.create("http://localhost:" + port + path))
 				.header("Content-Type", "application/json")
 				.POST(HttpRequest.BodyPublishers.ofString(body))
+				.build();
+
+		return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+	}
+
+	private HttpResponse<String> get(String path, String accessToken) throws Exception {
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create("http://localhost:" + port + path))
+				.header("Authorization", "Bearer " + accessToken)
+				.GET()
 				.build();
 
 		return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
