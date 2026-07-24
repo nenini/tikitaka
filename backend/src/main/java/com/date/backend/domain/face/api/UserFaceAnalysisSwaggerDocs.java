@@ -34,10 +34,12 @@ public interface UserFaceAnalysisSwaggerDocs {
 									    "analysisRequestId": 123,
 									    "status": "COMPLETED",
 									    "primaryType": "DOG",
+									    "primaryTypeDisplayName": "강아지상",
 									    "modelVersion": "face-type-facenet-geometry-v3-experimental",
 									    "tags": [
 									      {
 									        "code": "DOG",
+									        "displayName": "강아지상",
 									        "rank": 1,
 									        "relativeScore": 0.342118
 									      }

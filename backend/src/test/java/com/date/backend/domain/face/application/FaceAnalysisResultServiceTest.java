@@ -80,10 +80,14 @@ class FaceAnalysisResultServiceTest {
 		assertThat(response.analysisRequestId()).isEqualTo(analysisRequest.getId());
 		assertThat(response.status()).isEqualTo(FaceAnalysisStatus.COMPLETED);
 		assertThat(response.primaryType()).isEqualTo(FaceType.DOG);
+		assertThat(response.primaryTypeDisplayName()).isEqualTo("강아지상");
 		assertThat(response.modelVersion()).isEqualTo("face-type-v1");
 		assertThat(response.tags())
 				.extracting(tag -> tag.code())
 				.containsExactly(FaceType.DOG, FaceType.CAT);
+		assertThat(response.tags())
+				.extracting(tag -> tag.displayName())
+				.containsExactly("강아지상", "고양이상");
 		assertThat(faceAnalysisRequestRepository.findById(analysisRequest.getId()))
 				.get()
 				.extracting(FaceAnalysisRequest::getStatus)
@@ -114,9 +118,13 @@ class FaceAnalysisResultServiceTest {
 		assertThat(response.analysisRequestId()).isEqualTo(analysisRequest.getId());
 		assertThat(response.status()).isEqualTo(FaceAnalysisStatus.COMPLETED);
 		assertThat(response.primaryType()).isEqualTo(FaceType.DOG);
+		assertThat(response.primaryTypeDisplayName()).isEqualTo("강아지상");
 		assertThat(response.tags())
 				.extracting(tag -> tag.code())
 				.containsExactly(FaceType.DOG, FaceType.CAT);
+		assertThat(response.tags())
+				.extracting(tag -> tag.displayName())
+				.containsExactly("강아지상", "고양이상");
 	}
 
 	@Test

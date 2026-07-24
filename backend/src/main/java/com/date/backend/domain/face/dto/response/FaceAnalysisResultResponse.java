@@ -11,6 +11,7 @@ public record FaceAnalysisResultResponse(
 		Long analysisRequestId,
 		FaceAnalysisStatus status,
 		FaceType primaryType,
+		String primaryTypeDisplayName,
 		String modelVersion,
 		List<FaceAnalysisResultTagResponse> tags,
 		LocalDateTime analyzedAt
@@ -20,6 +21,7 @@ public record FaceAnalysisResultResponse(
 				result.getAnalysisRequest().getId(),
 				result.getAnalysisRequest().getStatus(),
 				FaceType.valueOf(result.getPrimaryFaceTag().getCode()),
+				result.getPrimaryFaceTag().getName(),
 				result.getModelVersion(),
 				result.getTags().stream()
 						.map(FaceAnalysisResultTagResponse::from)

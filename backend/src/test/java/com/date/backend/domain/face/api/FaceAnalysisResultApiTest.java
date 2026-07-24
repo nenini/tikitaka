@@ -126,7 +126,11 @@ class FaceAnalysisResultApiTest {
 		assertThat(resultData.path("analysisRequestId").asLong()).isEqualTo(analysisRequestId);
 		assertThat(resultData.path("status").asText()).isEqualTo("COMPLETED");
 		assertThat(resultData.path("primaryType").asText()).isEqualTo("DOG");
+		assertThat(resultData.path("primaryTypeDisplayName").asText())
+				.isEqualTo("강아지상");
 		assertThat(resultData.path("tags")).hasSize(2);
+		assertThat(resultData.path("tags").get(0).path("displayName").asText())
+				.isEqualTo("강아지상");
 
 		HttpResponse<String> latestResultResponse = get(
 				"/api/v1/users/me/face-analysis",
@@ -139,7 +143,11 @@ class FaceAnalysisResultApiTest {
 				.isEqualTo(analysisRequestId);
 		assertThat(latestResultData.path("status").asText()).isEqualTo("COMPLETED");
 		assertThat(latestResultData.path("primaryType").asText()).isEqualTo("DOG");
+		assertThat(latestResultData.path("primaryTypeDisplayName").asText())
+				.isEqualTo("강아지상");
 		assertThat(latestResultData.path("tags")).hasSize(2);
+		assertThat(latestResultData.path("tags").get(0).path("displayName").asText())
+				.isEqualTo("강아지상");
 
 		HttpResponse<String> duplicateResponse = post(
 				"/api/v1/face-analyses/" + analysisRequestId + "/result",
