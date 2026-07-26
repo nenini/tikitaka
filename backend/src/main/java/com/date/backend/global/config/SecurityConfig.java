@@ -61,6 +61,7 @@ public class SecurityConfig {
 								"/api/v1/face-analyses/**"
 						).authenticated()
 						.requestMatchers("/api/v1/surveys/**").authenticated()
+						.requestMatchers("/api/v1/match-requests/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)
