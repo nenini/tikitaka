@@ -10,7 +10,7 @@ import { cn } from '@/shared/lib/cn'
 /*  - 공통 컴포넌트 규약 준수: Steps / Card / CardButton / Callout / Button 등    */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '프로필', '설문'] as const
+const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 /** 본인확인 수단. 신분증 인증은 제외(사용자 지시) — 통신사 PASS 단일. */
 interface KycProvider {
@@ -49,13 +49,13 @@ export function VerifyKycPage() {
 
   const onNext = () => {
     // TODO(AUTH): 성인 확인 완료 상태를 서버/스토어에 반영
-    navigate('/signup/profile')
+    navigate('/signup/consent')
   }
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={4} current={2} labels={STEP_LABELS} />
+        <Steps count={5} current={2} labels={STEP_LABELS} />
         <h1 className="bt-h2 mt-4">본인 인증</h1>
         <p className="bt-body-sm bt-muted mt-1">성인 여부만 확인해요. 오래 걸리지 않아요.</p>
       </header>

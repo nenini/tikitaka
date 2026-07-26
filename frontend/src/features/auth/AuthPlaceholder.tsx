@@ -35,9 +35,9 @@ export function ProfilePage() {
   return (
     <AuthPlaceholder
       title="기본 프로필 (W-04)"
-      note="본인인증 다음 단계입니다. 닉네임·성별 등 기본 프로필을 입력해요 — 다음 차수에서 구현합니다."
-      backTo="/signup/verify"
-      backLabel="본인인증으로 돌아가기"
+      note="동의 다음 단계입니다. 닉네임·성별 등 기본 프로필을 입력해요 — 다음 차수에서 구현합니다."
+      backTo="/signup/consent"
+      backLabel="동의로 돌아가기"
     />
   )
 }
