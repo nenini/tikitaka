@@ -3,13 +3,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
+import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
 /*  - 이메일(중복확인) · 비밀번호(강도)·확인                                     */
+/*  - 실명·전화번호는 비공개(운영 목적) 수집 — 상대에게 공개되지 않는다.          */
 /*  - 개인정보 동의는 별도 목적별 동의 화면(W-03)에서 받는다.                     */
-/*  - 공통 컴포넌트 규약 준수: Steps / Field / Input / Progress / Callout        */
+/*  - 공통 컴포넌트 규약 준수: Steps / Field / Input / Progress / Badge / Callout */
 /* -------------------------------------------------------------------------- */
 
 const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
@@ -23,6 +24,11 @@ const signupSchema = z
       .regex(/[A-Za-z]/, '영문을 포함해주세요')
       .regex(/\d/, '숫자를 포함해주세요'),
     passwordConfirm: z.string().min(1, '비밀번호를 한 번 더 입력하세요'),
+    realName: z.string().trim().min(2, '실명을 입력하세요'),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^01[016789]-?\d{3,4}-?\d{4}$/, '올바른 휴대폰 번호를 입력하세요'),
   })
   .refine((d) => d.password === d.passwordConfirm, {
     path: ['passwordConfirm'],
@@ -63,7 +69,7 @@ export function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', passwordConfirm: '' },
+    defaultValues: { email: '', password: '', passwordConfirm: '', realName: '', phone: '' },
   })
 
   const email = watch('email')
@@ -169,6 +175,31 @@ export function SignupPage() {
                   {...register('passwordConfirm')}
                 />
               </Field>
+
+              <div className="h-px bg-[var(--bt-color-border)]" />
+
+              {/* 비공개(운영 목적) — 상대에게 공개되지 않음 */}
+              <div className="flex items-center gap-2">
+                <Badge>비공개</Badge>
+                <span className="bt-caption">
+                  아래 정보는 <b className="text-ink">운영 목적으로만</b> 쓰이고 상대에게 공개되지 않아요.
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <Field label="실명" required error={errors.realName?.message} className="flex-1">
+                  <Input autoComplete="name" placeholder="홍길동" {...register('realName')} />
+                </Field>
+                <Field label="전화번호" required error={errors.phone?.message} className="flex-1">
+                  <Input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    placeholder="010-1234-5678"
+                    {...register('phone')}
+                  />
+                </Field>
+              </div>
             </Stack>
           </Card>
 
