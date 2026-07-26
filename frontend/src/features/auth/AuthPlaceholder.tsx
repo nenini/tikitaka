@@ -30,14 +30,14 @@ export function AuthPlaceholder({
   )
 }
 
-/** 본인 인증(KYC · W-02b) — 회원가입 다음 단계. 다음 차수 구현. */
-export function VerifyKycPage() {
+/** 기본 프로필(W-04) — 본인인증 다음 단계. 다음 차수 구현. */
+export function ProfilePage() {
   return (
     <AuthPlaceholder
-      title="본인 인증 (KYC · W-02b)"
-      note="회원가입 다음 단계입니다. 통신사 PASS 인증(Mock)으로 성인 여부만 확인해요 — 다음 차수에서 구현합니다."
-      backTo="/signup"
-      backLabel="계정 만들기로 돌아가기"
+      title="기본 프로필 (W-04)"
+      note="본인인증 다음 단계입니다. 닉네임·성별 등 기본 프로필을 입력해요 — 다음 차수에서 구현합니다."
+      backTo="/signup/verify"
+      backLabel="본인인증으로 돌아가기"
     />
   )
 }
