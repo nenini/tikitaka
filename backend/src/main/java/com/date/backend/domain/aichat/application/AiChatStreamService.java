@@ -1,6 +1,7 @@
 package com.date.backend.domain.aichat.application;
 
 import com.date.backend.domain.aichat.dto.response.AiChatMessageResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatCancelResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatPersonaSelectedEvent;
 import com.date.backend.domain.aichat.dto.response.AiChatStreamChunkEvent;
 import com.date.backend.domain.aichat.dto.response.AiChatStreamConnectedEvent;
@@ -10,6 +11,8 @@ import com.date.backend.domain.aichat.integration.AiChatResponseStreamRequest;
 import com.date.backend.domain.aichat.integration.AiChatResponseStreamListener;
 import com.date.backend.domain.aichat.integration.AiChatResponseStreamer;
 import com.date.backend.domain.aichat.integration.AiChatPersonaSelection;
+import com.date.backend.domain.aichat.domain.AiResponseState;
+import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.AiChatErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +22,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
@@ -33,49 +35,97 @@ public class AiChatStreamService {
 	private static final Logger log = LoggerFactory.getLogger(AiChatStreamService.class);
 	private static final long SSE_TIMEOUT_MILLIS = 60_000L;
 
-	private final AiChatMessageService messageService;
 	private final AiChatContextService contextService;
+	private final AiChatTurnService turnService;
 	private final AiChatResponseStreamer responseStreamer;
 	private final Executor streamExecutor;
-	private final Map<String, ActiveStream> activeStreams = new ConcurrentHashMap<>();
+	private final Map<Long, ActiveStream> activeStreams = new ConcurrentHashMap<>();
 
 	public AiChatStreamService(
-			AiChatMessageService messageService,
 			AiChatContextService contextService,
+			AiChatTurnService turnService,
 			AiChatResponseStreamer responseStreamer,
 			@Qualifier("aiChatStreamExecutor") Executor streamExecutor
 	) {
-		this.messageService = messageService;
 		this.contextService = contextService;
+		this.turnService = turnService;
 		this.responseStreamer = responseStreamer;
 		this.streamExecutor = streamExecutor;
 	}
 
 	public SseEmitter stream(Long userId, Long sessionId, String userMessageText) {
 		contextService.validateContext(userId, sessionId);
-		AiChatMessageResponse userMessage =
-				messageService.saveUserMessage(userId, sessionId, userMessageText);
+		AiChatMessageResponse userMessage = turnService.startNewTurn(userId, sessionId, userMessageText);
+		return startStream(userId, sessionId, userMessage);
+	}
+
+	public SseEmitter retry(Long userId, Long sessionId, Long userMessageId) {
+		contextService.validateContext(userId, sessionId);
+		AiChatMessageResponse userMessage = turnService.startRetry(userId, sessionId, userMessageId);
+		return startStream(userId, sessionId, userMessage);
+	}
+
+	public AiChatCancelResponse cancel(
+			Long userId,
+			Long sessionId
+	) {
+		contextService.validateContext(userId, sessionId);
+		ActiveStream activeStream = activeStreams.remove(sessionId);
+		if (activeStream == null) {
+			throw new BusinessException(AiChatErrorCode.AI_RESPONSE_CANCEL_NOT_ALLOWED);
+		}
+		turnService.cancel(userId, sessionId, activeStream.userMessageId());
+		activeStream.cancelAndComplete();
+		return new AiChatCancelResponse(
+				sessionId,
+				activeStream.userMessageId(),
+				AiResponseState.CANCELLED
+		);
+	}
+
+	private SseEmitter startStream(
+			Long userId,
+			Long sessionId,
+			AiChatMessageResponse userMessage
+	) {
 		AiChatResponseStreamRequest aiRequest = contextService.createRequest(userId, sessionId);
 		SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
-		String streamId = UUID.randomUUID().toString();
-		ActiveStream activeStream = new ActiveStream(emitter);
-		activeStreams.put(streamId, activeStream);
+		ActiveStream activeStream = new ActiveStream(emitter, userMessage.messageId());
+		if (activeStreams.putIfAbsent(sessionId, activeStream) != null) {
+			turnService.fail(
+					userId,
+					sessionId,
+					userMessage.messageId(),
+					AiChatErrorCode.AI_RESPONSE_ALREADY_IN_PROGRESS.code()
+			);
+			throw new BusinessException(AiChatErrorCode.AI_RESPONSE_ALREADY_IN_PROGRESS);
+		}
 
-		emitter.onCompletion(() -> removeStream(streamId));
-		emitter.onTimeout(() -> cancelStream(streamId));
-		emitter.onError(exception -> cancelStream(streamId));
+		emitter.onCompletion(() -> removeStream(sessionId, activeStream));
+		emitter.onTimeout(() -> cancelStream(userId, sessionId, activeStream));
+		emitter.onError(exception -> cancelStream(userId, sessionId, activeStream));
 
 		FutureTask<Void> task = new FutureTask<>(() -> {
-			processStream(streamId, activeStream, userId, sessionId, userMessage, aiRequest);
+			processStream(activeStream, userId, sessionId, userMessage, aiRequest);
 			return null;
 		});
 		activeStream.setFuture(task);
-		streamExecutor.execute(task);
+		try {
+			streamExecutor.execute(task);
+		} catch (RuntimeException exception) {
+			removeStream(sessionId, activeStream);
+			turnService.fail(
+					userId,
+					sessionId,
+					userMessage.messageId(),
+					AiChatErrorCode.AI_RESPONSE_STREAM_FAILED.code()
+			);
+			throw exception;
+		}
 		return emitter;
 	}
 
 	private void processStream(
-			String streamId,
 			ActiveStream activeStream,
 			Long userId,
 			Long sessionId,
@@ -121,7 +171,12 @@ public class AiChatStreamService {
 				throw new IllegalStateException("AI 응답 스트림이 빈 응답으로 종료되었습니다.");
 			}
 			AiChatMessageResponse aiMessage =
-					messageService.saveAiMessage(userId, sessionId, completeResponse.toString());
+					turnService.complete(
+							userId,
+							sessionId,
+							userMessage.messageId(),
+							completeResponse.toString()
+					);
 			send(activeStream, "done", new AiChatStreamDoneEvent(
 					sessionId,
 					aiMessage.messageId(),
@@ -131,11 +186,18 @@ public class AiChatStreamService {
 			activeStream.emitter().complete();
 		} catch (StreamDisconnectedException exception) {
 			activeStream.cancel();
+			turnService.cancelIfProcessing(userId, sessionId, userMessage.messageId());
 		} catch (Exception exception) {
 			log.error("AI chat response stream failed. sessionId={}", sessionId, exception);
+			turnService.fail(
+					userId,
+					sessionId,
+					userMessage.messageId(),
+					AiChatErrorCode.AI_RESPONSE_STREAM_FAILED.code()
+			);
 			sendError(activeStream);
 		} finally {
-			removeStream(streamId);
+			removeStream(sessionId, activeStream);
 		}
 	}
 
@@ -171,15 +233,15 @@ public class AiChatStreamService {
 		}
 	}
 
-	private void cancelStream(String streamId) {
-		ActiveStream activeStream = activeStreams.remove(streamId);
-		if (activeStream != null) {
+	private void cancelStream(Long userId, Long sessionId, ActiveStream activeStream) {
+		if (activeStreams.remove(sessionId, activeStream)) {
 			activeStream.cancel();
+			turnService.cancelIfProcessing(userId, sessionId, activeStream.userMessageId());
 		}
 	}
 
-	private void removeStream(String streamId) {
-		activeStreams.remove(streamId);
+	private void removeStream(Long sessionId, ActiveStream activeStream) {
+		activeStreams.remove(sessionId, activeStream);
 	}
 
 	int activeStreamCount() {
@@ -188,15 +250,21 @@ public class AiChatStreamService {
 
 	private static final class ActiveStream {
 		private final SseEmitter emitter;
+		private final Long userMessageId;
 		private final AtomicBoolean cancelled = new AtomicBoolean();
 		private volatile Future<?> future;
 
-		private ActiveStream(SseEmitter emitter) {
+		private ActiveStream(SseEmitter emitter, Long userMessageId) {
 			this.emitter = emitter;
+			this.userMessageId = userMessageId;
 		}
 
 		SseEmitter emitter() {
 			return emitter;
+		}
+
+		Long userMessageId() {
+			return userMessageId;
 		}
 
 		void setFuture(Future<?> future) {
@@ -214,6 +282,11 @@ public class AiChatStreamService {
 			if (cancelled.compareAndSet(false, true) && future != null) {
 				future.cancel(true);
 			}
+		}
+
+		void cancelAndComplete() {
+			cancel();
+			emitter.complete();
 		}
 	}
 

@@ -1,6 +1,7 @@
 package com.date.backend.domain.aichat.api;
 
 import com.date.backend.domain.aichat.dto.request.AiChatStreamRequest;
+import com.date.backend.domain.aichat.dto.response.AiChatCancelResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,5 +69,32 @@ public interface AiChatStreamSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "AI 채팅 세션 ID", example = "15") Long sessionId,
 			@Valid AiChatStreamRequest request
+	);
+
+	@Operation(
+			summary = "실패·취소된 AI 응답 재시도",
+			description = "기존 USER 메시지를 중복 저장하지 않고 해당 메시지로 AI 응답 스트림을 다시 시작합니다."
+	)
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "SSE 재시도 연결 성공"),
+			@ApiResponse(responseCode = "409", description = "재시도 대상이 없거나 이미 처리 중")
+	})
+	SseEmitter retry(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "AI 채팅 세션 ID") Long sessionId,
+			@Parameter(description = "재시도할 USER 메시지 ID") Long userMessageId
+	);
+
+	@Operation(
+			summary = "진행 중인 AI 응답 취소",
+			description = "AI 서버 스트림 작업을 중단하고 세션 응답 상태를 CANCELLED로 기록합니다."
+	)
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "취소 성공"),
+			@ApiResponse(responseCode = "409", description = "취소할 응답 없음")
+	})
+	com.date.backend.global.api.ApiResponse<AiChatCancelResponse> cancel(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "AI 채팅 세션 ID") Long sessionId
 	);
 }

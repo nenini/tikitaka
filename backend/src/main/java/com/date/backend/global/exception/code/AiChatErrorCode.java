@@ -9,6 +9,21 @@ public enum AiChatErrorCode implements ErrorCode {
 			"AI_CHAT_PROFILE_INCOMPLETE",
 			"AI 채팅에 필요한 성별 또는 생년월일 정보가 없습니다."
 	),
+	AI_RESPONSE_ALREADY_IN_PROGRESS(
+			HttpStatus.CONFLICT,
+			"AI_RESPONSE_ALREADY_IN_PROGRESS",
+			"현재 AI 응답을 생성하고 있습니다."
+	),
+	AI_RESPONSE_RETRY_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"AI_RESPONSE_RETRY_NOT_ALLOWED",
+			"재시도할 수 있는 실패 또는 취소된 AI 응답이 없습니다."
+	),
+	AI_RESPONSE_CANCEL_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"AI_RESPONSE_CANCEL_NOT_ALLOWED",
+			"취소할 수 있는 AI 응답이 없습니다."
+	),
 	CHATBOT_PERSONA_NOT_FOUND(
 			HttpStatus.NOT_FOUND,
 			"CHATBOT_PERSONA_NOT_FOUND",

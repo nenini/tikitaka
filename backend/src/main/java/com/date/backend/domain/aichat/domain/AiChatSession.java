@@ -59,6 +59,16 @@ public class AiChatSession {
 	@Column(name = "closedAt")
 	private LocalDateTime closedAt;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "aiResponseState", nullable = false, length = 20)
+	private AiResponseState aiResponseState = AiResponseState.IDLE;
+
+	@Column(name = "pendingUserMessageId")
+	private Long pendingUserMessageId;
+
+	@Column(name = "lastAiResponseErrorCode", length = 100)
+	private String lastAiResponseErrorCode;
+
 	protected AiChatSession() {
 	}
 
@@ -118,6 +128,22 @@ public class AiChatSession {
 		return closedAt;
 	}
 
+	public LocalDateTime getLastUserMessageAt() {
+		return lastUserMessageAt;
+	}
+
+	public AiResponseState getAiResponseState() {
+		return aiResponseState;
+	}
+
+	public Long getPendingUserMessageId() {
+		return pendingUserMessageId;
+	}
+
+	public String getLastAiResponseErrorCode() {
+		return lastAiResponseErrorCode;
+	}
+
 	public void recordUserMessage(LocalDateTime sentAt) {
 		this.lastUserMessageAt = sentAt;
 	}
@@ -130,6 +156,44 @@ public class AiChatSession {
 			throw new IllegalStateException("AI persona cannot be changed within a chat session.");
 		}
 		this.aiPersonaKey = aiPersonaKey;
+	}
+
+	public void startAiResponse(Long userMessageId) {
+		if (aiResponseState == AiResponseState.PROCESSING) {
+			throw new IllegalStateException("AI response is already processing.");
+		}
+		this.aiResponseState = AiResponseState.PROCESSING;
+		this.pendingUserMessageId = userMessageId;
+		this.lastAiResponseErrorCode = null;
+	}
+
+	public void completeAiResponse(Long userMessageId) {
+		if (!matchesPendingMessage(userMessageId)) {
+			return;
+		}
+		this.aiResponseState = AiResponseState.IDLE;
+		this.pendingUserMessageId = null;
+		this.lastAiResponseErrorCode = null;
+	}
+
+	public void failAiResponse(Long userMessageId, String errorCode) {
+		if (aiResponseState != AiResponseState.PROCESSING || !matchesPendingMessage(userMessageId)) {
+			return;
+		}
+		this.aiResponseState = AiResponseState.FAILED;
+		this.lastAiResponseErrorCode = errorCode;
+	}
+
+	public void cancelAiResponse(Long userMessageId) {
+		if (!matchesPendingMessage(userMessageId)) {
+			return;
+		}
+		this.aiResponseState = AiResponseState.CANCELLED;
+		this.lastAiResponseErrorCode = "AI_RESPONSE_CANCELLED";
+	}
+
+	private boolean matchesPendingMessage(Long userMessageId) {
+		return pendingUserMessageId != null && pendingUserMessageId.equals(userMessageId);
 	}
 
 	public void close(LocalDateTime closedAt) {
