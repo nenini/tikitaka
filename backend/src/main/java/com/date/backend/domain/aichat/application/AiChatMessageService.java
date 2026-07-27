@@ -61,6 +61,24 @@ public class AiChatMessageService {
 				.toList();
 	}
 
+	@Transactional
+	public AiChatMessageResponse saveUserMessage(Long userId, Long sessionId, String messageText) {
+		return save(
+				userId,
+				sessionId,
+				new AiChatMessageCreateRequest(ChatMessageSenderType.USER, messageText, false)
+		);
+	}
+
+	@Transactional
+	public AiChatMessageResponse saveAiMessage(Long userId, Long sessionId, String messageText) {
+		return save(
+				userId,
+				sessionId,
+				new AiChatMessageCreateRequest(ChatMessageSenderType.AI, messageText, false)
+		);
+	}
+
 	private void validateOwner(Long userId, AiChatSession session) {
 		if (!session.getUser().getId().equals(userId)) {
 			throw new BusinessException(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);

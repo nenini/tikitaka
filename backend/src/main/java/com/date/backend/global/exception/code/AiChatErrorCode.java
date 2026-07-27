@@ -23,6 +23,11 @@ public enum AiChatErrorCode implements ErrorCode {
 			HttpStatus.FORBIDDEN,
 			"CHAT_SESSION_FORBIDDEN",
 			"해당 AI 채팅 세션에 접근할 수 없습니다."
+	),
+	AI_RESPONSE_STREAM_FAILED(
+			HttpStatus.BAD_GATEWAY,
+			"AI_RESPONSE_STREAM_FAILED",
+			"AI 응답을 전송하지 못했습니다."
 	);
 
 	private final HttpStatus status;
