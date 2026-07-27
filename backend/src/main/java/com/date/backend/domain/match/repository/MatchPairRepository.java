@@ -37,6 +37,17 @@ public interface MatchPairRepository extends JpaRepository<MatchPair, Long> {
 			@Param("statuses") Collection<MatchStatus> statuses
 	);
 
+	@Query("""
+			SELECT pair
+			FROM MatchPair pair
+			WHERE pair.status IN :statuses
+			AND (pair.userAId IN :userIds OR pair.userBId IN :userIds)
+			""")
+	List<MatchPair> findAllActiveByParticipantUserIds(
+			@Param("userIds") Collection<Long> userIds,
+			@Param("statuses") Collection<MatchStatus> statuses
+	);
+
 	List<MatchPair> findAllByStatusAndAcceptDeadlineAtBefore(
 			MatchStatus status,
 			java.time.LocalDateTime deadline

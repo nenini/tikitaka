@@ -17,6 +17,10 @@ import java.util.Optional;
 public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
 
 	@EntityGraph(attributePaths = {"preferredFaceTag", "actualFaceTag"})
+	@Query("SELECT request FROM MatchRequest request WHERE request.id = :id")
+	Optional<MatchRequest> findByIdWithFaceTags(@Param("id") Long id);
+
+	@EntityGraph(attributePaths = {"preferredFaceTag", "actualFaceTag"})
 	Optional<MatchRequest> findFirstByUserIdAndStatusInOrderByRequestedAtDesc(
 			Long userId,
 			Collection<MatchRequestStatus> statuses
@@ -26,6 +30,11 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
 	List<MatchRequest> findAllByStatusOrderByRequestedAtAscIdAsc(
 			MatchRequestStatus status,
 			Pageable pageable
+	);
+
+	@EntityGraph(attributePaths = {"preferredFaceTag", "actualFaceTag"})
+	List<MatchRequest> findAllByStatusOrderByRequestedAtAscIdAsc(
+			MatchRequestStatus status
 	);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
