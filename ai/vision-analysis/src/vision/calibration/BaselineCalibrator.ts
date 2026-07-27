@@ -5,14 +5,23 @@ import type {
   NormalizedPrimaryFace,
 } from "../core/NormalizedFaceFrame.js";
 import { computeExpressionActivityScore } from "../detectors/ExpressionActivityScore.js";
-import type { VisionBaseline } from "./VisionBaseline.js";
+import type {
+  BaselineSignal,
+  BaselineStatus,
+  SignalBaselineMode,
+  SignalBaselineState,
+  VisionBaseline,
+} from "./VisionBaseline.js";
 
-const BLENDSHAPES = [
-  "mouthSmileLeft",
-  "mouthSmileRight",
-  "cheekSquintLeft",
-  "cheekSquintRight",
-] as const;
+const BASELINE_SIGNALS: readonly BaselineSignal[] = [
+  "pose",
+  "faceCenter",
+  "faceGeometry",
+  "smile",
+  "gaze",
+  "expressionActivity",
+];
+const MOUTH_SHAPES = ["mouthSmileLeft", "mouthSmileRight"] as const;
 
 interface BaselineSample {
   readonly timestampMs: number;
@@ -22,19 +31,34 @@ interface BaselineSample {
   readonly faceAreaRatio: number;
   readonly faceCenterX: number;
   readonly faceCenterY: number;
-  readonly eyeGazeHorizontalRatio: number | null;
-  readonly eyeGazeVerticalRatio: number | null;
-  readonly blendshapes: Readonly<Record<string, number>>;
+  readonly leftEyeHorizontal: number | null;
+  readonly rightEyeHorizontal: number | null;
+  readonly leftEyeVertical: number | null;
+  readonly rightEyeVertical: number | null;
+  readonly mouthSmileLeft: number | null;
+  readonly mouthSmileRight: number | null;
 }
 
 export interface BaselineCalibrationState {
   readonly status: VisionBaseline["status"];
+  readonly overallStatus: VisionBaseline["status"];
   readonly progress: number;
   readonly usableFrameCount: number;
   readonly excludedFrameCount: number;
+  readonly setupWallTimeMs: number;
+  readonly calibrationWallTimeMs: number;
+  readonly calibrationUsableTimeMs: number;
+  /** Compatibility alias for existing UI consumers. */
   readonly usableDurationMs: number;
+  /** Compatibility alias for existing UI consumers. */
   readonly wallDurationMs: number;
+  readonly baselineModeBySignal: VisionBaseline["baselineModeBySignal"];
+  readonly confidenceBySignal: VisionBaseline["confidenceBySignal"];
   readonly baseline: VisionBaseline;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
 }
 
 function median(values: readonly number[]): number {
@@ -42,20 +66,45 @@ function median(values: readonly number[]): number {
   const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   const atMiddle = sorted[middle] ?? 0;
-  return sorted.length % 2 === 0 ? ((sorted[middle - 1] ?? atMiddle) + atMiddle) / 2 : atMiddle;
+  return sorted.length % 2 === 0
+    ? ((sorted[middle - 1] ?? atMiddle) + atMiddle) / 2
+    : atMiddle;
 }
 
 function trimmedMean(values: readonly number[], trimRatio: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((left, right) => left - right);
-  const trim = Math.min(Math.floor(sorted.length * trimRatio), Math.floor((sorted.length - 1) / 2));
+  const trim = Math.min(
+    Math.floor(sorted.length * trimRatio),
+    Math.floor((sorted.length - 1) / 2),
+  );
   const retained = sorted.slice(trim, sorted.length - trim);
   return retained.reduce((sum, value) => sum + value, 0) / retained.length;
 }
 
-function emptyBaseline(status: VisionBaseline["status"] = "NOT_STARTED"): VisionBaseline {
+function available(values: readonly (number | null)[]): number[] {
+  return values.filter((value): value is number => value !== null);
+}
+
+function emptySignalStates(
+  mode: SignalBaselineMode,
+): Record<BaselineSignal, SignalBaselineState> {
+  return Object.fromEntries(
+    BASELINE_SIGNALS.map((signal) => [
+      signal,
+      { mode, confidence: 0, sampleCount: 0 },
+    ]),
+  ) as Record<BaselineSignal, SignalBaselineState>;
+}
+
+function emptyBaseline(status: BaselineStatus = "NOT_STARTED"): VisionBaseline {
+  const terminalFallback = status === "GLOBAL_FALLBACK";
+  const states = emptySignalStates(
+    terminalFallback ? "GLOBAL_FALLBACK" : "COLLECTING",
+  );
   return {
     status,
+    baselineEpoch: 0,
     usableFrameCount: 0,
     calibratedAtSessionElapsedMs: null,
     yaw: 0,
@@ -64,30 +113,45 @@ function emptyBaseline(status: VisionBaseline["status"] = "NOT_STARTED"): Vision
     faceAreaRatio: 0.15,
     faceCenterX: 0.5,
     faceCenterY: 0.5,
-    eyeGazeHorizontalRatio: 0.5,
-    eyeGazeVerticalRatio: 0.5,
+    eyeGazeHorizontalRatio: null,
+    eyeGazeVerticalRatio: null,
+    leftEyeHorizontalBaseline: null,
+    rightEyeHorizontalBaseline: null,
+    leftEyeVerticalBaseline: null,
+    rightEyeVerticalBaseline: null,
+    leftEyeBaselineConfidence: 0,
+    rightEyeBaselineConfidence: 0,
     mouthSmileLeft: 0,
     mouthSmileRight: 0,
+    baselineSmileScore: 0,
     blendshapeMeans: {},
     blendshapeMedianAbsoluteDeviations: {},
     expressionActivityScore: null,
+    baselineModeBySignal: Object.fromEntries(
+      BASELINE_SIGNALS.map((signal) => [signal, states[signal].mode]),
+    ) as Record<BaselineSignal, SignalBaselineMode>,
+    confidenceBySignal: Object.fromEntries(
+      BASELINE_SIGNALS.map((signal) => [signal, 0]),
+    ) as Record<BaselineSignal, number>,
+    signalStates: states,
   };
 }
 
 /**
- * Builds a session-only baseline from technically usable frames.
- * No image, embedding, landmark array, or full blendshape vector is retained.
+ * Builds session-only, signal-specific baselines. Bad-quality time pauses the
+ * usable clock, and a missing eye or mouth blendshape never becomes a fake zero.
  */
 export class BaselineCalibrator {
-  // Pose samples stop growing once the primary baseline is ready.
   private readonly samples: BaselineSample[] = [];
   private baseline: VisionBaseline = emptyBaseline();
-  private startedAtMs: number | null = null;
+  private status: BaselineStatus = "NOT_STARTED";
+  private setupStartedAtMs: number | null = null;
+  private collectingStartedAtMs: number | null = null;
+  private stabilizationStartedAtMs: number | null = null;
+  private stabilizationFrameCount = 0;
   private lastUsableAtMs: number | null = null;
-  private usableDurationMs = 0;
+  private calibrationUsableTimeMs = 0;
   private excludedFrameCount = 0;
-  // Expression activity continues for the longer configured duration, then its
-  // temporary samples are released while the scalar baseline remains in memory.
   private readonly activityScores: number[] = [];
   private previousActivityFace: NormalizedPrimaryFace | null = null;
   private lastActivityAtMs: number | null = null;
@@ -99,123 +163,118 @@ export class BaselineCalibrator {
     private readonly attentionConfig: VisionConfig["screenAttention"],
   ) {}
 
-  update(frame: NormalizedFaceFrame, quality: FaceQualityDecision): BaselineCalibrationState {
-    // Fallback is terminal for this session; silently recalibrating later would
-    // move detector thresholds while an interview is already in progress.
-    if (this.baseline.status === "FALLBACK") {
+  update(
+    frame: NormalizedFaceFrame,
+    quality: FaceQualityDecision,
+  ): BaselineCalibrationState {
+    if (
+      this.status === "READY" ||
+      this.status === "PARTIAL" ||
+      this.status === "GLOBAL_FALLBACK"
+    ) {
+      this.collectPostCalibrationActivity(frame, quality);
       return this.getState(frame.sessionElapsedMs);
     }
-    this.startedAtMs ??= frame.sessionElapsedMs;
+
+    this.setupStartedAtMs ??= frame.sessionElapsedMs;
+    if (this.status === "NOT_STARTED") this.status = "PRECHECK";
+
     const face = frame.primaryFace;
-    // Calibration is stricter than general analysis: it requires one centered,
-    // fully observable face with complete pose values.
-    const valid = quality.usable && frame.faceCount === 1 && face !== null &&
-      face.yaw !== null && face.pitch !== null && face.roll !== null &&
-      face.box.inFrameRatio >= this.config.minimumInFrameRatio &&
-      Math.abs(face.yaw) <= this.config.maximumAbsoluteYawDegrees &&
-      Math.abs(face.pitch) <= this.config.maximumAbsolutePitchDegrees &&
-      Math.abs(face.roll) <= this.config.maximumAbsoluteRollDegrees;
-
-    if (
-      valid &&
-      face !== null &&
-      face.yaw !== null &&
-      face.pitch !== null &&
-      face.roll !== null
-    ) {
-      if (
-        this.baseline.status === "READY" &&
-        this.baseline.expressionActivityScore !== null
-      ) {
-        // Both baseline stages are complete, so no more face-derived samples are retained.
-        return this.getState(frame.sessionElapsedMs);
-      }
-      this.collectActivitySample(face, frame.sessionElapsedMs);
-
-      if (this.baseline.status === "READY") {
-        // Pose is already stable; only the longer activity stage may still update.
-        this.refreshActivityBaseline();
-        return this.getState(frame.sessionElapsedMs);
-      }
-
-      if (this.lastUsableAtMs !== null) {
-        // Large gaps mean unusable periods and must not count as calibration time.
-        this.usableDurationMs += Math.min(500, Math.max(0, frame.sessionElapsedMs - this.lastUsableAtMs));
-      }
-      this.lastUsableAtMs = frame.sessionElapsedMs;
-      const selected: Record<string, number> = {};
-      const names = new Set<string>([
-        ...BLENDSHAPES,
-        ...this.activityConfig.blendshapeNames,
-      ]);
-      for (const name of names) selected[name] = face.blendshapes[name] ?? 0;
-      const eyeGazeUsable = this.isEyeGazeUsable(face);
-      this.samples.push({
-        timestampMs: frame.sessionElapsedMs,
-        yaw: face.yaw,
-        pitch: face.pitch,
-        roll: face.roll,
-        faceAreaRatio: face.box.areaRatio,
-        faceCenterX: face.box.centerX,
-        faceCenterY: face.box.centerY,
-        eyeGazeHorizontalRatio: eyeGazeUsable
-          ? face.eyeGaze.horizontalRatio
-          : null,
-        eyeGazeVerticalRatio: eyeGazeUsable
-          ? face.eyeGaze.verticalRatio
-          : null,
-        blendshapes: selected,
-      });
-    } else {
+    const commonUsable = this.isCommonUsable(frame, quality);
+    if (!commonUsable || face === null) {
       this.excludedFrameCount += 1;
       this.lastUsableAtMs = null;
-      this.previousActivityFace = null;
-      this.lastActivityAtMs = null;
-
-      if (this.baseline.status === "READY") {
-        return this.getState(frame.sessionElapsedMs);
+      this.stabilizationStartedAtMs = null;
+      this.stabilizationFrameCount = 0;
+      if (this.status === "COLLECTING" || this.status === "STABILIZING") {
+        this.status = "PAUSED";
       }
+      return this.maybeFinish(frame.sessionElapsedMs);
     }
 
-    const wallDurationMs = frame.sessionElapsedMs - this.startedAtMs;
-    if (this.samples.length >= this.config.minimumUsableFrames && this.usableDurationMs >= this.config.targetUsableDurationMs) {
-      // Both frame count and usable time are required to avoid burst-only calibration.
-      this.baseline = this.computeBaseline(frame.sessionElapsedMs);
-    } else if (wallDurationMs >= this.config.maximumWallDurationMs) {
-      // Wall timeout is distinct from READY so detectors can expose fallback usage.
-      this.baseline = { ...emptyBaseline("FALLBACK"), calibratedAtSessionElapsedMs: frame.sessionElapsedMs };
-    } else {
-      this.baseline = { ...emptyBaseline("COLLECTING"), usableFrameCount: this.samples.length };
+    if (
+      this.status === "PRECHECK" ||
+      this.status === "PAUSED"
+    ) {
+      this.status = "STABILIZING";
+      this.stabilizationStartedAtMs = frame.sessionElapsedMs;
+      this.stabilizationFrameCount = 1;
+      return this.maybeFinish(frame.sessionElapsedMs);
     }
-    return this.getState(frame.sessionElapsedMs);
+
+    if (this.status === "STABILIZING") {
+      this.stabilizationFrameCount += 1;
+      const stableDuration =
+        frame.sessionElapsedMs - (this.stabilizationStartedAtMs ?? frame.sessionElapsedMs);
+      if (
+        stableDuration < this.config.stabilizationDurationMs ||
+        this.stabilizationFrameCount < this.config.stabilizationMinimumFrames
+      ) {
+        return this.maybeFinish(frame.sessionElapsedMs);
+      }
+      this.status = "COLLECTING";
+      this.collectingStartedAtMs ??= frame.sessionElapsedMs;
+      this.lastUsableAtMs = null;
+    }
+
+    this.collectSample(face, frame.sessionElapsedMs);
+    return this.maybeFinish(frame.sessionElapsedMs);
   }
 
   getBaseline(): VisionBaseline {
     return this.baseline;
   }
 
-  getState(nowMs = this.startedAtMs ?? 0): BaselineCalibrationState {
+  /** Explicit UI choice for skipping calibration; setup timeout alone is non-terminal. */
+  useGlobalFallback(nowMs: number): BaselineCalibrationState {
+    this.status = "GLOBAL_FALLBACK";
+    this.baseline = {
+      ...emptyBaseline("GLOBAL_FALLBACK"),
+      calibratedAtSessionElapsedMs: nowMs,
+    };
+    return this.getState(nowMs);
+  }
+
+  getState(nowMs = this.setupStartedAtMs ?? 0): BaselineCalibrationState {
+    const setupWallTimeMs =
+      this.setupStartedAtMs === null ? 0 : Math.max(0, nowMs - this.setupStartedAtMs);
+    const calibrationWallTimeMs =
+      this.collectingStartedAtMs === null
+        ? 0
+        : Math.max(0, nowMs - this.collectingStartedAtMs);
     return {
-      status: this.baseline.status,
-      progress: Math.min(1, Math.min(
-        this.usableDurationMs / this.config.targetUsableDurationMs,
-        this.samples.length / this.config.minimumUsableFrames,
-      )),
+      status: this.status,
+      overallStatus: this.status,
+      progress: Math.min(
+        1,
+        Math.min(
+          this.calibrationUsableTimeMs / this.config.targetUsableDurationMs,
+          this.samples.length / this.config.minimumUsableFrames,
+        ),
+      ),
       usableFrameCount: this.samples.length,
       excludedFrameCount: this.excludedFrameCount,
-      usableDurationMs: this.usableDurationMs,
-      wallDurationMs: this.startedAtMs === null ? 0 : Math.max(0, nowMs - this.startedAtMs),
+      setupWallTimeMs,
+      calibrationWallTimeMs,
+      calibrationUsableTimeMs: this.calibrationUsableTimeMs,
+      usableDurationMs: this.calibrationUsableTimeMs,
+      wallDurationMs: setupWallTimeMs,
+      baselineModeBySignal: this.baseline.baselineModeBySignal,
+      confidenceBySignal: this.baseline.confidenceBySignal,
       baseline: this.baseline,
     };
   }
 
   reset(): void {
-    // Baseline values and all source samples are session-only data.
     this.samples.length = 0;
     this.baseline = emptyBaseline();
-    this.startedAtMs = null;
+    this.status = "NOT_STARTED";
+    this.setupStartedAtMs = null;
+    this.collectingStartedAtMs = null;
+    this.stabilizationStartedAtMs = null;
+    this.stabilizationFrameCount = 0;
     this.lastUsableAtMs = null;
-    this.usableDurationMs = 0;
+    this.calibrationUsableTimeMs = 0;
     this.excludedFrameCount = 0;
     this.activityScores.length = 0;
     this.previousActivityFace = null;
@@ -223,18 +282,167 @@ export class BaselineCalibrator {
     this.activityUsableDurationMs = 0;
   }
 
-  private computeBaseline(timestampMs: number): VisionBaseline {
-    // Robust summaries reduce the influence of short pose or expression spikes.
+  private maybeFinish(nowMs: number): BaselineCalibrationState {
+    const confidence = this.commonCalibrationConfidence();
+    if (
+      this.samples.length >= this.config.minimumUsableFrames &&
+      this.calibrationUsableTimeMs >= this.config.targetUsableDurationMs &&
+      confidence >= this.config.readyMinimumConfidence
+    ) {
+      this.status = "READY";
+      this.baseline = this.computeBaseline(nowMs, "READY");
+      return this.getState(nowMs);
+    }
+
+    const wallTime =
+      this.collectingStartedAtMs === null
+        ? 0
+        : nowMs - this.collectingStartedAtMs;
+    if (wallTime < this.config.maximumWallDurationMs) {
+      this.baseline = {
+        ...emptyBaseline(this.status),
+        usableFrameCount: this.samples.length,
+      };
+      return this.getState(nowMs);
+    }
+
+    const partial =
+      this.samples.length >= this.config.partialMinimumUsableFrames &&
+      this.calibrationUsableTimeMs >= this.config.minimumUsableDurationMs &&
+      confidence >= this.config.partialMinimumConfidence;
+    this.status = partial ? "PARTIAL" : "GLOBAL_FALLBACK";
+    this.baseline = partial
+      ? this.computeBaseline(nowMs, "PARTIAL")
+      : {
+          ...emptyBaseline("GLOBAL_FALLBACK"),
+          calibratedAtSessionElapsedMs: nowMs,
+        };
+    return this.getState(nowMs);
+  }
+
+  private collectSample(face: NormalizedPrimaryFace, timestampMs: number): void {
+    if (this.lastUsableAtMs !== null) {
+      this.calibrationUsableTimeMs += Math.min(
+        500,
+        Math.max(0, timestampMs - this.lastUsableAtMs),
+      );
+    }
+    this.lastUsableAtMs = timestampMs;
+    this.collectActivitySample(face, timestampMs);
+
+    const leftBlink = face.blendshapes["eyeBlinkLeft"];
+    const rightBlink = face.blendshapes["eyeBlinkRight"];
+    const leftEyeUsable =
+      leftBlink !== undefined &&
+      leftBlink < this.attentionConfig.blinkEntryScore &&
+      face.eyeGaze.left !== null;
+    const rightEyeUsable =
+      rightBlink !== undefined &&
+      rightBlink < this.attentionConfig.blinkEntryScore &&
+      face.eyeGaze.right !== null;
+    this.samples.push({
+      timestampMs,
+      yaw: face.yaw ?? 0,
+      pitch: face.pitch ?? 0,
+      roll: face.roll ?? 0,
+      faceAreaRatio: face.box.areaRatio,
+      faceCenterX: face.box.centerX,
+      faceCenterY: face.box.centerY,
+      leftEyeHorizontal: leftEyeUsable
+        ? (face.eyeGaze.left?.horizontalRatio ?? null)
+        : null,
+      rightEyeHorizontal: rightEyeUsable
+        ? (face.eyeGaze.right?.horizontalRatio ?? null)
+        : null,
+      leftEyeVertical: leftEyeUsable
+        ? (face.eyeGaze.left?.verticalRatio ?? null)
+        : null,
+      rightEyeVertical: rightEyeUsable
+        ? (face.eyeGaze.right?.verticalRatio ?? null)
+        : null,
+      mouthSmileLeft: face.blendshapes["mouthSmileLeft"] ?? null,
+      mouthSmileRight: face.blendshapes["mouthSmileRight"] ?? null,
+    });
+  }
+
+  private computeBaseline(
+    timestampMs: number,
+    status: Extract<BaselineStatus, "READY" | "PARTIAL">,
+  ): VisionBaseline {
+    const leftH = available(this.samples.map((sample) => sample.leftEyeHorizontal));
+    const rightH = available(this.samples.map((sample) => sample.rightEyeHorizontal));
+    const leftV = available(this.samples.map((sample) => sample.leftEyeVertical));
+    const rightV = available(this.samples.map((sample) => sample.rightEyeVertical));
+    const mouthLeft = available(this.samples.map((sample) => sample.mouthSmileLeft));
+    const mouthRight = available(this.samples.map((sample) => sample.mouthSmileRight));
+    const leftEyeConfidence = clamp01(leftH.length / this.config.minimumUsableFrames);
+    const rightEyeConfidence = clamp01(rightH.length / this.config.minimumUsableFrames);
+    const mouthConfidence = clamp01(
+      Math.min(mouthLeft.length, mouthRight.length) /
+        this.config.minimumUsableFrames,
+    );
+    const commonConfidence = this.commonCalibrationConfidence();
+    const gazeMode: SignalBaselineMode =
+      leftEyeConfidence >= this.config.partialMinimumConfidence &&
+      rightEyeConfidence >= this.config.partialMinimumConfidence
+        ? "PERSONALIZED"
+        : leftEyeConfidence >= this.config.partialMinimumConfidence
+          ? "MONOCULAR_LEFT"
+          : rightEyeConfidence >= this.config.partialMinimumConfidence
+            ? "MONOCULAR_RIGHT"
+            : "UNAVAILABLE";
+    const smileMode: SignalBaselineMode =
+      mouthConfidence >= this.config.partialMinimumConfidence
+        ? "PERSONALIZED"
+        : "UNAVAILABLE";
+    const expressionConfidence = this.getActivityBaselineScore() === null ? 0 : 1;
+    const signalStates: Record<BaselineSignal, SignalBaselineState> = {
+      pose: { mode: "PERSONALIZED", confidence: commonConfidence, sampleCount: this.samples.length },
+      faceCenter: { mode: "PERSONALIZED", confidence: commonConfidence, sampleCount: this.samples.length },
+      faceGeometry: { mode: "PERSONALIZED", confidence: commonConfidence, sampleCount: this.samples.length },
+      smile: { mode: smileMode, confidence: mouthConfidence, sampleCount: Math.min(mouthLeft.length, mouthRight.length) },
+      gaze: {
+        mode: gazeMode,
+        confidence: Math.max(leftEyeConfidence, rightEyeConfidence),
+        sampleCount: Math.max(leftH.length, rightH.length),
+      },
+      expressionActivity: {
+        mode: expressionConfidence > 0 ? "PERSONALIZED" : "COLLECTING",
+        confidence: expressionConfidence,
+        sampleCount: this.activityScores.length,
+      },
+    };
+    const mouthSmileLeft = trimmedMean(mouthLeft, this.config.trimRatio);
+    const mouthSmileRight = trimmedMean(mouthRight, this.config.trimRatio);
     const means: Record<string, number> = {};
     const deviations: Record<string, number> = {};
-    for (const name of BLENDSHAPES) {
-      const values = this.samples.map((sample) => sample.blendshapes[name] ?? 0);
+    for (const [name, values] of [
+      ["mouthSmileLeft", mouthLeft],
+      ["mouthSmileRight", mouthRight],
+    ] as const) {
+      if (values.length === 0) continue;
       means[name] = trimmedMean(values, this.config.trimRatio);
       const center = median(values);
-      deviations[name] = median(values.map((value) => Math.abs(value - center)));
+      const empirical = 1.4826 * median(values.map((value) => Math.abs(value - center)));
+      const weight = values.length / (values.length + this.config.priorShrinkageSampleCount);
+      const prior = 0.08;
+      deviations[name] = Math.sqrt((1 - weight) * prior ** 2 + weight * empirical ** 2);
     }
+    const leftEyeHorizontalBaseline = leftH.length === 0 ? null : median(leftH);
+    const rightEyeHorizontalBaseline = rightH.length === 0 ? null : median(rightH);
+    const leftEyeVerticalBaseline = leftV.length === 0 ? null : median(leftV);
+    const rightEyeVerticalBaseline = rightV.length === 0 ? null : median(rightV);
+    const horizontal = available([
+      leftEyeHorizontalBaseline,
+      rightEyeHorizontalBaseline,
+    ]);
+    const vertical = available([
+      leftEyeVerticalBaseline,
+      rightEyeVerticalBaseline,
+    ]);
     return {
-      status: "READY",
+      status,
+      baselineEpoch: 0,
       usableFrameCount: this.samples.length,
       calibratedAtSessionElapsedMs: timestampMs,
       yaw: median(this.samples.map((sample) => sample.yaw)),
@@ -243,18 +451,94 @@ export class BaselineCalibrator {
       faceAreaRatio: median(this.samples.map((sample) => sample.faceAreaRatio)),
       faceCenterX: median(this.samples.map((sample) => sample.faceCenterX)),
       faceCenterY: median(this.samples.map((sample) => sample.faceCenterY)),
-      eyeGazeHorizontalRatio: this.medianNullable(
-        this.samples.map((sample) => sample.eyeGazeHorizontalRatio),
-      ),
-      eyeGazeVerticalRatio: this.medianNullable(
-        this.samples.map((sample) => sample.eyeGazeVerticalRatio),
-      ),
-      mouthSmileLeft: means["mouthSmileLeft"] ?? 0,
-      mouthSmileRight: means["mouthSmileRight"] ?? 0,
+      eyeGazeHorizontalRatio: horizontal.length === 0 ? null : median(horizontal),
+      eyeGazeVerticalRatio: vertical.length === 0 ? null : median(vertical),
+      leftEyeHorizontalBaseline,
+      rightEyeHorizontalBaseline,
+      leftEyeVerticalBaseline,
+      rightEyeVerticalBaseline,
+      leftEyeBaselineConfidence: leftEyeConfidence,
+      rightEyeBaselineConfidence: rightEyeConfidence,
+      mouthSmileLeft,
+      mouthSmileRight,
+      baselineSmileScore: (mouthSmileLeft + mouthSmileRight) / 2,
       blendshapeMeans: means,
       blendshapeMedianAbsoluteDeviations: deviations,
       expressionActivityScore: this.getActivityBaselineScore(),
+      baselineModeBySignal: Object.fromEntries(
+        BASELINE_SIGNALS.map((signal) => [signal, signalStates[signal].mode]),
+      ) as Record<BaselineSignal, SignalBaselineMode>,
+      confidenceBySignal: Object.fromEntries(
+        BASELINE_SIGNALS.map((signal) => [signal, signalStates[signal].confidence]),
+      ) as Record<BaselineSignal, number>,
+      signalStates,
     };
+  }
+
+  private commonCalibrationConfidence(): number {
+    return clamp01(
+      Math.min(
+        this.samples.length / this.config.minimumUsableFrames,
+        this.calibrationUsableTimeMs / this.config.targetUsableDurationMs,
+      ),
+    );
+  }
+
+  private isCommonUsable(
+    frame: NormalizedFaceFrame,
+    quality: FaceQualityDecision,
+  ): boolean {
+    const face = frame.primaryFace;
+    return (
+      quality.usable &&
+      frame.faceCount === 1 &&
+      face !== null &&
+      face.yaw !== null &&
+      face.pitch !== null &&
+      face.roll !== null &&
+      face.box.inFrameRatio >= this.config.minimumInFrameRatio &&
+      Math.abs(face.yaw) <= this.config.maximumAbsoluteYawDegrees &&
+      Math.abs(face.pitch) <= this.config.maximumAbsolutePitchDegrees &&
+      Math.abs(face.roll) <= this.config.maximumAbsoluteRollDegrees
+    );
+  }
+
+  private collectPostCalibrationActivity(
+    frame: NormalizedFaceFrame,
+    quality: FaceQualityDecision,
+  ): void {
+    if (
+      this.baseline.status === "GLOBAL_FALLBACK" ||
+      this.baseline.expressionActivityScore !== null ||
+      !this.isCommonUsable(frame, quality) ||
+      frame.primaryFace === null
+    ) {
+      return;
+    }
+    this.collectActivitySample(frame.primaryFace, frame.sessionElapsedMs);
+    const score = this.getActivityBaselineScore();
+    if (score !== null) {
+      this.baseline = {
+        ...this.baseline,
+        expressionActivityScore: score,
+        baselineModeBySignal: {
+          ...this.baseline.baselineModeBySignal,
+          expressionActivity: "PERSONALIZED",
+        },
+        confidenceBySignal: {
+          ...this.baseline.confidenceBySignal,
+          expressionActivity: 1,
+        },
+        signalStates: {
+          ...this.baseline.signalStates,
+          expressionActivity: {
+            mode: "PERSONALIZED",
+            confidence: 1,
+            sampleCount: this.activityScores.length,
+          },
+        },
+      };
+    }
   }
 
   private collectActivitySample(
@@ -269,7 +553,6 @@ export class BaselineCalibrator {
     if (score !== null) {
       this.activityScores.push(score);
       if (this.lastActivityAtMs !== null) {
-        // Long gaps are excluded so quality failures cannot satisfy calibration time.
         this.activityUsableDurationMs += Math.min(
           500,
           Math.max(0, timestampMs - this.lastActivityAtMs),
@@ -280,46 +563,7 @@ export class BaselineCalibrator {
     this.lastActivityAtMs = timestampMs;
   }
 
-  private isEyeGazeUsable(face: NormalizedPrimaryFace): boolean {
-    const gaze = face.eyeGaze;
-    const maximumBlink = Math.max(
-      face.blendshapes["eyeBlinkLeft"] ?? 0,
-      face.blendshapes["eyeBlinkRight"] ?? 0,
-    );
-    return (
-      gaze.horizontalRatio !== null &&
-      gaze.verticalRatio !== null &&
-      gaze.binocularAgreementScore !== null &&
-      gaze.binocularAgreementScore >=
-        this.attentionConfig.minimumBinocularAgreementScore &&
-      maximumBlink <= this.attentionConfig.maximumEyeBlinkScore
-    );
-  }
-
-  private medianNullable(values: readonly (number | null)[]): number | null {
-    const available = values.filter((value): value is number => value !== null);
-    return available.length === 0 ? null : median(available);
-  }
-
-  private refreshActivityBaseline(): void {
-    const activityScore = this.getActivityBaselineScore();
-    if (
-      activityScore !== null &&
-      this.baseline.expressionActivityScore === null
-    ) {
-      // Freeze one scalar activity baseline and immediately release its samples.
-      this.baseline = {
-        ...this.baseline,
-        expressionActivityScore: activityScore,
-      };
-      this.activityScores.length = 0;
-      this.previousActivityFace = null;
-      this.lastActivityAtMs = null;
-    }
-  }
-
   private getActivityBaselineScore(): number | null {
-    // Duration plus sample count prevents a sparse stream from becoming baseline.
     if (
       this.activityUsableDurationMs < this.config.activityBaselineDurationMs ||
       this.activityScores.length < this.config.minimumUsableFrames
