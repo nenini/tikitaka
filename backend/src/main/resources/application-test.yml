@@ -15,10 +15,14 @@ spring:
 match:
   policy:
     late-cancellation-threshold-seconds: 86400
+  worker:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 10000
+    batch-size: 20
   scheduler:
     enabled: false
     fixed-delay-ms: 10000
     initial-delay-ms: 10000
-    batch-size: 100
     acceptance-timeout-seconds: 300
     schedule-buffer-seconds: 3600

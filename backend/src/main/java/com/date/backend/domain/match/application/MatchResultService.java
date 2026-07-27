@@ -38,6 +38,7 @@ public class MatchResultService {
 	private final ProfileService profileService;
 	private final MatchSchedulerProperties properties;
 	private final Clock clock;
+	private final MatchJobEnqueueService jobEnqueueService;
 
 	public MatchResultService(
 			MatchPairRepository pairRepository,
@@ -46,7 +47,8 @@ public class MatchResultService {
 			MatchAvailabilityPolicy availabilityPolicy,
 			ProfileService profileService,
 			MatchSchedulerProperties properties,
-			Clock clock
+			Clock clock,
+			MatchJobEnqueueService jobEnqueueService
 	) {
 		this.pairRepository = pairRepository;
 		this.responseRepository = responseRepository;
@@ -55,6 +57,7 @@ public class MatchResultService {
 		this.profileService = profileService;
 		this.properties = properties;
 		this.clock = clock;
+		this.jobEnqueueService = jobEnqueueService;
 	}
 
 	public MatchResultResponse getCurrent(Long userId) {
@@ -95,6 +98,8 @@ public class MatchResultService {
 		pair.reject();
 		pair.getRequestA().returnToWaiting();
 		pair.getRequestB().returnToWaiting();
+		jobEnqueueService.enqueue(pair.getRequestA());
+		jobEnqueueService.enqueue(pair.getRequestB());
 		return toResponse(pair, userId);
 	}
 

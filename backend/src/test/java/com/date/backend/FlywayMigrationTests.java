@@ -45,6 +45,7 @@ class FlywayMigrationTests {
 		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
 		Integer matchRequestTraitSnapshotTableCount =
 				tableCount("MATCH_REQUEST_TRAIT_SNAPSHOTS");
+		Integer matchJobTableCount = tableCount("MATCH_JOBS");
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM `face_tag_catalog` "
@@ -68,7 +69,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(9);
+		assertThat(migrationCount).isEqualTo(10);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -85,6 +86,7 @@ class FlywayMigrationTests {
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
+		assertThat(matchJobTableCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();

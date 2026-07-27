@@ -3,7 +3,6 @@ package com.date.backend.domain.match.repository;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchRequestStatus;
 import jakarta.persistence.LockModeType;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,12 +23,6 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
 	Optional<MatchRequest> findFirstByUserIdAndStatusInOrderByRequestedAtDesc(
 			Long userId,
 			Collection<MatchRequestStatus> statuses
-	);
-
-	@EntityGraph(attributePaths = {"preferredFaceTag", "actualFaceTag"})
-	List<MatchRequest> findAllByStatusOrderByRequestedAtAscIdAsc(
-			MatchRequestStatus status,
-			Pageable pageable
 	);
 
 	@EntityGraph(attributePaths = {"preferredFaceTag", "actualFaceTag"})

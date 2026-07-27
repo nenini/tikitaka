@@ -13,9 +13,14 @@ import java.util.List;
 public class MatchExpirationService {
 
 	private final MatchPairRepository pairRepository;
+	private final MatchJobEnqueueService jobEnqueueService;
 
-	public MatchExpirationService(MatchPairRepository pairRepository) {
+	public MatchExpirationService(
+			MatchPairRepository pairRepository,
+			MatchJobEnqueueService jobEnqueueService
+	) {
 		this.pairRepository = pairRepository;
+		this.jobEnqueueService = jobEnqueueService;
 	}
 
 	@Transactional
@@ -40,5 +45,7 @@ public class MatchExpirationService {
 		pair.expire();
 		pair.getRequestA().returnToWaiting();
 		pair.getRequestB().returnToWaiting();
+		jobEnqueueService.enqueue(pair.getRequestA());
+		jobEnqueueService.enqueue(pair.getRequestB());
 	}
 }

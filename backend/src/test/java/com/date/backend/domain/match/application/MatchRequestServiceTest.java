@@ -7,6 +7,8 @@ import com.date.backend.domain.match.dto.request.MatchRequestSlotInput;
 import com.date.backend.domain.match.dto.response.MatchRequestResponse;
 import com.date.backend.domain.match.repository.ActiveMatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
+import com.date.backend.domain.match.repository.MatchJobRepository;
+import com.date.backend.domain.match.domain.MatchJobStatus;
 import com.date.backend.domain.profile.domain.Gender;
 import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
@@ -82,6 +84,9 @@ class MatchRequestServiceTest {
 	private ActiveMatchRequestRepository activeMatchRequestRepository;
 
 	@Autowired
+	private MatchJobRepository matchJobRepository;
+
+	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
 	private Long userId;
@@ -137,6 +142,10 @@ class MatchRequestServiceTest {
 		assertThat(response.selfTraits()).hasSize(3);
 		assertThat(response.availableSlots()).hasSize(2);
 		assertThat(activeMatchRequestRepository.existsById(userId)).isTrue();
+		assertThat(matchJobRepository.existsByMatchRequest_IdAndStatusIn(
+				response.matchRequestId(),
+				List.of(MatchJobStatus.PENDING)
+		)).isTrue();
 	}
 
 	@Test

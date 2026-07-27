@@ -98,10 +98,14 @@ face:
 match:
   policy:
     late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
+  worker:
+    enabled: ${MATCH_WORKER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_WORKER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${MATCH_WORKER_INITIAL_DELAY_MS:10000}
+    batch-size: ${MATCH_WORKER_BATCH_SIZE:20}
   scheduler:
     enabled: ${MATCH_SCHEDULER_ENABLED:true}
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
     initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
-    batch-size: ${MATCH_SCHEDULER_BATCH_SIZE:100}
     acceptance-timeout-seconds: ${MATCH_ACCEPTANCE_TIMEOUT_SECONDS:300}
     schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}

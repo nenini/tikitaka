@@ -56,6 +56,7 @@ public class MatchRequestService {
 	private final ActiveMatchRequestRepository activeMatchRequestRepository;
 	private final MatchRequestSlotRepository matchRequestSlotRepository;
 	private final MatchRequestTraitSnapshotRepository traitSnapshotRepository;
+	private final MatchJobEnqueueService jobEnqueueService;
 
 	public MatchRequestService(
 			UserRepository userRepository,
@@ -67,7 +68,8 @@ public class MatchRequestService {
 			MatchRequestRepository matchRequestRepository,
 			ActiveMatchRequestRepository activeMatchRequestRepository,
 			MatchRequestSlotRepository matchRequestSlotRepository,
-			MatchRequestTraitSnapshotRepository traitSnapshotRepository
+			MatchRequestTraitSnapshotRepository traitSnapshotRepository,
+			MatchJobEnqueueService jobEnqueueService
 	) {
 		this.userRepository = userRepository;
 		this.profileRepository = profileRepository;
@@ -79,6 +81,7 @@ public class MatchRequestService {
 		this.activeMatchRequestRepository = activeMatchRequestRepository;
 		this.matchRequestSlotRepository = matchRequestSlotRepository;
 		this.traitSnapshotRepository = traitSnapshotRepository;
+		this.jobEnqueueService = jobEnqueueService;
 	}
 
 	@Transactional
@@ -107,6 +110,7 @@ public class MatchRequestService {
 		} catch (DataIntegrityViolationException exception) {
 			throw new BusinessException(MatchErrorCode.MATCH_REQUEST_ALREADY_ACTIVE);
 		}
+		jobEnqueueService.enqueue(matchRequest);
 		return MatchRequestResponse.of(matchRequest, slots, traits);
 	}
 
@@ -138,6 +142,7 @@ public class MatchRequestService {
 
 		List<MatchRequestSlot> slots = saveSlots(matchRequest, request.availableSlots());
 		List<MatchRequestTraitSnapshot> traits = saveTraits(matchRequest, source);
+		jobEnqueueService.enqueue(matchRequest);
 		return MatchRequestResponse.of(matchRequest, slots, traits);
 	}
 

@@ -12,7 +12,8 @@ import java.time.ZoneId;
 @EnableScheduling
 @EnableConfigurationProperties({
 		MatchSchedulerProperties.class,
-		MatchPolicyProperties.class
+		MatchPolicyProperties.class,
+		MatchWorkerProperties.class
 })
 public class MatchSchedulerConfiguration {
 

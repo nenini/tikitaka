@@ -44,6 +44,8 @@ class MatchResultServiceTest {
 	private final MatchAvailabilityPolicy availabilityPolicy =
 			mock(MatchAvailabilityPolicy.class);
 	private final ProfileService profileService = mock(ProfileService.class);
+	private final MatchJobEnqueueService jobEnqueueService =
+			mock(MatchJobEnqueueService.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -51,7 +53,6 @@ class MatchResultServiceTest {
 	private final MatchSchedulerProperties properties = new MatchSchedulerProperties(
 			10_000,
 			10_000,
-			100,
 			300,
 			3_600
 	);
@@ -62,7 +63,8 @@ class MatchResultServiceTest {
 			availabilityPolicy,
 			profileService,
 			properties,
-			clock
+			clock,
+			jobEnqueueService
 	);
 
 	@Test

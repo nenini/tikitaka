@@ -19,7 +19,12 @@ class MatchExpirationServiceTest {
 	@Test
 	void expiresOverduePairAndReturnsRequestsToWaiting() {
 		MatchPairRepository pairRepository = mock(MatchPairRepository.class);
-		MatchExpirationService service = new MatchExpirationService(pairRepository);
+		MatchJobEnqueueService jobEnqueueService =
+				mock(MatchJobEnqueueService.class);
+		MatchExpirationService service = new MatchExpirationService(
+				pairRepository,
+				jobEnqueueService
+		);
 		MatchPair pair = mock(MatchPair.class);
 		MatchRequest first = mock(MatchRequest.class);
 		MatchRequest second = mock(MatchRequest.class);
@@ -41,5 +46,7 @@ class MatchExpirationServiceTest {
 		verify(pair).expire();
 		verify(first).returnToWaiting();
 		verify(second).returnToWaiting();
+		verify(jobEnqueueService).enqueue(first);
+		verify(jobEnqueueService).enqueue(second);
 	}
 }
