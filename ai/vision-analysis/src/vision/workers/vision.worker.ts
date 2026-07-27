@@ -115,6 +115,7 @@ function processFrame(
       sourceWidth: frame.sourceWidth,
       sourceHeight: frame.sourceHeight,
       brightnessScore: imageQuality.brightnessScore,
+      backlightScore: imageQuality.backlightScore,
       blurScore: imageQuality.blurScore,
       rawLaplacianVariance: imageQuality.rawLaplacianVariance,
       totalDurationMs: clock.monotonicNowMs() - startedAtMs,

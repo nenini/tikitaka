@@ -1,7 +1,7 @@
 {
   "eventId": "7b575df8-5ca3-4f58-a44e-0f2e825488e1",
   "eventType": "GAZE_AWAY_STARTED",
-  "version": 1,
+  "version": 3,
   "kind": "behavior",
   "sessionId": "session-123",
   "userId": "user-a",
@@ -13,7 +13,7 @@
   "confidence": 0.82,
   "source": "SCREEN_ATTENTION_DETECTOR",
   "modelVersion": "mediapipe-face-landmarker-v1",
-  "ruleVersion": "vision-rule-v1",
+  "ruleVersion": "vision-rule-v2",
   "episodeId": "36912865-d134-4691-b826-1dacd10f68f3",
   "payload": {
     "observedStartElapsedMs": 182700,
@@ -24,4 +24,3 @@
     "centerDeltaY": 0.01
   }
 }
-

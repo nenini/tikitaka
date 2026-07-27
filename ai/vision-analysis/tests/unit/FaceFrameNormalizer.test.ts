@@ -97,12 +97,14 @@ describe("FaceFrameNormalizer", () => {
     expect("landmarks" in (frame.primaryFace ?? {})).toBe(false);
   });
 
-  it("computes normalized landmark displacement on a following frame", () => {
+  it("removes rigid translation before landmark activity is measured", () => {
     const normalizer = new FaceFrameNormalizer();
     normalize(normalizer, createResult([createFace()]), 1);
     const next = normalize(normalizer, createResult([createFace(0.01)]), 2);
 
-    expect(next.primaryFace?.geometry.landmarkDisplacementScore).toBeGreaterThan(0);
+    expect(
+      next.primaryFace?.geometry.landmarkDisplacementScore,
+    ).toBeLessThan(0.000001);
   });
 
   it("returns no primary face when detection is empty", () => {
