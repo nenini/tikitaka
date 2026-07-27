@@ -18,8 +18,10 @@ const QUALITY_GATE_REASONS = [
   "FACE_MISSING",
   "MULTIPLE_FACES",
   "FACE_TOO_SMALL",
+  "FACE_TOO_LARGE",
   "FACE_OUT_OF_FRAME",
   "LOW_LIGHT",
+  "BACKLIGHT",
   "SEVERE_BLUR",
   "EXTREME_HEAD_POSE",
 ] as const;
@@ -109,6 +111,10 @@ export class FaceQualityDetector {
         config.faceArea.entryDurationMs,
         config.faceArea.recoveryDurationMs,
       ),
+      FACE_TOO_LARGE: new HysteresisGate(
+        config.faceAreaMaximum.entryDurationMs,
+        config.faceAreaMaximum.recoveryDurationMs,
+      ),
       FACE_OUT_OF_FRAME: new HysteresisGate(
         config.faceInFrame.entryDurationMs,
         config.faceInFrame.recoveryDurationMs,
@@ -116,6 +122,10 @@ export class FaceQualityDetector {
       LOW_LIGHT: new HysteresisGate(
         config.brightness.entryDurationMs,
         config.brightness.recoveryDurationMs,
+      ),
+      BACKLIGHT: new HysteresisGate(
+        config.backlight.entryDurationMs,
+        config.backlight.recoveryDurationMs,
       ),
       SEVERE_BLUR: new HysteresisGate(
         config.blur.entryDurationMs,
@@ -176,6 +186,16 @@ export class FaceQualityDetector {
       frame,
       events,
     );
+    this.applyGateTransition(
+      "FACE_TOO_LARGE",
+      this.gates.FACE_TOO_LARGE.update(
+        faceArea !== null && faceArea > this.config.faceAreaMaximum.entry,
+        faceArea !== null && faceArea < this.config.faceAreaMaximum.recovery,
+        timestampMs,
+      ),
+      frame,
+      events,
+    );
 
     const inFrameRatio = primary?.box.inFrameRatio ?? null;
     this.applyGateTransition(
@@ -196,6 +216,17 @@ export class FaceQualityDetector {
       this.gates.LOW_LIGHT.update(
         frame.imageQuality.brightnessScore < this.config.brightness.entry,
         frame.imageQuality.brightnessScore > this.config.brightness.recovery,
+        timestampMs,
+      ),
+      frame,
+      events,
+    );
+    const backlightScore = frame.imageQuality.backlightScore ?? 1;
+    this.applyGateTransition(
+      "BACKLIGHT",
+      this.gates.BACKLIGHT.update(
+        backlightScore < this.config.backlight.entry,
+        backlightScore > this.config.backlight.recovery,
         timestampMs,
       ),
       frame,
@@ -274,8 +305,10 @@ export class FaceQualityDetector {
         FACE_MISSING: this.gates.FACE_MISSING.getSnapshot(),
         MULTIPLE_FACES: this.gates.MULTIPLE_FACES.getSnapshot(),
         FACE_TOO_SMALL: this.gates.FACE_TOO_SMALL.getSnapshot(),
+        FACE_TOO_LARGE: this.gates.FACE_TOO_LARGE.getSnapshot(),
         FACE_OUT_OF_FRAME: this.gates.FACE_OUT_OF_FRAME.getSnapshot(),
         LOW_LIGHT: this.gates.LOW_LIGHT.getSnapshot(),
+        BACKLIGHT: this.gates.BACKLIGHT.getSnapshot(),
         SEVERE_BLUR: this.gates.SEVERE_BLUR.getSnapshot(),
         EXTREME_HEAD_POSE: this.gates.EXTREME_HEAD_POSE.getSnapshot(),
       },
@@ -357,6 +390,8 @@ export class FaceQualityDetector {
             }),
           );
           break;
+        case "FACE_TOO_LARGE":
+        case "BACKLIGHT":
         case "FACE_OUT_OF_FRAME":
         case "SEVERE_BLUR":
         case "EXTREME_HEAD_POSE":
@@ -405,6 +440,8 @@ export class FaceQualityDetector {
           }),
         );
         break;
+      case "FACE_TOO_LARGE":
+      case "BACKLIGHT":
       case "MULTIPLE_FACES":
       case "FACE_OUT_OF_FRAME":
       case "SEVERE_BLUR":
