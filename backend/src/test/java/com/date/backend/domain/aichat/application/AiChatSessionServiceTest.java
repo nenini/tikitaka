@@ -41,6 +41,9 @@ class AiChatSessionServiceTest {
 	private UserRepository userRepository;
 
 	@Autowired
+	private AiChatMessageService messageService;
+
+	@Autowired
 	private ChatbotPersonaRepository personaRepository;
 
 	private Long userId;
@@ -133,5 +136,26 @@ class AiChatSessionServiceTest {
 		);
 
 		assertThat(exception.getErrorCode()).isEqualTo(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
+	}
+
+	@Test
+	void ownerCanReadSessionListAndDetailWithMessages() {
+		Long sessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
+		).sessionId();
+		messageService.saveUserMessage(userId, sessionId, "안녕하세요");
+		messageService.saveAiMessage(userId, sessionId, "반갑습니다");
+
+		var sessions = sessionService.getSessions(userId);
+		var detail = sessionService.getSession(userId, sessionId);
+
+		assertThat(sessions).hasSize(1);
+		assertThat(sessions.get(0).lastMessage()).isEqualTo("반갑습니다");
+		assertThat(sessions.get(0).messageCount()).isEqualTo(2);
+		assertThat(detail.session().sessionId()).isEqualTo(sessionId);
+		assertThat(detail.messages())
+				.extracting(message -> message.messageText())
+				.containsExactly("안녕하세요", "반갑습니다");
 	}
 }

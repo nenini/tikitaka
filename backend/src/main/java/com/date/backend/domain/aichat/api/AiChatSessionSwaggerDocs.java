@@ -3,6 +3,8 @@ package com.date.backend.domain.aichat.api;
 import com.date.backend.domain.aichat.dto.request.AiChatSessionCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatSessionSummaryResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatSessionDetailResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
@@ -15,9 +17,22 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 @Tag(name = "AI Chat", description = "소개팅 연습 AI 채팅 세션 API")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public interface AiChatSessionSwaggerDocs {
+
+	@Operation(summary = "내 AI 채팅 세션 목록", description = "최신 세션부터 응답 상태와 마지막 메시지를 조회합니다.")
+	ApiResponse<List<AiChatSessionSummaryResponse>> getSessions(
+			@Parameter(hidden = true) AuthUser authUser
+	);
+
+	@Operation(summary = "AI 채팅 세션 상세", description = "세션 상태와 전체 USER·AI 메시지를 순서대로 조회합니다.")
+	ApiResponse<AiChatSessionDetailResponse> getSession(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "AI 채팅 세션 ID") Long sessionId
+	);
 
 	@Operation(
 			summary = "AI 채팅 세션 생성",

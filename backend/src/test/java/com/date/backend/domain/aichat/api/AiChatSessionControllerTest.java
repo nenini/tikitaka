@@ -27,6 +27,7 @@ import java.util.List;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -177,5 +178,25 @@ class AiChatSessionControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.status").value("COMPLETED"))
 				.andExpect(content().json(firstClosedAt));
+	}
+
+	@Test
+	void ownerCanReadSessionListAndDetail() throws Exception {
+		Long sessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
+		).sessionId();
+
+		mockMvc.perform(get("/api/v1/ai-chat/sessions")
+						.with(authentication(authentication)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].sessionId").value(sessionId))
+				.andExpect(jsonPath("$.data[0].aiResponseState").value("IDLE"));
+
+		mockMvc.perform(get("/api/v1/ai-chat/sessions/{sessionId}", sessionId)
+						.with(authentication(authentication)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.session.sessionId").value(sessionId))
+				.andExpect(jsonPath("$.data.messages").isArray());
 	}
 }
