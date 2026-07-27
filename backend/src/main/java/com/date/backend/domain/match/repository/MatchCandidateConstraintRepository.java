@@ -42,4 +42,22 @@ public class MatchCandidateConstraintRepository {
 				)
 				""", parameters, Long.class));
 	}
+
+	public boolean areUsersBlocked(Long firstUserId, Long secondUserId) {
+		MapSqlParameterSource parameters = new MapSqlParameterSource()
+				.addValue("firstUserId", firstUserId)
+				.addValue("secondUserId", secondUserId);
+		Integer count = jdbcTemplate.queryForObject("""
+				SELECT COUNT(*)
+				FROM user_blocks
+				WHERE (
+					blockerUserId = :firstUserId
+					AND blockedUserId = :secondUserId
+				) OR (
+					blockerUserId = :secondUserId
+					AND blockedUserId = :firstUserId
+				)
+				""", parameters, Integer.class);
+		return count != null && count > 0;
+	}
 }

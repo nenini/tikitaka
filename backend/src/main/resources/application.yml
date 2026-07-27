@@ -94,3 +94,12 @@ auth:
 face:
   analysis:
     request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
+
+match:
+  scheduler:
+    enabled: ${MATCH_SCHEDULER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
+    initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
+    batch-size: ${MATCH_SCHEDULER_BATCH_SIZE:100}
+    acceptance-timeout-seconds: ${MATCH_ACCEPTANCE_TIMEOUT_SECONDS:300}
+    schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}

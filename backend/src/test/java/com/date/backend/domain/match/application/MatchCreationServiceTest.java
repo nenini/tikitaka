@@ -1,0 +1,195 @@
+package com.date.backend.domain.match.application;
+
+import com.date.backend.domain.match.domain.ActiveMatchRequest;
+import com.date.backend.domain.match.domain.MatchPair;
+import com.date.backend.domain.match.domain.MatchRequest;
+import com.date.backend.domain.match.domain.MatchRequestSlot;
+import com.date.backend.domain.match.domain.MatchRequestStatus;
+import com.date.backend.domain.match.domain.MatchResponse;
+import com.date.backend.domain.match.policy.MatchAvailabilityPolicy;
+import com.date.backend.domain.match.policy.MatchEligibilityPolicy;
+import com.date.backend.domain.match.policy.MatchScore;
+import com.date.backend.domain.match.policy.MatchScorePolicy;
+import com.date.backend.domain.match.repository.ActiveMatchRequestRepository;
+import com.date.backend.domain.match.repository.MatchCandidateConstraintRepository;
+import com.date.backend.domain.match.repository.MatchPairRepository;
+import com.date.backend.domain.match.repository.MatchRequestRepository;
+import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
+import com.date.backend.domain.match.repository.MatchRequestTraitSnapshotRepository;
+import com.date.backend.domain.match.repository.MatchResponseRepository;
+import com.date.backend.domain.user.domain.User;
+import com.date.backend.domain.user.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class MatchCreationServiceTest {
+
+	private final MatchRequestRepository requestRepository =
+			mock(MatchRequestRepository.class);
+	private final ActiveMatchRequestRepository activeRequestRepository =
+			mock(ActiveMatchRequestRepository.class);
+	private final MatchRequestSlotRepository slotRepository =
+			mock(MatchRequestSlotRepository.class);
+	private final MatchRequestTraitSnapshotRepository traitRepository =
+			mock(MatchRequestTraitSnapshotRepository.class);
+	private final MatchPairRepository pairRepository = mock(MatchPairRepository.class);
+	private final MatchResponseRepository responseRepository =
+			mock(MatchResponseRepository.class);
+	private final MatchCandidateConstraintRepository constraintRepository =
+			mock(MatchCandidateConstraintRepository.class);
+	private final UserRepository userRepository = mock(UserRepository.class);
+	private final MatchEligibilityPolicy eligibilityPolicy =
+			mock(MatchEligibilityPolicy.class);
+	private final MatchAvailabilityPolicy availabilityPolicy =
+			mock(MatchAvailabilityPolicy.class);
+	private final MatchScorePolicy scorePolicy = mock(MatchScorePolicy.class);
+
+	private final MatchCreationService service = new MatchCreationService(
+			requestRepository,
+			activeRequestRepository,
+			slotRepository,
+			traitRepository,
+			pairRepository,
+			responseRepository,
+			constraintRepository,
+			userRepository,
+			eligibilityPolicy,
+			availabilityPolicy,
+			scorePolicy
+	);
+
+	@Test
+	void createsPairResponsesAndChangesBothRequestStatusesAfterRevalidation() {
+		MatchRequest first = request(1L, 101L, MatchRequestStatus.WAITING);
+		MatchRequest second = request(2L, 102L, MatchRequestStatus.WAITING);
+		ActiveMatchRequest firstReservation = reservation(101L, first);
+		ActiveMatchRequest secondReservation = reservation(102L, second);
+		User firstUser = user(101L);
+		User secondUser = user(102L);
+		List<MatchRequestSlot> slots = List.of(slot(first), slot(second));
+		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 10, 0);
+		LocalDateTime deadline = matchedAt.plusMinutes(5);
+		LocalDateTime earliestSessionStart = deadline.plusHours(1);
+
+		when(requestRepository.findAllByIdForUpdate(List.of(1L, 2L)))
+				.thenReturn(List.of(first, second));
+		when(activeRequestRepository.findAllByUserIdForUpdate(List.of(101L, 102L)))
+				.thenReturn(List.of(firstReservation, secondReservation));
+		when(pairRepository.findAllActiveByParticipantUserIds(
+				anyCollection(),
+				anyCollection()
+		)).thenReturn(List.of());
+		when(constraintRepository.areUsersBlocked(101L, 102L)).thenReturn(false);
+		when(userRepository.findAllById(List.of(101L, 102L)))
+				.thenReturn(List.of(firstUser, secondUser));
+		when(eligibilityPolicy.isEligible(
+				first,
+				firstUser,
+				second,
+				secondUser,
+				matchedAt.toLocalDate()
+		)).thenReturn(true);
+		when(slotRepository.findAllByMatchRequest_IdIn(List.of(1L, 2L)))
+				.thenReturn(slots);
+		when(availabilityPolicy.findEarliestStart(
+				anyCollection(),
+				anyCollection(),
+				any()
+		)).thenReturn(Optional.of(earliestSessionStart));
+		when(traitRepository.findAllByMatchRequest_IdIn(List.of(1L, 2L)))
+				.thenReturn(List.of());
+		when(scorePolicy.calculate(
+				first,
+				List.of(),
+				second,
+				List.of()
+		)).thenReturn(new MatchScore(
+				new BigDecimal("25.000"),
+				new BigDecimal("16.667"),
+				new BigDecimal("41.667")
+		));
+		when(pairRepository.save(any(MatchPair.class)))
+				.thenAnswer(invocation -> invocation.getArgument(0));
+
+		boolean created = service.createMatch(
+				1L,
+				2L,
+				matchedAt,
+				deadline,
+				earliestSessionStart
+		);
+
+		assertThat(created).isTrue();
+		verify(first).markMatchFound(matchedAt);
+		verify(second).markMatchFound(matchedAt);
+		verify(pairRepository).save(argThat(
+				pair -> pair.getMatchedAt().equals(matchedAt)
+						&& pair.getAcceptDeadlineAt().equals(deadline)
+		));
+		verify(responseRepository).saveAll(anyCollection());
+	}
+
+	@Test
+	void skipsCreationWhenLockedCandidateIsNoLongerWaiting() {
+		MatchRequest first = request(1L, 101L, MatchRequestStatus.WAITING);
+		MatchRequest second = request(2L, 102L, MatchRequestStatus.MATCH_FOUND);
+		when(requestRepository.findAllByIdForUpdate(List.of(1L, 2L)))
+				.thenReturn(List.of(first, second));
+
+		boolean created = service.createMatch(
+				1L,
+				2L,
+				LocalDateTime.of(2026, 7, 27, 10, 0),
+				LocalDateTime.of(2026, 7, 27, 10, 5),
+				LocalDateTime.of(2026, 7, 27, 11, 5)
+		);
+
+		assertThat(created).isFalse();
+		verify(pairRepository, never()).save(any());
+		verify(responseRepository, never()).saveAll(anyCollection());
+	}
+
+	private MatchRequest request(
+			Long id,
+			Long userId,
+			MatchRequestStatus status
+	) {
+		MatchRequest request = mock(MatchRequest.class);
+		when(request.getId()).thenReturn(id);
+		when(request.getUserId()).thenReturn(userId);
+		when(request.getStatus()).thenReturn(status);
+		return request;
+	}
+
+	private ActiveMatchRequest reservation(Long userId, MatchRequest request) {
+		ActiveMatchRequest reservation = mock(ActiveMatchRequest.class);
+		when(reservation.getUserId()).thenReturn(userId);
+		when(reservation.getMatchRequest()).thenReturn(request);
+		return reservation;
+	}
+
+	private User user(Long id) {
+		User user = mock(User.class);
+		when(user.getId()).thenReturn(id);
+		return user;
+	}
+
+	private MatchRequestSlot slot(MatchRequest request) {
+		MatchRequestSlot slot = mock(MatchRequestSlot.class);
+		when(slot.getMatchRequest()).thenReturn(request);
+		return slot;
+	}
+}

@@ -11,3 +11,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+match:
+  scheduler:
+    enabled: false
+    fixed-delay-ms: 10000
+    initial-delay-ms: 10000
+    batch-size: 100
+    acceptance-timeout-seconds: 300
+    schedule-buffer-seconds: 3600

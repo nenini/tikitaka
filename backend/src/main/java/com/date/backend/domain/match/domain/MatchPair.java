@@ -95,6 +95,24 @@ public class MatchPair {
 			BigDecimal traitScore,
 			LocalDateTime acceptDeadlineAt
 	) {
+		this(
+				firstRequest,
+				secondRequest,
+				faceScore,
+				traitScore,
+				acceptDeadlineAt,
+				null
+		);
+	}
+
+	public MatchPair(
+			MatchRequest firstRequest,
+			MatchRequest secondRequest,
+			BigDecimal faceScore,
+			BigDecimal traitScore,
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime matchedAt
+	) {
 		MatchRequest left = Objects.requireNonNull(firstRequest);
 		MatchRequest right = Objects.requireNonNull(secondRequest);
 		if (left.getId() == null || right.getId() == null) {
@@ -121,6 +139,7 @@ public class MatchPair {
 			throw new IllegalArgumentException("총 매칭 점수는 100점을 초과할 수 없습니다.");
 		}
 		this.acceptDeadlineAt = Objects.requireNonNull(acceptDeadlineAt);
+		this.matchedAt = matchedAt;
 	}
 
 	public void confirm(LocalDateTime confirmedAt, LocalDateTime scheduledAt) {
