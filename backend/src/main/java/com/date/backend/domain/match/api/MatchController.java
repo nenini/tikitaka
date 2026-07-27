@@ -7,7 +7,6 @@ import com.date.backend.domain.match.dto.response.MatchCancellationResponse;
 import com.date.backend.domain.match.dto.response.MatchResultResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
-import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Validated
 @RequestMapping("/api/v1/matches")
-public class MatchController {
+public class MatchController implements MatchSwaggerDocs {
 
 	private final MatchResultService matchResultService;
 	private final MatchCancellationService matchCancellationService;
@@ -35,6 +34,7 @@ public class MatchController {
 	}
 
 	@GetMapping("/me/current")
+	@Override
 	public ApiResponse<MatchResultResponse> getCurrent(
 			@AuthenticationPrincipal AuthUser authUser
 	) {
@@ -42,6 +42,7 @@ public class MatchController {
 	}
 
 	@PostMapping("/{matchPairId}/accept")
+	@Override
 	public ApiResponse<MatchResultResponse> accept(
 			@AuthenticationPrincipal AuthUser authUser,
 			@PathVariable Long matchPairId
@@ -52,6 +53,7 @@ public class MatchController {
 	}
 
 	@PostMapping("/{matchPairId}/reject")
+	@Override
 	public ApiResponse<MatchResultResponse> reject(
 			@AuthenticationPrincipal AuthUser authUser,
 			@PathVariable Long matchPairId
@@ -62,10 +64,11 @@ public class MatchController {
 	}
 
 	@DeleteMapping("/{matchPairId}")
+	@Override
 	public ApiResponse<MatchCancellationResponse> cancel(
 			@AuthenticationPrincipal AuthUser authUser,
 			@PathVariable Long matchPairId,
-			@Valid @RequestBody(required = false) MatchCancellationRequest request
+			@RequestBody(required = false) MatchCancellationRequest request
 	) {
 		return ApiResponse.success(
 				matchCancellationService.cancel(
