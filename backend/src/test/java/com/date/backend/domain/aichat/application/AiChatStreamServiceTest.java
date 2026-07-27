@@ -5,12 +5,17 @@ import com.date.backend.domain.aichat.domain.ChatMessageSenderType;
 import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
 import com.date.backend.domain.aichat.domain.ChatbotPersona;
 import com.date.backend.domain.aichat.integration.AiChatResponseStreamer;
+import com.date.backend.domain.aichat.integration.AiChatPersonaSelection;
+import com.date.backend.domain.aichat.integration.AiChatResponseStreamListener;
 import com.date.backend.domain.aichat.repository.AiChatMessageRepository;
 import com.date.backend.domain.aichat.repository.AiChatSessionRepository;
 import com.date.backend.domain.aichat.repository.ChatbotPersonaRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.domain.UserRole;
 import com.date.backend.domain.user.repository.UserRepository;
+import com.date.backend.domain.profile.domain.Gender;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.global.security.AuthUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +60,9 @@ class AiChatStreamServiceTest {
 	private UserRepository userRepository;
 
 	@Autowired
+	private ProfileRepository profileRepository;
+
+	@Autowired
 	private ChatbotPersonaRepository personaRepository;
 
 	@Autowired
@@ -81,6 +89,12 @@ class AiChatStreamServiceTest {
 				null,
 				LocalDate.of(2000, 1, 1)
 		));
+		profileRepository.save(new Profile(
+				user.getId(),
+				"stream-" + user.getId(),
+				Gender.MALE,
+				"Seoul"
+		));
 		ChatbotPersona persona = personaRepository.save(new ChatbotPersona(
 				"SSE 대화 상대",
 				"존댓말",
@@ -103,9 +117,13 @@ class AiChatStreamServiceTest {
 	@Test
 	void aiChunksAreDeliveredInOrderAndCompletedResponseIsSaved() throws Exception {
 		doAnswer(invocation -> {
-			java.util.function.Consumer<String> consumer = invocation.getArgument(1);
-			consumer.accept("안녕");
-			consumer.accept("하세요");
+			AiChatResponseStreamListener listener = invocation.getArgument(1);
+			listener.onPersonaSelected(new AiChatPersonaSelection(
+					"FEMALE_26_CALM_01",
+					"차분한 상대"
+			));
+			listener.onChunk("안녕");
+			listener.onChunk("하세요");
 			return null;
 		}).when(responseStreamer).stream(any(), any());
 
@@ -114,6 +132,8 @@ class AiChatStreamServiceTest {
 		assertThat(body)
 				.containsSubsequence(
 						"event:connected",
+						"event:persona",
+						"\"personaKey\":\"FEMALE_26_CALM_01\"",
 						"event:chunk",
 						"\"sequence\":1",
 						"\"content\":\"안녕\"",

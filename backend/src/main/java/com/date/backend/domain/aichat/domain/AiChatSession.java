@@ -28,9 +28,12 @@ public class AiChatSession {
 	@JoinColumn(name = "userId", nullable = false)
 	private User user;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "chatbotPersonaId", nullable = false)
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "chatbotPersonaId")
 	private ChatbotPersona persona;
+
+	@Column(name = "aiPersonaKey", length = 100)
+	private String aiPersonaKey;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "purpose", nullable = false, length = 30)
@@ -67,6 +70,13 @@ public class AiChatSession {
 		this.status = ChatSessionStatus.ACTIVE;
 	}
 
+	public AiChatSession(User user, ChatSessionPurpose purpose) {
+		this.user = user;
+		this.purpose = purpose;
+		this.stage = ConversationStage.INTRO;
+		this.status = ChatSessionStatus.ACTIVE;
+	}
+
 	@PrePersist
 	void prePersist() {
 		this.createdAt = LocalDateTime.now();
@@ -82,6 +92,10 @@ public class AiChatSession {
 
 	public ChatbotPersona getPersona() {
 		return persona;
+	}
+
+	public String getAiPersonaKey() {
+		return aiPersonaKey;
 	}
 
 	public ChatSessionPurpose getPurpose() {
@@ -106,6 +120,16 @@ public class AiChatSession {
 
 	public void recordUserMessage(LocalDateTime sentAt) {
 		this.lastUserMessageAt = sentAt;
+	}
+
+	public void selectAiPersona(String aiPersonaKey) {
+		if (aiPersonaKey == null || aiPersonaKey.isBlank()) {
+			throw new IllegalArgumentException("AI persona key must not be blank.");
+		}
+		if (this.aiPersonaKey != null && !this.aiPersonaKey.equals(aiPersonaKey)) {
+			throw new IllegalStateException("AI persona cannot be changed within a chat session.");
+		}
+		this.aiPersonaKey = aiPersonaKey;
 	}
 
 	public void close(LocalDateTime closedAt) {

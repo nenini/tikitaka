@@ -43,6 +43,7 @@ class FlywayMigrationTests {
 		Integer faceAnalysisResultTagTableCount = tableCount("FACE_ANALYSIS_RESULT_TAGS");
 		Integer aiChatPurposeColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PURPOSE");
 		Integer aiChatMessageSequenceColumnCount = columnCount("CHATBOT_MESSAGES", "SEQUENCENO");
+		Integer aiPersonaKeyColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIPERSONAKEY");
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM `face_tag_catalog` "
@@ -66,7 +67,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(10);
+		assertThat(migrationCount).isEqualTo(11);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -82,6 +83,7 @@ class FlywayMigrationTests {
 		assertThat(faceAnalysisResultTagTableCount).isEqualTo(1);
 		assertThat(aiChatPurposeColumnCount).isEqualTo(1);
 		assertThat(aiChatMessageSequenceColumnCount).isEqualTo(1);
+		assertThat(aiPersonaKeyColumnCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();

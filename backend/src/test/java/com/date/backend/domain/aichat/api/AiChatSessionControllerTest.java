@@ -92,14 +92,13 @@ class AiChatSessionControllerTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
-								  "personaId": %d,
 								  "purpose": "DATE_PRACTICE"
 								}
-								""".formatted(personaId)))
+								"""))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data.sessionId").isNumber())
-				.andExpect(jsonPath("$.data.personaId").value(personaId))
+				.andExpect(jsonPath("$.data.aiPersonaKey").isEmpty())
 				.andExpect(jsonPath("$.data.purpose").value("DATE_PRACTICE"))
 				.andExpect(jsonPath("$.data.stage").value("INTRO"))
 				.andExpect(jsonPath("$.data.status").value("ACTIVE"));
@@ -111,10 +110,9 @@ class AiChatSessionControllerTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
 								{
-								  "personaId": %d,
 								  "purpose": "DATE_PRACTICE"
 								}
-								""".formatted(personaId)))
+								"""))
 				.andExpect(status().isUnauthorized());
 	}
 
@@ -124,9 +122,7 @@ class AiChatSessionControllerTest {
 						.with(authentication(authentication))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{
-								  "personaId": 0
-								}
+								{}
 								"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
@@ -136,10 +132,9 @@ class AiChatSessionControllerTest {
 	void duplicateActiveSessionReturnsConflict() throws Exception {
 		String requestBody = """
 				{
-				  "personaId": %d,
 				  "purpose": "DATE_PRACTICE"
 				}
-				""".formatted(personaId);
+				""";
 
 		mockMvc.perform(post("/api/v1/ai-chat/sessions")
 						.with(authentication(authentication))
@@ -159,7 +154,7 @@ class AiChatSessionControllerTest {
 	void ownerCanCloseSessionRepeatedlyWithSameClosedAt() throws Exception {
 		Long sessionId = sessionService.create(
 				userId,
-				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
 		).sessionId();
 
 		String firstClosedAt = mockMvc.perform(patch(

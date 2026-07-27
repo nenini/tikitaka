@@ -9,8 +9,7 @@ import java.time.LocalDateTime;
 
 public record AiChatSessionCreateResponse(
 		Long sessionId,
-		Long personaId,
-		String personaName,
+		String aiPersonaKey,
 		ChatSessionPurpose purpose,
 		ConversationStage stage,
 		ChatSessionStatus status,
@@ -19,8 +18,7 @@ public record AiChatSessionCreateResponse(
 	public static AiChatSessionCreateResponse from(AiChatSession session) {
 		return new AiChatSessionCreateResponse(
 				session.getId(),
-				session.getPersona().getId(),
-				session.getPersona().getName(),
+				session.getAiPersonaKey(),
 				session.getPurpose(),
 				session.getStage(),
 				session.getStatus(),

@@ -1,5 +1,8 @@
 package com.date.backend.domain.aichat.integration;
 
+import com.date.backend.domain.aichat.domain.ChatMessageSenderType;
+import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
+import com.date.backend.domain.profile.domain.Gender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -44,6 +47,9 @@ class HttpAiChatResponseStreamerTest {
 			requestBody.set(objectMapper.readTree(exchange.getRequestBody()));
 			internalToken.set(exchange.getRequestHeaders().getFirst("X-Internal-Token"));
 			String response = """
+					event: persona
+					data: {"personaKey":"FEMALE_26_CALM_01","displayName":"차분한 상대"}
+
 					event: message
 					data: {"content":"안녕"}
 
@@ -58,12 +64,28 @@ class HttpAiChatResponseStreamerTest {
 
 		HttpAiChatResponseStreamer streamer = streamer("/chat/stream", "test-token");
 		List<String> chunks = new ArrayList<>();
-		streamer.stream(new AiChatResponseStreamRequest(3L, 7L, "인사해줘"), chunks::add);
+		AtomicReference<AiChatPersonaSelection> persona = new AtomicReference<>();
+		streamer.stream(request(3L, 7L, "인사해줘"), new AiChatResponseStreamListener() {
+			@Override
+			public void onPersonaSelected(AiChatPersonaSelection selection) {
+				persona.set(selection);
+			}
+
+			@Override
+			public void onChunk(String chunk) {
+				chunks.add(chunk);
+			}
+		});
 
 		assertThat(chunks).containsExactly("안녕", "하세요");
+		assertThat(persona.get()).isEqualTo(
+				new AiChatPersonaSelection("FEMALE_26_CALM_01", "차분한 상대")
+		);
 		assertThat(requestBody.get().path("userId").asLong()).isEqualTo(3L);
 		assertThat(requestBody.get().path("sessionId").asLong()).isEqualTo(7L);
-		assertThat(requestBody.get().path("messageText").asText()).isEqualTo("인사해줘");
+		assertThat(requestBody.get().path("personaCondition").path("gender").asText()).isEqualTo("MALE");
+		assertThat(requestBody.get().path("personaCondition").path("age").asInt()).isEqualTo(26);
+		assertThat(requestBody.get().path("history").path(0).path("content").asText()).isEqualTo("인사해줘");
 		assertThat(internalToken.get()).isEqualTo("test-token");
 	}
 
@@ -80,7 +102,7 @@ class HttpAiChatResponseStreamerTest {
 
 		List<String> chunks = new ArrayList<>();
 		streamer("/chat/stream", "").stream(
-				new AiChatResponseStreamRequest(1L, 2L, "질문"),
+				request(1L, 2L, "질문"),
 				chunks::add
 		);
 
@@ -94,7 +116,7 @@ class HttpAiChatResponseStreamerTest {
 		);
 
 		assertThatThrownBy(() -> streamer("/chat/stream", "").stream(
-				new AiChatResponseStreamRequest(1L, 2L, "질문"),
+				request(1L, 2L, "질문"),
 				chunk -> {
 				}
 		))
@@ -113,6 +135,17 @@ class HttpAiChatResponseStreamerTest {
 						internalToken
 				),
 				objectMapper
+		);
+	}
+
+	private AiChatResponseStreamRequest request(Long userId, Long sessionId, String message) {
+		return new AiChatResponseStreamRequest(
+				userId,
+				sessionId,
+				ChatSessionPurpose.DATE_PRACTICE,
+				new AiChatPersonaCondition(Gender.MALE, 26),
+				null,
+				List.of(new AiChatHistoryMessage(1L, ChatMessageSenderType.USER, message))
 		);
 	}
 

@@ -4,6 +4,11 @@ import com.date.backend.global.exception.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 public enum AiChatErrorCode implements ErrorCode {
+	AI_CHAT_PROFILE_INCOMPLETE(
+			HttpStatus.BAD_REQUEST,
+			"AI_CHAT_PROFILE_INCOMPLETE",
+			"AI 채팅에 필요한 성별 또는 생년월일 정보가 없습니다."
+	),
 	CHATBOT_PERSONA_NOT_FOUND(
 			HttpStatus.NOT_FOUND,
 			"CHATBOT_PERSONA_NOT_FOUND",

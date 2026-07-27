@@ -15,7 +15,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 
 public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 	private static final String DONE_MARKER = "[DONE]";
@@ -40,7 +39,7 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 	@Override
 	public void stream(
 			AiChatResponseStreamRequest request,
-			Consumer<String> chunkConsumer
+			AiChatResponseStreamListener listener
 	) throws Exception {
 		String requestBody = objectMapper.writeValueAsString(request);
 		HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(streamUri)
@@ -68,14 +67,14 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 					.orElse("")
 					.toLowerCase(Locale.ROOT);
 			if (contentType.contains("text/event-stream")) {
-				readSse(body, chunkConsumer);
+				readSse(body, listener);
 			} else {
-				readLineStream(body, chunkConsumer);
+				readLineStream(body, listener);
 			}
 		}
 	}
 
-	private void readSse(InputStream body, Consumer<String> chunkConsumer) throws IOException {
+	private void readSse(InputStream body, AiChatResponseStreamListener listener) throws IOException {
 		try (BufferedReader reader = reader(body)) {
 			String eventName = null;
 			List<String> dataLines = new ArrayList<>();
@@ -83,7 +82,7 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 			while ((line = reader.readLine()) != null) {
 				checkInterrupted();
 				if (line.isBlank()) {
-					boolean done = dispatchSseEvent(eventName, dataLines, chunkConsumer);
+					boolean done = dispatchSseEvent(eventName, dataLines, listener);
 					eventName = null;
 					dataLines.clear();
 					if (done) {
@@ -100,14 +99,14 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 					dataLines.add(line.substring("data:".length()).stripLeading());
 				}
 			}
-			dispatchSseEvent(eventName, dataLines, chunkConsumer);
+			dispatchSseEvent(eventName, dataLines, listener);
 		}
 	}
 
 	private boolean dispatchSseEvent(
 			String eventName,
 			List<String> dataLines,
-			Consumer<String> chunkConsumer
+			AiChatResponseStreamListener listener
 	) throws IOException {
 		if ("error".equalsIgnoreCase(eventName)) {
 			throw new AiChatServerException("AI 서버 스트림에서 error 이벤트를 반환했습니다.");
@@ -122,11 +121,15 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 		if (DONE_MARKER.equals(data.trim())) {
 			return true;
 		}
-		emitPayload(data, chunkConsumer);
+		if ("persona".equalsIgnoreCase(eventName)) {
+			listener.onPersonaSelected(extractPersona(data));
+			return false;
+		}
+		emitPayload(data, listener);
 		return false;
 	}
 
-	private void readLineStream(InputStream body, Consumer<String> chunkConsumer) throws IOException {
+	private void readLineStream(InputStream body, AiChatResponseStreamListener listener) throws IOException {
 		try (BufferedReader reader = reader(body)) {
 			String line;
 			while ((line = reader.readLine()) != null) {
@@ -134,16 +137,25 @@ public class HttpAiChatResponseStreamer implements AiChatResponseStreamer {
 				if (line.isBlank() || DONE_MARKER.equals(line.trim())) {
 					continue;
 				}
-				emitPayload(line, chunkConsumer);
+				emitPayload(line, listener);
 			}
 		}
 	}
 
-	private void emitPayload(String payload, Consumer<String> chunkConsumer) throws IOException {
+	private void emitPayload(String payload, AiChatResponseStreamListener listener) throws IOException {
 		String chunk = extractChunk(payload);
 		if (chunk != null && !chunk.isEmpty()) {
-			chunkConsumer.accept(chunk);
+			listener.onChunk(chunk);
 		}
+	}
+
+	private AiChatPersonaSelection extractPersona(String payload) throws IOException {
+		JsonNode root = objectMapper.readTree(payload);
+		String personaKey = firstText(root, "personaKey");
+		if (personaKey == null || personaKey.isBlank()) {
+			throw new AiChatServerException("AI 서버의 persona 이벤트에 personaKey가 없습니다.");
+		}
+		return new AiChatPersonaSelection(personaKey, firstText(root, "displayName"));
 	}
 
 	private String extractChunk(String payload) throws IOException {

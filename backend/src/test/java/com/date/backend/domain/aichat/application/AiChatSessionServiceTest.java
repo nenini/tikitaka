@@ -71,14 +71,11 @@ class AiChatSessionServiceTest {
 	void authenticatedUserCanCreateActiveChatSession() {
 		AiChatSessionCreateResponse response = sessionService.create(
 				userId,
-				new AiChatSessionCreateRequest(
-						personaId,
-						ChatSessionPurpose.DATE_PRACTICE
-				)
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
 		);
 
 		assertThat(response.sessionId()).isNotNull();
-		assertThat(response.personaId()).isEqualTo(personaId);
+		assertThat(response.aiPersonaKey()).isNull();
 		assertThat(response.purpose()).isEqualTo(ChatSessionPurpose.DATE_PRACTICE);
 		assertThat(response.stage()).isEqualTo(ConversationStage.INTRO);
 		assertThat(response.status()).isEqualTo(ChatSessionStatus.ACTIVE);
@@ -87,10 +84,8 @@ class AiChatSessionServiceTest {
 
 	@Test
 	void secondActiveChatSessionIsRejected() {
-		AiChatSessionCreateRequest request = new AiChatSessionCreateRequest(
-				personaId,
-				ChatSessionPurpose.DATE_PRACTICE
-		);
+		AiChatSessionCreateRequest request =
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE);
 		sessionService.create(userId, request);
 
 		BusinessException exception = catchThrowableOfType(
@@ -106,7 +101,7 @@ class AiChatSessionServiceTest {
 	void ownerCanCloseSessionAndRepeatedRequestKeepsOriginalClosedAt() {
 		Long sessionId = sessionService.create(
 				userId,
-				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
 		).sessionId();
 
 		AiChatSessionCloseResponse firstResponse = sessionService.close(userId, sessionId);
@@ -122,7 +117,7 @@ class AiChatSessionServiceTest {
 	void nonOwnerCannotCloseSession() {
 		Long sessionId = sessionService.create(
 				userId,
-				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
 		).sessionId();
 		User otherUser = userRepository.save(new User(
 				"ai-chat-other@example.com",

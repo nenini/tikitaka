@@ -1,8 +1,8 @@
 package com.date.backend.domain.aichat.api;
 
 import com.date.backend.domain.aichat.dto.request.AiChatSessionCreateRequest;
-import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
@@ -21,7 +21,11 @@ public interface AiChatSessionSwaggerDocs {
 
 	@Operation(
 			summary = "AI 채팅 세션 생성",
-			description = "인증 사용자의 소개팅 연습용 AI 채팅 세션을 생성합니다."
+			description = """
+					인증 사용자의 AI 채팅 세션을 생성합니다.
+					페르소나는 세션 생성 시 선택하지 않고 첫 AI 요청에서 성별·나이 조건에 따라
+					AI 서버가 선택하므로 생성 직후 aiPersonaKey는 null입니다.
+					"""
 	)
 	@ApiResponses({
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -31,7 +35,6 @@ public interface AiChatSessionSwaggerDocs {
 			),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "입력값 오류"),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패"),
-			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "페르소나 없음"),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "활성 세션 중복")
 	})
 	ApiResponse<AiChatSessionCreateResponse> create(
@@ -55,6 +58,6 @@ public interface AiChatSessionSwaggerDocs {
 	})
 	ApiResponse<AiChatSessionCloseResponse> close(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "AI 채팅 세션 ID") Long sessionId
+			@Parameter(description = "AI 채팅 세션 ID", example = "15") Long sessionId
 	);
 }
