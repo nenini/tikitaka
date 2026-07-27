@@ -3,6 +3,7 @@ package com.date.backend.domain.aichat.application;
 import com.date.backend.domain.aichat.domain.AiChatMessage;
 import com.date.backend.domain.aichat.domain.AiChatSession;
 import com.date.backend.domain.aichat.domain.ChatMessageSenderType;
+import com.date.backend.domain.aichat.domain.ChatSessionStatus;
 import com.date.backend.domain.aichat.dto.request.AiChatMessageCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatMessageResponse;
 import com.date.backend.domain.aichat.repository.AiChatMessageRepository;
@@ -37,6 +38,7 @@ public class AiChatMessageService {
 		AiChatSession session = sessionRepository.findByIdForUpdate(sessionId)
 				.orElseThrow(() -> new BusinessException(AiChatErrorCode.CHAT_SESSION_NOT_FOUND));
 		validateOwner(userId, session);
+		validateActive(session);
 
 		long nextSequence = messageRepository.findMaxSequenceNo(sessionId) + 1;
 		AiChatMessage message = messageRepository.saveAndFlush(new AiChatMessage(
@@ -82,6 +84,12 @@ public class AiChatMessageService {
 	private void validateOwner(Long userId, AiChatSession session) {
 		if (!session.getUser().getId().equals(userId)) {
 			throw new BusinessException(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
+		}
+	}
+
+	private void validateActive(AiChatSession session) {
+		if (session.getStatus() != ChatSessionStatus.ACTIVE) {
+			throw new BusinessException(AiChatErrorCode.CHAT_SESSION_CLOSED);
 		}
 	}
 }

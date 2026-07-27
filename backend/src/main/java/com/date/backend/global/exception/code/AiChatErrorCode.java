@@ -28,6 +28,11 @@ public enum AiChatErrorCode implements ErrorCode {
 			HttpStatus.BAD_GATEWAY,
 			"AI_RESPONSE_STREAM_FAILED",
 			"AI 응답을 전송하지 못했습니다."
+	),
+	CHAT_SESSION_CLOSED(
+			HttpStatus.CONFLICT,
+			"CHAT_SESSION_CLOSED",
+			"종료된 AI 채팅 세션에는 메시지를 저장할 수 없습니다."
 	);
 
 	private final HttpStatus status;

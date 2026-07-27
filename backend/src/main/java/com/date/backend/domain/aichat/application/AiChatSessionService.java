@@ -5,6 +5,7 @@ import com.date.backend.domain.aichat.domain.ChatSessionStatus;
 import com.date.backend.domain.aichat.domain.ChatbotPersona;
 import com.date.backend.domain.aichat.dto.request.AiChatSessionCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
 import com.date.backend.domain.aichat.repository.AiChatSessionRepository;
 import com.date.backend.domain.aichat.repository.ChatbotPersonaRepository;
 import com.date.backend.domain.user.domain.User;
@@ -15,6 +16,8 @@ import com.date.backend.global.exception.code.CommonErrorCode;
 import com.date.backend.global.exception.code.UserErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @Transactional(readOnly = true)
@@ -53,5 +56,16 @@ public class AiChatSessionService {
 				new AiChatSession(user, persona, request.purpose())
 		);
 		return AiChatSessionCreateResponse.from(session);
+	}
+
+	@Transactional
+	public AiChatSessionCloseResponse close(Long userId, Long sessionId) {
+		AiChatSession session = sessionRepository.findByIdForUpdate(sessionId)
+				.orElseThrow(() -> new BusinessException(AiChatErrorCode.CHAT_SESSION_NOT_FOUND));
+		if (!session.getUser().getId().equals(userId)) {
+			throw new BusinessException(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
+		}
+		session.close(LocalDateTime.now());
+		return AiChatSessionCloseResponse.from(session);
 	}
 }

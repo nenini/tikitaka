@@ -6,6 +6,7 @@ import com.date.backend.domain.aichat.domain.ChatbotPersona;
 import com.date.backend.domain.aichat.domain.ConversationStage;
 import com.date.backend.domain.aichat.dto.request.AiChatSessionCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
+import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
 import com.date.backend.domain.aichat.repository.ChatbotPersonaRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
@@ -99,5 +100,43 @@ class AiChatSessionServiceTest {
 
 		assertThat(exception.getErrorCode())
 				.isEqualTo(AiChatErrorCode.ACTIVE_CHAT_SESSION_EXISTS);
+	}
+
+	@Test
+	void ownerCanCloseSessionAndRepeatedRequestKeepsOriginalClosedAt() {
+		Long sessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+		).sessionId();
+
+		AiChatSessionCloseResponse firstResponse = sessionService.close(userId, sessionId);
+		AiChatSessionCloseResponse secondResponse = sessionService.close(userId, sessionId);
+
+		assertThat(firstResponse.status()).isEqualTo(ChatSessionStatus.COMPLETED);
+		assertThat(firstResponse.closedAt()).isNotNull();
+		assertThat(secondResponse.status()).isEqualTo(ChatSessionStatus.COMPLETED);
+		assertThat(secondResponse.closedAt()).isEqualTo(firstResponse.closedAt());
+	}
+
+	@Test
+	void nonOwnerCannotCloseSession() {
+		Long sessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+		).sessionId();
+		User otherUser = userRepository.save(new User(
+				"ai-chat-other@example.com",
+				"password-hash",
+				"다른 사용자",
+				null,
+				LocalDate.of(2000, 1, 1)
+		));
+
+		BusinessException exception = catchThrowableOfType(
+				() -> sessionService.close(otherUser.getId(), sessionId),
+				BusinessException.class
+		);
+
+		assertThat(exception.getErrorCode()).isEqualTo(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
 	}
 }

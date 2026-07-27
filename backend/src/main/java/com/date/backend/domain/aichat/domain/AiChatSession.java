@@ -100,7 +100,19 @@ public class AiChatSession {
 		return createdAt;
 	}
 
+	public LocalDateTime getClosedAt() {
+		return closedAt;
+	}
+
 	public void recordUserMessage(LocalDateTime sentAt) {
 		this.lastUserMessageAt = sentAt;
+	}
+
+	public void close(LocalDateTime closedAt) {
+		if (status != ChatSessionStatus.ACTIVE) {
+			return;
+		}
+		this.status = ChatSessionStatus.COMPLETED;
+		this.closedAt = closedAt;
 	}
 }

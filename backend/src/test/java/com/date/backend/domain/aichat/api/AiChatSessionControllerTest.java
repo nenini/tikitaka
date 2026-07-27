@@ -1,6 +1,9 @@
 package com.date.backend.domain.aichat.api;
 
 import com.date.backend.domain.aichat.domain.ChatbotPersona;
+import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
+import com.date.backend.domain.aichat.dto.request.AiChatSessionCreateRequest;
+import com.date.backend.domain.aichat.application.AiChatSessionService;
 import com.date.backend.domain.aichat.repository.ChatbotPersonaRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.domain.UserRole;
@@ -23,7 +26,9 @@ import java.util.List;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -46,7 +51,11 @@ class AiChatSessionControllerTest {
 	@Autowired
 	private ChatbotPersonaRepository personaRepository;
 
+	@Autowired
+	private AiChatSessionService sessionService;
+
 	private UsernamePasswordAuthenticationToken authentication;
+	private Long userId;
 	private Long personaId;
 
 	@BeforeEach
@@ -72,6 +81,7 @@ class AiChatSessionControllerTest {
 				null,
 				List.of(new SimpleGrantedAuthority("ROLE_USER"))
 		);
+		userId = user.getId();
 		personaId = persona.getId();
 	}
 
@@ -143,5 +153,34 @@ class AiChatSessionControllerTest {
 						.content(requestBody))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("ACTIVE_CHAT_SESSION_EXISTS"));
+	}
+
+	@Test
+	void ownerCanCloseSessionRepeatedlyWithSameClosedAt() throws Exception {
+		Long sessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(personaId, ChatSessionPurpose.DATE_PRACTICE)
+		).sessionId();
+
+		String firstClosedAt = mockMvc.perform(patch(
+								"/api/v1/ai-chat/sessions/{sessionId}/close",
+								sessionId
+						)
+						.with(authentication(authentication)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.status").value("COMPLETED"))
+				.andExpect(jsonPath("$.data.closedAt").isNotEmpty())
+				.andReturn()
+				.getResponse()
+				.getContentAsString();
+
+		mockMvc.perform(patch(
+							"/api/v1/ai-chat/sessions/{sessionId}/close",
+							sessionId
+						)
+						.with(authentication(authentication)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.status").value("COMPLETED"))
+				.andExpect(content().json(firstClosedAt));
 	}
 }

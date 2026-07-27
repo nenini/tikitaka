@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -110,6 +111,28 @@ class AiChatMessageServiceTest {
 
 		assertThat(saveException.getErrorCode()).isEqualTo(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
 		assertThat(readException.getErrorCode()).isEqualTo(AiChatErrorCode.CHAT_SESSION_FORBIDDEN);
+	}
+
+	@Test
+	void messageCannotBeSavedAfterSessionIsClosed() {
+		AiChatSession session = sessionRepository.findById(sessionId).orElseThrow();
+		session.close(LocalDateTime.now());
+		sessionRepository.saveAndFlush(session);
+
+		BusinessException exception = catchThrowableOfType(
+				() -> messageService.save(
+						ownerId,
+						sessionId,
+						new AiChatMessageCreateRequest(
+								ChatMessageSenderType.USER,
+								"종료 후 메시지",
+								false
+						)
+				),
+				BusinessException.class
+		);
+
+		assertThat(exception.getErrorCode()).isEqualTo(AiChatErrorCode.CHAT_SESSION_CLOSED);
 	}
 
 	private User saveUser(String email, String nickname) {
