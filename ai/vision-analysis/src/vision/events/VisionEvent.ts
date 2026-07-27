@@ -148,6 +148,20 @@ export interface VisionEventEnvelope<TEventType extends string> {
   readonly clientMonotonicMs: number;
   readonly occurredAt: string;
   readonly confidence: number;
+  readonly measurementConfidence?: number;
+  readonly signalClarity?: number;
+  readonly personalizationConfidence?: number;
+  readonly evidenceStrength?: number;
+  readonly baselineMode?:
+    | "PERSONALIZED"
+    | "MONOCULAR_LEFT"
+    | "MONOCULAR_RIGHT"
+    | "COLLECTING"
+    | "GLOBAL_FALLBACK"
+    | "UNAVAILABLE"
+    | "BASELINE_UNCERTAIN";
+  readonly coachingEligible?: boolean;
+  readonly baselineEpoch?: number;
   readonly source: VisionEventSource;
   readonly modelVersion: string;
   readonly ruleVersion: string;
@@ -186,6 +200,21 @@ export interface VisionMetricSnapshotPayload {
     readonly gazeHorizontalDelta?: number | null;
     readonly gazeVerticalDelta?: number | null;
     readonly stiffExpressionActive?: boolean;
+    readonly smileConfigurationScore?: number | null;
+    readonly baselineSmileScore?: number | null;
+    readonly smileDelta?: number | null;
+    readonly mouthAsymmetry?: number | null;
+    readonly maintainedSmileConfiguration?: boolean;
+    readonly headPoseScore?: number | null;
+    readonly faceCenterScore?: number | null;
+    readonly irisProxyScore?: number | null;
+    readonly screenAttentionScore?: number | null;
+    readonly screenAttentionConfidence?: number | null;
+    readonly gazeReliability?: number | null;
+    readonly binocularAgreement?: number | null;
+    readonly gazeMode?: string | null;
+    readonly attentionMode?: string | null;
+    readonly attentionEvidenceMode?: string | null;
   };
   readonly performance: {
     readonly profile: PerformanceProfile;
