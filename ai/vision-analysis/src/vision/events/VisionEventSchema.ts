@@ -22,7 +22,7 @@ const endedPayloadShape = {
 const eventEnvelopeSchema = z
   .object({
     eventId: z.uuid(),
-    version: z.literal(2),
+    version: z.literal(3),
     sessionId: z.string().min(1).max(128),
     userId: z.string().min(1).max(128),
     clientInstanceId: z.uuid(),
@@ -318,8 +318,11 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
             smile: z
               .object({
                 configurationScore: unitScoreSchema.nullable(),
+                baselineScore: unitScoreSchema.nullable(),
                 delta: nullableFiniteNumberSchema,
                 maintained: z.boolean(),
+                promptSuppressedByBaseline: z.boolean(),
+                baselinePromptSuppressionThreshold: unitScoreSchema,
                 confidence: unitScoreSchema,
               })
               .strict(),

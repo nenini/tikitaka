@@ -17,7 +17,7 @@ function behaviorEvent(eventId: string): VisionBehaviorEvent {
   return {
     eventId,
     eventType: "NOD_EVENT",
-    version: 2,
+    version: 3,
     sessionId: "session-a",
     userId: "user-a",
     clientInstanceId: "76a06bb5-2022-4126-a0f0-e370369e2459",
@@ -44,7 +44,7 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
   return {
     eventId,
     eventType: "VISION_METRIC_SNAPSHOT",
-    version: 2,
+    version: 3,
     sessionId: "session-a",
     userId: "user-a",
     clientInstanceId: "76a06bb5-2022-4126-a0f0-e370369e2459",
@@ -82,8 +82,11 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
       metrics: {
         smile: {
           configurationScore: 0.2,
+          baselineScore: 0.1,
           delta: 0,
           maintained: false,
+          promptSuppressedByBaseline: false,
+          baselinePromptSuppressionThreshold: 0.15,
           confidence: 0.9,
         },
         attention: {

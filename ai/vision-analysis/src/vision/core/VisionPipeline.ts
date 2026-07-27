@@ -464,12 +464,26 @@ export class VisionPipeline {
             smileState,
             "smileConfigurationScore",
           ),
+          baselineScore: this.readNullableNumber(
+            smileState,
+            "baselineSmileScore",
+          ),
           delta: this.readNullableNumber(smileState, "smileDelta"),
           maintained:
             this.readBoolean(
               smileState,
               "maintainedSmileConfiguration",
             ) ?? false,
+          promptSuppressedByBaseline:
+            this.readBoolean(
+              smileState,
+              "smilePromptSuppressedByBaseline",
+            ) ?? false,
+          baselinePromptSuppressionThreshold:
+            this.readNullableNumber(
+              smileState,
+              "baselinePromptSuppressionScore",
+            ) ?? this.config.smile.baselinePromptSuppressionScore,
           confidence:
             this.readNullableNumber(
               smileState,

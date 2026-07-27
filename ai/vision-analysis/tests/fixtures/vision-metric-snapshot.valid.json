@@ -1,7 +1,7 @@
 {
   "eventId": "1ba268b7-d0ce-42ae-b2f4-cd78af569a7d",
   "eventType": "VISION_METRIC_SNAPSHOT",
-  "version": 2,
+  "version": 3,
   "kind": "metric",
   "sessionId": "session-123",
   "userId": "user-a",
@@ -39,8 +39,11 @@
     "metrics": {
       "smile": {
         "configurationScore": 0.31,
+        "baselineScore": 0.24,
         "delta": 0.07,
         "maintained": true,
+        "promptSuppressedByBaseline": true,
+        "baselinePromptSuppressionThreshold": 0.15,
         "confidence": 0.83
       },
       "attention": {

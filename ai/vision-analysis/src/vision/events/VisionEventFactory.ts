@@ -157,7 +157,7 @@ export class VisionEventFactory {
     return {
       eventId: this.uuidFactory(),
       eventType,
-      version: 2,
+      version: 3,
       sessionId: this.identity.sessionId,
       userId: this.identity.userId,
       clientInstanceId: this.identity.clientInstanceId,

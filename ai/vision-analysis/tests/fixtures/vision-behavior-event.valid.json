@@ -1,7 +1,7 @@
 {
   "eventId": "7b575df8-5ca3-4f58-a44e-0f2e825488e1",
   "eventType": "GAZE_AWAY_STARTED",
-  "version": 2,
+  "version": 3,
   "kind": "behavior",
   "sessionId": "session-123",
   "userId": "user-a",

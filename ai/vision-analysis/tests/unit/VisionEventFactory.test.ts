@@ -95,8 +95,11 @@ describe("VisionEventFactory", () => {
         metrics: {
           smile: {
             configurationScore: 0.52,
+            baselineScore: 0.32,
             delta: 0.2,
             maintained: false,
+            promptSuppressedByBaseline: true,
+            baselinePromptSuppressionThreshold: 0.15,
             confidence: 0.9,
           },
           attention: {
@@ -130,10 +133,12 @@ describe("VisionEventFactory", () => {
     });
 
     expect(event.source).toBe("SMILE_EXPRESSION_DETECTOR");
+    expect(event.version).toBe(3);
     expect(event.seq).toBe(1);
     expect(event.sessionElapsedMs).toBe(5_500);
     expect(event.occurredAt).toBe("2026-07-20T10:30:00.800Z");
     expect(snapshot.seq).toBe(2);
+    expect(snapshot.version).toBe(3);
     expect(visionEventSchema.parse(event)).toEqual(event);
     expect(visionEventSchema.parse(snapshot)).toEqual(snapshot);
   });

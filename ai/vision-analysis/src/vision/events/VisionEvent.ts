@@ -131,7 +131,7 @@ export interface VisionBehaviorPayloadMap {
 export interface VisionEventEnvelope<TEventType extends string> {
   readonly eventId: string;
   readonly eventType: TEventType;
-  readonly version: 2;
+  readonly version: 3;
   readonly sessionId: string;
   readonly userId: string;
   readonly clientInstanceId: string;
@@ -192,8 +192,11 @@ export interface VisionMetricSnapshotPayload {
   readonly metrics: {
     readonly smile: {
       readonly configurationScore: number | null;
+      readonly baselineScore: number | null;
       readonly delta: number | null;
       readonly maintained: boolean;
+      readonly promptSuppressedByBaseline: boolean;
+      readonly baselinePromptSuppressionThreshold: number;
       readonly confidence: number;
     };
     readonly attention: {

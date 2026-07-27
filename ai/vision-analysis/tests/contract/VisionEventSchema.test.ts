@@ -19,14 +19,14 @@ describe("visionEventSchema contract fixtures", () => {
     expect(visionEventSchema.parse(fixture)).toEqual(fixture);
   });
 
-  it("rejects v1 instead of coercing it into the v2 contract", async () => {
+  it("rejects v2 instead of coercing it into the v3 contract", async () => {
     const fixture = await readFixture("vision-behavior-event.valid.json");
     if (typeof fixture !== "object" || fixture === null) {
       throw new TypeError("fixture must be an object");
     }
 
     expect(() =>
-      visionEventSchema.parse({ ...fixture, version: 1 }),
+      visionEventSchema.parse({ ...fixture, version: 2 }),
     ).toThrow();
   });
 
