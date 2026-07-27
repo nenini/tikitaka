@@ -9,6 +9,60 @@ const baseline = createVisionBaseline();
 const quality = { usable: true, confidence: 0.9, reasons: [] } as const;
 
 describe("ScreenAttentionDetector", () => {
+  it("uses configured pose, center, and gaze thresholds in component scores", () => {
+    const strictDetector = new ScreenAttentionDetector(
+      { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+      createDetectorEventFactory(),
+    );
+    const lenientDetector = new ScreenAttentionDetector(
+      {
+        ...defaultVisionConfig.screenAttention,
+        emaAlpha: 1,
+        yawRecoveryDegrees: 17,
+        yawEntryDegrees: 30,
+        pitchRecoveryDegrees: 13,
+        pitchEntryDegrees: 25,
+        centerXRecoveryDelta: 0.16,
+        centerXEntryDelta: 0.3,
+        centerYRecoveryDelta: 0.13,
+        centerYEntryDelta: 0.25,
+        gazeHorizontalRecoveryDelta: 0.16,
+        gazeHorizontalEntryDelta: 0.3,
+        gazeVerticalRecoveryDelta: 0.16,
+        gazeVerticalEntryDelta: 0.3,
+      },
+      createDetectorEventFactory(),
+    );
+    const context = { quality, baseline, performanceProfile: "HIGH" as const };
+    const frame = createNormalizedFaceFrame({
+      yaw: 16,
+      pitch: 12,
+      centerX: 0.65,
+      centerY: 0.62,
+      eyeGaze: {
+        left: { horizontalRatio: 0.65, verticalRatio: 0.65 },
+        right: { horizontalRatio: 0.65, verticalRatio: 0.65 },
+        horizontalRatio: 0.65,
+        verticalRatio: 0.65,
+        binocularAgreementScore: 1,
+      },
+      blendshapes: { eyeBlinkLeft: 0, eyeBlinkRight: 0 },
+    });
+
+    strictDetector.update(frame, context);
+    lenientDetector.update(frame, context);
+
+    expect(lenientDetector.getState().headPoseScore ?? 0).toBeGreaterThan(
+      strictDetector.getState().headPoseScore ?? 0,
+    );
+    expect(lenientDetector.getState().faceCenterScore ?? 0).toBeGreaterThan(
+      strictDetector.getState().faceCenterScore ?? 0,
+    );
+    expect(lenientDetector.getState().irisProxyScore ?? 0).toBeGreaterThan(
+      strictDetector.getState().irisProxyScore ?? 0,
+    );
+  });
+
   it("ignores a brief turn and emits one start/end for a sustained turn", () => {
     const detector = new ScreenAttentionDetector({ ...defaultVisionConfig.screenAttention, emaAlpha: 1 }, createDetectorEventFactory());
     const context = { quality, baseline, performanceProfile: "HIGH" as const };

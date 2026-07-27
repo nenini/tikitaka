@@ -318,20 +318,47 @@ export class ScreenAttentionDetector
         : 0.6 *
             (yaw === null
               ? 0
-              : smoothDecreasing(Math.abs(yaw), 12, 20)) +
+              : smoothDecreasing(
+                  Math.abs(yaw),
+                  this.config.yawRecoveryDegrees,
+                  this.config.yawEntryDegrees,
+                )) +
           0.4 *
             (pitch === null
               ? 0
-              : smoothDecreasing(Math.abs(pitch), 10, 15));
+              : smoothDecreasing(
+                  Math.abs(pitch),
+                  this.config.pitchRecoveryDegrees,
+                  this.config.pitchEntryDegrees,
+                ));
     const faceCenterScore =
-      0.6 * smoothDecreasing(Math.abs(centerX), 0.1, 0.18) +
-      0.4 * smoothDecreasing(Math.abs(centerY), 0.08, 0.15);
+      0.6 *
+        smoothDecreasing(
+          Math.abs(centerX),
+          this.config.centerXRecoveryDelta,
+          this.config.centerXEntryDelta,
+        ) +
+      0.4 *
+        smoothDecreasing(
+          Math.abs(centerY),
+          this.config.centerYRecoveryDelta,
+          this.config.centerYEntryDelta,
+        );
     const irisProxyScore =
       gazeHorizontal === null || gazeVertical === null
         ? null
         : 0.65 *
-            smoothDecreasing(Math.abs(gazeHorizontal), 0.1, 0.18) +
-          0.35 * smoothDecreasing(Math.abs(gazeVertical), 0.12, 0.2);
+            smoothDecreasing(
+              Math.abs(gazeHorizontal),
+              this.config.gazeHorizontalRecoveryDelta,
+              this.config.gazeHorizontalEntryDelta,
+            ) +
+          0.35 *
+            smoothDecreasing(
+              Math.abs(gazeVertical),
+              this.config.gazeVerticalRecoveryDelta,
+              this.config.gazeVerticalEntryDelta,
+            );
     const attentionMode: AttentionMode = fallback
       ? "GLOBAL_POSE_ONLY"
       : gazeMode === "BINOCULAR"
