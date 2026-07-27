@@ -4,7 +4,7 @@ import {
 } from "./VisionConfig.js";
 
 export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
-  schemaVersion: 1,
+  schemaVersion: 2,
   model: {
     wasmBasePath: "/mediapipe/wasm",
     modelAssetPath: "/models/face_landmarker.task",
@@ -216,6 +216,8 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     emaAlpha: 0.35,
   },
   smile: {
+    // A naturally raised mouth-corner baseline should not trigger "please smile".
+    baselinePromptSuppressionScore: 0.15,
     subtleAbsoluteScore: 0.2,
     smileAbsoluteScore: 0.4,
     strongAbsoluteScore: 0.7,

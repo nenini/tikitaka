@@ -160,6 +160,33 @@ describe("SmileExpressionDetector", () => {
       "NO_SIGNIFICANT_INCREASE",
     );
     expect(detector.getState().rawScore).toBe(0.5);
+    expect(detector.getState().smilePromptSuppressedByBaseline).toBe(true);
+    expect(detector.getState().baselinePromptSuppressionScore).toBe(0.15);
+  });
+
+  it("keeps smile prompting available below the dedicated baseline cutoff", () => {
+    const lowBaseline = createVisionBaseline({
+      mouthSmileLeft: 0.14,
+      mouthSmileRight: 0.14,
+      baselineSmileScore: 0.14,
+    });
+    const detector = new SmileExpressionDetector(
+      defaultVisionConfig.smile,
+      createDetectorEventFactory(),
+    );
+
+    detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 0,
+        blendshapes: {
+          mouthSmileLeft: 0.14,
+          mouthSmileRight: 0.14,
+        },
+      }),
+      { ...context, baseline: lowBaseline },
+    );
+
+    expect(detector.getState().smilePromptSuppressedByBaseline).toBe(false);
   });
 
   it("exposes a maintained subtle configuration without a behavior event", () => {

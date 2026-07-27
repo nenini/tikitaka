@@ -67,7 +67,7 @@ const higherIsWorseAngleGateSchema = z
 
 export const visionConfigSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     model: z
       .object({
         wasmBasePath: z.string().min(1),
@@ -324,6 +324,8 @@ export const visionConfigSchema = z
       }),
     smile: z
       .object({
+        /** Personalized baselines at or above this level suppress smile prompts. */
+        baselinePromptSuppressionScore: unitScoreSchema,
         subtleAbsoluteScore: unitScoreSchema,
         smileAbsoluteScore: unitScoreSchema,
         strongAbsoluteScore: unitScoreSchema,
@@ -357,6 +359,17 @@ export const visionConfigSchema = z
       })
       .strict()
       .superRefine((smile, context) => {
+        if (
+          smile.baselinePromptSuppressionScore >
+          smile.subtleAbsoluteScore
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["baselinePromptSuppressionScore"],
+            message:
+              "baseline prompt suppression must not exceed the subtle smile threshold",
+          });
+        }
         if (
           !(
             smile.subtleAbsoluteScore < smile.smileAbsoluteScore &&

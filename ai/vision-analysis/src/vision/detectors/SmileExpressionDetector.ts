@@ -43,6 +43,8 @@ export interface SmileExpressionDetectorState {
   readonly baselineScore: number | null;
   readonly baselineSmileScore: number | null;
   readonly baselineSmileConfigurationLevel: SmileConfigurationLevel | null;
+  readonly baselinePromptSuppressionScore: number;
+  readonly smilePromptSuppressedByBaseline: boolean;
   readonly baselineDelta: number | null;
   readonly smileDelta: number | null;
   readonly smileChangeLevel: SmileChangeLevel | null;
@@ -87,7 +89,7 @@ export class SmileExpressionDetector
   private suspensionWarmupUntilMs: number | null = null;
   private readonly episodeClock = new BehaviorEpisodeClock();
   private readonly scoreFilter: TimeBasedEmaFilter;
-  private snapshot: SmileExpressionDetectorState = this.emptyState();
+  private snapshot: SmileExpressionDetectorState;
 
   constructor(
     private readonly config: VisionConfig["smile"],
@@ -98,6 +100,7 @@ export class SmileExpressionDetector
     },
   ) {
     this.scoreFilter = new TimeBasedEmaFilter(config.emaHalfLifeMs);
+    this.snapshot = this.emptyState();
   }
 
   update(
@@ -161,6 +164,9 @@ export class SmileExpressionDetector
       context.baseline.baselineModeBySignal.smile === "PERSONALIZED";
     const base = personalized ? context.baseline.baselineSmileScore : null;
     const delta = base === null ? null : score - base;
+    const smilePromptSuppressedByBaseline =
+      base !== null &&
+      base >= this.config.baselinePromptSuppressionScore;
     const asymmetry = Math.abs(left - right);
     const asymmetryFactor =
       asymmetry <= this.config.asymmetryConfidenceStart
@@ -208,6 +214,9 @@ export class SmileExpressionDetector
         baselineScore: base,
         baselineSmileScore: base,
         baselineSmileConfigurationLevel: baselineLevel,
+        baselinePromptSuppressionScore:
+          this.config.baselinePromptSuppressionScore,
+        smilePromptSuppressedByBaseline,
         baselineDelta: delta,
         smileDelta: delta,
         smileChangeLevel: changeLevel,
@@ -377,6 +386,9 @@ export class SmileExpressionDetector
       baselineScore: base,
       baselineSmileScore: base,
       baselineSmileConfigurationLevel: baselineLevel,
+      baselinePromptSuppressionScore:
+        this.config.baselinePromptSuppressionScore,
+      smilePromptSuppressedByBaseline,
       baselineDelta: delta,
       smileDelta: delta,
       smileChangeLevel: changeLevel,
@@ -554,6 +566,9 @@ export class SmileExpressionDetector
       baselineScore: null,
       baselineSmileScore: null,
       baselineSmileConfigurationLevel: null,
+      baselinePromptSuppressionScore:
+        this.config.baselinePromptSuppressionScore,
+      smilePromptSuppressedByBaseline: false,
       baselineDelta: null,
       smileDelta: null,
       smileChangeLevel: null,
