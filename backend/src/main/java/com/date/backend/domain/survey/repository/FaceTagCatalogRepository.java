@@ -16,5 +16,7 @@ public interface FaceTagCatalogRepository extends JpaRepository<FaceTagCatalog, 
 			Collection<ApplicableGender> applicableGenders
 	);
 
+	List<FaceTagCatalog> findAllByCodeInAndActiveTrue(Collection<String> codes);
+
 	Optional<FaceTagCatalog> findByIdAndActiveTrue(Long id);
 }
