@@ -13,6 +13,16 @@ public enum AiChatErrorCode implements ErrorCode {
 			HttpStatus.CONFLICT,
 			"ACTIVE_CHAT_SESSION_EXISTS",
 			"이미 진행 중인 AI 채팅 세션이 있습니다."
+	),
+	CHAT_SESSION_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"CHAT_SESSION_NOT_FOUND",
+			"AI 채팅 세션을 찾을 수 없습니다."
+	),
+	CHAT_SESSION_FORBIDDEN(
+			HttpStatus.FORBIDDEN,
+			"CHAT_SESSION_FORBIDDEN",
+			"해당 AI 채팅 세션에 접근할 수 없습니다."
 	);
 
 	private final HttpStatus status;

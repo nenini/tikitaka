@@ -99,4 +99,8 @@ public class AiChatSession {
 	public LocalDateTime getCreatedAt() {
 		return createdAt;
 	}
+
+	public void recordUserMessage(LocalDateTime sentAt) {
+		this.lastUserMessageAt = sentAt;
+	}
 }
