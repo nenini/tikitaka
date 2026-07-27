@@ -19,6 +19,8 @@ import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchRequestTraitSnapshotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,7 @@ public class MatchCreationService {
 	private final MatchResponseRepository responseRepository;
 	private final MatchCandidateConstraintRepository constraintRepository;
 	private final UserRepository userRepository;
+	private final ProfileRepository profileRepository;
 	private final MatchEligibilityPolicy eligibilityPolicy;
 	private final MatchAvailabilityPolicy availabilityPolicy;
 	private final MatchScorePolicy scorePolicy;
@@ -60,6 +63,7 @@ public class MatchCreationService {
 			MatchResponseRepository responseRepository,
 			MatchCandidateConstraintRepository constraintRepository,
 			UserRepository userRepository,
+			ProfileRepository profileRepository,
 			MatchEligibilityPolicy eligibilityPolicy,
 			MatchAvailabilityPolicy availabilityPolicy,
 			MatchScorePolicy scorePolicy
@@ -72,6 +76,7 @@ public class MatchCreationService {
 		this.responseRepository = responseRepository;
 		this.constraintRepository = constraintRepository;
 		this.userRepository = userRepository;
+		this.profileRepository = profileRepository;
 		this.eligibilityPolicy = eligibilityPolicy;
 		this.availabilityPolicy = availabilityPolicy;
 		this.scorePolicy = scorePolicy;
@@ -123,12 +128,20 @@ public class MatchCreationService {
 				.collect(Collectors.toMap(User::getId, Function.identity()));
 		User firstUser = usersById.get(first.getUserId());
 		User secondUser = usersById.get(second.getUserId());
+		Map<Long, Profile> profilesByUserId = profileRepository.findAllById(userIds)
+				.stream()
+				.collect(Collectors.toMap(Profile::getUserId, Function.identity()));
+		Profile firstProfile = profilesByUserId.get(first.getUserId());
+		Profile secondProfile = profilesByUserId.get(second.getUserId());
 		if (firstUser == null || secondUser == null
+				|| firstProfile == null || secondProfile == null
 				|| !eligibilityPolicy.isEligible(
 						first,
 						firstUser,
+						firstProfile,
 						second,
 						secondUser,
+						secondProfile,
 						matchedAt.toLocalDate()
 				)) {
 			return false;

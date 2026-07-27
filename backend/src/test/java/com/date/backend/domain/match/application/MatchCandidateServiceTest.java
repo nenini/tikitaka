@@ -12,6 +12,9 @@ import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchRequestTraitSnapshotRepository;
+import com.date.backend.domain.profile.domain.Gender;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,7 @@ class MatchCandidateServiceTest {
 		MatchCandidateConstraintRepository constraintRepository =
 				mock(MatchCandidateConstraintRepository.class);
 		UserRepository userRepository = mock(UserRepository.class);
+		ProfileRepository profileRepository = mock(ProfileRepository.class);
 		MatchEligibilityPolicy eligibilityPolicy = mock(MatchEligibilityPolicy.class);
 		MatchAvailabilityPolicy availabilityPolicy = mock(MatchAvailabilityPolicy.class);
 		MatchScorePolicy scorePolicy = mock(MatchScorePolicy.class);
@@ -51,6 +55,7 @@ class MatchCandidateServiceTest {
 				pairRepository,
 				constraintRepository,
 				userRepository,
+				profileRepository,
 				eligibilityPolicy,
 				availabilityPolicy,
 				scorePolicy
@@ -83,6 +88,11 @@ class MatchCandidateServiceTest {
 		)).thenReturn(List.of(source, lowerScore, blockedHigherScore));
 		when(userRepository.findAllById(anyCollection()))
 				.thenReturn(List.of(sourceUser, lowerScoreUser, blockedUser));
+		when(profileRepository.findAllById(anyCollection())).thenReturn(List.of(
+				new Profile(101L, "source", Gender.MALE, "서울"),
+				new Profile(102L, "candidate", Gender.FEMALE, "서울"),
+				new Profile(103L, "blocked", Gender.FEMALE, "서울")
+		));
 		when(slotRepository.findAllByMatchRequest_IdIn(anyCollection()))
 				.thenReturn(slots);
 		when(traitRepository.findAllByMatchRequest_IdIn(anyCollection()))
@@ -96,6 +106,8 @@ class MatchCandidateServiceTest {
 				anyCollection()
 		)).thenReturn(List.of());
 		when(eligibilityPolicy.isEligible(
+				any(),
+				any(),
 				any(),
 				any(),
 				any(),

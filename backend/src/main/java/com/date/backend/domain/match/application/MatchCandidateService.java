@@ -15,6 +15,8 @@ import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchRequestTraitSnapshotRepository;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class MatchCandidateService {
 	private final MatchPairRepository matchPairRepository;
 	private final MatchCandidateConstraintRepository constraintRepository;
 	private final UserRepository userRepository;
+	private final ProfileRepository profileRepository;
 	private final MatchEligibilityPolicy eligibilityPolicy;
 	private final MatchAvailabilityPolicy availabilityPolicy;
 	private final MatchScorePolicy scorePolicy;
@@ -65,6 +68,7 @@ public class MatchCandidateService {
 			MatchPairRepository matchPairRepository,
 			MatchCandidateConstraintRepository constraintRepository,
 			UserRepository userRepository,
+			ProfileRepository profileRepository,
 			MatchEligibilityPolicy eligibilityPolicy,
 			MatchAvailabilityPolicy availabilityPolicy,
 			MatchScorePolicy scorePolicy
@@ -75,6 +79,7 @@ public class MatchCandidateService {
 		this.matchPairRepository = matchPairRepository;
 		this.constraintRepository = constraintRepository;
 		this.userRepository = userRepository;
+		this.profileRepository = profileRepository;
 		this.eligibilityPolicy = eligibilityPolicy;
 		this.availabilityPolicy = availabilityPolicy;
 		this.scorePolicy = scorePolicy;
@@ -110,6 +115,8 @@ public class MatchCandidateService {
 
 		Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
 				.collect(Collectors.toMap(User::getId, Function.identity()));
+		Map<Long, Profile> profilesByUserId = profileRepository.findAllById(userIds).stream()
+				.collect(Collectors.toMap(Profile::getUserId, Function.identity()));
 		Map<Long, List<MatchRequestSlot>> slotsByRequestId = groupSlots(
 				slotRepository.findAllByMatchRequest_IdIn(requestIds)
 		);
@@ -128,7 +135,10 @@ public class MatchCandidateService {
 		);
 
 		User sourceUser = usersById.get(source.getUserId());
-		if (sourceUser == null || usersWithActiveMatch.contains(source.getUserId())) {
+		Profile sourceProfile = profilesByUserId.get(source.getUserId());
+		if (sourceUser == null
+				|| sourceProfile == null
+				|| usersWithActiveMatch.contains(source.getUserId())) {
 			return Optional.empty();
 		}
 
@@ -147,10 +157,12 @@ public class MatchCandidateService {
 				.map(candidate -> toCandidate(
 						source,
 						sourceUser,
+						sourceProfile,
 						sourceSlots,
 						sourceTraits,
 						candidate,
 						usersById.get(candidate.getUserId()),
+						profilesByUserId.get(candidate.getUserId()),
 						slotsByRequestId.getOrDefault(candidate.getId(), List.of()),
 						traitsByRequestId.getOrDefault(candidate.getId(), List.of()),
 						earliestSessionStart
@@ -162,19 +174,25 @@ public class MatchCandidateService {
 	private Optional<MatchCandidate> toCandidate(
 			MatchRequest source,
 			User sourceUser,
+			Profile sourceProfile,
 			List<MatchRequestSlot> sourceSlots,
 			List<MatchRequestTraitSnapshot> sourceTraits,
 			MatchRequest candidate,
 			User candidateUser,
+			Profile candidateProfile,
 			List<MatchRequestSlot> candidateSlots,
 			List<MatchRequestTraitSnapshot> candidateTraits,
 			LocalDateTime earliestSessionStart
 	) {
-		if (candidateUser == null || !eligibilityPolicy.isEligible(
+		if (candidateUser == null
+				|| candidateProfile == null
+				|| !eligibilityPolicy.isEligible(
 				source,
 				sourceUser,
+				sourceProfile,
 				candidate,
 				candidateUser,
+				candidateProfile,
 				earliestSessionStart.toLocalDate()
 		)) {
 			return Optional.empty();

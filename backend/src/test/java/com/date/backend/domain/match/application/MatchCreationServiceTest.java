@@ -17,6 +17,9 @@ import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchRequestTraitSnapshotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
+import com.date.backend.domain.profile.domain.Gender;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,7 @@ class MatchCreationServiceTest {
 	private final MatchCandidateConstraintRepository constraintRepository =
 			mock(MatchCandidateConstraintRepository.class);
 	private final UserRepository userRepository = mock(UserRepository.class);
+	private final ProfileRepository profileRepository = mock(ProfileRepository.class);
 	private final MatchEligibilityPolicy eligibilityPolicy =
 			mock(MatchEligibilityPolicy.class);
 	private final MatchAvailabilityPolicy availabilityPolicy =
@@ -66,6 +70,7 @@ class MatchCreationServiceTest {
 			responseRepository,
 			constraintRepository,
 			userRepository,
+			profileRepository,
 			eligibilityPolicy,
 			availabilityPolicy,
 			scorePolicy
@@ -79,6 +84,8 @@ class MatchCreationServiceTest {
 		ActiveMatchRequest secondReservation = reservation(102L, second);
 		User firstUser = user(101L);
 		User secondUser = user(102L);
+		Profile firstProfile = new Profile(101L, "first", Gender.MALE, "서울");
+		Profile secondProfile = new Profile(102L, "second", Gender.FEMALE, "서울");
 		List<MatchRequestSlot> slots = List.of(slot(first), slot(second));
 		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 10, 0);
 		LocalDateTime deadline = matchedAt.plusMinutes(5);
@@ -95,11 +102,15 @@ class MatchCreationServiceTest {
 		when(constraintRepository.areUsersBlocked(101L, 102L)).thenReturn(false);
 		when(userRepository.findAllById(List.of(101L, 102L)))
 				.thenReturn(List.of(firstUser, secondUser));
+		when(profileRepository.findAllById(List.of(101L, 102L)))
+				.thenReturn(List.of(firstProfile, secondProfile));
 		when(eligibilityPolicy.isEligible(
 				first,
 				firstUser,
+				firstProfile,
 				second,
 				secondUser,
+				secondProfile,
 				matchedAt.toLocalDate()
 		)).thenReturn(true);
 		when(slotRepository.findAllByMatchRequest_IdIn(List.of(1L, 2L)))

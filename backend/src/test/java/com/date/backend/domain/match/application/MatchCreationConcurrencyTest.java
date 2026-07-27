@@ -9,6 +9,9 @@ import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
+import com.date.backend.domain.profile.domain.Gender;
+import com.date.backend.domain.profile.domain.Profile;
+import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.survey.domain.FaceTagCatalog;
 import com.date.backend.domain.survey.repository.FaceTagCatalogRepository;
 import com.date.backend.domain.user.domain.User;
@@ -48,6 +51,9 @@ class MatchCreationConcurrencyTest {
 	private UserRepository userRepository;
 
 	@Autowired
+	private ProfileRepository profileRepository;
+
+	@Autowired
 	private FaceTagCatalogRepository faceTagRepository;
 
 	@Autowired
@@ -80,6 +86,10 @@ class MatchCreationConcurrencyTest {
 				"사용자B",
 				"01033334444",
 				LocalDate.of(2000, 2, 1)
+		));
+		profileRepository.saveAllAndFlush(List.of(
+				new Profile(firstUser.getId(), "동시성남성", Gender.MALE, "서울"),
+				new Profile(secondUser.getId(), "동시성여성", Gender.FEMALE, "서울")
 		));
 		List<FaceTagCatalog> faceTags =
 				faceTagRepository.findAllByActiveTrueOrderByDisplayOrderAsc();
