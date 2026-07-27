@@ -23,6 +23,8 @@ import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,6 +62,8 @@ class MatchCreationServiceTest {
 	private final MatchAvailabilityPolicy availabilityPolicy =
 			mock(MatchAvailabilityPolicy.class);
 	private final MatchScorePolicy scorePolicy = mock(MatchScorePolicy.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 
 	private final MatchCreationService service = new MatchCreationService(
 			requestRepository,
@@ -73,7 +77,8 @@ class MatchCreationServiceTest {
 			profileRepository,
 			eligibilityPolicy,
 			availabilityPolicy,
-			scorePolicy
+			scorePolicy,
+			eventPublisher
 	);
 
 	@Test
@@ -133,7 +138,11 @@ class MatchCreationServiceTest {
 				new BigDecimal("41.667")
 		));
 		when(pairRepository.save(any(MatchPair.class)))
-				.thenAnswer(invocation -> invocation.getArgument(0));
+				.thenAnswer(invocation -> {
+					MatchPair pair = invocation.getArgument(0);
+					ReflectionTestUtils.setField(pair, "id", 1000L);
+					return pair;
+				});
 
 		boolean created = service.createMatch(
 				1L,
@@ -151,6 +160,13 @@ class MatchCreationServiceTest {
 						&& pair.getAcceptDeadlineAt().equals(deadline)
 		));
 		verify(responseRepository).saveAll(anyCollection());
+		verify(eventPublisher).publishEvent(new MatchFoundEvent(
+				1000L,
+				101L,
+				102L,
+				matchedAt,
+				deadline
+		));
 	}
 
 	@Test

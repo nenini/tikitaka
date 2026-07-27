@@ -14,6 +14,7 @@ import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.MatchErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class MatchResultService {
 	private final MatchSchedulerProperties properties;
 	private final Clock clock;
 	private final MatchJobEnqueueService jobEnqueueService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchResultService(
 			MatchPairRepository pairRepository,
@@ -48,7 +50,8 @@ public class MatchResultService {
 			ProfileService profileService,
 			MatchSchedulerProperties properties,
 			Clock clock,
-			MatchJobEnqueueService jobEnqueueService
+			MatchJobEnqueueService jobEnqueueService,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.pairRepository = pairRepository;
 		this.responseRepository = responseRepository;
@@ -58,6 +61,7 @@ public class MatchResultService {
 		this.properties = properties;
 		this.clock = clock;
 		this.jobEnqueueService = jobEnqueueService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	public MatchResultResponse getCurrent(Long userId) {
@@ -100,6 +104,15 @@ public class MatchResultService {
 		pair.getRequestB().returnToWaiting(now);
 		jobEnqueueService.enqueue(pair.getRequestA());
 		jobEnqueueService.enqueue(pair.getRequestB());
+		Long recipientUserId = pair.getUserAId().equals(userId)
+				? pair.getUserBId()
+				: pair.getUserAId();
+		eventPublisher.publishEvent(new MatchRejectedEvent(
+				pair.getId(),
+				userId,
+				recipientUserId,
+				now
+		));
 		return toResponse(pair, userId);
 	}
 
@@ -159,6 +172,13 @@ public class MatchResultService {
 		pair.confirm(confirmedAt, scheduledAt);
 		first.confirm();
 		second.confirm();
+		eventPublisher.publishEvent(new MatchConfirmedEvent(
+				pair.getId(),
+				pair.getUserAId(),
+				pair.getUserBId(),
+				confirmedAt,
+				scheduledAt
+		));
 	}
 
 	private MatchResultResponse toResponse(MatchPair pair, Long userId) {

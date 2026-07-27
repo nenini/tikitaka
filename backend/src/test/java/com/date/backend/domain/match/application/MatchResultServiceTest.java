@@ -13,6 +13,7 @@ import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -46,6 +47,8 @@ class MatchResultServiceTest {
 	private final ProfileService profileService = mock(ProfileService.class);
 	private final MatchJobEnqueueService jobEnqueueService =
 			mock(MatchJobEnqueueService.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -64,7 +67,8 @@ class MatchResultServiceTest {
 			profileService,
 			properties,
 			clock,
-			jobEnqueueService
+			jobEnqueueService,
+			eventPublisher
 	);
 
 	@Test
@@ -103,6 +107,13 @@ class MatchResultServiceTest {
 		verify(pair).confirm(NOW, scheduledAt);
 		verify(requestA).confirm();
 		verify(requestB).confirm();
+		verify(eventPublisher).publishEvent(new MatchConfirmedEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				NOW,
+				scheduledAt
+		));
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}
 
@@ -129,6 +140,12 @@ class MatchResultServiceTest {
 		verify(pair).reject();
 		verify(requestA).returnToWaiting(NOW);
 		verify(requestB).returnToWaiting(NOW);
+		verify(eventPublisher).publishEvent(new MatchRejectedEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				NOW
+		));
 		assertThat(result.myResponse().name()).isEqualTo("REJECTED");
 	}
 
