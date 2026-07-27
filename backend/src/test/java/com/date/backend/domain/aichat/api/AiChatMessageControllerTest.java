@@ -1,5 +1,6 @@
 package com.date.backend.domain.aichat.api;
 
+import com.date.backend.domain.aichat.application.AiChatMessageService;
 import com.date.backend.domain.aichat.domain.AiChatSession;
 import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
 import com.date.backend.domain.aichat.domain.ChatbotPersona;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,7 +26,6 @@ import java.util.List;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,6 +51,9 @@ class AiChatMessageControllerTest {
 	@Autowired
 	private AiChatSessionRepository sessionRepository;
 
+	@Autowired
+	private AiChatMessageService messageService;
+
 	private UsernamePasswordAuthenticationToken ownerAuthentication;
 	private UsernamePasswordAuthenticationToken otherAuthentication;
 	private Long sessionId;
@@ -73,42 +75,24 @@ class AiChatMessageControllerTest {
 		).getId();
 		ownerAuthentication = buildAuthentication(owner);
 		otherAuthentication = buildAuthentication(other);
+		messageService.saveUserMessage(owner.getId(), sessionId, "첫 번째 메시지");
+		messageService.saveAiMessage(owner.getId(), sessionId, "두 번째 메시지");
 	}
 
 	@Test
-	void ownerCanSaveAndReadMessagesInOrder() throws Exception {
-		saveMessage("USER", "첫 번째 메시지")
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.data.sequenceNo").value(1))
-				.andExpect(jsonPath("$.data.senderType").value("USER"))
-				.andExpect(jsonPath("$.data.createdAt").isNotEmpty());
-
-		saveMessage("AI", "두 번째 메시지")
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.data.sequenceNo").value(2));
-
+	void ownerCanReadUserAndAiMessagesInOrder() throws Exception {
 		mockMvc.perform(get(messageUrl()).with(authentication(ownerAuthentication)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.length()").value(2))
+				.andExpect(jsonPath("$.data[0].senderType").value("USER"))
 				.andExpect(jsonPath("$.data[0].messageText").value("첫 번째 메시지"))
+				.andExpect(jsonPath("$.data[0].sequenceNo").value(1))
+				.andExpect(jsonPath("$.data[1].senderType").value("AI"))
 				.andExpect(jsonPath("$.data[1].messageText").value("두 번째 메시지"));
 	}
 
 	@Test
-	void nonOwnerCannotSaveOrReadMessages() throws Exception {
-		mockMvc.perform(post(messageUrl())
-						.with(authentication(otherAuthentication))
-						.contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{
-								  "senderType": "USER",
-								  "messageText": "접근 시도",
-								  "proactive": false
-								}
-								"""))
-				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("CHAT_SESSION_FORBIDDEN"));
-
+	void nonOwnerCannotReadMessages() throws Exception {
 		mockMvc.perform(get(messageUrl()).with(authentication(otherAuthentication)))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("CHAT_SESSION_FORBIDDEN"));
@@ -118,22 +102,6 @@ class AiChatMessageControllerTest {
 	void unauthenticatedUserCannotReadMessages() throws Exception {
 		mockMvc.perform(get(messageUrl()))
 				.andExpect(status().isUnauthorized());
-	}
-
-	private org.springframework.test.web.servlet.ResultActions saveMessage(
-			String senderType,
-			String messageText
-	) throws Exception {
-		return mockMvc.perform(post(messageUrl())
-				.with(authentication(ownerAuthentication))
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{
-						  "senderType": "%s",
-						  "messageText": "%s",
-						  "proactive": false
-						}
-						""".formatted(senderType, messageText)));
 	}
 
 	private String messageUrl() {

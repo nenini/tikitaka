@@ -4,7 +4,6 @@ import com.date.backend.domain.aichat.domain.AiChatSession;
 import com.date.backend.domain.aichat.domain.ChatMessageSenderType;
 import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
 import com.date.backend.domain.aichat.domain.ChatbotPersona;
-import com.date.backend.domain.aichat.dto.request.AiChatMessageCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatMessageResponse;
 import com.date.backend.domain.aichat.repository.AiChatSessionRepository;
 import com.date.backend.domain.aichat.repository.ChatbotPersonaRepository;
@@ -73,16 +72,10 @@ class AiChatMessageServiceTest {
 
 	@Test
 	void userAndAiMessagesAreStoredAndReturnedInSequence() {
-		AiChatMessageResponse userMessage = messageService.save(
-				ownerId,
-				sessionId,
-				new AiChatMessageCreateRequest(ChatMessageSenderType.USER, "안녕하세요.", false)
-		);
-		AiChatMessageResponse aiMessage = messageService.save(
-				ownerId,
-				sessionId,
-				new AiChatMessageCreateRequest(ChatMessageSenderType.AI, "반갑습니다.", false)
-		);
+		AiChatMessageResponse userMessage =
+				messageService.saveUserMessage(ownerId, sessionId, "안녕하세요.");
+		AiChatMessageResponse aiMessage =
+				messageService.saveAiMessage(ownerId, sessionId, "반갑습니다.");
 
 		List<AiChatMessageResponse> messages = messageService.getMessages(ownerId, sessionId);
 
@@ -97,11 +90,8 @@ class AiChatMessageServiceTest {
 
 	@Test
 	void nonOwnerCannotSaveOrReadMessages() {
-		AiChatMessageCreateRequest request =
-				new AiChatMessageCreateRequest(ChatMessageSenderType.USER, "접근 시도", false);
-
 		BusinessException saveException = catchThrowableOfType(
-				() -> messageService.save(otherUserId, sessionId, request),
+				() -> messageService.saveUserMessage(otherUserId, sessionId, "접근 시도"),
 				BusinessException.class
 		);
 		BusinessException readException = catchThrowableOfType(
@@ -120,15 +110,7 @@ class AiChatMessageServiceTest {
 		sessionRepository.saveAndFlush(session);
 
 		BusinessException exception = catchThrowableOfType(
-				() -> messageService.save(
-						ownerId,
-						sessionId,
-						new AiChatMessageCreateRequest(
-								ChatMessageSenderType.USER,
-								"종료 후 메시지",
-								false
-						)
-				),
+				() -> messageService.saveUserMessage(ownerId, sessionId, "종료 후 메시지"),
 				BusinessException.class
 		);
 

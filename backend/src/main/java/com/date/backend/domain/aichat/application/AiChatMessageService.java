@@ -4,7 +4,6 @@ import com.date.backend.domain.aichat.domain.AiChatMessage;
 import com.date.backend.domain.aichat.domain.AiChatSession;
 import com.date.backend.domain.aichat.domain.ChatMessageSenderType;
 import com.date.backend.domain.aichat.domain.ChatSessionStatus;
-import com.date.backend.domain.aichat.dto.request.AiChatMessageCreateRequest;
 import com.date.backend.domain.aichat.dto.response.AiChatMessageResponse;
 import com.date.backend.domain.aichat.repository.AiChatMessageRepository;
 import com.date.backend.domain.aichat.repository.AiChatSessionRepository;
@@ -29,11 +28,11 @@ public class AiChatMessageService {
 		this.messageRepository = messageRepository;
 	}
 
-	@Transactional
-	public AiChatMessageResponse save(
+	private AiChatMessageResponse save(
 			Long userId,
 			Long sessionId,
-			AiChatMessageCreateRequest request
+			ChatMessageSenderType senderType,
+			String messageText
 	) {
 		AiChatSession session = sessionRepository.findByIdForUpdate(sessionId)
 				.orElseThrow(() -> new BusinessException(AiChatErrorCode.CHAT_SESSION_NOT_FOUND));
@@ -43,12 +42,12 @@ public class AiChatMessageService {
 		long nextSequence = messageRepository.findMaxSequenceNo(sessionId) + 1;
 		AiChatMessage message = messageRepository.saveAndFlush(new AiChatMessage(
 				session,
-				request.senderType(),
-				request.messageText(),
+				senderType,
+				messageText,
 				nextSequence,
-				request.proactive()
+				false
 		));
-		if (request.senderType() == ChatMessageSenderType.USER) {
+		if (senderType == ChatMessageSenderType.USER) {
 			session.recordUserMessage(message.getCreatedAt());
 		}
 		return AiChatMessageResponse.from(message);
@@ -65,20 +64,12 @@ public class AiChatMessageService {
 
 	@Transactional
 	public AiChatMessageResponse saveUserMessage(Long userId, Long sessionId, String messageText) {
-		return save(
-				userId,
-				sessionId,
-				new AiChatMessageCreateRequest(ChatMessageSenderType.USER, messageText, false)
-		);
+		return save(userId, sessionId, ChatMessageSenderType.USER, messageText);
 	}
 
 	@Transactional
 	public AiChatMessageResponse saveAiMessage(Long userId, Long sessionId, String messageText) {
-		return save(
-				userId,
-				sessionId,
-				new AiChatMessageCreateRequest(ChatMessageSenderType.AI, messageText, false)
-		);
+		return save(userId, sessionId, ChatMessageSenderType.AI, messageText);
 	}
 
 	private void validateOwner(Long userId, AiChatSession session) {

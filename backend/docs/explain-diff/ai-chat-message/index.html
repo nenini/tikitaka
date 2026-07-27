@@ -76,7 +76,7 @@
   <header>
     <div class="eyebrow">BACKEND · AI_CHAT-02</div>
     <h1>AI 채팅 메시지 저장 및 조회</h1>
-    <p class="lead">사용자·AI 메시지를 세션 안에서 순서대로 저장하고, 오직 세션 소유자만 전체 대화 기록을 조회하도록 변경했습니다.</p>
+    <p class="lead">사용자·AI 메시지는 통합 스트림 API가 유형을 자동 지정해 저장하고, 오직 세션 소유자만 전체 대화 기록을 조회하도록 구성했습니다.</p>
     <div class="status">✓ 전체 테스트 96개 통과</div>
   </header>
 
@@ -89,7 +89,7 @@
       </article>
       <article class="card after">
         <h3>AFTER · 대화 기록 관리</h3>
-        <p class="muted"><code>senderType</code>, <code>messageText</code>, <code>sequenceNo</code>, <code>createdAt</code>을 응답하며 세션별 순서를 DB 유일 제약으로 보호합니다.</p>
+        <p class="muted">Frontend는 <code>senderType</code>을 지정하지 않습니다. 통합 스트림이 사용자 입력은 USER, AI 답변은 AI로 저장하고 조회 API가 전체 기록을 반환합니다.</p>
       </article>
     </div>
   </section>
@@ -110,12 +110,10 @@
     <h2>API</h2>
     <div class="grid">
       <article class="card">
-        <h3><span class="pill post">POST</span> 메시지 저장</h3>
-        <p><code>/api/v1/ai-chat/sessions/{sessionId}/messages</code></p>
+        <h3><span class="pill post">POST</span> 사용자 전송 + AI 스트림</h3>
+        <p><code>/api/v1/ai-chat/sessions/{sessionId}/responses/stream</code></p>
         <pre>{
-  "senderType": "USER",
-  "messageText": "안녕하세요.",
-  "proactive": false
+  "messageText": "안녕하세요."
 }</pre>
       </article>
       <article class="card">
@@ -158,7 +156,7 @@
         <tr><td>정상 조회</td><td class="ok">200 OK · sequenceNo 오름차순</td></tr>
       </tbody>
     </table>
-    <p class="warn" style="margin-top:14px">현재 AI 서버 연동 전 단계이므로 저장 요청은 USER와 AI 유형을 모두 받을 수 있습니다. 이후 Backend↔AI 내부 인증을 붙일 때 AI 메시지 저장 경로를 내부 전용으로 제한하는 것이 권장됩니다.</p>
+    <p class="warn" style="margin-top:14px"><code>POST /messages</code>는 제거됐습니다. 실제 채팅은 <code>POST /responses/stream</code>, 기존 기록 확인은 <code>GET /messages</code>만 사용합니다.</p>
   </section>
 </main>
 </body>
