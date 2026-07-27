@@ -10,7 +10,10 @@ import java.time.ZoneId;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(MatchSchedulerProperties.class)
+@EnableConfigurationProperties({
+		MatchSchedulerProperties.class,
+		MatchPolicyProperties.class
+})
 public class MatchSchedulerConfiguration {
 
 	@Bean

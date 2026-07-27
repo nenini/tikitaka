@@ -68,6 +68,16 @@ public enum MatchErrorCode implements ErrorCode {
 			HttpStatus.CONFLICT,
 			"MATCH_SCHEDULE_NOT_AVAILABLE",
 			"예약 가능한 공통 시간을 찾을 수 없습니다."
+	),
+	MATCH_CANCELLATION_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"MATCH_CANCELLATION_NOT_ALLOWED",
+			"확정된 매칭만 취소할 수 있습니다."
+	),
+	MATCH_SESSION_ALREADY_STARTED(
+			HttpStatus.CONFLICT,
+			"MATCH_SESSION_ALREADY_STARTED",
+			"이미 시작된 매칭은 취소할 수 없습니다."
 	);
 
 	private final HttpStatus status;

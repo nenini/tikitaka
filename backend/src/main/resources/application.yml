@@ -96,6 +96,8 @@ face:
     request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
 
 match:
+  policy:
+    late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
   scheduler:
     enabled: ${MATCH_SCHEDULER_ENABLED:true}
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}

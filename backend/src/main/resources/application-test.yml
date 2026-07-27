@@ -13,6 +13,8 @@ spring:
       ddl-auto: create-drop
 
 match:
+  policy:
+    late-cancellation-threshold-seconds: 86400
   scheduler:
     enabled: false
     fixed-delay-ms: 10000
