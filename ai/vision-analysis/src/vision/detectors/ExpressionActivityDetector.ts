@@ -92,7 +92,7 @@ export class ExpressionActivityDetector
     }
     if (
       context.baseline.status !== "READY" &&
-      context.baseline.status !== "FALLBACK"
+      context.baseline.status !== "GLOBAL_FALLBACK"
     ) {
       // Pose calibration is required before behavior-relative metrics are used.
       this.clearSamples();

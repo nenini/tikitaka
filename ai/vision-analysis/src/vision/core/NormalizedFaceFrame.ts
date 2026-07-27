@@ -41,6 +41,8 @@ export interface NormalizedPrimaryFace {
   readonly pitch: number | null;
   readonly roll: number | null;
   readonly blendshapes: Readonly<Record<string, number>>;
+  /** Required keys absent from the MediaPipe result; absence is not score zero. */
+  readonly missingRequiredBlendshapes: readonly string[];
   readonly geometry: NormalizedFaceGeometry;
   readonly eyeGaze: NormalizedEyeGaze;
 }
@@ -62,6 +64,8 @@ export interface NormalizedFaceFrame {
   readonly imageQuality: {
     /** 0 is very dark and 1 is sufficiently bright. */
     readonly brightnessScore: number;
+    /** 0 is strong face-vs-background backlight and 1 is evenly exposed. */
+    readonly backlightScore?: number;
     /** 0 is severely blurred and 1 is sharp. */
     readonly blurScore: number;
     /** Unscaled Laplacian variance exposed locally for threshold tuning. */
@@ -82,8 +86,10 @@ export const FACE_QUALITY_REASONS = [
   "FACE_MISSING",
   "MULTIPLE_FACES",
   "FACE_TOO_SMALL",
+  "FACE_TOO_LARGE",
   "FACE_OUT_OF_FRAME",
   "LOW_LIGHT",
+  "BACKLIGHT",
   "SEVERE_BLUR",
   "EXTREME_HEAD_POSE",
   "VIDEO_DIMENSIONS_UNAVAILABLE",

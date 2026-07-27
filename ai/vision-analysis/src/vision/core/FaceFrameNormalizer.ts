@@ -18,6 +18,12 @@ const UPPER_LIP_CENTER_INDEX = 13;
 const CHIN_INDEX = 152;
 const MOUTH_CORNER_LEFT_INDEX = 61;
 const MOUTH_CORNER_RIGHT_INDEX = 291;
+const REQUIRED_BLENDSHAPES = [
+  "mouthSmileLeft",
+  "mouthSmileRight",
+  "eyeBlinkLeft",
+  "eyeBlinkRight",
+] as const;
 
 // Indices follow MediaPipe's official Face Landmarker eye/iris connections.
 const LEFT_EYE = {
@@ -43,6 +49,7 @@ export interface FaceFrameNormalizationInput {
   readonly sourceWidth: number;
   readonly sourceHeight: number;
   readonly brightnessScore: number;
+  readonly backlightScore?: number;
   readonly blurScore: number;
   readonly rawLaplacianVariance: number;
   readonly totalDurationMs: number;
@@ -265,6 +272,9 @@ export class FaceFrameNormalizer {
       pitch: pose?.pitch ?? null,
       roll: pose?.roll ?? null,
       blendshapes: primary.blendshapes,
+      missingRequiredBlendshapes: REQUIRED_BLENDSHAPES.filter(
+        (name) => primary.blendshapes[name] === undefined,
+      ),
       geometry,
       eyeGaze,
     });
@@ -365,6 +375,7 @@ export class FaceFrameNormalizer {
       primaryFace,
       imageQuality: {
         brightnessScore: input.brightnessScore,
+        backlightScore: input.backlightScore ?? 1,
         blurScore: input.blurScore,
         rawLaplacianVariance: input.rawLaplacianVariance,
       },

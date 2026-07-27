@@ -75,7 +75,7 @@ export class NodDetector
     }
     if (
       context.baseline.status !== "READY" &&
-      context.baseline.status !== "FALLBACK"
+      context.baseline.status !== "GLOBAL_FALLBACK"
     ) {
       // A nod is measured relative to the user's calibrated neutral pitch.
       this.resetTracking("WAITING_FOR_BASELINE");
