@@ -30,6 +30,7 @@ export function createVisionBaseline(
     ]),
   ) as VisionBaseline["signalStates"];
   return {
+    schemaVersion: 2,
     status: "READY",
     baselineEpoch: 0,
     usableFrameCount: 20,

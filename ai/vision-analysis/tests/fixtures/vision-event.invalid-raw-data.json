@@ -1,7 +1,7 @@
 {
   "eventId": "1ba268b7-d0ce-42ae-b2f4-cd78af569a7d",
   "eventType": "VISION_METRIC_SNAPSHOT",
-  "version": 1,
+  "version": 2,
   "kind": "metric",
   "sessionId": "session-123",
   "userId": "user-a",
@@ -13,12 +13,24 @@
   "confidence": 0.91,
   "source": "VISION_PIPELINE",
   "modelVersion": "mediapipe-face-landmarker-v1",
-  "ruleVersion": "vision-rule-v1",
+  "ruleVersion": "vision-rule-v2",
   "rawLandmarks": [[0.1, 0.2, 0.3]],
   "payload": {
     "quality": {
       "usable": true,
+      "state": "USABLE",
+      "confidence": 0.91,
+      "components": {
+        "facePresence": 1,
+        "faceSize": 0.9,
+        "inFrame": 1,
+        "brightness": 0.72,
+        "blur": 0.81,
+        "poseObservability": 1,
+        "trackingStability": 0.9
+      },
       "reasons": [],
+      "pendingReasons": [],
       "faceDetected": true,
       "faceCount": 1,
       "faceBoxRatio": 0.17,
@@ -26,6 +38,25 @@
       "blurScore": 0.81
     },
     "metrics": {
+      "smile": {
+        "configurationScore": 0.31,
+        "delta": 0.07,
+        "maintained": true,
+        "confidence": 0.83
+      },
+      "attention": {
+        "score": 72,
+        "confidence": 0.87,
+        "mode": "BINOCULAR"
+      },
+      "activity": {
+        "upperFaceActivityScore": 0.35,
+        "lowerFaceActivityScore": 0.52,
+        "poseAlignedLandmarkActivityScore": 0.4,
+        "expressionActivityScore": 0.44,
+        "confidence": 0.76,
+        "experimentalOnly": true
+      },
       "screenFacingScore": 0.86,
       "smileScore": 0.31,
       "expressionActivityScore": 0.44,
@@ -42,4 +73,3 @@
     }
   }
 }
-

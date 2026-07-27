@@ -17,7 +17,7 @@ function behaviorEvent(eventId: string): VisionBehaviorEvent {
   return {
     eventId,
     eventType: "NOD_EVENT",
-    version: 1,
+    version: 2,
     sessionId: "session-a",
     userId: "user-a",
     clientInstanceId: "76a06bb5-2022-4126-a0f0-e370369e2459",
@@ -44,7 +44,7 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
   return {
     eventId,
     eventType: "VISION_METRIC_SNAPSHOT",
-    version: 1,
+    version: 2,
     sessionId: "session-a",
     userId: "user-a",
     clientInstanceId: "76a06bb5-2022-4126-a0f0-e370369e2459",
@@ -60,7 +60,19 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
     payload: {
       quality: {
         usable: true,
+        state: "USABLE",
+        confidence: 0.9,
+        components: {
+          facePresence: 1,
+          faceSize: 0.9,
+          inFrame: 1,
+          brightness: 0.8,
+          blur: 0.8,
+          poseObservability: 1,
+          trackingStability: 0.9,
+        },
         reasons: [],
+        pendingReasons: [],
         faceDetected: true,
         faceCount: 1,
         faceBoxRatio: 0.2,
@@ -68,6 +80,25 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
         blurScore: 0.8,
       },
       metrics: {
+        smile: {
+          configurationScore: 0.2,
+          delta: 0,
+          maintained: false,
+          confidence: 0.9,
+        },
+        attention: {
+          score: 90,
+          confidence: 0.9,
+          mode: "BINOCULAR",
+        },
+        activity: {
+          upperFaceActivityScore: 0.2,
+          lowerFaceActivityScore: 0.4,
+          poseAlignedLandmarkActivityScore: 0.3,
+          expressionActivityScore: 0.3,
+          confidence: 0.8,
+          experimentalOnly: true,
+        },
         screenFacingScore: 0.9,
         smileScore: 0.2,
         expressionActivityScore: 0.3,

@@ -73,7 +73,19 @@ describe("VisionEventFactory", () => {
       payload: {
         quality: {
           usable: true,
+          state: "USABLE",
+          confidence: 0.9,
+          components: {
+            facePresence: 1,
+            faceSize: 0.9,
+            inFrame: 1,
+            brightness: 0.7,
+            blur: 0.8,
+            poseObservability: 1,
+            trackingStability: 0.9,
+          },
           reasons: [],
+          pendingReasons: [],
           faceDetected: true,
           faceCount: 1,
           faceBoxRatio: 0.16,
@@ -81,6 +93,25 @@ describe("VisionEventFactory", () => {
           blurScore: 0.8,
         },
         metrics: {
+          smile: {
+            configurationScore: 0.52,
+            delta: 0.2,
+            maintained: false,
+            confidence: 0.9,
+          },
+          attention: {
+            score: 80,
+            confidence: 0.9,
+            mode: "BINOCULAR",
+          },
+          activity: {
+            upperFaceActivityScore: 0.3,
+            lowerFaceActivityScore: 0.5,
+            poseAlignedLandmarkActivityScore: 0.4,
+            expressionActivityScore: 0.4,
+            confidence: 0.8,
+            experimentalOnly: true,
+          },
           screenFacingScore: 0.8,
           smileScore: 0.52,
           expressionActivityScore: 0.4,
@@ -107,4 +138,3 @@ describe("VisionEventFactory", () => {
     expect(visionEventSchema.parse(snapshot)).toEqual(snapshot);
   });
 });
-

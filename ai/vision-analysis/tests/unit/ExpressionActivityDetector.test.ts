@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createVisionBaseline } from "../helpers/createVisionBaseline.js";
 import { defaultVisionConfig } from "../../src/vision/config/defaultVisionConfig.js";
 import { ExpressionActivityDetector } from "../../src/vision/detectors/ExpressionActivityDetector.js";
-import { visionBehaviorEventSchema } from "../../src/vision/events/VisionEventSchema.js";
+import { computeExpressionActivityScores } from "../../src/vision/detectors/ExpressionActivityScore.js";
 import { createDetectorEventFactory } from "../helpers/createDetectorTestKit.js";
 import { createNormalizedFaceFrame } from "../helpers/createNormalizedFaceFrame.js";
 
@@ -33,7 +33,8 @@ const usableContext = {
 
 const activityConfig = {
   ...defaultVisionConfig.expressionActivity,
-  blendshapeNames: ["jawOpen"],
+  upperFaceBlendshapeNames: ["browInnerUp"],
+  lowerFaceBlendshapeNames: ["mouthSmileLeft"],
   blendshapeWeight: 0.7,
   landmarkWeight: 0.3,
   windowMs: 400,
@@ -47,7 +48,43 @@ const activityConfig = {
 };
 
 describe("ExpressionActivityDetector", () => {
-  it("emits one low-activity episode after warmup and hysteresis", () => {
+  it("normalizes total variation by observable seconds across frame rates", () => {
+    const previous = createNormalizedFaceFrame({
+      timestampMs: 0,
+      blendshapes: { browInnerUp: 0, mouthSmileLeft: 0 },
+    }).primaryFace;
+    const atFiveFps = createNormalizedFaceFrame({
+      timestampMs: 200,
+      blendshapes: { browInnerUp: 0.2, mouthSmileLeft: 0.2 },
+    }).primaryFace;
+    const atLowFps = createNormalizedFaceFrame({
+      timestampMs: 400,
+      blendshapes: { browInnerUp: 0.4, mouthSmileLeft: 0.4 },
+    }).primaryFace;
+    if (previous === null || atFiveFps === null || atLowFps === null) {
+      throw new Error("test faces must be present");
+    }
+
+    const fiveFps = computeExpressionActivityScores(
+      previous,
+      atFiveFps,
+      200,
+      1,
+      activityConfig,
+    );
+    const lowFps = computeExpressionActivityScores(
+      previous,
+      atLowFps,
+      400,
+      1,
+      activityConfig,
+    );
+    expect(fiveFps.expressionActivityScore).toBeCloseTo(
+      lowFps.expressionActivityScore ?? -1,
+    );
+  });
+
+  it("keeps activity as an experimental metric without behavior events", () => {
     const detector = new ExpressionActivityDetector(
       activityConfig,
       createDetectorEventFactory(),
@@ -55,38 +92,28 @@ describe("ExpressionActivityDetector", () => {
 
     for (const timestampMs of [0, 200, 400, 600, 800]) {
       expect(
-        detector.update(createNormalizedFaceFrame({ timestampMs }), usableContext),
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            blendshapes: { browInnerUp: 0, mouthSmileLeft: 0 },
+          }),
+          usableContext,
+        ),
       ).toHaveLength(0);
     }
-    const started = detector.update(
-      createNormalizedFaceFrame({ timestampMs: 1_000 }),
-      usableContext,
-    );
-    expect(started.map((event) => event.eventType)).toEqual([
-      "STIFF_EXPRESSION_STARTED",
-    ]);
-    expect(visionBehaviorEventSchema.parse(started[0])).toEqual(started[0]);
-
-    detector.update(
+    const events = detector.update(
       createNormalizedFaceFrame({
-        timestampMs: 1_200,
-        blendshapes: { jawOpen: 1 },
-        landmarkDisplacementScore: 1,
+        timestampMs: 1_000,
+        blendshapes: { browInnerUp: 0.2, mouthSmileLeft: 0.2 },
       }),
       usableContext,
     );
-    const ended = detector.update(
-      createNormalizedFaceFrame({
-        timestampMs: 1_400,
-        blendshapes: { jawOpen: 0 },
-        landmarkDisplacementScore: 1,
-      }),
-      usableContext,
-    );
-    expect(ended.map((event) => event.eventType)).toEqual([
-      "STIFF_EXPRESSION_ENDED",
-    ]);
-    expect(visionBehaviorEventSchema.parse(ended[0])).toEqual(ended[0]);
+    expect(events).toHaveLength(0);
+    expect(detector.getState()).toMatchObject({
+      state: "NORMAL",
+      activityConfidence: expect.any(Number),
+    });
+    expect(detector.getState().lowerFaceActivityScore).not.toBeNull();
   });
 
   it("clears candidate samples across an unusable gap", () => {
@@ -104,7 +131,7 @@ describe("ExpressionActivityDetector", () => {
     });
 
     expect(events).toHaveLength(0);
-    expect(detector.getState().state).toBe("WAITING_FOR_BASELINE");
+    expect(detector.getState().state).toBe("SUSPENDED");
     expect(detector.getState().sampleCount).toBe(0);
   });
 });

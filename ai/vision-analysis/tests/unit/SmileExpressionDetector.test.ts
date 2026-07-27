@@ -24,8 +24,9 @@ describe("SmileExpressionDetector", () => {
     detector.update(createNormalizedFaceFrame({ timestampMs: 600, blendshapes: relaxed }), context);
     expect(detector.update(createNormalizedFaceFrame({ timestampMs: 1_000, blendshapes: smile }), context)).toHaveLength(0);
     detector.update(createNormalizedFaceFrame({ timestampMs: 1_200, blendshapes: relaxed }), context);
-    detector.update(createNormalizedFaceFrame({ timestampMs: 1_900, blendshapes: relaxed }), context);
-    expect(detector.update(createNormalizedFaceFrame({ timestampMs: 2_600, blendshapes: relaxed }), context)[0]?.eventType).toBe("SMILE_ENDED");
+    detector.update(createNormalizedFaceFrame({ timestampMs: 1_600, blendshapes: relaxed }), context);
+    detector.update(createNormalizedFaceFrame({ timestampMs: 2_000, blendshapes: relaxed }), context);
+    expect(detector.update(createNormalizedFaceFrame({ timestampMs: 2_400, blendshapes: relaxed }), context)[0]?.eventType).toBe("SMILE_ENDED");
   });
 
   it("treats missing mouth keys as unavailable but accepts explicit zero", () => {
@@ -37,7 +38,7 @@ describe("SmileExpressionDetector", () => {
       createNormalizedFaceFrame({ timestampMs: 0, blendshapes: {} }),
       context,
     );
-    expect(detector.getState().state).toBe("UNAVAILABLE");
+    expect(detector.getState().state).toBe("SUSPENDED");
     expect(detector.getState().signalAvailable).toBe(false);
 
     detector.update(
@@ -49,6 +50,80 @@ describe("SmileExpressionDetector", () => {
     );
     expect(detector.getState().signalAvailable).toBe(true);
     expect(detector.getState().smileConfigurationScore).toBe(0);
+  });
+
+  it("keeps a short suspension in one episode and ends a long one at failure start", () => {
+    const detector = new SmileExpressionDetector(
+      defaultVisionConfig.smile,
+      createDetectorEventFactory(),
+    );
+    for (const timestampMs of [0, 200, 400]) {
+      detector.update(
+        createNormalizedFaceFrame({ timestampMs, blendshapes: smile }),
+        context,
+      );
+    }
+
+    expect(
+      detector.suspend({
+        sessionElapsedMs: 500,
+        clientMonotonicMs: 500,
+        reason: "ANALYSIS_UNAVAILABLE",
+        suspensionStartedElapsedMs: 500,
+      }),
+    ).toHaveLength(0);
+    detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 1_000,
+        blendshapes: smile,
+      }),
+      context,
+    );
+    expect(detector.getState().state).toBe("ACTIVE");
+
+    const ended = detector.suspend({
+      sessionElapsedMs: 2_201,
+      clientMonotonicMs: 2_201,
+      reason: "ANALYSIS_UNAVAILABLE",
+      suspensionStartedElapsedMs: 1_100,
+    });
+    expect(ended[0]?.eventType).toBe("SMILE_ENDED");
+    if (ended[0]?.eventType !== "SMILE_ENDED") {
+      throw new Error("expected a smile end event");
+    }
+    expect(ended[0].payload).toMatchObject({
+      observedEndElapsedMs: 1_100,
+      wallDurationMs: 1_100,
+      terminationReason: "ANALYSIS_UNAVAILABLE",
+    });
+    expect(
+      ended[0].payload.observedDurationMs +
+        ended[0].payload.unobservedDurationMs,
+    ).toBe(ended[0].payload.wallDurationMs);
+  });
+
+  it("ends an active episode immediately when the camera is disabled", () => {
+    const detector = new SmileExpressionDetector(
+      defaultVisionConfig.smile,
+      createDetectorEventFactory(),
+    );
+    for (const timestampMs of [0, 200, 400]) {
+      detector.update(
+        createNormalizedFaceFrame({ timestampMs, blendshapes: smile }),
+        context,
+      );
+    }
+
+    const events = detector.suspend({
+      sessionElapsedMs: 500,
+      clientMonotonicMs: 500,
+      reason: "CAMERA_DISABLED",
+    });
+    expect(events[0]?.eventType).toBe("SMILE_ENDED");
+    if (events[0]?.eventType === "SMILE_ENDED") {
+      expect(events[0].payload.terminationReason).toBe("CAMERA_DISABLED");
+      expect(events[0].payload.observedEndElapsedMs).toBe(500);
+    }
   });
 
   it("uses mouth-only scoring and keeps configuration separate from change", () => {

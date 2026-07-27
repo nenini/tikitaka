@@ -19,6 +19,17 @@ describe("visionEventSchema contract fixtures", () => {
     expect(visionEventSchema.parse(fixture)).toEqual(fixture);
   });
 
+  it("rejects v1 instead of coercing it into the v2 contract", async () => {
+    const fixture = await readFixture("vision-behavior-event.valid.json");
+    if (typeof fixture !== "object" || fixture === null) {
+      throw new TypeError("fixture must be an object");
+    }
+
+    expect(() =>
+      visionEventSchema.parse({ ...fixture, version: 1 }),
+    ).toThrow();
+  });
+
   it("accepts the metric snapshot contract fixture", async () => {
     const fixture = await readFixture("vision-metric-snapshot.valid.json");
 
@@ -77,4 +88,3 @@ describe("visionEventSchema contract fixtures", () => {
     );
   });
 });
-

@@ -52,7 +52,8 @@ describe("BaselineCalibrator", () => {
       defaultVisionConfig.calibration,
       {
         ...defaultVisionConfig.expressionActivity,
-        blendshapeNames: ["jawOpen"],
+        upperFaceBlendshapeNames: ["browInnerUp"],
+        lowerFaceBlendshapeNames: ["mouthSmileLeft"],
         blendshapeWeight: 1,
         landmarkWeight: 0,
       },
@@ -63,7 +64,10 @@ describe("BaselineCalibrator", () => {
       calibrator.update(
         createNormalizedFaceFrame({
           timestampMs,
-          blendshapes: { jawOpen: timestampMs % 400 === 0 ? 0 : 0.2 },
+          blendshapes: {
+            browInnerUp: timestampMs % 400 === 0 ? 0 : 0.2,
+            mouthSmileLeft: timestampMs % 400 === 0 ? 0 : 0.2,
+          },
         }),
         usable,
       );
@@ -72,7 +76,7 @@ describe("BaselineCalibrator", () => {
     const baseline = calibrator.getBaseline();
     expect(baseline.status).toBe("READY");
     expect(baseline.expressionActivityScore).not.toBeNull();
-    expect(baseline.expressionActivityScore).toBeCloseTo(0.2);
+    expect(baseline.expressionActivityScore).toBeCloseTo(0.5);
   });
 
   it("pauses on quality failure and resumes without discarding samples", () => {
