@@ -17,6 +17,19 @@ from chatbot.schemas import ChatMessage, PersonaSpec
 # 응답만 잘라내고 짧은 응답은 그대로 둔다.
 _SENT_END_RE = re.compile(r"[.!?。！？…]+")
 
+# 모델이 가끔 뱉는 마크다운 강조 문자(**볼드**·#헤딩·`코드`). 채팅엔 불필요하고
+# 그대로 FE로 가면 별표가 보이므로 제거한다. 캐주얼 한국어 대화에서 이 문자들이
+# 정상적으로 쓰일 일은 거의 없다.
+_MD_RE = re.compile(r"[*#`]+")
+
+
+def _strip_markdown(stream: Iterator[str]) -> Iterator[str]:
+    """토큰마다 마크다운 강조 문자를 제거. 제거 후 빈 조각은 건너뛴다."""
+    for piece in stream:
+        cleaned = _MD_RE.sub("", piece)
+        if cleaned:
+            yield cleaned
+
 
 def _cap_sentences(stream: Iterator[str], max_sentences: int = 2) -> Iterator[str]:
     """스트림을 문장 N개까지만 흘려보내고 조기 종료(길이 하드캡 + 생성 조기중단)."""
@@ -57,7 +70,7 @@ class Conversation:
         stream = self.llm.stream(
             system_prompt=self.system_prompt, history=self.history, user_text=user_text
         )
-        return _cap_sentences(stream, max_sentences=max_sentences)
+        return _cap_sentences(_strip_markdown(stream), max_sentences=max_sentences)
 
     def send(self, user_text: str) -> ChatMessage:
         """유저 메시지 전송 → 봇 응답(완성본). 이력에 유저·봇 메시지를 추가한다."""
