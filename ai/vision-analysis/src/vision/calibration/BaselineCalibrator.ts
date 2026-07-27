@@ -103,6 +103,7 @@ function emptyBaseline(status: BaselineStatus = "NOT_STARTED"): VisionBaseline {
     terminalFallback ? "GLOBAL_FALLBACK" : "COLLECTING",
   );
   return {
+    schemaVersion: 2,
     status,
     baselineEpoch: 0,
     usableFrameCount: 0,
@@ -441,6 +442,7 @@ export class BaselineCalibrator {
       rightEyeVerticalBaseline,
     ]);
     return {
+      schemaVersion: 2,
       status,
       baselineEpoch: 0,
       usableFrameCount: this.samples.length,
@@ -490,7 +492,7 @@ export class BaselineCalibrator {
   ): boolean {
     const face = frame.primaryFace;
     return (
-      quality.usable &&
+      (quality.calibrationEligible ?? quality.usable) &&
       frame.faceCount === 1 &&
       face !== null &&
       face.yaw !== null &&
@@ -548,6 +550,10 @@ export class BaselineCalibrator {
     const score = computeExpressionActivityScore(
       this.previousActivityFace,
       face,
+      this.lastActivityAtMs === null
+        ? 0
+        : timestampMs - this.lastActivityAtMs,
+      1,
       this.activityConfig,
     );
     if (score !== null) {

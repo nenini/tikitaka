@@ -9,7 +9,7 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     wasmBasePath: "/mediapipe/wasm",
     modelAssetPath: "/models/face_landmarker.task",
     modelVersion: "mediapipe-face-landmarker-v1",
-    ruleVersion: "vision-rule-v1",
+    ruleVersion: "vision-rule-v2",
     numFaces: 2,
     minFaceDetectionConfidence: 0.5,
     minFacePresenceConfidence: 0.5,
@@ -62,6 +62,10 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     profileChangeCooldownMs: 15_000,
     maxProcessingBudgetRatio: 0.7,
     nodMinimumActualFps: 4.5,
+  },
+  behaviorPolicy: {
+    suspensionGraceMs: 1_000,
+    recoveryWarmupMs: 500,
   },
   calibration: {
     setupRecommendedDurationMs: 15_000,
@@ -163,7 +167,6 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
       recoveryDurationMs: 500,
     },
     analysisRecoveryWarmupMs: 1_000,
-    defaultEventConfidence: 0.85,
   },
   screenAttention: {
     yawEntryDegrees: 20,
@@ -245,18 +248,26 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     emaHalfLifeMs: 300,
   },
   expressionActivity: {
-    blendshapeNames: [
-      "mouthSmileLeft",
-      "mouthSmileRight",
+    upperFaceBlendshapeNames: [
       "browInnerUp",
       "browDownLeft",
       "browDownRight",
-      "jawOpen",
+      "eyeSquintLeft",
+      "eyeSquintRight",
+    ],
+    lowerFaceBlendshapeNames: [
+      "mouthSmileLeft",
+      "mouthSmileRight",
       "mouthFrownLeft",
       "mouthFrownRight",
+      "mouthPressLeft",
+      "mouthPressRight",
     ],
     blendshapeWeight: 0.7,
     landmarkWeight: 0.3,
+    maximumFrameGapMs: 500,
+    rateNormalizationPerSecond: 2,
+    emitBehaviorEvents: false,
     windowMs: 8_000,
     warmupMs: 5_000,
     minimumWindowSamples: 10,
@@ -267,7 +278,6 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     baselineLowRatio: 0.6,
     baselineRecoveryRatio: 0.85,
     emaAlpha: 0.25,
-    defaultEventConfidence: 0.78,
   },
   nod: {
     enabledByDefault: false,

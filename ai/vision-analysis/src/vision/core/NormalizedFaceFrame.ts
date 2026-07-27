@@ -100,8 +100,30 @@ export const FACE_QUALITY_REASONS = [
 
 export type FaceQualityReason = (typeof FACE_QUALITY_REASONS)[number];
 
+export interface FaceQualityComponents {
+  readonly facePresence: number;
+  readonly faceSize: number;
+  readonly inFrame: number;
+  readonly brightness: number;
+  readonly blur: number;
+  readonly poseObservability: number;
+  readonly trackingStability: number;
+}
+
 export interface FaceQualityDecision {
+  /** Metrics may still be produced while degraded; UNUSABLE blocks observation. */
   readonly usable: boolean;
+  /** A degraded candidate cannot seed calibration or a new behavior candidate. */
+  readonly calibrationEligible?: boolean;
+  readonly canStartBehavior?: boolean;
   readonly confidence: number;
+  readonly components?: FaceQualityComponents;
   readonly reasons: readonly FaceQualityReason[];
+  readonly state?:
+    | "USABLE"
+    | "DEGRADED_CANDIDATE"
+    | "UNUSABLE"
+    | "RECOVERY_CANDIDATE";
+  readonly pendingReasons?: readonly FaceQualityReason[];
+  readonly unavailableSinceMs?: number | null;
 }

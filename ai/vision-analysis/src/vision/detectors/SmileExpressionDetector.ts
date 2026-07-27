@@ -6,21 +6,19 @@ import type {
 } from "../events/VisionEvent.js";
 import type { VisionEventFactory } from "../events/VisionEventFactory.js";
 import { TimeBasedEmaFilter } from "../filters/EmaFilter.js";
+import {
+  BEHAVIOR_STATES,
+  BehaviorEpisodeClock,
+  type BehaviorState,
+} from "./BehaviorStateMachine.js";
 import type {
   DetectorSuspensionContext,
   VisionDetector,
   VisionDetectorContext,
 } from "./VisionDetector.js";
 
-export const SMILE_STATES = [
-  "WAITING_FOR_BASELINE",
-  "UNAVAILABLE",
-  "IDLE",
-  "SMILE_CANDIDATE",
-  "SMILE_ACTIVE",
-  "END_CANDIDATE",
-] as const;
-export type SmileStateName = (typeof SMILE_STATES)[number];
+export const SMILE_STATES = BEHAVIOR_STATES;
+export type SmileStateName = BehaviorState;
 
 export type SmileConfigurationLevel =
   | "LOW_SMILE_CONFIGURATION"
@@ -63,6 +61,7 @@ export interface SmileExpressionDetectorState {
 function terminationReason(
   reason: DetectorSuspensionContext["reason"],
 ): EpisodeTerminationReason {
+  if (reason === "CAMERA_DISABLED") return "CAMERA_DISABLED";
   if (reason === "CONSENT_WITHDRAWN") return "CONSENT_WITHDRAWN";
   if (reason === "SESSION_ENDED") return "SESSION_ENDED";
   return "ANALYSIS_UNAVAILABLE";
@@ -84,12 +83,19 @@ export class SmileExpressionDetector
   private candidateObservations = 0;
   private maintainedSinceMs: number | null = null;
   private lastFrameAtMs: number | null = null;
+  private cooldownUntilMs = 0;
+  private suspensionWarmupUntilMs: number | null = null;
+  private readonly episodeClock = new BehaviorEpisodeClock();
   private readonly scoreFilter: TimeBasedEmaFilter;
   private snapshot: SmileExpressionDetectorState = this.emptyState();
 
   constructor(
     private readonly config: VisionConfig["smile"],
     private readonly eventFactory: VisionEventFactory,
+    private readonly behaviorPolicy: VisionConfig["behaviorPolicy"] = {
+      suspensionGraceMs: 1_000,
+      recoveryWarmupMs: 500,
+    },
   ) {
     this.scoreFilter = new TimeBasedEmaFilter(config.emaHalfLifeMs);
   }
@@ -109,10 +115,15 @@ export class SmileExpressionDetector
       !["READY", "PARTIAL", "GLOBAL_FALLBACK"].includes(
         context.baseline.status,
       )
+      || ["COLLECTING", "UNAVAILABLE", "BASELINE_UNCERTAIN"].includes(
+        context.baseline.baselineModeBySignal.smile,
+      )
     ) {
-      this.state = "WAITING_FOR_BASELINE";
-      this.snapshot = this.emptyState();
-      return [];
+      return this.suspend({
+        sessionElapsedMs: frame.sessionElapsedMs,
+        clientMonotonicMs: frame.clientMonotonicMs,
+        reason: "ANALYSIS_UNAVAILABLE",
+      });
     }
 
     const now = frame.sessionElapsedMs;
@@ -120,8 +131,12 @@ export class SmileExpressionDetector
       this.lastFrameAtMs !== null &&
       now - this.lastFrameAtMs > this.config.maximumFrameGapMs
     ) {
-      // A long observation gap cannot satisfy a continuous episode duration.
-      this.resetCandidate(now);
+      if (this.episodeClock.isActive()) {
+        this.episodeClock.suspend(this.lastFrameAtMs);
+        this.transition("SUSPENDED", this.lastFrameAtMs);
+      } else {
+        this.resetCandidate(now);
+      }
       this.scoreFilter.reset();
     }
     this.lastFrameAtMs = now;
@@ -130,11 +145,11 @@ export class SmileExpressionDetector
     const left = shapes["mouthSmileLeft"];
     const right = shapes["mouthSmileRight"];
     if (left === undefined || right === undefined) {
-      const events =
-        this.activeSinceMs === null
-          ? []
-          : [this.endEpisode(now, "ANALYSIS_UNAVAILABLE")];
-      this.state = "UNAVAILABLE";
+      const events = this.suspend({
+        sessionElapsedMs: now,
+        clientMonotonicMs: frame.clientMonotonicMs,
+        reason: "ANALYSIS_UNAVAILABLE",
+      });
       this.scoreFilter.reset();
       this.snapshot = this.emptyState();
       return events;
@@ -173,6 +188,43 @@ export class SmileExpressionDetector
     const maintainedDurationMs =
       this.maintainedSinceMs === null ? 0 : now - this.maintainedSinceMs;
 
+    if (
+      measurementConfidence < this.config.minimumMeasurementConfidence
+    ) {
+      const events = this.suspend({
+        sessionElapsedMs: now,
+        clientMonotonicMs: frame.clientMonotonicMs,
+        reason: "ANALYSIS_UNAVAILABLE",
+      });
+      this.snapshot = {
+        state: this.state,
+        signalAvailable: true,
+        mouthSmileLeft: left,
+        mouthSmileRight: right,
+        rawScore: raw,
+        smoothedScore: score,
+        smileConfigurationScore: score,
+        smileConfigurationLevel: configurationLevel,
+        baselineScore: base,
+        baselineSmileScore: base,
+        baselineSmileConfigurationLevel: baselineLevel,
+        baselineDelta: delta,
+        smileDelta: delta,
+        smileChangeLevel: changeLevel,
+        mouthAsymmetry: asymmetry,
+        measurementConfidence,
+        personalizationConfidence,
+        coachingEligible: false,
+        maintainedSmileConfiguration: false,
+        maintainedDurationMs: 0,
+        stateSinceMs: this.stateSinceMs,
+        activeSinceMs: this.activeSinceMs,
+        peakScore: this.peakScore,
+        peakSmileLevel: this.peakSmileLevel,
+      };
+      return events;
+    }
+
     const fallbackEntry =
       !personalized &&
       score >= this.config.strongAbsoluteScore &&
@@ -188,7 +240,9 @@ export class SmileExpressionDetector
       delta >= this.config.smileDelta &&
       asymmetry <= this.config.asymmetryHold &&
       measurementConfidence >= this.config.minimumMeasurementConfidence;
-    const entry = personalizedEntry || fallbackEntry;
+    const entry =
+      (context.quality.canStartBehavior ?? context.quality.usable) &&
+      (personalizedEntry || fallbackEntry);
     const requiredDuration = personalized
       ? this.config.smileMinimumDurationMs
       : this.config.fallbackMinimumDurationMs;
@@ -202,13 +256,39 @@ export class SmileExpressionDetector
         : score <= this.config.strongRecoveryAbsoluteScore;
     const events: VisionBehaviorEvent[] = [];
 
-    if (this.state === "WAITING_FOR_BASELINE" || this.state === "UNAVAILABLE") {
-      this.transition("IDLE", now);
+    if (this.state === "SUSPENDED") {
+      const suspensionMs = this.episodeClock.suspensionDurationMs(now);
+      if (
+        this.episodeClock.isActive() &&
+        suspensionMs > this.behaviorPolicy.suspensionGraceMs
+      ) {
+        const endAt = this.episodeClock.suspensionStartedAt() ?? now;
+        events.push(this.endEpisode(endAt, "ANALYSIS_UNAVAILABLE"));
+        this.cooldownUntilMs = now + this.config.smileMergeGapMs;
+        this.transition("COOLDOWN", now);
+      } else if (this.episodeClock.isActive()) {
+        this.episodeClock.resume(now);
+        this.suspensionWarmupUntilMs = null;
+        this.transition("ACTIVE", now);
+      } else {
+        this.suspensionWarmupUntilMs ??=
+          now + this.behaviorPolicy.recoveryWarmupMs;
+        if (now >= this.suspensionWarmupUntilMs) {
+          this.suspensionWarmupUntilMs = null;
+          this.transition("NORMAL", now);
+        }
+      }
     }
-    if (this.state === "IDLE" && entry) {
+    if (this.state === "WAITING_FOR_BASELINE") {
+      this.transition("NORMAL", now);
+    }
+    if (this.state === "COOLDOWN" && now >= this.cooldownUntilMs) {
+      this.transition("NORMAL", now);
+    }
+    if (this.state === "NORMAL" && entry) {
       this.candidateObservations = 1;
-      this.transition("SMILE_CANDIDATE", now);
-    } else if (this.state === "SMILE_CANDIDATE") {
+      this.transition("CANDIDATE", now);
+    } else if (this.state === "CANDIDATE") {
       if (!entry) {
         this.resetCandidate(now);
       } else {
@@ -223,7 +303,8 @@ export class SmileExpressionDetector
           this.peakSmileLevel = configurationLevel;
           this.scoreSum = score;
           this.scoreCount = 1;
-          this.transition("SMILE_ACTIVE", now);
+          this.episodeClock.start(this.activeSinceMs ?? now, now);
+          this.transition("ACTIVE", now);
           events.push(
             this.eventFactory.createBehaviorEvent("SMILE_STARTED", {
               confidence: this.eventConfidence(
@@ -255,13 +336,22 @@ export class SmileExpressionDetector
           );
         }
       }
-    } else if (this.state === "SMILE_ACTIVE") {
+    } else if (this.state === "ACTIVE") {
+      if (!this.episodeClock.observe(now, this.config.maximumFrameGapMs)) {
+        this.transition(
+          "SUSPENDED",
+          this.episodeClock.suspensionStartedAt() ?? now,
+        );
+      }
       this.recordScore(score, configurationLevel);
-      if (recovered) this.transition("END_CANDIDATE", now);
-    } else if (this.state === "END_CANDIDATE") {
+      if (this.state === "ACTIVE" && recovered) {
+        this.transition("RECOVERY_CANDIDATE", now);
+      }
+    } else if (this.state === "RECOVERY_CANDIDATE") {
+      this.episodeClock.observe(now, this.config.maximumFrameGapMs);
       this.recordScore(score, configurationLevel);
       if (!recovered) {
-        this.transition("SMILE_ACTIVE", now);
+        this.transition("ACTIVE", now);
       } else if (
         now - (this.stateSinceMs ?? now) >=
         Math.max(
@@ -270,7 +360,8 @@ export class SmileExpressionDetector
         )
       ) {
         events.push(this.endEpisode(now, "RECOVERED"));
-        this.transition("IDLE", now);
+        this.cooldownUntilMs = now + this.config.smileMergeGapMs;
+        this.transition("COOLDOWN", now);
       }
     }
 
@@ -307,21 +398,36 @@ export class SmileExpressionDetector
   suspend(
     context: DetectorSuspensionContext,
   ): readonly VisionBehaviorEvent[] {
-    const events =
-      this.activeSinceMs === null
-        ? []
-        : [
-            this.endEpisode(
-              context.sessionElapsedMs,
-              terminationReason(context.reason),
-            ),
-          ];
+    const events: VisionBehaviorEvent[] = [];
+    const immediate =
+      context.reason === "CAMERA_DISABLED" ||
+      context.reason === "CONSENT_WITHDRAWN" ||
+      context.reason === "SESSION_ENDED";
+    if (this.episodeClock.isActive()) {
+      this.episodeClock.suspend(
+        context.suspensionStartedElapsedMs ?? context.sessionElapsedMs,
+      );
+      if (
+        immediate ||
+        this.episodeClock.suspensionDurationMs(context.sessionElapsedMs) >
+          this.behaviorPolicy.suspensionGraceMs
+      ) {
+        const endAt = immediate
+          ? context.sessionElapsedMs
+          : (this.episodeClock.suspensionStartedAt() ??
+            context.sessionElapsedMs);
+        events.push(
+          this.endEpisode(endAt, terminationReason(context.reason)),
+        );
+      }
+    }
     this.scoreFilter.reset();
-    this.state = "WAITING_FOR_BASELINE";
-    this.stateSinceMs = null;
+    this.state = immediate ? "WAITING_FOR_BASELINE" : "SUSPENDED";
+    this.stateSinceMs = context.sessionElapsedMs;
     this.lastFrameAtMs = null;
     this.candidateObservations = 0;
     this.maintainedSinceMs = null;
+    this.suspensionWarmupUntilMs = null;
     this.snapshot = this.emptyState();
     return events;
   }
@@ -343,6 +449,9 @@ export class SmileExpressionDetector
     this.candidateObservations = 0;
     this.maintainedSinceMs = null;
     this.lastFrameAtMs = null;
+    this.cooldownUntilMs = 0;
+    this.suspensionWarmupUntilMs = null;
+    this.episodeClock.reset();
     this.snapshot = this.emptyState();
   }
 
@@ -388,7 +497,7 @@ export class SmileExpressionDetector
 
   private resetCandidate(now: number): void {
     this.candidateObservations = 0;
-    if (this.activeSinceMs === null) this.transition("IDLE", now);
+    if (this.activeSinceMs === null) this.transition("NORMAL", now);
   }
 
   private recordScore(
@@ -407,13 +516,13 @@ export class SmileExpressionDetector
     now: number,
     reason: EpisodeTerminationReason,
   ): VisionBehaviorEvent {
-    const start = this.activeSinceMs ?? now;
+    const durations = this.episodeClock.durations(now);
     const event = this.eventFactory.createBehaviorEvent("SMILE_ENDED", {
       confidence: this.snapshot.measurementConfidence,
       episodeId: this.episodeId,
       payload: {
         observedEndElapsedMs: now,
-        durationMs: Math.max(0, now - start),
+        ...durations,
         peakSmileScore: this.peakScore,
         meanSmileScore:
           this.scoreCount === 0
@@ -428,6 +537,7 @@ export class SmileExpressionDetector
     this.peakSmileLevel = null;
     this.scoreSum = 0;
     this.scoreCount = 0;
+    this.episodeClock.reset();
     return event;
   }
 

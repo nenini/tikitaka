@@ -14,13 +14,15 @@ const startedPayloadShape = {
 } as const;
 const endedPayloadShape = {
   observedEndElapsedMs: nonNegativeFiniteNumberSchema,
-  durationMs: nonNegativeFiniteNumberSchema,
+  wallDurationMs: nonNegativeFiniteNumberSchema,
+  observedDurationMs: nonNegativeFiniteNumberSchema,
+  unobservedDurationMs: nonNegativeFiniteNumberSchema,
 } as const;
 
 const eventEnvelopeSchema = z
   .object({
     eventId: z.uuid(),
-    version: z.literal(1),
+    version: z.literal(2),
     sessionId: z.string().min(1).max(128),
     userId: z.string().min(1).max(128),
     clientInstanceId: z.uuid(),
@@ -234,48 +236,45 @@ const lowExpressionActivityEndedSchema = behaviorEventSchema(
   },
 );
 
-const stiffExpressionStartedSchema = behaviorEventSchema(
-  "STIFF_EXPRESSION_STARTED",
-  "EXPRESSION_ACTIVITY_DETECTOR",
-  {
-    ...startedPayloadShape,
-    activityScore: unitScoreSchema,
-    baselineActivityScore: unitScoreSchema.nullable(),
-    windowMs: z.number().positive(),
-  },
-);
-
-const stiffExpressionEndedSchema = behaviorEventSchema(
-  "STIFF_EXPRESSION_ENDED",
-  "EXPRESSION_ACTIVITY_DETECTOR",
-  {
-    ...endedPayloadShape,
-    activityScore: unitScoreSchema,
-    terminationReason: z.enum(EPISODE_TERMINATION_REASONS),
-  },
-);
-
-export const visionBehaviorEventSchema = z.discriminatedUnion("eventType", [
-  faceMissingStartedSchema,
-  faceMissingEndedSchema,
-  multipleFacesDetectedSchema,
-  lowLightStartedSchema,
-  lowLightEndedSchema,
-  faceTooSmallStartedSchema,
-  faceTooSmallEndedSchema,
-  analysisUnavailableSchema,
-  analysisRecoveredSchema,
-  gazeAwayStartedSchema,
-  gazeAwayEndedSchema,
-  prolongedGazeAwaySchema,
-  smileStartedSchema,
-  smileEndedSchema,
-  nodEventSchema,
-  lowExpressionActivityStartedSchema,
-  lowExpressionActivityEndedSchema,
-  stiffExpressionStartedSchema,
-  stiffExpressionEndedSchema,
-]);
+export const visionBehaviorEventSchema = z
+  .discriminatedUnion("eventType", [
+    faceMissingStartedSchema,
+    faceMissingEndedSchema,
+    multipleFacesDetectedSchema,
+    lowLightStartedSchema,
+    lowLightEndedSchema,
+    faceTooSmallStartedSchema,
+    faceTooSmallEndedSchema,
+    analysisUnavailableSchema,
+    analysisRecoveredSchema,
+    gazeAwayStartedSchema,
+    gazeAwayEndedSchema,
+    prolongedGazeAwaySchema,
+    smileStartedSchema,
+    smileEndedSchema,
+    nodEventSchema,
+    lowExpressionActivityStartedSchema,
+    lowExpressionActivityEndedSchema,
+  ])
+  .superRefine((event, context) => {
+    const payload: object = event.payload;
+    const wall = Reflect.get(payload, "wallDurationMs");
+    const observed = Reflect.get(payload, "observedDurationMs");
+    const unobserved = Reflect.get(payload, "unobservedDurationMs");
+    if (
+      typeof wall === "number" &&
+      typeof observed === "number" &&
+      typeof unobserved === "number" &&
+      Math.abs(observed + unobserved - wall) > 0.001
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["payload", "observedDurationMs"],
+        message:
+          "observedDurationMs + unobservedDurationMs must equal wallDurationMs",
+      });
+    }
+  });
 
 export const visionMetricSnapshotSchema = eventEnvelopeSchema
   .extend({
@@ -287,7 +286,26 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
         quality: z
           .object({
             usable: z.boolean(),
+            state: z.enum([
+              "USABLE",
+              "DEGRADED_CANDIDATE",
+              "UNUSABLE",
+              "RECOVERY_CANDIDATE",
+            ]),
+            confidence: unitScoreSchema,
+            components: z
+              .object({
+                facePresence: unitScoreSchema,
+                faceSize: unitScoreSchema,
+                inFrame: unitScoreSchema,
+                brightness: unitScoreSchema,
+                blur: unitScoreSchema,
+                poseObservability: unitScoreSchema,
+                trackingStability: unitScoreSchema,
+              })
+              .strict(),
             reasons: z.array(z.enum(FACE_QUALITY_REASONS)),
+            pendingReasons: z.array(z.enum(FACE_QUALITY_REASONS)),
             faceDetected: z.boolean(),
             faceCount: z.number().int().nonnegative(),
             faceBoxRatio: unitScoreSchema.nullable(),
@@ -297,16 +315,45 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
           .strict(),
         metrics: z
           .object({
+            smile: z
+              .object({
+                configurationScore: unitScoreSchema.nullable(),
+                delta: nullableFiniteNumberSchema,
+                maintained: z.boolean(),
+                confidence: unitScoreSchema,
+              })
+              .strict(),
+            attention: z
+              .object({
+                score: z.number().min(0).max(100).nullable(),
+                confidence: unitScoreSchema,
+                mode: z.string().min(1),
+              })
+              .strict(),
+            activity: z
+              .object({
+                upperFaceActivityScore: unitScoreSchema.nullable(),
+                lowerFaceActivityScore: unitScoreSchema.nullable(),
+                poseAlignedLandmarkActivityScore: unitScoreSchema.nullable(),
+                expressionActivityScore: unitScoreSchema.nullable(),
+                confidence: unitScoreSchema,
+                experimentalOnly: z.literal(true),
+              })
+              .strict(),
             screenFacingScore: unitScoreSchema.nullable(),
             smileScore: unitScoreSchema.nullable(),
             expressionActivityScore: unitScoreSchema.nullable(),
+            upperFaceActivityScore: unitScoreSchema.nullable().optional(),
+            lowerFaceActivityScore: unitScoreSchema.nullable().optional(),
+            poseAlignedLandmarkActivityScore:
+              unitScoreSchema.nullable().optional(),
+            activityConfidence: unitScoreSchema.nullable().optional(),
             yawDelta: nullableFiniteNumberSchema,
             pitchDelta: nullableFiniteNumberSchema,
             rollDelta: nullableFiniteNumberSchema,
             eyeGazeScore: unitScoreSchema.nullable().optional(),
             gazeHorizontalDelta: nullableFiniteNumberSchema.optional(),
             gazeVerticalDelta: nullableFiniteNumberSchema.optional(),
-            stiffExpressionActive: z.boolean().optional(),
             smileConfigurationScore: unitScoreSchema.nullable().optional(),
             baselineSmileScore: unitScoreSchema.nullable().optional(),
             smileDelta: nullableFiniteNumberSchema.optional(),

@@ -6,23 +6,19 @@ import type {
 } from "../events/VisionEvent.js";
 import type { VisionEventFactory } from "../events/VisionEventFactory.js";
 import { EmaFilter } from "../filters/EmaFilter.js";
+import {
+  BEHAVIOR_STATES,
+  BehaviorEpisodeClock,
+  type BehaviorState,
+} from "./BehaviorStateMachine.js";
 import type {
   DetectorSuspensionContext,
   VisionDetector,
   VisionDetectorContext,
 } from "./VisionDetector.js";
 
-export const SCREEN_ATTENTION_STATES = [
-  "WAITING_FOR_BASELINE",
-  "SUSPENDED",
-  "NORMAL",
-  "AWAY_CANDIDATE",
-  "AWAY_ACTIVE",
-  "RECOVERY_CANDIDATE",
-  "COOLDOWN",
-] as const;
-export type ScreenAttentionStateName =
-  (typeof SCREEN_ATTENTION_STATES)[number];
+export const SCREEN_ATTENTION_STATES = BEHAVIOR_STATES;
+export type ScreenAttentionStateName = BehaviorState;
 export type GazeMode =
   | "BINOCULAR"
   | "MONOCULAR_LEFT"
@@ -100,6 +96,7 @@ function smoothDecreasing(
 function terminationReason(
   reason: DetectorSuspensionContext["reason"],
 ): EpisodeTerminationReason {
+  if (reason === "CAMERA_DISABLED") return "CAMERA_DISABLED";
   if (reason === "CONSENT_WITHDRAWN") return "CONSENT_WITHDRAWN";
   if (reason === "SESSION_ENDED") return "SESSION_ENDED";
   return "ANALYSIS_UNAVAILABLE";
@@ -121,6 +118,9 @@ export class ScreenAttentionDetector
   private cooldownUntilMs = 0;
   private candidateObservations = 0;
   private recoveryObservations = 0;
+  private lastFrameAtMs: number | null = null;
+  private suspensionWarmupUntilMs: number | null = null;
+  private readonly episodeClock = new BehaviorEpisodeClock();
   private leftBlinkActive = false;
   private rightBlinkActive = false;
   private leftGazeWarmupUntilMs = 0;
@@ -134,6 +134,10 @@ export class ScreenAttentionDetector
   constructor(
     private readonly config: VisionConfig["screenAttention"],
     private readonly eventFactory: VisionEventFactory,
+    private readonly behaviorPolicy: VisionConfig["behaviorPolicy"] = {
+      suspensionGraceMs: 1_000,
+      recoveryWarmupMs: 500,
+    },
   ) {
     this.yawFilter = new EmaFilter(config.emaAlpha);
     this.pitchFilter = new EmaFilter(config.emaAlpha);
@@ -155,13 +159,40 @@ export class ScreenAttentionDetector
     const baseline = context.baseline;
     if (
       !["READY", "PARTIAL", "GLOBAL_FALLBACK"].includes(baseline.status)
+      || baseline.baselineModeBySignal.pose === "BASELINE_UNCERTAIN"
+      || baseline.baselineModeBySignal.gaze === "BASELINE_UNCERTAIN"
+      || baseline.baselineModeBySignal.pose === "COLLECTING"
+      || baseline.baselineModeBySignal.gaze === "COLLECTING"
     ) {
-      this.state = "WAITING_FOR_BASELINE";
-      this.snapshot = this.emptyState();
-      return [];
+      return this.suspend({
+        sessionElapsedMs: frame.sessionElapsedMs,
+        clientMonotonicMs: frame.clientMonotonicMs,
+        reason: "ANALYSIS_UNAVAILABLE",
+      });
     }
 
     const now = frame.sessionElapsedMs;
+    const maximumFrameGapMs = Math.min(
+      1_500,
+      Math.max(
+        1_000,
+        (2.5 / Math.max(frame.processing.actualFps, 0.1)) * 1_000,
+      ),
+    );
+    if (
+      this.lastFrameAtMs !== null &&
+      now - this.lastFrameAtMs > maximumFrameGapMs
+    ) {
+      if (this.episodeClock.isActive()) {
+        this.episodeClock.suspend(this.lastFrameAtMs);
+        this.transition("SUSPENDED", this.lastFrameAtMs);
+      } else {
+        this.candidateObservations = 0;
+        this.transition("NORMAL", now);
+      }
+      this.resetFilters();
+    }
+    this.lastFrameAtMs = now;
     const face = frame.primaryFace;
     const fallback = baseline.status === "GLOBAL_FALLBACK";
     const rawYaw =
@@ -390,14 +421,11 @@ export class ScreenAttentionDetector
       screenAttentionScore === null ||
       measurementConfidence < this.config.suspendedConfidenceThreshold;
     if (suspended) {
-      const events =
-        this.activeSinceMs === null
-          ? []
-          : [this.endEpisode(now, "ANALYSIS_UNAVAILABLE")];
-      this.state = "SUSPENDED";
-      this.stateSinceMs = now;
-      this.candidateObservations = 0;
-      this.recoveryObservations = 0;
+      const events = this.suspend({
+        sessionElapsedMs: now,
+        clientMonotonicMs: frame.clientMonotonicMs,
+        reason: "ANALYSIS_UNAVAILABLE",
+      });
       this.snapshot = this.createSnapshot({
         rawYaw,
         rawPitch,
@@ -449,6 +477,7 @@ export class ScreenAttentionDetector
       gazeReliability >= this.config.irisOnlyMinimumReliability &&
       screenAttentionConfidence >= this.config.irisOnlyMinimumConfidence;
     const entry =
+      (context.quality.canStartBehavior ?? context.quality.usable) &&
       attentionEvidenceMode !== "HEAD_IRIS_CONFLICT" &&
       (fallbackEntry || consistentEntry || headOnlyEntry || irisOnlyEntry);
     const entryDuration = fallback
@@ -464,10 +493,30 @@ export class ScreenAttentionDetector
       screenAttentionConfidence >= this.config.minimumRecoveryConfidence;
     const events: VisionBehaviorEvent[] = [];
 
-    if (
-      this.state === "WAITING_FOR_BASELINE" ||
-      this.state === "SUSPENDED"
-    ) {
+    if (this.state === "SUSPENDED") {
+      const suspensionMs = this.episodeClock.suspensionDurationMs(now);
+      if (
+        this.episodeClock.isActive() &&
+        suspensionMs > this.behaviorPolicy.suspensionGraceMs
+      ) {
+        const endAt = this.episodeClock.suspensionStartedAt() ?? now;
+        events.push(this.endEpisode(endAt, "ANALYSIS_UNAVAILABLE"));
+        this.cooldownUntilMs = now + this.config.cooldownMs;
+        this.transition("COOLDOWN", now);
+      } else if (this.episodeClock.isActive()) {
+        this.episodeClock.resume(now);
+        this.suspensionWarmupUntilMs = null;
+        this.transition("ACTIVE", now);
+      } else {
+        this.suspensionWarmupUntilMs ??=
+          now + this.behaviorPolicy.recoveryWarmupMs;
+        if (now >= this.suspensionWarmupUntilMs) {
+          this.suspensionWarmupUntilMs = null;
+          this.transition("NORMAL", now);
+        }
+      }
+    }
+    if (this.state === "WAITING_FOR_BASELINE") {
       this.transition("NORMAL", now);
     }
     if (this.state === "COOLDOWN" && now >= this.cooldownUntilMs) {
@@ -475,8 +524,8 @@ export class ScreenAttentionDetector
     }
     if (this.state === "NORMAL" && entry) {
       this.candidateObservations = 1;
-      this.transition("AWAY_CANDIDATE", now);
-    } else if (this.state === "AWAY_CANDIDATE") {
+      this.transition("CANDIDATE", now);
+    } else if (this.state === "CANDIDATE") {
       if (!entry) {
         this.candidateObservations = 0;
         this.transition("NORMAL", now);
@@ -488,7 +537,8 @@ export class ScreenAttentionDetector
         ) {
           this.activeSinceMs = this.stateSinceMs;
           this.episodeId = this.eventFactory.createEpisodeId();
-          this.transition("AWAY_ACTIVE", now);
+          this.episodeClock.start(this.activeSinceMs ?? now, now);
+          this.transition("ACTIVE", now);
           events.push(
             this.eventFactory.createBehaviorEvent("GAZE_AWAY_STARTED", {
               confidence: screenAttentionConfidence,
@@ -500,7 +550,8 @@ export class ScreenAttentionDetector
                 baselineMode: fallback
                   ? "GLOBAL_FALLBACK"
                   : baseline.baselineModeBySignal.gaze,
-                coachingEligible: !fallback,
+                coachingEligible:
+                  !fallback && screenAttentionConfidence >= 0.75,
                 baselineEpoch: baseline.baselineEpoch,
               },
               episodeId: this.episodeId,
@@ -518,10 +569,18 @@ export class ScreenAttentionDetector
           );
         }
       }
-    } else if (this.state === "AWAY_ACTIVE") {
+    } else if (this.state === "ACTIVE") {
+      if (!this.episodeClock.observe(now, maximumFrameGapMs)) {
+        this.transition(
+          "SUSPENDED",
+          this.episodeClock.suspensionStartedAt() ?? now,
+        );
+      }
       if (
+        this.state === "ACTIVE" &&
         !this.prolongedEmitted &&
-        now - (this.activeSinceMs ?? now) >= this.config.prolongedDurationMs
+        this.episodeClock.durations(now).observedDurationMs >=
+          this.config.prolongedDurationMs
       ) {
         this.prolongedEmitted = true;
         events.push(
@@ -535,12 +594,14 @@ export class ScreenAttentionDetector
               baselineMode: fallback
                 ? "GLOBAL_FALLBACK"
                 : baseline.baselineModeBySignal.gaze,
-              coachingEligible: !fallback,
+              coachingEligible:
+                !fallback && screenAttentionConfidence >= 0.75,
               baselineEpoch: baseline.baselineEpoch,
             },
             episodeId: this.episodeId,
             payload: {
-              activeDurationMs: now - (this.activeSinceMs ?? now),
+              activeDurationMs:
+                this.episodeClock.durations(now).observedDurationMs,
               yawDelta: yaw,
               pitchDelta: pitch,
               gazeHorizontalDelta: gazeHorizontal,
@@ -549,15 +610,16 @@ export class ScreenAttentionDetector
           }),
         );
       }
-      if (recovered) {
+      if (this.state === "ACTIVE" && recovered) {
         this.recoveryObservations = 1;
         this.transition("RECOVERY_CANDIDATE", now);
       }
     } else if (this.state === "RECOVERY_CANDIDATE") {
       if (!recovered) {
         this.recoveryObservations = 0;
-        this.transition("AWAY_ACTIVE", now);
+        this.transition("ACTIVE", now);
       } else {
+        this.episodeClock.observe(now, maximumFrameGapMs);
         this.recoveryObservations += 1;
         if (
           now - (this.stateSinceMs ?? now) >=
@@ -605,20 +667,35 @@ export class ScreenAttentionDetector
   suspend(
     context: DetectorSuspensionContext,
   ): readonly VisionBehaviorEvent[] {
-    const events =
-      this.activeSinceMs === null
-        ? []
-        : [
-            this.endEpisode(
-              context.sessionElapsedMs,
-              terminationReason(context.reason),
-            ),
-          ];
+    const events: VisionBehaviorEvent[] = [];
+    const immediate =
+      context.reason === "CAMERA_DISABLED" ||
+      context.reason === "CONSENT_WITHDRAWN" ||
+      context.reason === "SESSION_ENDED";
+    if (this.episodeClock.isActive()) {
+      this.episodeClock.suspend(
+        context.suspensionStartedElapsedMs ?? context.sessionElapsedMs,
+      );
+      if (
+        immediate ||
+        this.episodeClock.suspensionDurationMs(context.sessionElapsedMs) >
+          this.behaviorPolicy.suspensionGraceMs
+      ) {
+        const endAt = immediate
+          ? context.sessionElapsedMs
+          : (this.episodeClock.suspensionStartedAt() ??
+            context.sessionElapsedMs);
+        events.push(
+          this.endEpisode(endAt, terminationReason(context.reason)),
+        );
+      }
+    }
     this.resetFilters();
-    this.state = "WAITING_FOR_BASELINE";
-    this.stateSinceMs = null;
+    this.state = immediate ? "WAITING_FOR_BASELINE" : "SUSPENDED";
+    this.stateSinceMs = context.sessionElapsedMs;
     this.candidateObservations = 0;
     this.recoveryObservations = 0;
+    this.suspensionWarmupUntilMs = null;
     this.snapshot = this.emptyState();
     return events;
   }
@@ -637,6 +714,9 @@ export class ScreenAttentionDetector
     this.cooldownUntilMs = 0;
     this.candidateObservations = 0;
     this.recoveryObservations = 0;
+    this.lastFrameAtMs = null;
+    this.suspensionWarmupUntilMs = null;
+    this.episodeClock.reset();
     this.leftBlinkActive = false;
     this.rightBlinkActive = false;
     this.leftGazeWarmupUntilMs = 0;
@@ -674,19 +754,20 @@ export class ScreenAttentionDetector
     now: number,
     reason: EpisodeTerminationReason,
   ): VisionBehaviorEvent {
-    const start = this.activeSinceMs ?? now;
+    const durations = this.episodeClock.durations(now);
     const event = this.eventFactory.createBehaviorEvent("GAZE_AWAY_ENDED", {
       confidence: this.snapshot.screenAttentionConfidence,
       episodeId: this.episodeId,
       payload: {
         observedEndElapsedMs: now,
-        durationMs: Math.max(0, now - start),
+        ...durations,
         terminationReason: reason,
       },
     });
     this.activeSinceMs = null;
     this.episodeId = null;
     this.prolongedEmitted = false;
+    this.episodeClock.reset();
     return event;
   }
 

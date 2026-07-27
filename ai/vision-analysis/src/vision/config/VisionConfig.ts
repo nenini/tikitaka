@@ -124,6 +124,12 @@ export const visionConfigSchema = z
         nodMinimumActualFps: z.number().positive(),
       })
       .strict(),
+    behaviorPolicy: z
+      .object({
+        suspensionGraceMs: z.number().int().positive(),
+        recoveryWarmupMs: z.number().int().nonnegative(),
+      })
+      .strict(),
     calibration: z
       .object({
         setupRecommendedDurationMs: z.number().int().positive(),
@@ -238,7 +244,6 @@ export const visionConfigSchema = z
         extremePitch: higherIsWorseAngleGateSchema,
         extremeRoll: higherIsWorseAngleGateSchema,
         analysisRecoveryWarmupMs: durationSchema,
-        defaultEventConfidence: unitScoreSchema,
       })
       .strict(),
     screenAttention: z
@@ -380,9 +385,13 @@ export const visionConfigSchema = z
       }),
     expressionActivity: z
       .object({
-        blendshapeNames: z.array(z.string().min(1)).min(1),
+        upperFaceBlendshapeNames: z.array(z.string().min(1)).min(1),
+        lowerFaceBlendshapeNames: z.array(z.string().min(1)).min(1),
         blendshapeWeight: unitScoreSchema,
         landmarkWeight: unitScoreSchema,
+        maximumFrameGapMs: z.number().int().positive(),
+        rateNormalizationPerSecond: z.number().positive(),
+        emitBehaviorEvents: z.literal(false),
         windowMs: z.number().int().positive(),
         warmupMs: z.number().int().positive(),
         minimumWindowSamples: z.number().int().positive(),
@@ -393,7 +402,6 @@ export const visionConfigSchema = z
         baselineLowRatio: z.number().positive().max(1),
         baselineRecoveryRatio: z.number().positive(),
         emaAlpha: z.number().positive().max(1),
-        defaultEventConfidence: unitScoreSchema,
       })
       .strict()
       .superRefine((activity, context) => {

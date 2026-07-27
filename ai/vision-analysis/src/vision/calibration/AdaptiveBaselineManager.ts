@@ -93,7 +93,7 @@ export class AdaptiveBaselineManager {
     }
 
     const baseEligible =
-      quality.usable &&
+      (quality.calibrationEligible ?? quality.usable) &&
       face !== null &&
       face.yaw !== null &&
       face.pitch !== null &&

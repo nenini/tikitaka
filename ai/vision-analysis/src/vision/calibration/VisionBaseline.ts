@@ -38,6 +38,7 @@ export interface SignalBaselineState {
 }
 
 export interface VisionBaseline {
+  readonly schemaVersion: 2;
   readonly status: BaselineStatus;
   readonly baselineEpoch: number;
   readonly usableFrameCount: number;

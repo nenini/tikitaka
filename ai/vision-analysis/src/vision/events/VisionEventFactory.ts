@@ -32,8 +32,6 @@ const EVENT_SOURCE_BY_TYPE = {
   NOD_EVENT: "NOD_DETECTOR",
   LOW_EXPRESSION_ACTIVITY_STARTED: "EXPRESSION_ACTIVITY_DETECTOR",
   LOW_EXPRESSION_ACTIVITY_ENDED: "EXPRESSION_ACTIVITY_DETECTOR",
-  STIFF_EXPRESSION_STARTED: "EXPRESSION_ACTIVITY_DETECTOR",
-  STIFF_EXPRESSION_ENDED: "EXPRESSION_ACTIVITY_DETECTOR",
 } as const satisfies Readonly<
   Record<VisionBehaviorEventType, VisionEventSource>
 >;
@@ -159,7 +157,7 @@ export class VisionEventFactory {
     return {
       eventId: this.uuidFactory(),
       eventType,
-      version: 1,
+      version: 2,
       sessionId: this.identity.sessionId,
       userId: this.identity.userId,
       clientInstanceId: this.identity.clientInstanceId,
@@ -175,7 +173,7 @@ export class VisionEventFactory {
         details.personalizationConfidence ?? 1,
       evidenceStrength: details.evidenceStrength ?? confidence,
       baselineMode: details.baselineMode ?? "PERSONALIZED",
-      coachingEligible: details.coachingEligible ?? true,
+      coachingEligible: details.coachingEligible ?? false,
       baselineEpoch: details.baselineEpoch ?? 0,
       modelVersion: this.versions.modelVersion,
       ruleVersion: this.versions.ruleVersion,

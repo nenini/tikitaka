@@ -21,8 +21,6 @@ export const VISION_BEHAVIOR_EVENT_TYPES = [
   "NOD_EVENT",
   "LOW_EXPRESSION_ACTIVITY_STARTED",
   "LOW_EXPRESSION_ACTIVITY_ENDED",
-  "STIFF_EXPRESSION_STARTED",
-  "STIFF_EXPRESSION_ENDED",
 ] as const;
 
 export type VisionBehaviorEventType =
@@ -42,6 +40,7 @@ export type VisionEventSource = (typeof VISION_EVENT_SOURCES)[number];
 export const EPISODE_TERMINATION_REASONS = [
   "RECOVERED",
   "ANALYSIS_UNAVAILABLE",
+  "CAMERA_DISABLED",
   "CONSENT_WITHDRAWN",
   "SESSION_ENDED",
 ] as const;
@@ -55,7 +54,9 @@ interface StartedPayload {
 
 interface EndedPayload {
   readonly observedEndElapsedMs: number;
-  readonly durationMs: number;
+  readonly wallDurationMs: number;
+  readonly observedDurationMs: number;
+  readonly unobservedDurationMs: number;
 }
 
 export interface VisionBehaviorPayloadMap {
@@ -125,21 +126,12 @@ export interface VisionBehaviorPayloadMap {
     readonly activityScore: number;
     readonly terminationReason: EpisodeTerminationReason;
   };
-  readonly STIFF_EXPRESSION_STARTED: StartedPayload & {
-    readonly activityScore: number;
-    readonly baselineActivityScore: number | null;
-    readonly windowMs: number;
-  };
-  readonly STIFF_EXPRESSION_ENDED: EndedPayload & {
-    readonly activityScore: number;
-    readonly terminationReason: EpisodeTerminationReason;
-  };
 }
 
 export interface VisionEventEnvelope<TEventType extends string> {
   readonly eventId: string;
   readonly eventType: TEventType;
-  readonly version: 1;
+  readonly version: 2;
   readonly sessionId: string;
   readonly userId: string;
   readonly clientInstanceId: string;
@@ -182,7 +174,15 @@ export type VisionBehaviorEvent = {
 export interface VisionMetricSnapshotPayload {
   readonly quality: {
     readonly usable: boolean;
+    readonly state:
+      | "USABLE"
+      | "DEGRADED_CANDIDATE"
+      | "UNUSABLE"
+      | "RECOVERY_CANDIDATE";
+    readonly confidence: number;
+    readonly components: import("../core/NormalizedFaceFrame.js").FaceQualityComponents;
     readonly reasons: readonly FaceQualityReason[];
+    readonly pendingReasons: readonly FaceQualityReason[];
     readonly faceDetected: boolean;
     readonly faceCount: number;
     readonly faceBoxRatio: number | null;
@@ -190,16 +190,38 @@ export interface VisionMetricSnapshotPayload {
     readonly blurScore: number;
   };
   readonly metrics: {
+    readonly smile: {
+      readonly configurationScore: number | null;
+      readonly delta: number | null;
+      readonly maintained: boolean;
+      readonly confidence: number;
+    };
+    readonly attention: {
+      readonly score: number | null;
+      readonly confidence: number;
+      readonly mode: string;
+    };
+    readonly activity: {
+      readonly upperFaceActivityScore: number | null;
+      readonly lowerFaceActivityScore: number | null;
+      readonly poseAlignedLandmarkActivityScore: number | null;
+      readonly expressionActivityScore: number | null;
+      readonly confidence: number;
+      readonly experimentalOnly: true;
+    };
     readonly screenFacingScore: number | null;
     readonly smileScore: number | null;
     readonly expressionActivityScore: number | null;
+    readonly upperFaceActivityScore?: number | null;
+    readonly lowerFaceActivityScore?: number | null;
+    readonly poseAlignedLandmarkActivityScore?: number | null;
+    readonly activityConfidence?: number | null;
     readonly yawDelta: number | null;
     readonly pitchDelta: number | null;
     readonly rollDelta: number | null;
     readonly eyeGazeScore?: number | null;
     readonly gazeHorizontalDelta?: number | null;
     readonly gazeVerticalDelta?: number | null;
-    readonly stiffExpressionActive?: boolean;
     readonly smileConfigurationScore?: number | null;
     readonly baselineSmileScore?: number | null;
     readonly smileDelta?: number | null;

@@ -325,33 +325,85 @@ export class FaceFrameNormalizer {
           : Math.abs(chin.y - nose.y) / faceHeight,
       landmarkDisplacementScore: this.computeDisplacement(
         landmarks,
-        box.areaRatio,
       ),
     };
   }
 
   private computeDisplacement(
     landmarks: readonly FaceLandmarkPoint[],
-    faceAreaRatio: number,
   ): number | null {
     const previous = this.previousLandmarks;
     if (previous === null || previous.length !== landmarks.length) {
       return null;
     }
 
-    let sum = 0;
+    const currentCenter = this.landmarkCenter(landmarks);
+    const previousCenter = this.landmarkCenter(previous);
+    const currentScale = this.landmarkScale(landmarks, currentCenter);
+    const previousScale = this.landmarkScale(previous, previousCenter);
+    if (currentScale === 0 || previousScale === 0) return null;
+
+    let dot = 0;
+    let cross = 0;
     for (let index = 0; index < landmarks.length; index += 1) {
       const current = landmarks[index];
       const before = previous[index];
       if (current === undefined || before === undefined) {
         return null;
       }
-      sum += Math.hypot(current.x - before.x, current.y - before.y);
+      const currentX = (current.x - currentCenter.x) / currentScale;
+      const currentY = (current.y - currentCenter.y) / currentScale;
+      const previousX = (before.x - previousCenter.x) / previousScale;
+      const previousY = (before.y - previousCenter.y) / previousScale;
+      dot += previousX * currentX + previousY * currentY;
+      cross += previousX * currentY - previousY * currentX;
     }
 
-    const normalized =
-      sum / landmarks.length / Math.sqrt(Math.max(faceAreaRatio, 0.000001));
-    return clamp(normalized, 0, 1);
+    const angle = Math.atan2(cross, dot);
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    let sum = 0;
+    for (let index = 0; index < landmarks.length; index += 1) {
+      const current = landmarks[index];
+      const before = previous[index];
+      if (current === undefined || before === undefined) return null;
+      const currentX = (current.x - currentCenter.x) / currentScale;
+      const currentY = (current.y - currentCenter.y) / currentScale;
+      const previousX = (before.x - previousCenter.x) / previousScale;
+      const previousY = (before.y - previousCenter.y) / previousScale;
+      const alignedX = previousX * cosine - previousY * sine;
+      const alignedY = previousX * sine + previousY * cosine;
+      sum += Math.hypot(currentX - alignedX, currentY - alignedY);
+    }
+    return clamp(sum / landmarks.length, 0, 1);
+  }
+
+  private landmarkCenter(
+    landmarks: readonly FaceLandmarkPoint[],
+  ): { readonly x: number; readonly y: number } {
+    const sum = landmarks.reduce(
+      (result, point) => ({
+        x: result.x + point.x,
+        y: result.y + point.y,
+      }),
+      { x: 0, y: 0 },
+    );
+    return {
+      x: sum.x / Math.max(landmarks.length, 1),
+      y: sum.y / Math.max(landmarks.length, 1),
+    };
+  }
+
+  private landmarkScale(
+    landmarks: readonly FaceLandmarkPoint[],
+    center: { readonly x: number; readonly y: number },
+  ): number {
+    const squared = landmarks.reduce(
+      (sum, point) =>
+        sum + (point.x - center.x) ** 2 + (point.y - center.y) ** 2,
+      0,
+    );
+    return Math.sqrt(squared / Math.max(landmarks.length, 1));
   }
 
   private createFrame(
