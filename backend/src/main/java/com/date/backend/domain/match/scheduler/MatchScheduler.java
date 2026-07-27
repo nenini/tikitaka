@@ -3,6 +3,7 @@ package com.date.backend.domain.match.scheduler;
 import com.date.backend.domain.match.application.MatchCandidate;
 import com.date.backend.domain.match.application.MatchCandidateService;
 import com.date.backend.domain.match.application.MatchCreationService;
+import com.date.backend.domain.match.application.MatchExpirationService;
 import com.date.backend.domain.match.config.MatchSchedulerProperties;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchRequestStatus;
@@ -34,6 +35,7 @@ public class MatchScheduler {
 	private final MatchRequestRepository requestRepository;
 	private final MatchCandidateService candidateService;
 	private final MatchCreationService creationService;
+	private final MatchExpirationService expirationService;
 	private final MatchSchedulerProperties properties;
 	private final Clock clock;
 
@@ -41,12 +43,14 @@ public class MatchScheduler {
 			MatchRequestRepository requestRepository,
 			MatchCandidateService candidateService,
 			MatchCreationService creationService,
+			MatchExpirationService expirationService,
 			MatchSchedulerProperties properties,
 			Clock clock
 	) {
 		this.requestRepository = requestRepository;
 		this.candidateService = candidateService;
 		this.creationService = creationService;
+		this.expirationService = expirationService;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -56,6 +60,7 @@ public class MatchScheduler {
 			initialDelayString = "${match.scheduler.initial-delay-ms:10000}"
 	)
 	public void matchWaitingRequests() {
+		expirationService.expireOverdue(LocalDateTime.now(clock));
 		List<MatchRequest> sources = requestRepository
 				.findAllByStatusOrderByRequestedAtAscIdAsc(
 						MatchRequestStatus.WAITING,

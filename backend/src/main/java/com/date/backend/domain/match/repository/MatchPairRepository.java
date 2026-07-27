@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Collection;
 import java.util.List;
@@ -24,6 +25,20 @@ public interface MatchPairRepository extends JpaRepository<MatchPair, Long> {
 	Optional<MatchPair> findFirstByUserAIdOrUserBIdOrderByMatchedAtDesc(
 			Long userAId,
 			Long userBId
+	);
+
+	@EntityGraph(attributePaths = {"requestA", "requestB"})
+	@Query("""
+			SELECT pair
+			FROM MatchPair pair
+			WHERE (pair.userAId = :userId OR pair.userBId = :userId)
+			AND pair.status IN :statuses
+			ORDER BY pair.matchedAt DESC, pair.id DESC
+			""")
+	List<MatchPair> findCurrentByParticipant(
+			@Param("userId") Long userId,
+			@Param("statuses") Collection<MatchStatus> statuses,
+			Pageable pageable
 	);
 
 	@Query("""

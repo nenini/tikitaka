@@ -201,6 +201,10 @@ public class MatchPair {
 		return userAId.equals(userId) || userBId.equals(userId);
 	}
 
+	public boolean isAcceptanceExpired(LocalDateTime now) {
+		return !Objects.requireNonNull(now).isBefore(acceptDeadlineAt);
+	}
+
 	@PrePersist
 	void prePersist() {
 		LocalDateTime now = LocalDateTime.now();

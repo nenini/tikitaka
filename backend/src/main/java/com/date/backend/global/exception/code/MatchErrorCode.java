@@ -38,6 +38,36 @@ public enum MatchErrorCode implements ErrorCode {
 			HttpStatus.BAD_REQUEST,
 			"INVALID_MATCH_REQUEST",
 			"유효하지 않은 매칭 신청 조건입니다."
+	),
+	MATCH_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"MATCH_NOT_FOUND",
+			"매칭 결과를 찾을 수 없습니다."
+	),
+	MATCH_NOT_PARTICIPANT(
+			HttpStatus.FORBIDDEN,
+			"MATCH_NOT_PARTICIPANT",
+			"해당 매칭의 참여자가 아닙니다."
+	),
+	MATCH_NOT_RESPONDABLE(
+			HttpStatus.CONFLICT,
+			"MATCH_NOT_RESPONDABLE",
+			"현재 응답할 수 없는 매칭입니다."
+	),
+	MATCH_RESPONSE_ALREADY_PROCESSED(
+			HttpStatus.CONFLICT,
+			"MATCH_RESPONSE_ALREADY_PROCESSED",
+			"이미 매칭 응답을 완료했습니다."
+	),
+	MATCH_ACCEPTANCE_DEADLINE_EXPIRED(
+			HttpStatus.CONFLICT,
+			"MATCH_ACCEPTANCE_DEADLINE_EXPIRED",
+			"매칭 수락 제한 시간이 만료되었습니다."
+	),
+	MATCH_SCHEDULE_NOT_AVAILABLE(
+			HttpStatus.CONFLICT,
+			"MATCH_SCHEDULE_NOT_AVAILABLE",
+			"예약 가능한 공통 시간을 찾을 수 없습니다."
 	);
 
 	private final HttpStatus status;

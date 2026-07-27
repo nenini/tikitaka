@@ -3,6 +3,7 @@ package com.date.backend.domain.match.scheduler;
 import com.date.backend.domain.match.application.MatchCandidate;
 import com.date.backend.domain.match.application.MatchCandidateService;
 import com.date.backend.domain.match.application.MatchCreationService;
+import com.date.backend.domain.match.application.MatchExpirationService;
 import com.date.backend.domain.match.config.MatchSchedulerProperties;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchRequestStatus;
@@ -30,6 +31,7 @@ class MatchSchedulerTest {
 		MatchRequestRepository requestRepository = mock(MatchRequestRepository.class);
 		MatchCandidateService candidateService = mock(MatchCandidateService.class);
 		MatchCreationService creationService = mock(MatchCreationService.class);
+		MatchExpirationService expirationService = mock(MatchExpirationService.class);
 		MatchSchedulerProperties properties = new MatchSchedulerProperties(
 				10_000,
 				10_000,
@@ -46,6 +48,7 @@ class MatchSchedulerTest {
 				requestRepository,
 				candidateService,
 				creationService,
+				expirationService,
 				properties,
 				clock
 		);
@@ -73,6 +76,7 @@ class MatchSchedulerTest {
 
 		scheduler.matchWaitingRequests();
 
+		verify(expirationService).expireOverdue(matchedAt);
 		verify(creationService).createMatch(
 				1L,
 				2L,
