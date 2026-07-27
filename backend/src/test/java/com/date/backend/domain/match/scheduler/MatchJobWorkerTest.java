@@ -4,6 +4,7 @@ import com.date.backend.domain.match.application.ClaimedMatchJob;
 import com.date.backend.domain.match.application.MatchJobClaimService;
 import com.date.backend.domain.match.application.MatchJobFailureService;
 import com.date.backend.domain.match.application.MatchJobProcessor;
+import com.date.backend.domain.match.application.MatchJobRecoveryService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -28,6 +29,8 @@ class MatchJobWorkerTest {
 	private final MatchJobProcessor processor = mock(MatchJobProcessor.class);
 	private final MatchJobFailureService failureService =
 			mock(MatchJobFailureService.class);
+	private final MatchJobRecoveryService recoveryService =
+			mock(MatchJobRecoveryService.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -36,6 +39,7 @@ class MatchJobWorkerTest {
 			claimService,
 			processor,
 			failureService,
+			recoveryService,
 			clock
 	);
 
@@ -46,6 +50,7 @@ class MatchJobWorkerTest {
 
 		worker.processJobs();
 
+		verify(recoveryService).recoverStale(NOW);
 		verify(processor).process(eq(1L), anyString());
 	}
 

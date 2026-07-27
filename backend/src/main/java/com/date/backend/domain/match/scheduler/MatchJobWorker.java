@@ -4,6 +4,7 @@ import com.date.backend.domain.match.application.ClaimedMatchJob;
 import com.date.backend.domain.match.application.MatchJobClaimService;
 import com.date.backend.domain.match.application.MatchJobFailureService;
 import com.date.backend.domain.match.application.MatchJobProcessor;
+import com.date.backend.domain.match.application.MatchJobRecoveryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,6 +30,7 @@ public class MatchJobWorker {
 	private final MatchJobClaimService claimService;
 	private final MatchJobProcessor processor;
 	private final MatchJobFailureService failureService;
+	private final MatchJobRecoveryService recoveryService;
 	private final Clock clock;
 	private final String workerId = "match-worker-" + UUID.randomUUID();
 
@@ -36,11 +38,13 @@ public class MatchJobWorker {
 			MatchJobClaimService claimService,
 			MatchJobProcessor processor,
 			MatchJobFailureService failureService,
+			MatchJobRecoveryService recoveryService,
 			Clock clock
 	) {
 		this.claimService = claimService;
 		this.processor = processor;
 		this.failureService = failureService;
+		this.recoveryService = recoveryService;
 		this.clock = clock;
 	}
 
@@ -49,9 +53,11 @@ public class MatchJobWorker {
 			initialDelayString = "${match.worker.initial-delay-ms:10000}"
 	)
 	public void processJobs() {
+		LocalDateTime now = LocalDateTime.now(clock);
+		recoveryService.recoverStale(now);
 		List<ClaimedMatchJob> jobs = claimService.claim(
 				workerId,
-				LocalDateTime.now(clock)
+				now
 		);
 		for (ClaimedMatchJob job : jobs) {
 			process(job);
@@ -68,12 +74,20 @@ public class MatchJobWorker {
 					job.matchRequestId(),
 					exception
 			);
-			failureService.fail(
-					job.jobId(),
-					workerId,
-					exception.getMessage(),
-					LocalDateTime.now(clock)
-			);
+			try {
+				failureService.fail(
+						job.jobId(),
+						workerId,
+						exception.getMessage(),
+						LocalDateTime.now(clock)
+				);
+			} catch (Exception failureException) {
+				log.error(
+						"Failed to record match job failure. jobId={}",
+						job.jobId(),
+						failureException
+				);
+			}
 		}
 	}
 }

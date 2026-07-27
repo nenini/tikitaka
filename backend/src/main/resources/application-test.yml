@@ -20,6 +20,10 @@ match:
     fixed-delay-ms: 1000
     initial-delay-ms: 10000
     batch-size: 20
+    max-attempts: 3
+    initial-backoff-seconds: 5
+    max-backoff-seconds: 300
+    processing-timeout-seconds: 60
   scheduler:
     enabled: false
     fixed-delay-ms: 10000

@@ -2,6 +2,7 @@ package com.date.backend.domain.match.application;
 
 import com.date.backend.domain.match.domain.MatchJob;
 import com.date.backend.domain.match.repository.MatchJobRepository;
+import com.date.backend.domain.match.policy.MatchJobRetryPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,9 +12,14 @@ import java.time.LocalDateTime;
 public class MatchJobFailureService {
 
 	private final MatchJobRepository jobRepository;
+	private final MatchJobRetryPolicy retryPolicy;
 
-	public MatchJobFailureService(MatchJobRepository jobRepository) {
+	public MatchJobFailureService(
+			MatchJobRepository jobRepository,
+			MatchJobRetryPolicy retryPolicy
+	) {
 		this.jobRepository = jobRepository;
+		this.retryPolicy = retryPolicy;
 	}
 
 	@Transactional
@@ -25,6 +31,13 @@ public class MatchJobFailureService {
 		if (!job.isOwnedBy(workerId)) {
 			return;
 		}
-		job.fail(error, failedAt);
+		if (retryPolicy.canRetry(job.getAttemptCount())) {
+			job.reschedule(
+					error,
+					retryPolicy.nextAvailableAt(job.getAttemptCount(), failedAt)
+			);
+		} else {
+			job.fail(error, failedAt);
+		}
 	}
 }

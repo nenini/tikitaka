@@ -41,4 +41,19 @@ public interface MatchJobRepository extends JpaRepository<MatchJob, Long> {
 	@EntityGraph(attributePaths = "matchRequest")
 	@Query("SELECT job FROM MatchJob job WHERE job.id = :jobId")
 	Optional<MatchJob> findByIdForUpdate(@Param("jobId") Long jobId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@EntityGraph(attributePaths = "matchRequest")
+	@Query("""
+			SELECT job
+			FROM MatchJob job
+			WHERE job.status = :status
+			AND job.claimedAt <= :claimedBefore
+			ORDER BY job.claimedAt, job.id
+			""")
+	List<MatchJob> findStaleProcessingForUpdate(
+			@Param("status") MatchJobStatus status,
+			@Param("claimedBefore") LocalDateTime claimedBefore,
+			Pageable pageable
+	);
 }

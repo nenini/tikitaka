@@ -33,4 +33,20 @@ class MatchJobTest {
 		assertThatThrownBy(() -> job.claim("worker-2", now.plusSeconds(1)))
 				.isInstanceOf(IllegalStateException.class);
 	}
+
+	@Test
+	void reschedulePreservesAttemptAndClearsOwnership() {
+		LocalDateTime now = LocalDateTime.of(2026, 7, 27, 10, 0);
+		MatchJob job = new MatchJob(mock(MatchRequest.class), now);
+		job.claim("worker-1", now);
+
+		job.reschedule("일시 오류", now.plusSeconds(5));
+
+		assertThat(job.getStatus()).isEqualTo(MatchJobStatus.PENDING);
+		assertThat(job.getAttemptCount()).isEqualTo(1);
+		assertThat(job.getWorkerId()).isNull();
+		assertThat(job.getClaimedAt()).isNull();
+		assertThat(job.getAvailableAt()).isEqualTo(now.plusSeconds(5));
+		assertThat(job.getLastError()).isEqualTo("일시 오류");
+	}
 }

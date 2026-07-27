@@ -97,6 +97,18 @@ public class MatchJob {
 		this.lastError = normalizeError(error);
 	}
 
+	public void reschedule(String error, LocalDateTime availableAt) {
+		if (status != MatchJobStatus.PROCESSING) {
+			throw new IllegalStateException("처리 중인 매칭 작업만 재시도할 수 있습니다.");
+		}
+		this.status = MatchJobStatus.PENDING;
+		this.availableAt = Objects.requireNonNull(availableAt);
+		this.claimedAt = null;
+		this.failedAt = null;
+		this.workerId = null;
+		this.lastError = normalizeError(error);
+	}
+
 	public boolean isOwnedBy(String workerId) {
 		return status == MatchJobStatus.PROCESSING
 				&& this.workerId != null
