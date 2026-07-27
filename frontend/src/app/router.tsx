@@ -8,6 +8,7 @@ import { TrackSelectPage } from '@/features/matching/TrackSelectPage'
 import { MatchQueuePage } from '@/features/matching/MatchQueuePage'
 import { MatchCardPage } from '@/features/matching/MatchCardPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
+import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
 
 /**
  * 앱 라우팅. 기능이 확정되면 각 feature 폴더에 페이지를 추가한다.
@@ -30,7 +31,10 @@ export const router = createBrowserRouter([
       { path: '/session/:sessionId', element: <SessionPage /> },
       // TODO(FE-B 다음 배치): /ai-video/setup(W-21), /chatbot/persona(W-10) · /report/:id, /dashboard, /contact ...
 
-      { path: '/dev', element: <ComponentGallery /> }
+      //-----------
+      // 개발용, 추후 삭제
+      { path: '/dev', element: <ComponentGallery /> },
+      { path: '/livekit-demo', element: <LiveKitDemoPage /> }
     ],
   },
 ])
