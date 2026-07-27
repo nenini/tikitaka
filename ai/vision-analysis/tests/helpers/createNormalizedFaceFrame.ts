@@ -10,6 +10,7 @@ export interface NormalizedFrameOptions {
   readonly faceAreaRatio?: number;
   readonly inFrameRatio?: number;
   readonly brightnessScore?: number;
+  readonly backlightScore?: number;
   readonly blurScore?: number;
   readonly yaw?: number | null;
   readonly pitch?: number | null;
@@ -55,6 +56,14 @@ export function createNormalizedFaceFrame(
           pitch: options.pitch ?? 0,
           roll: options.roll ?? 0,
           blendshapes: options.blendshapes ?? {},
+          missingRequiredBlendshapes: [
+            "mouthSmileLeft",
+            "mouthSmileRight",
+            "eyeBlinkLeft",
+            "eyeBlinkRight",
+          ].filter(
+            (name) => options.blendshapes?.[name] === undefined,
+          ),
           geometry: {
             mouthCornerLiftLeft: 0,
             mouthCornerLiftRight: 0,
@@ -79,6 +88,7 @@ export function createNormalizedFaceFrame(
       : null,
     imageQuality: {
       brightnessScore: options.brightnessScore ?? 0.8,
+      backlightScore: options.backlightScore ?? 1,
       blurScore: options.blurScore ?? 0.8,
       rawLaplacianVariance: 240,
     },

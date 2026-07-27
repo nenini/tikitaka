@@ -161,5 +161,26 @@ describe("FaceQualityDetector", () => {
     expect(detector.getState().state).toBe("USABLE");
     expect(detector.getState().activeReasons).toEqual([]);
   });
-});
 
+  it("distinguishes a too-large face and backlight from a small face", () => {
+    const clock = new MutableClock();
+    const detector = createDetector(clock);
+    let output = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 0,
+        faceAreaRatio: 0.7,
+        backlightScore: 0.1,
+      }),
+    );
+    output = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 600,
+        faceAreaRatio: 0.7,
+        backlightScore: 0.1,
+      }),
+    );
+    expect(output.decision.reasons).toContain("FACE_TOO_LARGE");
+    expect(output.decision.reasons).toContain("BACKLIGHT");
+    expect(output.decision.reasons).not.toContain("FACE_TOO_SMALL");
+  });
+});

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { VisionBaseline } from "../../src/vision/calibration/VisionBaseline.js";
+import { createVisionBaseline } from "../helpers/createVisionBaseline.js";
 import { defaultVisionConfig } from "../../src/vision/config/defaultVisionConfig.js";
 import { ExpressionActivityDetector } from "../../src/vision/detectors/ExpressionActivityDetector.js";
 import { visionBehaviorEventSchema } from "../../src/vision/events/VisionEventSchema.js";
 import { createDetectorEventFactory } from "../helpers/createDetectorTestKit.js";
 import { createNormalizedFaceFrame } from "../helpers/createNormalizedFaceFrame.js";
 
-const baseline: VisionBaseline = {
+const baseline = createVisionBaseline({
   status: "READY",
   usableFrameCount: 20,
   calibratedAtSessionElapsedMs: 5_000,
@@ -24,7 +24,7 @@ const baseline: VisionBaseline = {
   blendshapeMeans: {},
   blendshapeMedianAbsoluteDeviations: {},
   expressionActivityScore: null,
-};
+});
 const usableContext = {
   quality: { usable: true, confidence: 0.9, reasons: [] } as const,
   baseline,
