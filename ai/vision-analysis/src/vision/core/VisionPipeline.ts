@@ -1,5 +1,6 @@
 import type { DetectorName, VisionConfig } from "../config/VisionConfig.js";
 import { BaselineCalibrator } from "../calibration/BaselineCalibrator.js";
+import { AdaptiveBaselineManager } from "../calibration/AdaptiveBaselineManager.js";
 import type {
   BaselineCalibrationState,
 } from "../calibration/BaselineCalibrator.js";
@@ -81,6 +82,7 @@ const FAILED_QUALITY: FaceQualityDecision = {
 export class VisionPipeline {
   private readonly qualityDetector: FaceQualityDetector;
   private readonly calibrator: BaselineCalibrator;
+  private readonly adaptiveBaseline: AdaptiveBaselineManager;
   private readonly screenAttention: BehaviorDetector;
   private readonly smileExpression: BehaviorDetector;
   private readonly expressionActivity: BehaviorDetector;
@@ -106,6 +108,9 @@ export class VisionPipeline {
       config.calibration,
       config.expressionActivity,
       config.screenAttention,
+    );
+    this.adaptiveBaseline = new AdaptiveBaselineManager(
+      config.adaptiveBaseline,
     );
     this.screenAttention =
       options.detectorOverrides?.screenAttention ??
@@ -170,6 +175,7 @@ export class VisionPipeline {
     // Sequence reset belongs to session cleanup alongside every detector and baseline.
     this.qualityDetector.reset();
     this.calibrator.reset();
+    this.adaptiveBaseline.reset();
     for (const entry of this.detectorEntries) {
       try {
         entry.detector.reset();
@@ -195,8 +201,26 @@ export class VisionPipeline {
 
     // The calibrator sees unusable frames only to break timing continuity; it
     // never records their pose or expression values as baseline samples.
-    const calibration = this.calibrator.update(frame, qualityOutput.decision);
-    const baseline = calibration.baseline;
+    const calibrationState = this.calibrator.update(
+      frame,
+      qualityOutput.decision,
+    );
+    const baseline = this.adaptiveBaseline.update(
+      calibrationState.baseline,
+      frame,
+      qualityOutput.decision,
+      {
+        gaze: this.isDetectorBusy(this.screenAttention.getState()),
+        nod: this.isDetectorBusy(this.nod.getState()),
+        smile: this.isDetectorBusy(this.smileExpression.getState()),
+      },
+    );
+    const calibration: BaselineCalibrationState = {
+      ...calibrationState,
+      baseline,
+      baselineModeBySignal: baseline.baselineModeBySignal,
+      confidenceBySignal: baseline.confidenceBySignal,
+    };
 
     if (!qualityOutput.decision.usable) {
       // Suspending clears temporal windows and closes any active behavior episode.
@@ -409,6 +433,58 @@ export class VisionPipeline {
         stiffExpressionActive: ["ACTIVE", "RECOVERING"].includes(
           this.readString(activityState, "state") ?? "",
         ),
+        smileConfigurationScore: this.readNullableNumber(
+          smileState,
+          "smileConfigurationScore",
+        ),
+        baselineSmileScore: this.readNullableNumber(
+          smileState,
+          "baselineSmileScore",
+        ),
+        smileDelta: this.readNullableNumber(smileState, "smileDelta"),
+        mouthAsymmetry: this.readNullableNumber(
+          smileState,
+          "mouthAsymmetry",
+        ),
+        maintainedSmileConfiguration:
+          this.readBoolean(
+            smileState,
+            "maintainedSmileConfiguration",
+          ) ?? false,
+        headPoseScore: this.readNullableNumber(
+          screenState,
+          "headPoseScore",
+        ),
+        faceCenterScore: this.readNullableNumber(
+          screenState,
+          "faceCenterScore",
+        ),
+        irisProxyScore: this.readNullableNumber(
+          screenState,
+          "irisProxyScore",
+        ),
+        screenAttentionScore: this.readNullableNumber(
+          screenState,
+          "screenAttentionScore",
+        ),
+        screenAttentionConfidence: this.readNullableNumber(
+          screenState,
+          "screenAttentionConfidence",
+        ),
+        gazeReliability: this.readNullableNumber(
+          screenState,
+          "gazeReliability",
+        ),
+        binocularAgreement: this.readNullableNumber(
+          screenState,
+          "binocularAgreement",
+        ),
+        gazeMode: this.readString(screenState, "gazeMode"),
+        attentionMode: this.readString(screenState, "attentionMode"),
+        attentionEvidenceMode: this.readString(
+          screenState,
+          "attentionEvidenceMode",
+        ),
       },
       performance: {
         profile: frame.processing.performanceProfile,
@@ -443,5 +519,20 @@ export class VisionPipeline {
   private readString(state: object, key: string): string | null {
     const value = Reflect.get(state, key);
     return typeof value === "string" ? value : null;
+  }
+
+  private readBoolean(state: object, key: string): boolean | null {
+    const value = Reflect.get(state, key);
+    return typeof value === "boolean" ? value : null;
+  }
+
+  private isDetectorBusy(state: object): boolean {
+    const value = this.readString(state, "state");
+    return (
+      value !== null &&
+      (value.includes("CANDIDATE") ||
+        value.includes("ACTIVE") ||
+        value.includes("RECOVERING"))
+    );
   }
 }

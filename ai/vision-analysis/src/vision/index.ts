@@ -1,5 +1,6 @@
 export * from "./calibration/VisionBaseline.js";
 export * from "./calibration/BaselineCalibrator.js";
+export * from "./calibration/AdaptiveBaselineManager.js";
 export * from "./config/index.js";
 export * from "./core/FaceFrameNormalizer.js";
 export * from "./core/FaceLandmarkerAdapter.js";
