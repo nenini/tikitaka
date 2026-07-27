@@ -30,14 +30,14 @@ export function AuthPlaceholder({
   )
 }
 
-/** 기본 프로필(W-04) — 본인인증 다음 단계. 다음 차수 구현. */
-export function ProfilePage() {
+/** 설문(W-06) — 프로필 다음 단계(온보딩 마지막). 다음 차수 구현. */
+export function SurveyPage() {
   return (
     <AuthPlaceholder
-      title="기본 프로필 (W-04)"
-      note="동의 다음 단계입니다. 닉네임·성별 등 기본 프로필을 입력해요 — 다음 차수에서 구현합니다."
-      backTo="/signup/consent"
-      backLabel="동의로 돌아가기"
+      title="설문 (W-06)"
+      note="온보딩 마지막 단계입니다. 내 성격·원하는 상대·선호 얼굴상·선호 연령·개선 목표를 입력해요 — 다음 차수에서 구현합니다."
+      backTo="/signup/profile"
+      backLabel="기본 프로필로 돌아가기"
     />
   )
 }
