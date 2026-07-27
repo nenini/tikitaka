@@ -20,6 +20,7 @@ public record MatchRequestResponse(
 		List<MatchTraitSnapshotResponse> selfTraits,
 		List<MatchRequestSlotResponse> availableSlots,
 		LocalDateTime requestedAt,
+		LocalDateTime waitingStartedAt,
 		LocalDateTime matchedAt,
 		LocalDateTime cancelledAt
 ) {
@@ -39,6 +40,7 @@ public record MatchRequestResponse(
 				toTraitResponses(traits, TraitSnapshotType.SELF),
 				slots.stream().map(MatchRequestSlotResponse::from).toList(),
 				request.getRequestedAt(),
+				request.getWaitingStartedAt(),
 				request.getMatchedAt(),
 				request.getCancelledAt()
 		);

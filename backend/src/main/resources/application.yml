@@ -98,6 +98,7 @@ face:
 match:
   policy:
     late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
+    setting-recommendation-delay-seconds: ${MATCH_SETTING_RECOMMENDATION_DELAY_SECONDS:86400}
   worker:
     enabled: ${MATCH_WORKER_ENABLED:true}
     fixed-delay-ms: ${MATCH_WORKER_FIXED_DELAY_MS:1000}

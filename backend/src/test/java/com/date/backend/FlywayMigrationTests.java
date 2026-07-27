@@ -46,6 +46,10 @@ class FlywayMigrationTests {
 		Integer matchRequestTraitSnapshotTableCount =
 				tableCount("MATCH_REQUEST_TRAIT_SNAPSHOTS");
 		Integer matchJobTableCount = tableCount("MATCH_JOBS");
+		Integer matchWaitingStartedAtColumnCount = columnCount(
+				"MATCH_REQUESTS",
+				"WAITINGSTARTEDAT"
+		);
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM `face_tag_catalog` "
@@ -87,6 +91,7 @@ class FlywayMigrationTests {
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
 		assertThat(matchJobTableCount).isEqualTo(1);
+		assertThat(matchWaitingStartedAtColumnCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();
@@ -109,6 +114,18 @@ class FlywayMigrationTests {
 		return jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM `" + tableName + "`",
 				Integer.class
+		);
+	}
+
+	private Integer columnCount(String tableName, String columnName) {
+		return jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+						+ "WHERE TABLE_SCHEMA = 'PUBLIC' "
+						+ "AND TABLE_NAME = ? "
+						+ "AND COLUMN_NAME = ?",
+				Integer.class,
+				tableName,
+				columnName
 		);
 	}
 }

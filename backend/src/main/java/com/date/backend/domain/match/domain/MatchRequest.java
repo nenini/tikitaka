@@ -51,6 +51,9 @@ public class MatchRequest {
 	@Column(name = "requestedAt", nullable = false, updatable = false)
 	private LocalDateTime requestedAt;
 
+	@Column(name = "waitingStartedAt", nullable = false)
+	private LocalDateTime waitingStartedAt;
+
 	@Column(name = "matchedAt")
 	private LocalDateTime matchedAt;
 
@@ -76,6 +79,24 @@ public class MatchRequest {
 			FaceTagCatalog preferredFaceTag,
 			FaceTagCatalog actualFaceTag
 	) {
+		this(
+				userId,
+				preferredAgeMin,
+				preferredAgeMax,
+				preferredFaceTag,
+				actualFaceTag,
+				LocalDateTime.now()
+		);
+	}
+
+	public MatchRequest(
+			Long userId,
+			short preferredAgeMin,
+			short preferredAgeMax,
+			FaceTagCatalog preferredFaceTag,
+			FaceTagCatalog actualFaceTag,
+			LocalDateTime waitingStartedAt
+	) {
 		validateAgeRange(preferredAgeMin, preferredAgeMax);
 		this.userId = Objects.requireNonNull(userId, "사용자 ID는 필수입니다.");
 		this.preferredAgeMin = preferredAgeMin;
@@ -88,13 +109,15 @@ public class MatchRequest {
 				actualFaceTag,
 				"현재 얼굴상 snapshot은 필수입니다."
 		);
+		this.waitingStartedAt = Objects.requireNonNull(waitingStartedAt);
 	}
 
 	public void updateSnapshot(
 			short preferredAgeMin,
 			short preferredAgeMax,
 			FaceTagCatalog preferredFaceTag,
-			FaceTagCatalog actualFaceTag
+			FaceTagCatalog actualFaceTag,
+			LocalDateTime waitingStartedAt
 	) {
 		if (status != MatchRequestStatus.WAITING) {
 			throw new IllegalStateException("대기 중인 매칭 요청만 수정할 수 있습니다.");
@@ -104,6 +127,7 @@ public class MatchRequest {
 		this.preferredAgeMax = preferredAgeMax;
 		this.preferredFaceTag = Objects.requireNonNull(preferredFaceTag);
 		this.actualFaceTag = Objects.requireNonNull(actualFaceTag);
+		this.waitingStartedAt = Objects.requireNonNull(waitingStartedAt);
 	}
 
 	public void markMatchFound(LocalDateTime matchedAt) {
@@ -114,12 +138,13 @@ public class MatchRequest {
 		this.matchedAt = Objects.requireNonNull(matchedAt);
 	}
 
-	public void returnToWaiting() {
+	public void returnToWaiting(LocalDateTime waitingStartedAt) {
 		if (status != MatchRequestStatus.MATCH_FOUND) {
 			throw new IllegalStateException("상대가 정해진 요청만 대기 상태로 복귀할 수 있습니다.");
 		}
 		this.status = MatchRequestStatus.WAITING;
 		this.matchedAt = null;
+		this.waitingStartedAt = Objects.requireNonNull(waitingStartedAt);
 	}
 
 	public void confirm() {
@@ -207,6 +232,10 @@ public class MatchRequest {
 
 	public LocalDateTime getRequestedAt() {
 		return requestedAt;
+	}
+
+	public LocalDateTime getWaitingStartedAt() {
+		return waitingStartedAt;
 	}
 
 	public LocalDateTime getMatchedAt() {

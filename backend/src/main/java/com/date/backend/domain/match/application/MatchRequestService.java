@@ -93,12 +93,14 @@ public class MatchRequestService {
 		}
 
 		MatchSourceSnapshot source = resolveSourceSnapshot(userId);
+		LocalDateTime now = LocalDateTime.now(SERVICE_ZONE_ID);
 		MatchRequest matchRequest = matchRequestRepository.save(new MatchRequest(
 				userId,
 				request.preferredAgeMin(),
 				request.preferredAgeMax(),
 				source.preferredFaceTag().getFaceTag(),
-				source.actualFaceTag().getFaceTag()
+				source.actualFaceTag().getFaceTag(),
+				now
 		));
 		List<MatchRequestSlot> slots = saveSlots(matchRequest, request.availableSlots());
 		List<MatchRequestTraitSnapshot> traits = saveTraits(matchRequest, source);
@@ -132,7 +134,8 @@ public class MatchRequestService {
 				request.preferredAgeMin(),
 				request.preferredAgeMax(),
 				source.preferredFaceTag().getFaceTag(),
-				source.actualFaceTag().getFaceTag()
+				source.actualFaceTag().getFaceTag(),
+				LocalDateTime.now(SERVICE_ZONE_ID)
 		);
 
 		matchRequestSlotRepository.deleteAllByMatchRequest_Id(matchRequest.getId());

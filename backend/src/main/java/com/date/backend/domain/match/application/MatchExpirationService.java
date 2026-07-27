@@ -37,14 +37,14 @@ public class MatchExpirationService {
 			pairRepository.findByIdForUpdate(pairId)
 					.filter(pair -> pair.getStatus() == MatchStatus.PENDING_ACCEPTANCE)
 					.filter(pair -> pair.isAcceptanceExpired(now))
-					.ifPresent(this::expire);
+					.ifPresent(pair -> expire(pair, now));
 		}
 	}
 
-	private void expire(MatchPair pair) {
+	private void expire(MatchPair pair, LocalDateTime waitingStartedAt) {
 		pair.expire();
-		pair.getRequestA().returnToWaiting();
-		pair.getRequestB().returnToWaiting();
+		pair.getRequestA().returnToWaiting(waitingStartedAt);
+		pair.getRequestB().returnToWaiting(waitingStartedAt);
 		jobEnqueueService.enqueue(pair.getRequestA());
 		jobEnqueueService.enqueue(pair.getRequestB());
 	}

@@ -127,8 +127,8 @@ class MatchResultServiceTest {
 		MatchResultResponse result = service.reject(PAIR_ID, USER_A_ID);
 
 		verify(pair).reject();
-		verify(requestA).returnToWaiting();
-		verify(requestB).returnToWaiting();
+		verify(requestA).returnToWaiting(NOW);
+		verify(requestB).returnToWaiting(NOW);
 		assertThat(result.myResponse().name()).isEqualTo("REJECTED");
 	}
 

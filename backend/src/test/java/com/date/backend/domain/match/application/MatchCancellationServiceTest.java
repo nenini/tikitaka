@@ -40,7 +40,7 @@ class MatchCancellationServiceTest {
 		MatchCancellationService service = new MatchCancellationService(
 				pairRepository,
 				activeRequestRepository,
-				new MatchPolicyProperties(86_400),
+				new MatchPolicyProperties(86_400, 86_400),
 				eventPublisher,
 				clock
 		);

@@ -24,3 +24,16 @@ CREATE INDEX `IDX_match_jobs_claim`
 
 CREATE INDEX `IDX_match_jobs_request_status`
     ON `match_jobs` (`matchRequestId`, `status`);
+
+ALTER TABLE `match_requests`
+    ADD COLUMN `waitingStartedAt` DATETIME NULL;
+
+UPDATE `match_requests`
+SET `waitingStartedAt` = COALESCE(`updatedAt`, `requestedAt`)
+WHERE `waitingStartedAt` IS NULL;
+
+ALTER TABLE `match_requests`
+    MODIFY COLUMN `waitingStartedAt` DATETIME NOT NULL;
+
+CREATE INDEX `IDX_match_requests_status_waiting_started`
+    ON `match_requests` (`status`, `waitingStartedAt`, `matchRequestId`);

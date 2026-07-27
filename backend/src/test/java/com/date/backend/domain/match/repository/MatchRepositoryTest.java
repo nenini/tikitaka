@@ -1,5 +1,6 @@
 package com.date.backend.domain.match.repository;
 
+import com.date.backend.domain.match.application.MatchWaitingRecommendationService;
 import com.date.backend.domain.match.domain.ActiveMatchRequest;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchRequest;
@@ -73,6 +74,9 @@ class MatchRepositoryTest {
 
 	@Autowired
 	private MatchResponseRepository matchResponseRepository;
+
+	@Autowired
+	private MatchWaitingRecommendationService waitingRecommendationService;
 
 	@Autowired
 	private EntityManager entityManager;
@@ -209,6 +213,57 @@ class MatchRepositoryTest {
 				userA.getId(),
 				Set.of(MatchStatus.PENDING_ACCEPTANCE, MatchStatus.CONFIRMED)
 		)).isTrue();
+	}
+
+	@Test
+	void findsOnlyActiveRequestsWaitingForAtLeastTwentyFourHours() {
+		List<FaceTagCatalog> faceTags =
+				faceTagCatalogRepository.findAllByActiveTrueOrderByDisplayOrderAsc();
+		LocalDateTime now = LocalDateTime.of(2026, 7, 28, 12, 0);
+		User dueUser = saveUser("waiting-due@example.com", LocalDate.of(2000, 1, 1));
+		User recentUser = saveUser("waiting-recent@example.com", LocalDate.of(2000, 1, 2));
+		User inactiveUser = saveUser(
+				"waiting-inactive@example.com",
+				LocalDate.of(2000, 1, 3)
+		);
+		MatchRequest dueRequest = matchRequestRepository.save(new MatchRequest(
+				dueUser.getId(),
+				(short) 20,
+				(short) 40,
+				faceTags.get(0),
+				faceTags.get(0),
+				now.minusHours(24)
+		));
+		MatchRequest recentRequest = matchRequestRepository.save(new MatchRequest(
+				recentUser.getId(),
+				(short) 20,
+				(short) 40,
+				faceTags.get(0),
+				faceTags.get(0),
+				now.minusHours(23).minusMinutes(59)
+		));
+		matchRequestRepository.save(new MatchRequest(
+				inactiveUser.getId(),
+				(short) 20,
+				(short) 40,
+				faceTags.get(0),
+				faceTags.get(0),
+				now.minusHours(25)
+		));
+		activeMatchRequestRepository.saveAll(List.of(
+				new ActiveMatchRequest(dueUser.getId(), dueRequest),
+				new ActiveMatchRequest(recentUser.getId(), recentRequest)
+		));
+		entityManager.flush();
+		entityManager.clear();
+
+		assertThat(waitingRecommendationService.findDueTargets(now, 10))
+				.singleElement()
+				.satisfies(target -> {
+					assertThat(target.userId()).isEqualTo(dueUser.getId());
+					assertThat(target.matchRequestId()).isEqualTo(dueRequest.getId());
+					assertThat(target.waitingStartedAt()).isEqualTo(now.minusHours(24));
+				});
 	}
 
 	private User saveUser(String email, LocalDate birthDate) {

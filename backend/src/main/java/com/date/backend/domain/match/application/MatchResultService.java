@@ -96,8 +96,8 @@ public class MatchResultService {
 		MatchPair pair = getPairForResponse(matchPairId, userId, now);
 		getPendingResponse(pair.getId(), userId).reject(now);
 		pair.reject();
-		pair.getRequestA().returnToWaiting();
-		pair.getRequestB().returnToWaiting();
+		pair.getRequestA().returnToWaiting(now);
+		pair.getRequestB().returnToWaiting(now);
 		jobEnqueueService.enqueue(pair.getRequestA());
 		jobEnqueueService.enqueue(pair.getRequestB());
 		return toResponse(pair, userId);
