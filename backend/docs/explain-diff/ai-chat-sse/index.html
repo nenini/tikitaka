@@ -141,7 +141,7 @@
       <div>chunk 순차 전송</div>
       <div>AI 저장·종료</div>
     </div>
-    <div class="current">현재 실제 AI 서버 호출 구현은 아직 연결되지 않았습니다. SSE 구조와 교체 지점은 완성됐으며, AI 구현체가 들어오면 <code>AiChatResponseStreamer</code>를 구현해 연결합니다.</div>
+    <div class="current"><code>AI_CHAT_BASE_URL</code>을 설정하면 실제 HTTP 스트리밍 구현이 활성화됩니다. 설정하지 않은 환경에서는 명확한 error 이벤트를 반환하는 기본 구현을 사용합니다.</div>
   </section>
 
   <section id="controller">
@@ -265,14 +265,14 @@ return emitter;</code></pre>
         Consumer&lt;String&gt; chunkConsumer
     ) throws Exception;
 }</code></pre>
-        <p class="why">Backend는 AI 서버 구현 방법을 알 필요가 없습니다. AI 구현체는 답변 조각을 받을 때마다 <code>chunkConsumer.accept(chunk)</code>만 호출하면 됩니다.</p>
+        <p class="why">실제 HTTP 구현은 AI 서버에 POST 요청하고 SSE·NDJSON·일반 텍스트 스트림을 읽은 뒤, 답변 조각마다 <code>chunkConsumer.accept(chunk)</code>를 호출합니다.</p>
       </div>
     </div>
     <div class="step">
       <div class="number">7</div>
       <div>
-        <h3 class="file">UnconfiguredAiChatResponseStreamer.java</h3>
-        <p>현재 AI 서버가 연결되지 않았음을 명확하게 알리는 기본 구현입니다. 실제 구현 빈이 등록되면 <code>@ConditionalOnMissingBean</code> 설정에 의해 자동으로 대체됩니다.</p>
+        <h3 class="file">HttpAiChatResponseStreamer.java</h3>
+        <p><code>AI_CHAT_BASE_URL</code>이 있으면 실제 구현을 사용하고, 값이 없으면 <code>UnconfiguredAiChatResponseStreamer</code>가 설정 누락을 error 이벤트로 알립니다.</p>
       </div>
     </div>
   </section>
