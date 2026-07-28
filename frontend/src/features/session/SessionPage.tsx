@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertDialog, Button, CallControls, Callout, DarkScope, IconButton } from '@/components'
+import { AlertDialog, Button, CallControls, Callout, DarkScope, Icon, IconButton } from '@/components'
 import { useCoachingStore } from '@/stores/coaching.store'
 import { AudioTrackView } from './livekit/TrackView'
 import { devTokenProvider } from './livekit/tokenProvider'
@@ -83,6 +83,31 @@ export function SessionPage() {
   //   useLiveKitRoom 이 ParticipantConnected 를 상태로 노출하면 그걸 쓰는 게 정확하다.
   const partnerJoined = Boolean(session.remoteVideo || session.remoteAudio)
 
+  // 권한이 없으면 세션 UI 자체를 그리지 않는다. 훅이 룸 연결도 끊어놓은 상태다.
+  if (session.mediaDenied) {
+    return (
+      <DarkScope>
+        <div className="mx-auto flex h-[100dvh] max-w-[440px] flex-col items-center justify-center gap-4 p-6 text-center">
+          <Icon name="camera-off" size={40} className="text-faint" />
+          <h1 className="bt-h3">세션에 들어갈 수 없어요</h1>
+          <p className="bt-body-sm bt-muted">
+            {session.error?.message ?? '카메라·마이크 권한이 필요해요.'} 화상 연습은 두 사람이 서로
+            보고 들어야 진행돼요. 브라우저 주소창의 자물쇠 아이콘에서 권한을 허용한 뒤 다시
+            시도해 주세요.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => navigate('/')}>
+              나가기
+            </Button>
+            <Button variant="primary" leadingIcon="refresh" onClick={session.retry}>
+              다시 시도
+            </Button>
+          </div>
+        </div>
+      </DarkScope>
+    )
+  }
+
   return (
     <DarkScope>
       <div className="mx-auto flex h-[100dvh] max-w-[1280px] flex-col gap-3 p-3 sm:p-4">
@@ -91,31 +116,28 @@ export function SessionPage() {
           <SessionStage
             remoteVideo={session.remoteVideo}
             localVideo={session.localVideo}
-            themeLabel="🍽 저녁 식당"
+            themeLabel="저녁 식당"
             remainingSec={remainingSec}
             connectionState={session.state}
             partnerJoined={partnerJoined}
             cameraDisabled={session.cameraDisabled}
-            silenceHint={
-              <SilenceHint
-                stage={stage}
-                silenceSec={silenceSec}
-                topics={MOCK_TOPICS}
-                questions={MOCK_QUESTIONS}
-                questionsState="ready"
-                onPickTopic={() => {
-                  // 힌트를 쓰면 침묵 계측을 리셋한다 — 사용자가 이미 행동했으므로 더 개입하지 않는다.
-                  lastVoiceAtRef.current = Date.now()
-                }}
-                onPickQuestion={() => {
-                  lastVoiceAtRef.current = Date.now()
-                }}
-              />
-            }
           />
 
           <aside className="max-h-[38vh] min-h-0 overflow-y-auto lg:max-h-none">
             <CoachRail
+              silenceHint={
+                <SilenceHint
+                  stage={stage}
+                  silenceSec={silenceSec}
+                  topics={MOCK_TOPICS}
+                  questions={MOCK_QUESTIONS}
+                  questionsState="ready"
+                  onDismiss={() => {
+                    // 닫으면 침묵 계측을 리셋한다 — 다음 침묵 사이클까지 다시 뜨지 않는다.
+                    lastVoiceAtRef.current = Date.now()
+                  }}
+                />
+              }
               message={visibleMessage}
               onDismissMessage={() => setDismissedId(latest?.id ?? null)}
               goalLabel="발화량 줄이기"

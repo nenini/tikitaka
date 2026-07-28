@@ -14,7 +14,7 @@ import {
 } from '@/components'
 import { useSessionStore } from '@/stores/session.store'
 import { useDeviceCheck } from './useDeviceCheck'
-import { emojiForPlaceType, fetchRoomBundle, joinSession, themeForHour } from './api'
+import { fetchRoomBundle, joinSession, themeForHour } from './api'
 import type { DeviceStatus, RoomBundle } from './types'
 
 /**
@@ -42,8 +42,6 @@ export function WaitingRoomPage() {
     setPhase('waiting-room')
     setSessionId(sessionId)
   }, [sessionId, setPhase, setSessionId])
-
-  const themeEmoji = bundle ? emojiForPlaceType(bundle.theme.placeType) : '🍽'
 
   async function handleEnter() {
     if (!device.ready || joining) return
@@ -76,7 +74,7 @@ export function WaitingRoomPage() {
           <Cluster gap={8} style={{ alignItems: 'center', justifyContent: 'space-between' }}>
             <Cluster gap={8} style={{ alignItems: 'center' }}>
               <TagChip>
-                {themeEmoji} {bundle?.theme.name ?? '상황 테마 배정 중'}
+                {bundle?.theme.name ?? '상황 테마 배정 중'}
               </TagChip>
               {bundle && (
                 <span className="bt-caption text-faint">

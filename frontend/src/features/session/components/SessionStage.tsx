@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client'
 import { Badge, ConnectionIndicator, Icon, SessionTimer, Spinner } from '@/components'
 import type { ConnectionState } from '@/components'
@@ -16,15 +15,14 @@ export interface SessionStageProps {
   partnerName?: string
   /** 내 카메라를 끈 상태 — PIP 에 표시한다 */
   cameraDisabled: boolean
-  /** 침묵 단계 힌트. 좌하단에 얹힌다 */
-  silenceHint?: ReactNode
 }
 
 /**
- * 세션 주 화면 — 상대 영상이 주인공이고 나머지는 그 위에 얹힌다.
+ * 세션 주 화면 — 상대 영상이 주인공이다.
  *
  * 오버레이 배치 규칙(§10): 코칭·힌트는 **상대 얼굴을 가리지 않는다.**
- * 그래서 상단은 얇은 메타 정보(테마·타이머)만, 하단 모서리에만 힌트를 둔다.
+ * 그래서 영상 위에 남는 건 얇은 메타 정보(테마·타이머·연결 상태)와 PIP 뿐이고,
+ * 침묵 힌트·코칭 카드는 전부 코치 레일에서 그린다.
  */
 export function SessionStage({
   remoteVideo,
@@ -35,7 +33,6 @@ export function SessionStage({
   partnerJoined,
   partnerName,
   cameraDisabled,
-  silenceHint,
 }: SessionStageProps) {
   return (
     <div
@@ -77,14 +74,8 @@ export function SessionStage({
         </div>
       </div>
 
-      {/* 하단 좌: 침묵 단계 힌트 — PIP 와 겹치지 않도록 오른쪽 여백을 비워둔다 */}
-      {silenceHint && (
-        <div className="absolute bottom-3 left-3 right-3 max-w-[340px] sm:right-[168px]">
-          {silenceHint}
-        </div>
-      )}
-
-      {/* 하단 우: 내 영상 PIP */}
+      {/* 하단 우: 내 영상 PIP.
+          침묵 힌트·코칭은 전부 코치 레일로 옮겨서, 영상 위에 얹히는 건 이제 PIP 뿐이다. */}
       <div
         className="absolute bottom-3 right-3 h-[110px] w-[82px] overflow-hidden rounded-lg sm:h-[150px] sm:w-[112px]"
         style={{

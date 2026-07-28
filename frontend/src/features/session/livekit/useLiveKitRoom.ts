@@ -26,6 +26,18 @@ export interface LiveKitSession {
     needsAudioUnlock: boolean /** 브라우저 자동재생 정책으로 소리가 막혔을 때 true*/
     unlockAudio: () => void
     error: Error | null
+    /**
+     * 카메라·마이크 권한이 없어 세션에 들어갈 수 없는 상태.
+     * true 면 룸에 **연결되지 않았거나 강제로 끊긴 것**이므로 세션 UI 를 그리면 안 된다.
+     */
+    mediaDenied: boolean
+    /** 권한을 다시 확인하고 입장을 재시도한다 */
+    retry: () => void
+}
+
+/** 권한 거부·장치 없음을 구분한다. 사용자에게 다른 안내를 해야 한다. */
+function isPermissionError(err: unknown): boolean {
+    return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError')
 }
 
 export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveKitSession {
@@ -39,9 +51,19 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
     const [cameraPending, setCameraPending] = useState(false)
     const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false)
     const [error, setError] = useState<Error | null>(null)
+    const [mediaDenied, setMediaDenied] = useState(false)
+    // 값이 바뀌면 effect 가 다시 돌아 입장을 재시도한다.
+    const [retryNonce, setRetryNonce] = useState(0)
 
     // 토글 콜백이 항상 살아있는 Room 을 참조하도록 ref로
     const roomRef = useRef<Room | null>(null)
+
+    const retry = useCallback(() => {
+        setMediaDenied(false)
+        setError(null)
+        setState('connecting')
+        setRetryNonce((n) => n + 1)
+    }, [])
 
     useEffect(() => {
         let cancelled = false
@@ -99,17 +121,82 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
                 if (!cancelled) setNeedsAudioUnlock(!room.canPlaybackAudio)
             })
 
+        /** 권한이 사라지면 세션에 남아 있으면 안 된다 — 즉시 끊고 차단 상태로 전환한다. */
+        function blockForMedia(err: unknown) {
+            setMediaDenied(true)
+            setError(
+                isPermissionError(err)
+                    ? new Error('카메라·마이크 권한이 필요해요.')
+                    : new Error('카메라 또는 마이크를 찾을 수 없어요.'),
+            )
+            setState('disconnected')
+            void room.disconnect()
+        }
+
+        // 세션 도중 브라우저 설정에서 권한을 꺼도 즉시 쫓아내기 위해 권한 상태를 구독한다.
+        // Permissions API 의 camera/microphone 은 일부 브라우저(Firefox 등)에서 미지원이라
+        // 실패해도 조용히 넘어간다 — 그 경우엔 아래 입장 게이트만으로 막는다.
+        const permissionWatchers: PermissionStatus[] = []
+        async function watchPermissions() {
+            for (const name of ['camera', 'microphone'] as const) {
+                try {
+                    const status = await navigator.permissions.query({ name: name as PermissionName })
+                    if (cancelled) return
+                    status.onchange = () => {
+                        if (!cancelled && status.state === 'denied') {
+                            blockForMedia(new DOMException('permission revoked', 'NotAllowedError'))
+                        }
+                    }
+                    permissionWatchers.push(status)
+                } catch {
+                    /* 미지원 브라우저 — 입장 게이트로만 막는다 */
+                }
+            }
+        }
+
         async function start() {
             try {
+                // ── 입장 게이트 ──
+                // 반드시 **연결 전에** 장치를 확인한다. 예전에는 connect() 뒤에 장치를 켰는데,
+                // 그러면 권한이 거부돼도 룸에는 이미 들어간 상태로 남았다(연결됨 + 권한 오류).
+                // getUserMedia 는 권한 확인과 요청을 겸하므로 브라우저 구분 없이 동작한다.
+                let probe: MediaStream
+                try {
+                    probe = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                } catch (err) {
+                    if (cancelled) return
+                    // 연결 자체를 시도하지 않는다.
+                    setMediaDenied(true)
+                    setError(
+                        isPermissionError(err)
+                            ? new Error('카메라·마이크 권한이 필요해요.')
+                            : new Error('카메라 또는 마이크를 찾을 수 없어요.'),
+                    )
+                    setState('disconnected')
+                    return
+                }
+                // 확인용 트랙은 바로 반납한다. 실제 발행 트랙은 LiveKit 이 다시 잡는다
+                // (카메라 표시등이 잠깐 깜빡일 수 있지만, 권한 판정의 정확성을 택했다).
+                probe.getTracks().forEach((t) => t.stop())
+                if (cancelled) return
+
+                void watchPermissions()
+
                 const { serverUrl, token } = await getToken(roomName)
                 if (cancelled) return
 
                 await room.connect(serverUrl, token)
                 if (cancelled) return
 
-                // 접속 후 내 장치를 켠다. 권한 거부는 여기서 throw
-                await room.localParticipant.setMicrophoneEnabled(true)
-                await room.localParticipant.setCameraEnabled(true)
+                // 게이트를 통과했어도 이 사이에 권한이 바뀌었을 수 있다. 실패하면 입장을 취소한다.
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(true)
+                    await room.localParticipant.setCameraEnabled(true)
+                } catch (err) {
+                    if (cancelled) return
+                    blockForMedia(err)
+                    return
+                }
                 if (cancelled) return
 
                 setMuted(!room.localParticipant.isMicrophoneEnabled)
@@ -125,11 +212,12 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
         return () => {
             cancelled = true
             roomRef.current = null
+            permissionWatchers.forEach((s) => (s.onchange = null))
             room.removeAllListeners()
             // 로컬 트랙 정지(카메라 표시등 OFF)까지 여기서 완료
             void room.disconnect()
         }
-    }, [roomName, getToken])
+    }, [roomName, getToken, retryNonce])
 
     const toggleMute = useCallback(async () => {
         const room = roomRef.current
@@ -184,5 +272,7 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
         needsAudioUnlock,
         unlockAudio,
         error,
+        mediaDenied,
+        retry,
     }
 }

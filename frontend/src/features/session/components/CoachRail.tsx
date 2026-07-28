@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { CoachToast, Icon } from '@/components'
 import type { CoachMessage } from '@/stores/coaching.store'
 import { ExtensionOfferCard } from './ExtensionOfferCard'
@@ -5,6 +6,12 @@ import type { ExtensionChoice } from './ExtensionOfferCard'
 import { GoalProgressCard } from './GoalProgressCard'
 
 export interface CoachRailProps {
+  /**
+   * 침묵 단계 힌트(주제·질문). 코칭과 같은 "나에게만 보이는" 영역이라 여기 모은다 —
+   * 영상 위에 얹으면 상대 얼굴을 가리기 때문이다(원칙 2).
+   * 나타났다 사라지는 시간 민감 정보라 레일 **맨 위**에 둔다.
+   */
+  silenceHint?: ReactNode
   /**
    * 현재 띄울 코칭 메시지. **한 번에 하나만** 받는다(원칙 2) —
    * 배열을 받아 쌓으면 규칙이 화면에서 조용히 깨진다.
@@ -34,6 +41,7 @@ const TONE_TITLE: Record<CoachMessage['tone'], string> = {
  * 사용자가 그 사실을 알 수 있도록 상단에 항상 "나에게만 보여요"를 명시한다.
  */
 export function CoachRail({
+  silenceHint,
   message,
   onDismissMessage,
   goalLabel,
@@ -49,6 +57,8 @@ export function CoachRail({
         <Icon name="lock" size={12} />
         코치 · 나에게만 보여요
       </div>
+
+      {silenceHint}
 
       {message && (
         <CoachToast

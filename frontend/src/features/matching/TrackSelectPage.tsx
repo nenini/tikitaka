@@ -30,7 +30,7 @@ export function TrackSelectPage() {
   return (
     <main className="mx-auto w-full max-w-[1040px] px-5 py-6">
       <header className="mb-5">
-        <h1 className="bt-h1">어떤 상대와 연습할까요?</h1>
+        <h1 className="bt-h1">(페이지 수정중) 어떤 상대와 연습할까요?</h1>
         <p className="bt-body bt-muted mt-1">
           동시에 진행할 수 있는 매칭은 <b>1개</b>입니다. AI 화상·챗봇은 대기 큐를 유지한 채 이용할 수 있어요.
         </p>
