@@ -1,7 +1,7 @@
 {
   "eventId": "7b575df8-5ca3-4f58-a44e-0f2e825488e1",
   "eventType": "GAZE_AWAY_STARTED",
-  "version": 3,
+  "version": 4,
   "kind": "behavior",
   "sessionId": "session-123",
   "userId": "user-a",
@@ -11,6 +11,9 @@
   "clientMonotonicMs": 923421.5,
   "occurredAt": "2026-07-20T10:30:00.800Z",
   "confidence": 0.82,
+  "baselineMode": "PERSONALIZED",
+  "coachingEligible": true,
+  "baselineEpoch": 1,
   "source": "SCREEN_ATTENTION_DETECTOR",
   "modelVersion": "mediapipe-face-landmarker-v1",
   "ruleVersion": "vision-rule-v2",

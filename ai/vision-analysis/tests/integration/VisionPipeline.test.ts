@@ -111,6 +111,9 @@ describe("VisionPipeline", () => {
     expect(first.detectorErrors).toEqual([
       { detectorName: "smile", phase: "UPDATE" },
     ]);
+    expect(
+      first.metricSnapshot?.payload.capabilities.activeDetectors,
+    ).not.toContain("SMILE_EXPRESSION");
     expect(activity.updateCalls).toBe(3);
     expect(smile.resetCalls).toBe(3);
     for (const event of [...first.events, ...next.events]) {
@@ -166,5 +169,138 @@ describe("VisionPipeline", () => {
     expect(detectors.smileExpression.suspendCalls).toBe(1);
     expect(detectors.expressionActivity.suspendCalls).toBe(1);
     expect(detectors.nod.suspendCalls).toBe(1);
+  });
+
+  it("separates observed time from frame gaps and reports configured versus active detectors", () => {
+    const pipeline = new VisionPipeline(
+      defaultVisionConfig,
+      createFactory(),
+    );
+
+    pipeline.process(createNormalizedFaceFrame({ timestampMs: 0 }));
+    pipeline.process(createNormalizedFaceFrame({ timestampMs: 200 }));
+    pipeline.process(createNormalizedFaceFrame({ timestampMs: 400 }));
+    const snapshot = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 1_000 }),
+    ).metricSnapshot;
+
+    expect(snapshot?.payload.observationInterval).toEqual({
+      startedAtSessionElapsedMs: 0,
+      endedAtSessionElapsedMs: 1_000,
+      observedDurationMs: 400,
+    });
+    expect(snapshot?.payload.capabilities.configuredDetectors).toContain(
+      "NOD",
+    );
+    expect(snapshot?.payload.capabilities.activeDetectors).not.toContain(
+      "NOD",
+    );
+  });
+
+  it("reports only quality and attention as configured in the LOW profile", () => {
+    const pipeline = new VisionPipeline(
+      defaultVisionConfig,
+      createFactory(),
+    );
+    const highFrame = createNormalizedFaceFrame({ timestampMs: 0 });
+    const lowFrame: NormalizedFaceFrame = {
+      ...highFrame,
+      processing: {
+        ...highFrame.processing,
+        performanceProfile: "LOW",
+        targetFps: 1.5,
+        actualFps: 1.5,
+      },
+    };
+
+    const snapshot = pipeline.process(lowFrame).metricSnapshot;
+
+    expect(snapshot?.payload.capabilities).toEqual({
+      configuredDetectors: ["FACE_QUALITY", "SCREEN_ATTENTION"],
+      activeDetectors: ["FACE_QUALITY", "SCREEN_ATTENTION"],
+    });
+    expect(snapshot?.payload.metrics.smile.configurationScore).toBeNull();
+  });
+
+  it("uses the first vision frame instead of session zero for the first metric interval", () => {
+    const pipeline = new VisionPipeline(
+      defaultVisionConfig,
+      createFactory(),
+    );
+
+    const snapshot = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 180_000 }),
+    ).metricSnapshot;
+
+    expect(snapshot?.payload.observationInterval).toEqual({
+      startedAtSessionElapsedMs: 180_000,
+      endedAtSessionElapsedMs: 180_000,
+      observedDurationMs: 0,
+    });
+  });
+
+  it("counts normal 1.5 FPS LOW-profile intervals as observed time", () => {
+    const pipeline = new VisionPipeline(
+      defaultVisionConfig,
+      createFactory(),
+    );
+    const lowFrame = (timestampMs: number): NormalizedFaceFrame => {
+      const frame = createNormalizedFaceFrame({ timestampMs });
+      return {
+        ...frame,
+        processing: {
+          ...frame.processing,
+          performanceProfile: "LOW",
+          targetFps: 1.5,
+          actualFps: 1.5,
+        },
+      };
+    };
+
+    pipeline.process(lowFrame(0));
+    pipeline.process(lowFrame(667));
+    const snapshot = pipeline.process(lowFrame(1_334)).metricSnapshot;
+
+    expect(snapshot?.payload.observationInterval).toEqual({
+      startedAtSessionElapsedMs: 0,
+      endedAtSessionElapsedMs: 1_334,
+      observedDurationMs: 1_334,
+    });
+  });
+
+  it("does not count camera-disabled intervals as observed time", () => {
+    const pipeline = new VisionPipeline(
+      defaultVisionConfig,
+      createFactory(),
+    );
+    const cameraDisabled = {
+      cameraEnabled: false,
+      trackEnded: false,
+      videoDimensionsAvailable: true,
+      tabVisible: true,
+      landmarkerAvailable: true,
+      workerHealthy: true,
+    } as const;
+
+    pipeline.process(createNormalizedFaceFrame({ timestampMs: 0 }));
+    pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 200 }),
+      cameraDisabled,
+    );
+    pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 400 }),
+      cameraDisabled,
+    );
+    const snapshot = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 1_000 }),
+      cameraDisabled,
+    ).metricSnapshot;
+
+    expect(snapshot?.payload.observationInterval).toEqual({
+      startedAtSessionElapsedMs: 0,
+      endedAtSessionElapsedMs: 1_000,
+      observedDurationMs: 0,
+    });
+    expect(snapshot?.payload.capabilities.activeDetectors).toEqual([]);
   });
 });

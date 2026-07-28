@@ -132,6 +132,10 @@ describe("VisionSessionRuntime", () => {
     expect(sampler.stopped).toBe(true);
     expect(resource.disposed).toBe(true);
     expect(publisher.closeOptions).toEqual({ flush: false });
+    expect(
+      endResult.finalEvents.some((event) => event.kind === "metric"),
+    ).toBe(false);
+    expect(publisher.published).toHaveLength(1);
     expect(runtime.getState()).toBe("ENDED");
     await expect(
       runtime.process(createNormalizedFaceFrame({ timestampMs: 200 })),
@@ -148,11 +152,28 @@ describe("VisionSessionRuntime", () => {
       new RecordingSampler(),
     );
 
+    await runtime.process(
+      createNormalizedFaceFrame({ timestampMs: 0 }),
+    );
     await runtime.end("SESSION_ENDED", {
       sessionElapsedMs: 100,
       clientMonotonicMs: 100,
     });
 
+    const finalBatch = publisher.published.at(-1);
+    expect(finalBatch?.filter((event) => event.kind === "metric")).toHaveLength(
+      1,
+    );
+    expect(finalBatch?.find((event) => event.kind === "metric")).toMatchObject({
+      sessionElapsedMs: 100,
+      payload: {
+        observationInterval: {
+          startedAtSessionElapsedMs: 0,
+          endedAtSessionElapsedMs: 100,
+          observedDurationMs: 0,
+        },
+      },
+    });
     expect(publisher.closeOptions).toEqual({ flush: true });
   });
 });

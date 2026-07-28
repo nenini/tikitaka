@@ -184,6 +184,12 @@ export class NodDetector
           events.push(
             this.eventFactory.createBehaviorEvent("NOD_EVENT", {
               confidence: this.config.defaultEventConfidence,
+              confidenceDetails: {
+                baselineMode:
+                  context.baseline.baselineModeBySignal.pose,
+                coachingEligible: false,
+                baselineEpoch: context.baseline.baselineEpoch,
+              },
               episodeId: null,
               payload: {
                 amplitudeDegrees: this.peakAmplitudeDegrees,
