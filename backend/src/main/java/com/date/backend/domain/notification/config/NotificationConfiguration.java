@@ -8,7 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableConfigurationProperties({
 		NotificationWorkerProperties.class,
-		NotificationSseProperties.class
+		NotificationSseProperties.class,
+		NotificationWaitingRecommendationProperties.class
 })
 public class NotificationConfiguration {
 }

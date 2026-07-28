@@ -71,6 +71,11 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '17'",
 				Integer.class
 		);
+		Integer waitingRecommendationMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '18'",
+				Integer.class
+		);
 		Integer proposedScheduledAtColumnCount = columnCount(
 				"MATCH_PAIRS",
 				"PROPOSEDSCHEDULEDAT"
@@ -82,6 +87,10 @@ class FlywayMigrationTests {
 		Integer matchWaitingStartedAtColumnCount = columnCount(
 				"MATCH_REQUESTS",
 				"WAITINGSTARTEDAT"
+		);
+		Integer settingRecommendationSentAtColumnCount = columnCount(
+				"MATCH_REQUESTS",
+				"SETTINGRECOMMENDATIONSENTAT"
 		);
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
@@ -106,7 +115,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isGreaterThanOrEqualTo(13);
+		assertThat(migrationCount).isGreaterThanOrEqualTo(14);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -131,9 +140,11 @@ class FlywayMigrationTests {
 		assertThat(notificationMigrationCount).isEqualTo(1);
 		assertThat(matchPolicyMigrationCount).isEqualTo(1);
 		assertThat(notificationQueryMigrationCount).isEqualTo(1);
+		assertThat(waitingRecommendationMigrationCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);
 		assertThat(matchWaitingStartedAtColumnCount).isEqualTo(1);
+		assertThat(settingRecommendationSentAtColumnCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();
