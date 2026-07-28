@@ -7,6 +7,8 @@ import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
 import { TrackSelectPage } from '@/features/matching/TrackSelectPage'
 import { MatchQueuePage } from '@/features/matching/MatchQueuePage'
 import { MatchCardPage } from '@/features/matching/MatchCardPage'
+import { ChatPage } from '@/features/chatbot/ChatPage'
+import { PersonaSetupPage } from '@/features/chatbot/PersonaSetupPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
 
@@ -29,7 +31,11 @@ export const router = createBrowserRouter([
       // 대기방(기기 점검) → 세션. 대기방을 거쳐 WebRTC 세션으로 진입한다.
       { path: '/session/:sessionId/room', element: <WaitingRoomPage /> },
       { path: '/session/:sessionId', element: <SessionPage /> },
-      // TODO(FE-B 다음 배치): /ai-video/setup(W-21), /chatbot/persona(W-10) · /report/:id, /dashboard, /contact ...
+      // AI 챗봇 F5: 페르소나 설정 W-10 → 대화 W-10b. `/chatbot` 은 진행 중 세션으로 해석된다.
+      { path: '/chatbot/persona', element: <PersonaSetupPage /> },
+      { path: '/chatbot', element: <ChatPage /> },
+      { path: '/chatbot/:chatSessionId', element: <ChatPage /> },
+      // TODO(FE-B 다음 배치): /ai-video/setup(W-21) · /report/:id, /dashboard, /contact ...
 
       //-----------
       // 개발용, 추후 삭제
