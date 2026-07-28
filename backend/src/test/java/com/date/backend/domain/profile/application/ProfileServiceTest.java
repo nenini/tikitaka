@@ -19,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
 import java.util.Optional;
 
@@ -106,7 +105,7 @@ class ProfileServiceTest {
 	}
 
 	@Test
-	void publicProfileContainsAgeCalculatedFromBirthDate() {
+	void publicProfileContainsKoreanAgeCalculatedFromBirthYear() {
 		LocalDate birthDate = LocalDate.of(2000, 7, 15);
 		Profile profile = new Profile(USER_ID, "별빛", Gender.FEMALE, "서울");
 		when(profileRepository.findById(USER_ID)).thenReturn(Optional.of(profile));
@@ -114,10 +113,9 @@ class ProfileServiceTest {
 
 		PublicProfileResponse response = profileService.getPublicProfile(USER_ID);
 
-		int expectedAge = Period.between(
-				birthDate,
-				LocalDate.now(ZoneId.of("Asia/Seoul"))
-		).getYears();
+		int expectedAge = LocalDate.now(ZoneId.of("Asia/Seoul")).getYear()
+				- birthDate.getYear()
+				+ 1;
 		assertThat(response.nickname()).isEqualTo("별빛");
 		assertThat(response.gender()).isEqualTo(Gender.FEMALE);
 		assertThat(response.regionCity()).isEqualTo("서울");
