@@ -94,3 +94,23 @@ auth:
 face:
   analysis:
     request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
+
+match:
+  policy:
+    late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
+    setting-recommendation-delay-seconds: ${MATCH_SETTING_RECOMMENDATION_DELAY_SECONDS:86400}
+  worker:
+    enabled: ${MATCH_WORKER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_WORKER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${MATCH_WORKER_INITIAL_DELAY_MS:10000}
+    batch-size: ${MATCH_WORKER_BATCH_SIZE:20}
+    max-attempts: ${MATCH_WORKER_MAX_ATTEMPTS:3}
+    initial-backoff-seconds: ${MATCH_WORKER_INITIAL_BACKOFF_SECONDS:5}
+    max-backoff-seconds: ${MATCH_WORKER_MAX_BACKOFF_SECONDS:300}
+    processing-timeout-seconds: ${MATCH_WORKER_PROCESSING_TIMEOUT_SECONDS:60}
+  scheduler:
+    enabled: ${MATCH_SCHEDULER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
+    initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
+    acceptance-timeout-seconds: ${MATCH_ACCEPTANCE_TIMEOUT_SECONDS:300}
+    schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}
