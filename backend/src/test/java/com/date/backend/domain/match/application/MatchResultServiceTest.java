@@ -12,6 +12,7 @@ import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
+import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -46,6 +47,8 @@ class MatchResultServiceTest {
 	private final ProfileService profileService = mock(ProfileService.class);
 	private final MatchJobEnqueueService jobEnqueueService =
 			mock(MatchJobEnqueueService.class);
+	private final WaitingRoomProvisioningService waitingRoomProvisioningService =
+			mock(WaitingRoomProvisioningService.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -64,7 +67,8 @@ class MatchResultServiceTest {
 			profileService,
 			properties,
 			clock,
-			jobEnqueueService
+			jobEnqueueService,
+			waitingRoomProvisioningService
 	);
 
 	@Test
@@ -103,6 +107,7 @@ class MatchResultServiceTest {
 		verify(pair).confirm(NOW, scheduledAt);
 		verify(requestA).confirm();
 		verify(requestB).confirm();
+		verify(waitingRoomProvisioningService).provision(pair);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}
 
