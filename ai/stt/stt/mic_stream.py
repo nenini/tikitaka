@@ -21,6 +21,7 @@ import numpy as np
 import sounddevice as sd
 
 from stt.pipeline import SAMPLE_RATE, SttEngine
+from stt.events import TranscriptFinalizedEvent
 from stt.session import SpeakerStream, make_vad_options
 
 
@@ -43,7 +44,8 @@ def main() -> None:
     stream = SpeakerStream(
         engine,
         session_id=args.session,
-        speaker_id=args.speaker,
+        user_id=args.speaker,
+        participant_identity=f"dev-{args.speaker}",
         vad_opts=make_vad_options(args.vad_threshold, args.end_silence, args.max_utterance),
         end_silence_ms=args.end_silence,
         min_confidence=args.min_conf,
@@ -51,7 +53,9 @@ def main() -> None:
 
     audio_q: "queue.Queue[np.ndarray]" = queue.Queue()
 
-    def callback(indata, frames, time_info, status):  # noqa: ANN001
+    def callback(
+        indata: np.ndarray, frames: int, time_info: object, status: object
+    ) -> None:
         if status:
             print(f"[stt] 입력 상태: {status}")
         audio_q.put(indata[:, 0].copy())
@@ -63,11 +67,17 @@ def main() -> None:
                 while not audio_q.empty():
                     chunk = np.concatenate([chunk, audio_q.get_nowait()])
                 for e in stream.feed(chunk):
-                    p = e.payload
-                    print(
-                        f"[{p.segment_start_ms / 1000:6.1f}s] "
-                        f"({e.speaker_id} conf={e.confidence}) {p.text}"
-                    )
+                    if isinstance(e, TranscriptFinalizedEvent):
+                        p = e.payload
+                        print(
+                            f"[{p.segment_start_ms / 1000:6.1f}s] "
+                            f"({e.user_id} conf={e.confidence}) {p.text}"
+                        )
+                    else:
+                        print(
+                            f"[{e.session_elapsed_ms / 1000:6.1f}s] "
+                            f"({e.user_id}) <{e.event_type}>"
+                        )
         except KeyboardInterrupt:
             print("\n[stt] 종료.")
 
