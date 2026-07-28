@@ -1,8 +1,12 @@
 ALTER TABLE `notifications`
     ADD COLUMN `presentation` VARCHAR(30) NOT NULL DEFAULT 'BELL_AND_TOAST'
-        AFTER `relatedId`,
+        AFTER `relatedId`;
+
+ALTER TABLE `notifications`
     ADD COLUMN `deduplicationKey` VARCHAR(200) NULL
-        AFTER `presentation`,
+        AFTER `presentation`;
+
+ALTER TABLE `notifications`
     ADD CONSTRAINT `UK_notifications_deduplication_key`
         UNIQUE (`deduplicationKey`);
 

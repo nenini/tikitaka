@@ -28,13 +28,15 @@ class MatchNotificationEventListenerTest {
 	@Test
 	void createsMatchFoundNotificationForBothParticipants() {
 		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 10, 0);
-		LocalDateTime deadline = matchedAt.plusMinutes(5);
+		LocalDateTime proposedScheduledAt = matchedAt.plusHours(8);
+		LocalDateTime deadline = proposedScheduledAt.minusHours(1);
 
 		listener.handleMatchFound(new MatchFoundEvent(
 				PAIR_ID,
 				USER_A_ID,
 				USER_B_ID,
 				matchedAt,
+				proposedScheduledAt,
 				deadline
 		));
 
@@ -42,7 +44,8 @@ class MatchNotificationEventListenerTest {
 				USER_A_ID,
 				NotificationType.MATCH_FOUND,
 				"새로운 매칭이 성립되었어요",
-				"새로운 매칭이 성립되었습니다. 2026-07-27 10:05까지 수락하거나 거절해 주세요.",
+				"예정 세션은 2026-07-27 18:00입니다. "
+						+ "2026-07-27 17:00까지 수락하거나 거절해 주세요.",
 				NotificationReferenceType.MATCH_PAIR,
 				PAIR_ID,
 				NotificationPresentation.BELL_AND_TOAST,
@@ -52,7 +55,8 @@ class MatchNotificationEventListenerTest {
 				USER_B_ID,
 				NotificationType.MATCH_FOUND,
 				"새로운 매칭이 성립되었어요",
-				"새로운 매칭이 성립되었습니다. 2026-07-27 10:05까지 수락하거나 거절해 주세요.",
+				"예정 세션은 2026-07-27 18:00입니다. "
+						+ "2026-07-27 17:00까지 수락하거나 거절해 주세요.",
 				NotificationReferenceType.MATCH_PAIR,
 				PAIR_ID,
 				NotificationPresentation.BELL_AND_TOAST,

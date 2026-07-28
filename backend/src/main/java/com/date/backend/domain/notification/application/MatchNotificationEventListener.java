@@ -29,7 +29,9 @@ public class MatchNotificationEventListener {
 
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void handleMatchFound(MatchFoundEvent event) {
-		String content = "새로운 매칭이 성립되었습니다. "
+		String content = "예정 세션은 "
+				+ DATE_TIME_FORMATTER.format(event.proposedScheduledAt())
+				+ "입니다. "
 				+ DATE_TIME_FORMATTER.format(event.acceptDeadlineAt())
 				+ "까지 수락하거나 거절해 주세요.";
 		createForParticipant(

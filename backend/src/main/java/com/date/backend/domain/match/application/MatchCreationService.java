@@ -92,7 +92,7 @@ public class MatchCreationService {
 			Long secondRequestId,
 			LocalDateTime matchedAt,
 			LocalDateTime acceptDeadlineAt,
-			LocalDateTime earliestSessionStart
+			LocalDateTime proposedScheduledAt
 	) {
 		List<Long> requestIds = List.of(firstRequestId, secondRequestId);
 		List<MatchRequest> lockedRequests = requestRepository.findAllByIdForUpdate(
@@ -155,11 +155,12 @@ public class MatchCreationService {
 				.findAllByMatchRequest_IdIn(requestIds)
 				.stream()
 				.collect(Collectors.groupingBy(slot -> slot.getMatchRequest().getId()));
-		if (availabilityPolicy.findEarliestStart(
+		boolean proposedScheduleStillAvailable = availabilityPolicy.findEarliestStart(
 				slotsByRequest.getOrDefault(first.getId(), List.of()),
 				slotsByRequest.getOrDefault(second.getId(), List.of()),
-				earliestSessionStart
-		).isEmpty()) {
+				proposedScheduledAt
+		).filter(proposedScheduledAt::equals).isPresent();
+		if (!proposedScheduleStillAvailable) {
 			return false;
 		}
 
@@ -182,6 +183,7 @@ public class MatchCreationService {
 				score.faceScore(),
 				score.traitScore(),
 				acceptDeadlineAt,
+				proposedScheduledAt,
 				matchedAt
 		));
 		responseRepository.saveAll(List.of(
@@ -195,6 +197,7 @@ public class MatchCreationService {
 				pair.getUserAId(),
 				pair.getUserBId(),
 				pair.getMatchedAt(),
+				pair.getProposedScheduledAt(),
 				pair.getAcceptDeadlineAt()
 		));
 		return true;

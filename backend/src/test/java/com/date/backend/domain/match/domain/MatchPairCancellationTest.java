@@ -52,9 +52,10 @@ class MatchPairCancellationTest {
 				new BigDecimal("25.000"),
 				new BigDecimal("25.000"),
 				matchedAt.plusMinutes(5),
+				matchedAt.plusDays(2),
 				matchedAt
 		);
-		pair.confirm(matchedAt.plusMinutes(2), matchedAt.plusDays(2));
+		pair.confirm(matchedAt.plusMinutes(2));
 		return pair;
 	}
 

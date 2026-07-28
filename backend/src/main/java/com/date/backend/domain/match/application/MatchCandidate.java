@@ -8,6 +8,6 @@ import java.time.LocalDateTime;
 public record MatchCandidate(
 		MatchRequest request,
 		MatchScore score,
-		LocalDateTime earliestSessionStart
+		LocalDateTime proposedScheduledAt
 ) {
 }

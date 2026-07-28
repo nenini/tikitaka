@@ -28,5 +28,6 @@ match:
     enabled: false
     fixed-delay-ms: 10000
     initial-delay-ms: 10000
-    acceptance-timeout-seconds: 300
+    acceptance-timeout-seconds: 28800
+    minimum-acceptance-window-seconds: 3600
     schedule-buffer-seconds: 3600

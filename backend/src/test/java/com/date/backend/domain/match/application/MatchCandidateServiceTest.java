@@ -134,7 +134,7 @@ class MatchCandidateServiceTest {
 					assertThat(candidate.request().getId()).isEqualTo(2L);
 					assertThat(candidate.score().totalScore())
 							.isEqualByComparingTo("40.000");
-					assertThat(candidate.earliestSessionStart()).isEqualTo(earliestStart);
+					assertThat(candidate.proposedScheduledAt()).isEqualTo(earliestStart);
 				});
 	}
 
