@@ -123,7 +123,8 @@ export function SessionPage() {
             cameraDisabled={session.cameraDisabled}
           />
 
-          <aside className="max-h-[38vh] min-h-0 overflow-y-auto lg:max-h-none">
+          {/* 모바일에서는 높이 고정 */}
+          <aside className="h-[38vh] min-h-0 overflow-y-auto lg:h-auto">
             <CoachRail
               silenceHint={
                 <SilenceHint

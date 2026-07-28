@@ -115,10 +115,15 @@ export function SilenceHint({
           disabled
           onSelect={() => { }}
           onRetry={onRetryQuestions}
+          // 디자인 시스템의 `:disabled` 규칙이 붙이는 `cursor: not-allowed` 를 덮는다.
+          // 이 항목들은 "지금 못 누르는 버튼"이 아니라 **읽는 정보**라서 금지 커서가 어색하다.
+          // 공통 CSS 를 건드릴 수 없어 피처 쪽에서 덮어쓰며, `:disabled` 만 겨냥해
+          // 재시도 버튼(비활성이 아님)에는 영향이 없다.
+          className="[&_button:disabled]:cursor-default!"
         />
 
         {/* <button onClick={onDismiss} aria-label="힌트 닫기" style={{ position: 'absolute', top: 8, right: 14 }}>X</button> */}
-        <HintCloseButton onClick={onDismiss} aria-label="힌트 닫기" style={{ position: 'absolute', top: 8, right: 14 }} />
+        {/* <HintCloseButton onClick={onDismiss} aria-label="힌트 닫기" style={{ position: 'absolute', top: 8, right: 14 }} /> */}
       </div>
     </div>
   )
