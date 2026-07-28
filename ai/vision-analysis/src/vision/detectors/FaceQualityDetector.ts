@@ -9,6 +9,12 @@ import {
 } from "../core/NormalizedFaceFrame.js";
 import type { VisionBehaviorEvent } from "../events/VisionEvent.js";
 import type { VisionEventFactory } from "../events/VisionEventFactory.js";
+
+const QUALITY_EVENT_CONFIDENCE_DETAILS = {
+  baselineMode: "NOT_APPLICABLE",
+  coachingEligible: false,
+  baselineEpoch: 0,
+} as const;
 import {
   HysteresisGate,
   type HysteresisGateSnapshot,
@@ -401,6 +407,7 @@ export class FaceQualityDetector {
           events.push(
             this.eventFactory.createBehaviorEvent("FACE_MISSING_STARTED", {
               confidence: this.qualityConfidence,
+              confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
               episodeId,
               payload: {
                 observedStartElapsedMs: transition.observedStartMs,
@@ -412,6 +419,7 @@ export class FaceQualityDetector {
           events.push(
             this.eventFactory.createBehaviorEvent("MULTIPLE_FACES_DETECTED", {
               confidence: this.qualityConfidence,
+              confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
               episodeId,
               payload: {
                 observedStartElapsedMs: transition.observedStartMs,
@@ -424,6 +432,7 @@ export class FaceQualityDetector {
           events.push(
             this.eventFactory.createBehaviorEvent("LOW_LIGHT_STARTED", {
               confidence: this.qualityConfidence,
+              confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
               episodeId,
               payload: {
                 observedStartElapsedMs: transition.observedStartMs,
@@ -437,6 +446,7 @@ export class FaceQualityDetector {
           events.push(
             this.eventFactory.createBehaviorEvent("FACE_TOO_SMALL_STARTED", {
               confidence: this.qualityConfidence,
+              confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
               episodeId,
               payload: {
                 observedStartElapsedMs: transition.observedStartMs,
@@ -462,6 +472,7 @@ export class FaceQualityDetector {
         events.push(
           this.eventFactory.createBehaviorEvent("FACE_MISSING_ENDED", {
             confidence: this.qualityConfidence,
+            confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
             episodeId,
             payload: {
               observedEndElapsedMs: transition.observedEndMs,
@@ -476,6 +487,7 @@ export class FaceQualityDetector {
         events.push(
           this.eventFactory.createBehaviorEvent("LOW_LIGHT_ENDED", {
             confidence: this.qualityConfidence,
+            confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
             episodeId,
             payload: {
               observedEndElapsedMs: transition.observedEndMs,
@@ -491,6 +503,7 @@ export class FaceQualityDetector {
         events.push(
           this.eventFactory.createBehaviorEvent("FACE_TOO_SMALL_ENDED", {
             confidence: this.qualityConfidence,
+            confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
             episodeId,
             payload: {
               observedEndElapsedMs: transition.observedEndMs,
@@ -542,6 +555,7 @@ export class FaceQualityDetector {
     events.push(
       this.eventFactory.createBehaviorEvent("ANALYSIS_UNAVAILABLE", {
         confidence: this.qualityConfidence,
+        confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
         episodeId: this.analysisEpisodeId,
         payload: { observedStartElapsedMs: observedStartMs, reasons },
       }),
@@ -573,6 +587,7 @@ export class FaceQualityDetector {
     events.push(
       this.eventFactory.createBehaviorEvent("ANALYSIS_RECOVERED", {
         confidence: this.qualityConfidence,
+        confidenceDetails: QUALITY_EVENT_CONFIDENCE_DETAILS,
         episodeId: this.analysisEpisodeId,
         payload: {
           observedEndElapsedMs: recoverySinceMs,

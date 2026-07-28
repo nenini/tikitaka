@@ -1,5 +1,5 @@
 import type { FaceQualityRuntimeStatus } from "../detectors/FaceQualityDetector.js";
-import type { VisionBehaviorEvent } from "../events/VisionEvent.js";
+import type { VisionEvent } from "../events/VisionEvent.js";
 import type {
   VisionEventPublisher,
   VisionPublishResult,
@@ -40,7 +40,7 @@ export interface VisionSessionFrameResult {
 }
 
 export interface VisionSessionEndResult {
-  readonly finalEvents: readonly VisionBehaviorEvent[];
+  readonly finalEvents: readonly VisionEvent[];
   readonly cleanupFailures: readonly (
     | "PIPELINE"
     | "PUBLISHER"
@@ -150,7 +150,7 @@ export class VisionSessionRuntime {
     },
   ): Promise<VisionSessionEndResult> {
     const failures: Array<"PIPELINE" | "PUBLISHER" | "RESOURCE"> = [];
-    let finalEvents: readonly VisionBehaviorEvent[] = [];
+    let finalEvents: readonly VisionEvent[] = [];
 
     // Stopping sampling prevents new work; waiting here prevents an older frame
     // from publishing after the consent boundary has been closed.
@@ -158,7 +158,7 @@ export class VisionSessionRuntime {
     this.recordNewDroppedFrames();
 
     try {
-      finalEvents = this.pipeline.endSession(reason, timePoint);
+      finalEvents = this.pipeline.endSession(reason, timePoint).events;
     } catch {
       failures.push("PIPELINE");
       // A faulty detector must not block the remaining privacy cleanup.

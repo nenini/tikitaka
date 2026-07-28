@@ -4,7 +4,10 @@ import type {
   EpisodeTerminationReason,
   VisionBehaviorEvent,
 } from "../events/VisionEvent.js";
-import type { VisionEventFactory } from "../events/VisionEventFactory.js";
+import type {
+  EventConfidenceDetails,
+  VisionEventFactory,
+} from "../events/VisionEventFactory.js";
 import { EmaFilter } from "../filters/EmaFilter.js";
 import {
   BEHAVIOR_STATES,
@@ -114,6 +117,7 @@ export class ScreenAttentionDetector
   private stateSinceMs: number | null = null;
   private activeSinceMs: number | null = null;
   private episodeId: string | null = null;
+  private episodeConfidenceDetails: EventConfidenceDetails | null = null;
   private prolongedEmitted = false;
   private cooldownUntilMs = 0;
   private candidateObservations = 0;
@@ -564,23 +568,24 @@ export class ScreenAttentionDetector
         ) {
           this.activeSinceMs = this.stateSinceMs;
           this.episodeId = this.eventFactory.createEpisodeId();
+          this.episodeConfidenceDetails = {
+            measurementConfidence,
+            signalClarity: screenAttentionConfidence,
+            personalizationConfidence: fallback ? 0 : 1,
+            evidenceStrength: screenAttentionConfidence,
+            baselineMode: fallback
+              ? "GLOBAL_FALLBACK"
+              : baseline.baselineModeBySignal.gaze,
+            coachingEligible:
+              !fallback && screenAttentionConfidence >= 0.75,
+            baselineEpoch: baseline.baselineEpoch,
+          };
           this.episodeClock.start(this.activeSinceMs ?? now, now);
           this.transition("ACTIVE", now);
           events.push(
             this.eventFactory.createBehaviorEvent("GAZE_AWAY_STARTED", {
               confidence: screenAttentionConfidence,
-              confidenceDetails: {
-                measurementConfidence,
-                signalClarity: screenAttentionConfidence,
-                personalizationConfidence: fallback ? 0 : 1,
-                evidenceStrength: screenAttentionConfidence,
-                baselineMode: fallback
-                  ? "GLOBAL_FALLBACK"
-                  : baseline.baselineModeBySignal.gaze,
-                coachingEligible:
-                  !fallback && screenAttentionConfidence >= 0.75,
-                baselineEpoch: baseline.baselineEpoch,
-              },
+              confidenceDetails: this.episodeConfidenceDetails,
               episodeId: this.episodeId,
               payload: {
                 observedStartElapsedMs: this.activeSinceMs ?? now,
@@ -737,6 +742,7 @@ export class ScreenAttentionDetector
     this.stateSinceMs = null;
     this.activeSinceMs = null;
     this.episodeId = null;
+    this.episodeConfidenceDetails = null;
     this.prolongedEmitted = false;
     this.cooldownUntilMs = 0;
     this.candidateObservations = 0;
@@ -784,6 +790,12 @@ export class ScreenAttentionDetector
     const durations = this.episodeClock.durations(now);
     const event = this.eventFactory.createBehaviorEvent("GAZE_AWAY_ENDED", {
       confidence: this.snapshot.screenAttentionConfidence,
+      confidenceDetails:
+        this.episodeConfidenceDetails ?? {
+          baselineMode: "UNAVAILABLE",
+          coachingEligible: false,
+          baselineEpoch: 0,
+        },
       episodeId: this.episodeId,
       payload: {
         observedEndElapsedMs: now,
@@ -793,6 +805,7 @@ export class ScreenAttentionDetector
     });
     this.activeSinceMs = null;
     this.episodeId = null;
+    this.episodeConfidenceDetails = null;
     this.prolongedEmitted = false;
     this.episodeClock.reset();
     return event;

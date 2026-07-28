@@ -19,8 +19,6 @@ export const VISION_BEHAVIOR_EVENT_TYPES = [
   "SMILE_STARTED",
   "SMILE_ENDED",
   "NOD_EVENT",
-  "LOW_EXPRESSION_ACTIVITY_STARTED",
-  "LOW_EXPRESSION_ACTIVITY_ENDED",
 ] as const;
 
 export type VisionBehaviorEventType =
@@ -31,7 +29,6 @@ export const VISION_EVENT_SOURCES = [
   "SCREEN_ATTENTION_DETECTOR",
   "SMILE_EXPRESSION_DETECTOR",
   "NOD_DETECTOR",
-  "EXPRESSION_ACTIVITY_DETECTOR",
   "VISION_PIPELINE",
 ] as const;
 
@@ -117,21 +114,26 @@ export interface VisionBehaviorPayloadMap {
     readonly downstrokeMs: number;
     readonly upstrokeMs: number;
   };
-  readonly LOW_EXPRESSION_ACTIVITY_STARTED: StartedPayload & {
-    readonly activityScore: number;
-    readonly baselineActivityScore: number | null;
-    readonly windowMs: number;
-  };
-  readonly LOW_EXPRESSION_ACTIVITY_ENDED: EndedPayload & {
-    readonly activityScore: number;
-    readonly terminationReason: EpisodeTerminationReason;
-  };
 }
+
+export const VISION_BASELINE_MODES = [
+  "PERSONALIZED",
+  "MONOCULAR_LEFT",
+  "MONOCULAR_RIGHT",
+  "COLLECTING",
+  "GLOBAL_FALLBACK",
+  "UNAVAILABLE",
+  "BASELINE_UNCERTAIN",
+  "NOT_APPLICABLE",
+] as const;
+
+/** Describes which calibration evidence was valid for one public event. */
+export type VisionBaselineMode = (typeof VISION_BASELINE_MODES)[number];
 
 export interface VisionEventEnvelope<TEventType extends string> {
   readonly eventId: string;
   readonly eventType: TEventType;
-  readonly version: 3;
+  readonly version: 4;
   readonly sessionId: string;
   readonly userId: string;
   readonly clientInstanceId: string;
@@ -144,16 +146,9 @@ export interface VisionEventEnvelope<TEventType extends string> {
   readonly signalClarity?: number;
   readonly personalizationConfidence?: number;
   readonly evidenceStrength?: number;
-  readonly baselineMode?:
-    | "PERSONALIZED"
-    | "MONOCULAR_LEFT"
-    | "MONOCULAR_RIGHT"
-    | "COLLECTING"
-    | "GLOBAL_FALLBACK"
-    | "UNAVAILABLE"
-    | "BASELINE_UNCERTAIN";
-  readonly coachingEligible?: boolean;
-  readonly baselineEpoch?: number;
+  readonly baselineMode: VisionBaselineMode;
+  readonly coachingEligible: boolean;
+  readonly baselineEpoch: number;
   readonly source: VisionEventSource;
   readonly modelVersion: string;
   readonly ruleVersion: string;
@@ -172,6 +167,17 @@ export type VisionBehaviorEvent = {
 }[VisionBehaviorEventType];
 
 export interface VisionMetricSnapshotPayload {
+  /** Wall-clock bounds and the usable subset observed inside those bounds. */
+  readonly observationInterval: {
+    readonly startedAtSessionElapsedMs: number;
+    readonly endedAtSessionElapsedMs: number;
+    readonly observedDurationMs: number;
+  };
+  /** Separates feature/profile configuration from detectors that could observe. */
+  readonly capabilities: {
+    readonly configuredDetectors: readonly import("../config/VisionConfig.js").DetectorName[];
+    readonly activeDetectors: readonly import("../config/VisionConfig.js").DetectorName[];
+  };
   readonly quality: {
     readonly usable: boolean;
     readonly state:
