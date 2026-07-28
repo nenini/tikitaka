@@ -117,6 +117,11 @@ match:
     schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}
 
 notification:
+  sse:
+    enabled: ${NOTIFICATION_SSE_ENABLED:true}
+    timeout-ms: ${NOTIFICATION_SSE_TIMEOUT_MS:1800000}
+    retry-ms: ${NOTIFICATION_SSE_RETRY_MS:3000}
+    heartbeat-interval-ms: ${NOTIFICATION_SSE_HEARTBEAT_INTERVAL_MS:30000}
   worker:
     enabled: ${NOTIFICATION_WORKER_ENABLED:true}
     fixed-delay-ms: ${NOTIFICATION_WORKER_FIXED_DELAY_MS:1000}

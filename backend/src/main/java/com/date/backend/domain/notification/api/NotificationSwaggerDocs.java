@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "Notification", description = "개인 알림 조회 및 읽음 처리 API")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
@@ -123,6 +125,35 @@ public interface NotificationSwaggerDocs {
 			)
 	})
 	ApiResponse<ReadAllNotificationsResponse> readAll(
+			@Parameter(hidden = true) AuthUser authUser
+	);
+
+	@Operation(
+			summary = "개인 알림 실시간 구독",
+			description = """
+					SSE 연결을 생성하고 새 알림을 notification 이벤트로 실시간 전송합니다.
+					Authorization Bearer 헤더가 필요하므로 브라우저에서는 헤더를 지원하는
+					fetch 기반 SSE 클라이언트를 사용해야 합니다.
+					재연결 후 누락 가능성이 있는 알림은 알림 목록 API로 동기화합니다.
+					"""
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "SSE 구독 연결 성공",
+					content = @Content(
+							mediaType = "text/event-stream",
+							schema = @Schema(
+									implementation = NotificationResponse.class
+							)
+					)
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "401",
+					description = "인증 실패"
+			)
+	})
+	ResponseEntity<SseEmitter> subscribe(
 			@Parameter(hidden = true) AuthUser authUser
 	);
 }

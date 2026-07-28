@@ -4,7 +4,9 @@ import com.date.backend.domain.notification.domain.Notification;
 import com.date.backend.domain.notification.domain.NotificationPresentation;
 import com.date.backend.domain.notification.domain.NotificationReferenceType;
 import com.date.backend.domain.notification.domain.NotificationType;
+import com.date.backend.domain.notification.dto.response.NotificationResponse;
 import com.date.backend.domain.notification.repository.NotificationRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationCreationService {
 
 	private final NotificationRepository notificationRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
-	public NotificationCreationService(NotificationRepository notificationRepository) {
+	public NotificationCreationService(
+			NotificationRepository notificationRepository,
+			ApplicationEventPublisher eventPublisher
+	) {
 		this.notificationRepository = notificationRepository;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -32,7 +39,7 @@ public class NotificationCreationService {
 		if (notificationRepository.existsByDeduplicationKey(deduplicationKey)) {
 			return;
 		}
-		notificationRepository.save(new Notification(
+		Notification notification = notificationRepository.save(new Notification(
 				userId,
 				type,
 				title,
@@ -41,6 +48,10 @@ public class NotificationCreationService {
 				referenceId,
 				presentation,
 				deduplicationKey
+		));
+		eventPublisher.publishEvent(new NotificationCreatedEvent(
+				userId,
+				NotificationResponse.from(notification)
 		));
 	}
 }

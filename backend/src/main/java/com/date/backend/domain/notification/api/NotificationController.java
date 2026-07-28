@@ -2,6 +2,7 @@ package com.date.backend.domain.notification.api;
 
 import com.date.backend.domain.notification.application.NotificationQueryService;
 import com.date.backend.domain.notification.application.NotificationCommandService;
+import com.date.backend.domain.notification.application.NotificationSseService;
 import com.date.backend.domain.notification.dto.response.NotificationListResponse;
 import com.date.backend.domain.notification.dto.response.NotificationResponse;
 import com.date.backend.domain.notification.dto.response.ReadAllNotificationsResponse;
@@ -16,6 +17,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @Validated
@@ -24,13 +29,16 @@ public class NotificationController implements NotificationSwaggerDocs {
 
 	private final NotificationQueryService queryService;
 	private final NotificationCommandService commandService;
+	private final NotificationSseService sseService;
 
 	public NotificationController(
 			NotificationQueryService queryService,
-			NotificationCommandService commandService
+			NotificationCommandService commandService,
+			NotificationSseService sseService
 	) {
 		this.queryService = queryService;
 		this.commandService = commandService;
+		this.sseService = sseService;
 	}
 
 	@Override
@@ -72,5 +80,17 @@ public class NotificationController implements NotificationSwaggerDocs {
 			@AuthenticationPrincipal AuthUser authUser
 	) {
 		return ApiResponse.success(commandService.readAll(authUser.userId()));
+	}
+
+	@Override
+	@GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public ResponseEntity<SseEmitter> subscribe(
+			@AuthenticationPrincipal AuthUser authUser
+	) {
+		return ResponseEntity.ok()
+				.contentType(MediaType.TEXT_EVENT_STREAM)
+				.header(HttpHeaders.CACHE_CONTROL, "no-cache")
+				.header("X-Accel-Buffering", "no")
+				.body(sseService.subscribe(authUser.userId()));
 	}
 }

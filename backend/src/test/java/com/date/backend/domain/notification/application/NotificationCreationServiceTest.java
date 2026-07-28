@@ -5,6 +5,7 @@ import com.date.backend.domain.notification.domain.NotificationReferenceType;
 import com.date.backend.domain.notification.domain.NotificationType;
 import com.date.backend.domain.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -16,8 +17,13 @@ class NotificationCreationServiceTest {
 
 	private final NotificationRepository notificationRepository =
 			mock(NotificationRepository.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 	private final NotificationCreationService service =
-			new NotificationCreationService(notificationRepository);
+			new NotificationCreationService(
+					notificationRepository,
+					eventPublisher
+			);
 
 	@Test
 	void skipsDuplicatedNotification() {
@@ -37,5 +43,6 @@ class NotificationCreationServiceTest {
 		);
 
 		verify(notificationRepository, never()).save(any());
+		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 }

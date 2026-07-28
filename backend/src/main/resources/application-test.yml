@@ -33,6 +33,11 @@ match:
     schedule-buffer-seconds: 3600
 
 notification:
+  sse:
+    enabled: false
+    timeout-ms: 1800000
+    retry-ms: 3000
+    heartbeat-interval-ms: 30000
   worker:
     enabled: false
     fixed-delay-ms: 1000
