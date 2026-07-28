@@ -23,6 +23,7 @@ import type {
 } from "../detectors/VisionDetector.js";
 import type {
   VisionBehaviorEvent,
+  VisionBaselineMode,
   VisionEvent,
   VisionMetricSnapshot,
   VisionMetricSnapshotPayload,
@@ -38,6 +39,18 @@ type BehaviorDetector = VisionDetector<NormalizedFaceFrame, object>;
 interface DetectorEntry {
   readonly configName: Exclude<DetectorName, "FACE_QUALITY">;
   readonly detector: BehaviorDetector;
+}
+
+interface MetricFrameSummary {
+  readonly sessionElapsedMs: number;
+  readonly faceDetected: boolean;
+  readonly faceCount: number;
+  readonly faceBoxRatio: number | null;
+  readonly brightnessScore: number;
+  readonly blurScore: number;
+  readonly performance: NormalizedFaceFrame["processing"];
+  readonly configuredDetectors: readonly DetectorName[];
+  readonly activeDetectors: readonly DetectorName[];
 }
 
 export interface VisionPipelineDetectorOverrides {
@@ -72,6 +85,18 @@ export interface VisionPipelineOutput {
   readonly detectorErrors: readonly VisionPipelineError[];
 }
 
+export interface VisionSessionFinalOutput {
+  /** Episodes closed for the explicit session termination reason. */
+  readonly behaviorEvents: readonly VisionBehaviorEvent[];
+  /** Present only for a normal end after at least one analyzed frame. */
+  readonly metricSnapshot: VisionMetricSnapshot | null;
+  /** Publish order: final checkpoint first, then closed behavior episodes. */
+  readonly events: readonly VisionEvent[];
+}
+
+const MINIMUM_OBSERVED_FRAME_GAP_MS = 500;
+const OBSERVED_FRAME_GAP_TOLERANCE = 1.5;
+
 const FAILED_QUALITY: FaceQualityDecision = {
   usable: false,
   calibrationEligible: false,
@@ -103,6 +128,13 @@ export class VisionPipeline {
   private processingDurationSumMs = 0;
   private processedFrameCount = 0;
   private droppedFramesSinceLastSnapshot = 0;
+  private metricIntervalStartedAtMs: number | null = null;
+  private observedDurationSinceLastSnapshotMs = 0;
+  private lastObservationAtMs: number | null = null;
+  private lastObservationUsable = false;
+  private latestMetricFrameSummary: MetricFrameSummary | null = null;
+  private latestQuality: FaceQualityDecision | null = null;
+  private latestBaseline: VisionBaseline | null = null;
 
   constructor(
     private readonly config: VisionConfig,
@@ -180,14 +212,33 @@ export class VisionPipeline {
       readonly sessionElapsedMs: number;
       readonly clientMonotonicMs: number;
     },
-  ): readonly VisionBehaviorEvent[] {
+  ): VisionSessionFinalOutput {
+    const metricSnapshot =
+      reason === "SESSION_ENDED" &&
+      this.latestMetricFrameSummary !== null &&
+      this.latestQuality !== null &&
+      this.latestBaseline !== null
+        ? this.eventFactory.withTimePoint(timePoint, () =>
+            this.createMetricSnapshot(
+              this.latestMetricFrameSummary as MetricFrameSummary,
+              this.latestQuality as FaceQualityDecision,
+              this.latestBaseline as VisionBaseline,
+              true,
+              timePoint.sessionElapsedMs,
+            ),
+          )
+        : null;
     // Close active episodes before reset so downstream consumers receive an
     // explicit consent/session termination reason exactly once.
-    const events = this.eventFactory.withTimePoint(timePoint, () =>
+    const behaviorEvents = this.eventFactory.withTimePoint(timePoint, () =>
       this.suspendAll(reason, timePoint, []),
     );
+    const events: VisionEvent[] = [
+      ...(metricSnapshot === null ? [] : [metricSnapshot]),
+      ...behaviorEvents,
+    ];
     this.reset();
-    return events;
+    return { behaviorEvents, metricSnapshot, events };
   }
 
   reset(): void {
@@ -207,6 +258,13 @@ export class VisionPipeline {
     this.processingDurationSumMs = 0;
     this.processedFrameCount = 0;
     this.droppedFramesSinceLastSnapshot = 0;
+    this.metricIntervalStartedAtMs = null;
+    this.observedDurationSinceLastSnapshotMs = 0;
+    this.lastObservationAtMs = null;
+    this.lastObservationUsable = false;
+    this.latestMetricFrameSummary = null;
+    this.latestQuality = null;
+    this.latestBaseline = null;
   }
 
   private processAtFrameTime(
@@ -240,6 +298,8 @@ export class VisionPipeline {
       baselineModeBySignal: baseline.baselineModeBySignal,
       confidenceBySignal: baseline.confidenceBySignal,
     };
+    this.recordObservation(frame, qualityOutput.decision);
+    const successfulDetectors = new Set<DetectorName>();
 
     if (!qualityOutput.decision.usable) {
       // Suspending clears temporal windows and closes any active behavior episode.
@@ -257,6 +317,7 @@ export class VisionPipeline {
         ),
       );
     } else {
+      successfulDetectors.add("FACE_QUALITY");
       const context: VisionDetectorContext = {
         quality: qualityOutput.decision,
         baseline,
@@ -278,6 +339,7 @@ export class VisionPipeline {
         }
         try {
           behaviorEvents.push(...entry.detector.update(frame, context));
+          successfulDetectors.add(entry.configName);
         } catch {
           // One detector failure is converted into local diagnostic metadata;
           // remaining detectors and the WebRTC call continue normally.
@@ -307,9 +369,17 @@ export class VisionPipeline {
 
     this.processingDurationSumMs += frame.processing.totalDurationMs;
     this.processedFrameCount += 1;
-    const metricSnapshot = this.createMetricSnapshot(
+    const metricFrameSummary = this.createMetricFrameSummary(
       frame,
+      successfulDetectors,
+    );
+    this.latestMetricFrameSummary = metricFrameSummary;
+    this.latestQuality = qualityOutput.decision;
+    this.latestBaseline = baseline;
+    const metricSnapshot = this.createMetricSnapshot(
+      metricFrameSummary,
       qualityOutput.decision,
+      baseline,
     );
     const events: VisionEvent[] = [...behaviorEvents];
     if (metricSnapshot !== null) events.push(metricSnapshot);
@@ -419,11 +489,15 @@ export class VisionPipeline {
   }
 
   private createMetricSnapshot(
-    frame: NormalizedFaceFrame,
+    frame: MetricFrameSummary,
     quality: FaceQualityDecision,
+    baseline: VisionBaseline,
+    force = false,
+    endedAtSessionElapsedMs = frame.sessionElapsedMs,
   ): VisionMetricSnapshot | null {
     // Rate limiting uses session time and therefore remains deterministic in tests.
     if (
+      !force &&
       this.lastMetricSnapshotAtMs !== null &&
       frame.sessionElapsedMs - this.lastMetricSnapshotAtMs <
         this.config.events.metricSnapshotIntervalMs
@@ -434,9 +508,26 @@ export class VisionPipeline {
     const screenState = this.screenAttention.getState();
     const smileState = this.smileExpression.getState();
     const activityState = this.expressionActivity.getState();
+    const intervalStartedAtMs =
+      this.metricIntervalStartedAtMs ?? endedAtSessionElapsedMs;
     const payload: VisionMetricSnapshotPayload = {
       // Only scalar summaries are copied. Raw images, landmarks, and complete
       // blendshape records never enter the transport event contract.
+      observationInterval: {
+        startedAtSessionElapsedMs: intervalStartedAtMs,
+        endedAtSessionElapsedMs,
+        observedDurationMs: Math.min(
+          this.observedDurationSinceLastSnapshotMs,
+          Math.max(
+            0,
+            endedAtSessionElapsedMs - intervalStartedAtMs,
+          ),
+        ),
+      },
+      capabilities: {
+        configuredDetectors: frame.configuredDetectors,
+        activeDetectors: frame.activeDetectors,
+      },
       quality: {
         usable: quality.usable,
         state: quality.state ?? (quality.usable ? "USABLE" : "UNUSABLE"),
@@ -454,9 +545,9 @@ export class VisionPipeline {
         pendingReasons: quality.pendingReasons ?? [],
         faceDetected: frame.faceDetected,
         faceCount: frame.faceCount,
-        faceBoxRatio: frame.primaryFace?.box.areaRatio ?? null,
-        brightnessScore: frame.imageQuality.brightnessScore,
-        blurScore: frame.imageQuality.blurScore,
+        faceBoxRatio: frame.faceBoxRatio,
+        brightnessScore: frame.brightnessScore,
+        blurScore: frame.blurScore,
       },
       metrics: {
         smile: {
@@ -621,9 +712,9 @@ export class VisionPipeline {
         ),
       },
       performance: {
-        profile: frame.processing.performanceProfile,
-        targetFps: frame.processing.targetFps,
-        actualFps: frame.processing.actualFps,
+        profile: frame.performance.performanceProfile,
+        targetFps: frame.performance.targetFps,
+        actualFps: frame.performance.actualFps,
         meanProcessingMs:
           this.processedFrameCount === 0
             ? 0
@@ -633,14 +724,113 @@ export class VisionPipeline {
     };
     const snapshot = this.eventFactory.createMetricSnapshot({
       confidence: quality.confidence,
+      confidenceDetails: {
+        baselineMode: this.metricBaselineMode(baseline),
+        coachingEligible: false,
+        baselineEpoch: baseline.baselineEpoch,
+      },
       payload,
     });
-    this.lastMetricSnapshotAtMs = frame.sessionElapsedMs;
+    this.lastMetricSnapshotAtMs = endedAtSessionElapsedMs;
+    this.metricIntervalStartedAtMs = endedAtSessionElapsedMs;
+    this.observedDurationSinceLastSnapshotMs = 0;
     // Performance accumulators describe only the next snapshot interval.
     this.processingDurationSumMs = 0;
     this.processedFrameCount = 0;
     this.droppedFramesSinceLastSnapshot = 0;
     return snapshot;
+  }
+
+  private recordObservation(
+    frame: NormalizedFaceFrame,
+    quality: FaceQualityDecision,
+  ): void {
+    // Both ends of a short interval must be usable. This prevents low quality
+    // and missing frames from inflating the denominator used by aggregation.
+    if (this.metricIntervalStartedAtMs === null) {
+      // Vision can start after the call begins, so the first analyzed frame is
+      // the first valid wall-clock boundary for this pipeline's metrics.
+      this.metricIntervalStartedAtMs = frame.sessionElapsedMs;
+    }
+    if (this.lastObservationAtMs !== null) {
+      const gapMs = frame.sessionElapsedMs - this.lastObservationAtMs;
+      const expectedFrameIntervalMs =
+        1_000 / frame.processing.targetFps;
+      const maximumGapMs = Math.max(
+        MINIMUM_OBSERVED_FRAME_GAP_MS,
+        expectedFrameIntervalMs * OBSERVED_FRAME_GAP_TOLERANCE,
+      );
+      if (
+        gapMs >= 0 &&
+        gapMs <= maximumGapMs &&
+        this.lastObservationUsable &&
+        quality.usable
+      ) {
+        this.observedDurationSinceLastSnapshotMs += gapMs;
+      }
+    }
+    this.lastObservationAtMs = frame.sessionElapsedMs;
+    this.lastObservationUsable = quality.usable;
+  }
+
+  private createMetricFrameSummary(
+    frame: NormalizedFaceFrame,
+    successfulDetectors: ReadonlySet<DetectorName>,
+  ): MetricFrameSummary {
+    const configuredDetectors = this.configuredDetectors(frame);
+    return {
+      sessionElapsedMs: frame.sessionElapsedMs,
+      faceDetected: frame.faceDetected,
+      faceCount: frame.faceCount,
+      faceBoxRatio: frame.primaryFace?.box.areaRatio ?? null,
+      brightnessScore: frame.imageQuality.brightnessScore,
+      blurScore: frame.imageQuality.blurScore,
+      performance: { ...frame.processing },
+      configuredDetectors,
+      activeDetectors: configuredDetectors.filter((name) =>
+        successfulDetectors.has(name),
+      ),
+    };
+  }
+
+  private configuredDetectors(
+    frame: NormalizedFaceFrame,
+  ): readonly DetectorName[] {
+    // Profile and explicit feature flags define capability configuration.
+    return this.config.profiles[
+      frame.processing.performanceProfile
+    ].enabledDetectors.filter(
+      (name) =>
+        name === "FACE_QUALITY" ||
+        this.options.enabledDetectorOverrides?.[name] !== false,
+    );
+  }
+
+  private metricBaselineMode(
+    baseline: VisionBaseline,
+  ): VisionBaselineMode {
+    // A metric spans several signals, so the most restrictive exceptional
+    // state wins before a usable personalized/monocular mode is reported.
+    const modes = Object.values(baseline.baselineModeBySignal);
+    if (modes.includes("BASELINE_UNCERTAIN")) {
+      return "BASELINE_UNCERTAIN";
+    }
+    if (
+      baseline.status === "NOT_STARTED" ||
+      baseline.status === "PRECHECK" ||
+      baseline.status === "STABILIZING" ||
+      baseline.status === "COLLECTING" ||
+      baseline.status === "PAUSED"
+    ) {
+      return "COLLECTING";
+    }
+    if (baseline.status === "GLOBAL_FALLBACK") {
+      return "GLOBAL_FALLBACK";
+    }
+    if (modes.includes("MONOCULAR_LEFT")) return "MONOCULAR_LEFT";
+    if (modes.includes("MONOCULAR_RIGHT")) return "MONOCULAR_RIGHT";
+    if (modes.includes("PERSONALIZED")) return "PERSONALIZED";
+    return "UNAVAILABLE";
   }
 
   private readNullableNumber(state: object, key: string): number | null {
