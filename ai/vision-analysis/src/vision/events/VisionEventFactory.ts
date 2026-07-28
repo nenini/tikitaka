@@ -30,8 +30,6 @@ const EVENT_SOURCE_BY_TYPE = {
   SMILE_STARTED: "SMILE_EXPRESSION_DETECTOR",
   SMILE_ENDED: "SMILE_EXPRESSION_DETECTOR",
   NOD_EVENT: "NOD_DETECTOR",
-  LOW_EXPRESSION_ACTIVITY_STARTED: "EXPRESSION_ACTIVITY_DETECTOR",
-  LOW_EXPRESSION_ACTIVITY_ENDED: "EXPRESSION_ACTIVITY_DETECTOR",
 } as const satisfies Readonly<
   Record<VisionBehaviorEventType, VisionEventSource>
 >;
@@ -51,14 +49,14 @@ export interface CreateBehaviorEventOptions<
   TEventType extends VisionBehaviorEventType,
 > {
   readonly confidence: number;
-  readonly confidenceDetails?: EventConfidenceDetails;
+  readonly confidenceDetails: EventConfidenceDetails;
   readonly episodeId: string | null;
   readonly payload: VisionBehaviorPayloadMap[TEventType];
 }
 
 export interface CreateMetricSnapshotOptions {
   readonly confidence: number;
-  readonly confidenceDetails?: EventConfidenceDetails;
+  readonly confidenceDetails: EventConfidenceDetails;
   readonly payload: VisionMetricSnapshotPayload;
 }
 
@@ -67,9 +65,9 @@ export interface EventConfidenceDetails {
   readonly signalClarity?: number;
   readonly personalizationConfidence?: number;
   readonly evidenceStrength?: number;
-  readonly baselineMode?: VisionEventEnvelope<string>["baselineMode"];
-  readonly coachingEligible?: boolean;
-  readonly baselineEpoch?: number;
+  readonly baselineMode: VisionEventEnvelope<string>["baselineMode"];
+  readonly coachingEligible: boolean;
+  readonly baselineEpoch: number;
 }
 
 export class VisionEventFactory {
@@ -149,15 +147,17 @@ export class VisionEventFactory {
   private createEnvelope<TEventType extends string>(
     eventType: TEventType,
     confidence: number,
-    details: EventConfidenceDetails = {},
+    details: EventConfidenceDetails,
   ): Omit<VisionEventEnvelope<TEventType>, "source"> {
+    // Eligibility fields deliberately have no defaults. Every producer must
+    // state its baseline semantics instead of silently appearing personalized.
     // Frame-scoped time wins over wall-time sampling to keep a multi-event frame exact.
     const timePoint = this.scopedTimePoint ?? this.timeline.now();
 
     return {
       eventId: this.uuidFactory(),
       eventType,
-      version: 3,
+      version: 4,
       sessionId: this.identity.sessionId,
       userId: this.identity.userId,
       clientInstanceId: this.identity.clientInstanceId,
@@ -172,9 +172,9 @@ export class VisionEventFactory {
       personalizationConfidence:
         details.personalizationConfidence ?? 1,
       evidenceStrength: details.evidenceStrength ?? confidence,
-      baselineMode: details.baselineMode ?? "PERSONALIZED",
-      coachingEligible: details.coachingEligible ?? false,
-      baselineEpoch: details.baselineEpoch ?? 0,
+      baselineMode: details.baselineMode,
+      coachingEligible: details.coachingEligible,
+      baselineEpoch: details.baselineEpoch,
       modelVersion: this.versions.modelVersion,
       ruleVersion: this.versions.ruleVersion,
     };

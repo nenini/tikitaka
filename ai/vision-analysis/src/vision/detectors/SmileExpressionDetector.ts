@@ -4,7 +4,10 @@ import type {
   EpisodeTerminationReason,
   VisionBehaviorEvent,
 } from "../events/VisionEvent.js";
-import type { VisionEventFactory } from "../events/VisionEventFactory.js";
+import type {
+  EventConfidenceDetails,
+  VisionEventFactory,
+} from "../events/VisionEventFactory.js";
 import { TimeBasedEmaFilter } from "../filters/EmaFilter.js";
 import {
   BEHAVIOR_STATES,
@@ -78,6 +81,7 @@ export class SmileExpressionDetector
   private stateSinceMs: number | null = null;
   private activeSinceMs: number | null = null;
   private episodeId: string | null = null;
+  private episodeConfidenceDetails: EventConfidenceDetails | null = null;
   private peakScore = 0;
   private peakSmileLevel: SmileConfigurationLevel | null = null;
   private scoreSum = 0;
@@ -308,6 +312,20 @@ export class SmileExpressionDetector
         ) {
           this.activeSinceMs = this.stateSinceMs;
           this.episodeId = this.eventFactory.createEpisodeId();
+          this.episodeConfidenceDetails = {
+            measurementConfidence,
+            signalClarity: measurementConfidence,
+            personalizationConfidence,
+            evidenceStrength: Math.min(
+              measurementConfidence,
+              personalized ? personalizationConfidence : 0.55,
+            ),
+            baselineMode: personalized
+              ? "PERSONALIZED"
+              : "GLOBAL_FALLBACK",
+            coachingEligible: personalized,
+            baselineEpoch: context.baseline.baselineEpoch,
+          };
           this.peakScore = score;
           this.peakSmileLevel = configurationLevel;
           this.scoreSum = score;
@@ -321,20 +339,7 @@ export class SmileExpressionDetector
                 personalizationConfidence,
                 personalized,
               ),
-              confidenceDetails: {
-                measurementConfidence,
-                signalClarity: measurementConfidence,
-                personalizationConfidence,
-                evidenceStrength: Math.min(
-                  measurementConfidence,
-                  personalized ? personalizationConfidence : 0.55,
-                ),
-                baselineMode: personalized
-                  ? "PERSONALIZED"
-                  : "GLOBAL_FALLBACK",
-                coachingEligible: personalized,
-                baselineEpoch: context.baseline.baselineEpoch,
-              },
+              confidenceDetails: this.episodeConfidenceDetails,
               episodeId: this.episodeId,
               payload: {
                 observedStartElapsedMs: this.activeSinceMs ?? now,
@@ -454,6 +459,7 @@ export class SmileExpressionDetector
     this.stateSinceMs = null;
     this.activeSinceMs = null;
     this.episodeId = null;
+    this.episodeConfidenceDetails = null;
     this.peakScore = 0;
     this.peakSmileLevel = null;
     this.scoreSum = 0;
@@ -531,6 +537,12 @@ export class SmileExpressionDetector
     const durations = this.episodeClock.durations(now);
     const event = this.eventFactory.createBehaviorEvent("SMILE_ENDED", {
       confidence: this.snapshot.measurementConfidence,
+      confidenceDetails:
+        this.episodeConfidenceDetails ?? {
+          baselineMode: "UNAVAILABLE",
+          coachingEligible: false,
+          baselineEpoch: 0,
+        },
       episodeId: this.episodeId,
       payload: {
         observedEndElapsedMs: now,
@@ -545,6 +557,7 @@ export class SmileExpressionDetector
     });
     this.activeSinceMs = null;
     this.episodeId = null;
+    this.episodeConfidenceDetails = null;
     this.peakScore = 0;
     this.peakSmileLevel = null;
     this.scoreSum = 0;
