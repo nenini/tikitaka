@@ -61,6 +61,11 @@ describe("VisionEventFactory", () => {
 
     const event = factory.createBehaviorEvent("SMILE_STARTED", {
       confidence: 0.84,
+      confidenceDetails: {
+        baselineMode: "PERSONALIZED",
+        coachingEligible: true,
+        baselineEpoch: 1,
+      },
       episodeId: "36912865-d134-4691-b826-1dacd10f68f3",
       payload: {
         observedStartElapsedMs: 5_100,
@@ -70,7 +75,29 @@ describe("VisionEventFactory", () => {
     });
     const snapshot = factory.createMetricSnapshot({
       confidence: 0.9,
+      confidenceDetails: {
+        baselineMode: "PERSONALIZED",
+        coachingEligible: false,
+        baselineEpoch: 1,
+      },
       payload: {
+        observationInterval: {
+          startedAtSessionElapsedMs: 5_000,
+          endedAtSessionElapsedMs: 5_500,
+          observedDurationMs: 500,
+        },
+        capabilities: {
+          configuredDetectors: [
+            "FACE_QUALITY",
+            "SCREEN_ATTENTION",
+            "SMILE_EXPRESSION",
+          ],
+          activeDetectors: [
+            "FACE_QUALITY",
+            "SCREEN_ATTENTION",
+            "SMILE_EXPRESSION",
+          ],
+        },
         quality: {
           usable: true,
           state: "USABLE",
@@ -133,12 +160,12 @@ describe("VisionEventFactory", () => {
     });
 
     expect(event.source).toBe("SMILE_EXPRESSION_DETECTOR");
-    expect(event.version).toBe(3);
+    expect(event.version).toBe(4);
     expect(event.seq).toBe(1);
     expect(event.sessionElapsedMs).toBe(5_500);
     expect(event.occurredAt).toBe("2026-07-20T10:30:00.800Z");
     expect(snapshot.seq).toBe(2);
-    expect(snapshot.version).toBe(3);
+    expect(snapshot.version).toBe(4);
     expect(visionEventSchema.parse(event)).toEqual(event);
     expect(visionEventSchema.parse(snapshot)).toEqual(snapshot);
   });
