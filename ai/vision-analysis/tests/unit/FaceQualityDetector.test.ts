@@ -161,5 +161,63 @@ describe("FaceQualityDetector", () => {
     expect(detector.getState().state).toBe("USABLE");
     expect(detector.getState().activeReasons).toEqual([]);
   });
-});
 
+  it("distinguishes a too-large face and backlight from a small face", () => {
+    const clock = new MutableClock();
+    const detector = createDetector(clock);
+    let output = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 0,
+        faceAreaRatio: 0.7,
+        backlightScore: 0.1,
+      }),
+    );
+    output = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 600,
+        faceAreaRatio: 0.7,
+        backlightScore: 0.1,
+      }),
+    );
+    expect(output.decision.reasons).toContain("FACE_TOO_LARGE");
+    expect(output.decision.reasons).toContain("BACKLIGHT");
+    expect(output.decision.reasons).not.toContain("FACE_TOO_SMALL");
+  });
+
+  it("blocks new behavior and calibration while degradation is only a candidate", () => {
+    const detector = createDetector(new MutableClock());
+    const output = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 0,
+        brightnessScore: 0.1,
+      }),
+    );
+
+    expect(output.state.state).toBe("DEGRADED_CANDIDATE");
+    expect(output.decision.usable).toBe(true);
+    expect(output.decision.canStartBehavior).toBe(false);
+    expect(output.decision.calibrationEligible).toBe(false);
+    expect(output.decision.confidence).toBeLessThanOrEqual(0.7);
+  });
+
+  it("computes component confidence and caps mandatory in-frame failures", () => {
+    const detector = createDetector(new MutableClock());
+    const healthy = detector.update(
+      createNormalizedFaceFrame({ timestampMs: 0 }),
+    );
+    const clipped = detector.update(
+      createNormalizedFaceFrame({
+        timestampMs: 200,
+        inFrameRatio: 0.5,
+      }),
+    );
+
+    expect(healthy.decision.confidence).not.toBe(0.85);
+    expect(healthy.decision.components).toMatchObject({
+      facePresence: 1,
+      poseObservability: 1,
+    });
+    expect(clipped.decision.confidence).toBeLessThanOrEqual(0.4);
+    expect(clipped.decision.components?.inFrame).toBe(0.5);
+  });
+});

@@ -8,6 +8,7 @@ import type { VisionBehaviorEvent } from "../events/VisionEvent.js";
 
 export const DETECTOR_SUSPENSION_REASONS = [
   "ANALYSIS_UNAVAILABLE",
+  "CAMERA_DISABLED",
   "CONSENT_WITHDRAWN",
   "SESSION_ENDED",
   "PERFORMANCE_PROFILE_DISABLED",
@@ -26,6 +27,7 @@ export interface DetectorSuspensionContext {
   readonly sessionElapsedMs: number;
   readonly clientMonotonicMs: number;
   readonly reason: DetectorSuspensionReason;
+  readonly suspensionStartedElapsedMs?: number;
 }
 
 export interface VisionDetector<
@@ -45,4 +47,3 @@ export interface VisionDetector<
 
   getState(): Readonly<TState>;
 }
-

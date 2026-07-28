@@ -19,6 +19,17 @@ describe("visionEventSchema contract fixtures", () => {
     expect(visionEventSchema.parse(fixture)).toEqual(fixture);
   });
 
+  it("rejects earlier versions instead of coercing them into v4", async () => {
+    const fixture = await readFixture("vision-behavior-event.valid.json");
+    if (typeof fixture !== "object" || fixture === null) {
+      throw new TypeError("fixture must be an object");
+    }
+
+    expect(() =>
+      visionEventSchema.parse({ ...fixture, version: 3 }),
+    ).toThrow();
+  });
+
   it("accepts the metric snapshot contract fixture", async () => {
     const fixture = await readFixture("vision-metric-snapshot.valid.json");
 
@@ -43,6 +54,62 @@ describe("visionEventSchema contract fixtures", () => {
     };
 
     expect(() => visionEventSchema.parse(invalidFixture)).toThrow();
+  });
+
+  it("requires eligibility fields on every event", async () => {
+    const fixture = await readFixture("vision-behavior-event.valid.json");
+    if (typeof fixture !== "object" || fixture === null) {
+      throw new TypeError("fixture must be an object");
+    }
+    const {
+      baselineMode: _baselineMode,
+      ...withoutBaselineMode
+    } = fixture as Record<string, unknown>;
+
+    expect(() => visionEventSchema.parse(withoutBaselineMode)).toThrow();
+  });
+
+  it("rejects observation time outside the metric interval", async () => {
+    const fixture = await readFixture("vision-metric-snapshot.valid.json");
+    if (typeof fixture !== "object" || fixture === null) {
+      throw new TypeError("fixture must be an object");
+    }
+    const payload = Reflect.get(fixture, "payload") as Record<string, unknown>;
+
+    expect(() =>
+      visionEventSchema.parse({
+        ...fixture,
+        payload: {
+          ...payload,
+          observationInterval: {
+            startedAtSessionElapsedMs: 100,
+            endedAtSessionElapsedMs: 200,
+            observedDurationMs: 101,
+          },
+        },
+      }),
+    ).toThrow(/observed duration/);
+  });
+
+  it("rejects active detectors that were not configured", async () => {
+    const fixture = await readFixture("vision-metric-snapshot.valid.json");
+    if (typeof fixture !== "object" || fixture === null) {
+      throw new TypeError("fixture must be an object");
+    }
+    const payload = Reflect.get(fixture, "payload") as Record<string, unknown>;
+
+    expect(() =>
+      visionEventSchema.parse({
+        ...fixture,
+        payload: {
+          ...payload,
+          capabilities: {
+            configuredDetectors: ["FACE_QUALITY"],
+            activeDetectors: ["SMILE_EXPRESSION"],
+          },
+        },
+      }),
+    ).toThrow(/active detectors/);
   });
 
   it("rejects unusable-state reasons on a usable snapshot", async () => {
@@ -77,4 +144,3 @@ describe("visionEventSchema contract fixtures", () => {
     );
   });
 });
-
