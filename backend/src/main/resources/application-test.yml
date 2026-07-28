@@ -31,3 +31,13 @@ match:
     acceptance-timeout-seconds: 28800
     minimum-acceptance-window-seconds: 3600
     schedule-buffer-seconds: 3600
+
+notification:
+  worker:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 10000
+    batch-size: 20
+    max-attempts: 3
+    retry-delay-seconds: 5
+    processing-timeout-seconds: 60

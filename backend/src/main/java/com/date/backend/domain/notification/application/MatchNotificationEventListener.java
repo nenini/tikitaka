@@ -2,6 +2,7 @@ package com.date.backend.domain.notification.application;
 
 import com.date.backend.domain.match.application.MatchCancelledEvent;
 import com.date.backend.domain.match.application.MatchConfirmedEvent;
+import com.date.backend.domain.match.application.MatchExpiredEvent;
 import com.date.backend.domain.match.application.MatchFoundEvent;
 import com.date.backend.domain.match.application.MatchRejectedEvent;
 import com.date.backend.domain.notification.domain.NotificationPresentation;
@@ -89,6 +90,24 @@ public class MatchNotificationEventListener {
 				NotificationType.MATCH_CANCELLED,
 				"확정된 매칭이 취소되었어요",
 				"상대방이 매칭을 취소했습니다. 새로운 매칭을 다시 신청할 수 있습니다.",
+				event.matchPairId()
+		);
+	}
+
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void handleMatchExpired(MatchExpiredEvent event) {
+		createForParticipant(
+				event.userAId(),
+				NotificationType.MATCH_ACCEPTANCE_EXPIRED,
+				"매칭 수락 시간이 만료되었어요",
+				"양측 수락이 완료되지 않아 새로운 상대를 다시 찾습니다.",
+				event.matchPairId()
+		);
+		createForParticipant(
+				event.userBId(),
+				NotificationType.MATCH_ACCEPTANCE_EXPIRED,
+				"매칭 수락 시간이 만료되었어요",
+				"양측 수락이 완료되지 않아 새로운 상대를 다시 찾습니다.",
 				event.matchPairId()
 		);
 	}

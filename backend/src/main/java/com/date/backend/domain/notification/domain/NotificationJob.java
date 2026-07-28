@@ -169,6 +169,11 @@ public class NotificationJob {
 		);
 	}
 
+	public boolean isProcessingBy(String workerId) {
+		return status == NotificationJobStatus.PROCESSING
+				&& Objects.equals(this.workerId, workerId);
+	}
+
 	@PrePersist
 	void prePersist() {
 		LocalDateTime now = LocalDateTime.now();

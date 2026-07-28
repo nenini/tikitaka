@@ -12,11 +12,13 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -94,5 +96,59 @@ class NotificationRepositoryTest {
 		assertThat(notificationJobRepository.existsByDeduplicationKey(
 				foundJob.getDeduplicationKey()
 		)).isTrue();
+	}
+
+	@Test
+	void dueJobsCanBeClaimedAndPendingJobsCanBeCancelledByReference() {
+		User user = userRepository.save(new User(
+				"notification-worker@example.com",
+				"password-hash",
+				"알림 작업 사용자",
+				null,
+				LocalDate.of(2000, 1, 1)
+		));
+		LocalDateTime now = LocalDateTime.of(2026, 7, 28, 10, 0);
+		NotificationJob dueJob = notificationJobRepository.save(new NotificationJob(
+				user.getId(),
+				NotificationType.MATCH_ACCEPTANCE_DEADLINE_SOON,
+				"수락 마감 안내",
+				"수락 마감까지 1시간 남았습니다.",
+				NotificationReferenceType.MATCH_PAIR,
+				20L,
+				NotificationPresentation.BELL_AND_TOAST,
+				"MATCH_ACCEPTANCE_DEADLINE_SOON:20:" + user.getId(),
+				now.minusMinutes(1)
+		));
+		NotificationJob futureJob = notificationJobRepository.save(new NotificationJob(
+				user.getId(),
+				NotificationType.SESSION_REMINDER_1H,
+				"세션 시작 안내",
+				"세션 시작까지 1시간 남았습니다.",
+				NotificationReferenceType.MATCH_PAIR,
+				20L,
+				NotificationPresentation.BELL_AND_TOAST,
+				"SESSION_REMINDER_1H:20:" + user.getId(),
+				now.plusHours(1)
+		));
+		entityManager.flush();
+
+		List<NotificationJob> claimable =
+				notificationJobRepository.findClaimableForUpdate(
+						NotificationJobStatus.PENDING,
+						now,
+						PageRequest.of(0, 20)
+				);
+		List<NotificationJob> cancellable =
+				notificationJobRepository.findCancellableForUpdate(
+						NotificationReferenceType.MATCH_PAIR,
+						20L,
+						NotificationJobStatus.PENDING,
+						List.of(NotificationType.SESSION_REMINDER_1H)
+				);
+
+		assertThat(claimable).extracting(NotificationJob::getId)
+				.containsExactly(dueJob.getId());
+		assertThat(cancellable).extracting(NotificationJob::getId)
+				.containsExactly(futureJob.getId());
 	}
 }

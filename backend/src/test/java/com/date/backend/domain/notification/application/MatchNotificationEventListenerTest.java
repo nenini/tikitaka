@@ -2,6 +2,7 @@ package com.date.backend.domain.notification.application;
 
 import com.date.backend.domain.match.application.MatchCancelledEvent;
 import com.date.backend.domain.match.application.MatchConfirmedEvent;
+import com.date.backend.domain.match.application.MatchExpiredEvent;
 import com.date.backend.domain.match.application.MatchFoundEvent;
 import com.date.backend.domain.match.application.MatchRejectedEvent;
 import com.date.backend.domain.notification.domain.NotificationPresentation;
@@ -139,6 +140,37 @@ class MatchNotificationEventListenerTest {
 				PAIR_ID,
 				NotificationPresentation.BELL_AND_TOAST,
 				"MATCH_CANCELLED:10:102"
+		);
+	}
+
+	@Test
+	void createsExpiredNotificationForBothParticipants() {
+		listener.handleMatchExpired(new MatchExpiredEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				LocalDateTime.of(2026, 7, 27, 18, 0)
+		));
+
+		verify(creationService).create(
+				USER_A_ID,
+				NotificationType.MATCH_ACCEPTANCE_EXPIRED,
+				"매칭 수락 시간이 만료되었어요",
+				"양측 수락이 완료되지 않아 새로운 상대를 다시 찾습니다.",
+				NotificationReferenceType.MATCH_PAIR,
+				PAIR_ID,
+				NotificationPresentation.BELL_AND_TOAST,
+				"MATCH_ACCEPTANCE_EXPIRED:10:101"
+		);
+		verify(creationService).create(
+				USER_B_ID,
+				NotificationType.MATCH_ACCEPTANCE_EXPIRED,
+				"매칭 수락 시간이 만료되었어요",
+				"양측 수락이 완료되지 않아 새로운 상대를 다시 찾습니다.",
+				NotificationReferenceType.MATCH_PAIR,
+				PAIR_ID,
+				NotificationPresentation.BELL_AND_TOAST,
+				"MATCH_ACCEPTANCE_EXPIRED:10:102"
 		);
 	}
 }
