@@ -1,5 +1,6 @@
 import type { DetectorName, VisionConfig } from "../config/VisionConfig.js";
 import { BaselineCalibrator } from "../calibration/BaselineCalibrator.js";
+import { AdaptiveBaselineManager } from "../calibration/AdaptiveBaselineManager.js";
 import type {
   BaselineCalibrationState,
 } from "../calibration/BaselineCalibrator.js";
@@ -73,7 +74,18 @@ export interface VisionPipelineOutput {
 
 const FAILED_QUALITY: FaceQualityDecision = {
   usable: false,
+  calibrationEligible: false,
+  canStartBehavior: false,
   confidence: 0,
+  components: {
+    facePresence: 0,
+    faceSize: 0,
+    inFrame: 0,
+    brightness: 0,
+    blur: 0,
+    poseObservability: 0,
+    trackingStability: 0,
+  },
   reasons: ["WORKER_ERROR"],
 };
 
@@ -81,6 +93,7 @@ const FAILED_QUALITY: FaceQualityDecision = {
 export class VisionPipeline {
   private readonly qualityDetector: FaceQualityDetector;
   private readonly calibrator: BaselineCalibrator;
+  private readonly adaptiveBaseline: AdaptiveBaselineManager;
   private readonly screenAttention: BehaviorDetector;
   private readonly smileExpression: BehaviorDetector;
   private readonly expressionActivity: BehaviorDetector;
@@ -107,12 +120,23 @@ export class VisionPipeline {
       config.expressionActivity,
       config.screenAttention,
     );
+    this.adaptiveBaseline = new AdaptiveBaselineManager(
+      config.adaptiveBaseline,
+    );
     this.screenAttention =
       options.detectorOverrides?.screenAttention ??
-      new ScreenAttentionDetector(config.screenAttention, eventFactory);
+      new ScreenAttentionDetector(
+        config.screenAttention,
+        eventFactory,
+        config.behaviorPolicy,
+      );
     this.smileExpression =
       options.detectorOverrides?.smileExpression ??
-      new SmileExpressionDetector(config.smile, eventFactory);
+      new SmileExpressionDetector(
+        config.smile,
+        eventFactory,
+        config.behaviorPolicy,
+      );
     this.expressionActivity =
       options.detectorOverrides?.expressionActivity ??
       new ExpressionActivityDetector(config.expressionActivity, eventFactory);
@@ -170,6 +194,7 @@ export class VisionPipeline {
     // Sequence reset belongs to session cleanup alongside every detector and baseline.
     this.qualityDetector.reset();
     this.calibrator.reset();
+    this.adaptiveBaseline.reset();
     for (const entry of this.detectorEntries) {
       try {
         entry.detector.reset();
@@ -195,16 +220,40 @@ export class VisionPipeline {
 
     // The calibrator sees unusable frames only to break timing continuity; it
     // never records their pose or expression values as baseline samples.
-    const calibration = this.calibrator.update(frame, qualityOutput.decision);
-    const baseline = calibration.baseline;
+    const calibrationState = this.calibrator.update(
+      frame,
+      qualityOutput.decision,
+    );
+    const baseline = this.adaptiveBaseline.update(
+      calibrationState.baseline,
+      frame,
+      qualityOutput.decision,
+      {
+        gaze: this.isDetectorBusy(this.screenAttention.getState()),
+        nod: this.isDetectorBusy(this.nod.getState()),
+        smile: this.isDetectorBusy(this.smileExpression.getState()),
+      },
+    );
+    const calibration: BaselineCalibrationState = {
+      ...calibrationState,
+      baseline,
+      baselineModeBySignal: baseline.baselineModeBySignal,
+      confidenceBySignal: baseline.confidenceBySignal,
+    };
 
     if (!qualityOutput.decision.usable) {
       // Suspending clears temporal windows and closes any active behavior episode.
+      const suspensionReason =
+        qualityOutput.decision.reasons.includes("CAMERA_DISABLED") ||
+        qualityOutput.decision.reasons.includes("TRACK_ENDED")
+          ? "CAMERA_DISABLED"
+          : "ANALYSIS_UNAVAILABLE";
       behaviorEvents.push(
         ...this.suspendAll(
-          "ANALYSIS_UNAVAILABLE",
+          suspensionReason,
           frame,
           errors,
+          qualityOutput.decision.unavailableSinceMs ?? undefined,
         ),
       );
     } else {
@@ -328,10 +377,19 @@ export class VisionPipeline {
       readonly clientMonotonicMs: number;
     },
     errors: VisionPipelineError[],
+    suspensionStartedElapsedMs?: number,
   ): VisionBehaviorEvent[] {
     const events: VisionBehaviorEvent[] = [];
     for (const entry of this.detectorEntries) {
-      events.push(...this.suspendDetector(entry, reason, timePoint, errors));
+      events.push(
+        ...this.suspendDetector(
+          entry,
+          reason,
+          timePoint,
+          errors,
+          suspensionStartedElapsedMs,
+        ),
+      );
     }
     return events;
   }
@@ -344,9 +402,16 @@ export class VisionPipeline {
       readonly clientMonotonicMs: number;
     },
     errors: VisionPipelineError[],
+    suspensionStartedElapsedMs?: number,
   ): readonly VisionBehaviorEvent[] {
     try {
-      return entry.detector.suspend({ ...timePoint, reason });
+      return entry.detector.suspend({
+        ...timePoint,
+        reason,
+        ...(suspensionStartedElapsedMs === undefined
+          ? {}
+          : { suspensionStartedElapsedMs }),
+      });
     } catch {
       errors.push({ detectorName: entry.detector.name, phase: "SUSPEND" });
       return [];
@@ -374,7 +439,19 @@ export class VisionPipeline {
       // blendshape records never enter the transport event contract.
       quality: {
         usable: quality.usable,
+        state: quality.state ?? (quality.usable ? "USABLE" : "UNUSABLE"),
+        confidence: quality.confidence,
+        components: quality.components ?? {
+          facePresence: quality.usable ? 1 : 0,
+          faceSize: quality.confidence,
+          inFrame: quality.confidence,
+          brightness: quality.confidence,
+          blur: quality.confidence,
+          poseObservability: quality.confidence,
+          trackingStability: quality.confidence,
+        },
         reasons: quality.reasons,
+        pendingReasons: quality.pendingReasons ?? [],
         faceDetected: frame.faceDetected,
         faceCount: frame.faceCount,
         faceBoxRatio: frame.primaryFace?.box.areaRatio ?? null,
@@ -382,6 +459,74 @@ export class VisionPipeline {
         blurScore: frame.imageQuality.blurScore,
       },
       metrics: {
+        smile: {
+          configurationScore: this.readNullableNumber(
+            smileState,
+            "smileConfigurationScore",
+          ),
+          baselineScore: this.readNullableNumber(
+            smileState,
+            "baselineSmileScore",
+          ),
+          delta: this.readNullableNumber(smileState, "smileDelta"),
+          maintained:
+            this.readBoolean(
+              smileState,
+              "maintainedSmileConfiguration",
+            ) ?? false,
+          promptSuppressedByBaseline:
+            this.readBoolean(
+              smileState,
+              "smilePromptSuppressedByBaseline",
+            ) ?? false,
+          baselinePromptSuppressionThreshold:
+            this.readNullableNumber(
+              smileState,
+              "baselinePromptSuppressionScore",
+            ) ?? this.config.smile.baselinePromptSuppressionScore,
+          confidence:
+            this.readNullableNumber(
+              smileState,
+              "measurementConfidence",
+            ) ?? 0,
+        },
+        attention: {
+          score: this.readNullableNumber(
+            screenState,
+            "screenAttentionScore",
+          ),
+          confidence:
+            this.readNullableNumber(
+              screenState,
+              "screenAttentionConfidence",
+            ) ?? 0,
+          mode:
+            this.readString(screenState, "attentionMode") ?? "UNRELIABLE",
+        },
+        activity: {
+          upperFaceActivityScore: this.readNullableNumber(
+            activityState,
+            "upperFaceActivityScore",
+          ),
+          lowerFaceActivityScore: this.readNullableNumber(
+            activityState,
+            "lowerFaceActivityScore",
+          ),
+          poseAlignedLandmarkActivityScore: this.readNullableNumber(
+            activityState,
+            "poseAlignedLandmarkActivityScore",
+          ),
+          expressionActivityScore: this.readNullableNumber(
+            activityState,
+            "windowActivityScore",
+          ),
+          confidence:
+            this.readNullableNumber(
+              activityState,
+              "activityConfidence",
+            ) ?? 0,
+          experimentalOnly: true,
+        },
         screenFacingScore: this.readNullableNumber(
           screenState,
           "screenFacingScore",
@@ -390,6 +535,22 @@ export class VisionPipeline {
         expressionActivityScore: this.readNullableNumber(
           activityState,
           "windowActivityScore",
+        ),
+        upperFaceActivityScore: this.readNullableNumber(
+          activityState,
+          "upperFaceActivityScore",
+        ),
+        lowerFaceActivityScore: this.readNullableNumber(
+          activityState,
+          "lowerFaceActivityScore",
+        ),
+        poseAlignedLandmarkActivityScore: this.readNullableNumber(
+          activityState,
+          "poseAlignedLandmarkActivityScore",
+        ),
+        activityConfidence: this.readNullableNumber(
+          activityState,
+          "activityConfidence",
         ),
         yawDelta: this.readNullableNumber(screenState, "smoothedYawDelta"),
         pitchDelta: this.readNullableNumber(
@@ -406,8 +567,57 @@ export class VisionPipeline {
           screenState,
           "smoothedGazeVerticalDelta",
         ),
-        stiffExpressionActive: ["ACTIVE", "RECOVERING"].includes(
-          this.readString(activityState, "state") ?? "",
+        smileConfigurationScore: this.readNullableNumber(
+          smileState,
+          "smileConfigurationScore",
+        ),
+        baselineSmileScore: this.readNullableNumber(
+          smileState,
+          "baselineSmileScore",
+        ),
+        smileDelta: this.readNullableNumber(smileState, "smileDelta"),
+        mouthAsymmetry: this.readNullableNumber(
+          smileState,
+          "mouthAsymmetry",
+        ),
+        maintainedSmileConfiguration:
+          this.readBoolean(
+            smileState,
+            "maintainedSmileConfiguration",
+          ) ?? false,
+        headPoseScore: this.readNullableNumber(
+          screenState,
+          "headPoseScore",
+        ),
+        faceCenterScore: this.readNullableNumber(
+          screenState,
+          "faceCenterScore",
+        ),
+        irisProxyScore: this.readNullableNumber(
+          screenState,
+          "irisProxyScore",
+        ),
+        screenAttentionScore: this.readNullableNumber(
+          screenState,
+          "screenAttentionScore",
+        ),
+        screenAttentionConfidence: this.readNullableNumber(
+          screenState,
+          "screenAttentionConfidence",
+        ),
+        gazeReliability: this.readNullableNumber(
+          screenState,
+          "gazeReliability",
+        ),
+        binocularAgreement: this.readNullableNumber(
+          screenState,
+          "binocularAgreement",
+        ),
+        gazeMode: this.readString(screenState, "gazeMode"),
+        attentionMode: this.readString(screenState, "attentionMode"),
+        attentionEvidenceMode: this.readString(
+          screenState,
+          "attentionEvidenceMode",
         ),
       },
       performance: {
@@ -443,5 +653,20 @@ export class VisionPipeline {
   private readString(state: object, key: string): string | null {
     const value = Reflect.get(state, key);
     return typeof value === "string" ? value : null;
+  }
+
+  private readBoolean(state: object, key: string): boolean | null {
+    const value = Reflect.get(state, key);
+    return typeof value === "boolean" ? value : null;
+  }
+
+  private isDetectorBusy(state: object): boolean {
+    const value = this.readString(state, "state");
+    return (
+      value !== null &&
+      (value.includes("CANDIDATE") ||
+        value.includes("ACTIVE") ||
+        value.includes("RECOVERING"))
+    );
   }
 }

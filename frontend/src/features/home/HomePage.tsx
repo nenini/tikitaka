@@ -19,11 +19,12 @@ export function HomePage() {
         </Button>
       </div>
 
+
       {/* div + onClick 이 아니라 실제 링크 — 키보드/스크린리더로도 도달·활성화된다 */}
-      <CardLink as={Link} to="/session/demo">
-        <CardHeader title="데모 세션 열기" action={<Badge tone="info">P0</Badge>} />
+      <CardLink as={Link} to="/session/demo/room">
+        <CardHeader title="대기방 입장 (기기 점검)" action={<Badge tone="info">P0</Badge>} />
         <p className="bt-body-sm bt-muted">
-          WebRTC 화상 세션 화면(다크 고정)으로 이동합니다. 실제 연결은 FE-A 가 구현.
+          카메라·마이크·스피커를 점검하고 세션에 입장합니다. 통과하면 WebRTC 세션(다크 고정)으로 이어져요.
         </p>
       </CardLink>
     </main>

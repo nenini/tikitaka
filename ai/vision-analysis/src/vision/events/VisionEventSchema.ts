@@ -14,13 +14,15 @@ const startedPayloadShape = {
 } as const;
 const endedPayloadShape = {
   observedEndElapsedMs: nonNegativeFiniteNumberSchema,
-  durationMs: nonNegativeFiniteNumberSchema,
+  wallDurationMs: nonNegativeFiniteNumberSchema,
+  observedDurationMs: nonNegativeFiniteNumberSchema,
+  unobservedDurationMs: nonNegativeFiniteNumberSchema,
 } as const;
 
 const eventEnvelopeSchema = z
   .object({
     eventId: z.uuid(),
-    version: z.literal(1),
+    version: z.literal(3),
     sessionId: z.string().min(1).max(128),
     userId: z.string().min(1).max(128),
     clientInstanceId: z.uuid(),
@@ -29,6 +31,23 @@ const eventEnvelopeSchema = z
     clientMonotonicMs: nonNegativeFiniteNumberSchema,
     occurredAt: z.string().datetime({ offset: true }),
     confidence: unitScoreSchema,
+    measurementConfidence: unitScoreSchema.optional(),
+    signalClarity: unitScoreSchema.optional(),
+    personalizationConfidence: unitScoreSchema.optional(),
+    evidenceStrength: unitScoreSchema.optional(),
+    baselineMode: z
+      .enum([
+        "PERSONALIZED",
+        "MONOCULAR_LEFT",
+        "MONOCULAR_RIGHT",
+        "COLLECTING",
+        "GLOBAL_FALLBACK",
+        "UNAVAILABLE",
+        "BASELINE_UNCERTAIN",
+      ])
+      .optional(),
+    coachingEligible: z.boolean().optional(),
+    baselineEpoch: z.number().int().nonnegative().optional(),
     modelVersion: z.string().min(1).max(128),
     ruleVersion: z.string().min(1).max(128),
   })
@@ -217,48 +236,45 @@ const lowExpressionActivityEndedSchema = behaviorEventSchema(
   },
 );
 
-const stiffExpressionStartedSchema = behaviorEventSchema(
-  "STIFF_EXPRESSION_STARTED",
-  "EXPRESSION_ACTIVITY_DETECTOR",
-  {
-    ...startedPayloadShape,
-    activityScore: unitScoreSchema,
-    baselineActivityScore: unitScoreSchema.nullable(),
-    windowMs: z.number().positive(),
-  },
-);
-
-const stiffExpressionEndedSchema = behaviorEventSchema(
-  "STIFF_EXPRESSION_ENDED",
-  "EXPRESSION_ACTIVITY_DETECTOR",
-  {
-    ...endedPayloadShape,
-    activityScore: unitScoreSchema,
-    terminationReason: z.enum(EPISODE_TERMINATION_REASONS),
-  },
-);
-
-export const visionBehaviorEventSchema = z.discriminatedUnion("eventType", [
-  faceMissingStartedSchema,
-  faceMissingEndedSchema,
-  multipleFacesDetectedSchema,
-  lowLightStartedSchema,
-  lowLightEndedSchema,
-  faceTooSmallStartedSchema,
-  faceTooSmallEndedSchema,
-  analysisUnavailableSchema,
-  analysisRecoveredSchema,
-  gazeAwayStartedSchema,
-  gazeAwayEndedSchema,
-  prolongedGazeAwaySchema,
-  smileStartedSchema,
-  smileEndedSchema,
-  nodEventSchema,
-  lowExpressionActivityStartedSchema,
-  lowExpressionActivityEndedSchema,
-  stiffExpressionStartedSchema,
-  stiffExpressionEndedSchema,
-]);
+export const visionBehaviorEventSchema = z
+  .discriminatedUnion("eventType", [
+    faceMissingStartedSchema,
+    faceMissingEndedSchema,
+    multipleFacesDetectedSchema,
+    lowLightStartedSchema,
+    lowLightEndedSchema,
+    faceTooSmallStartedSchema,
+    faceTooSmallEndedSchema,
+    analysisUnavailableSchema,
+    analysisRecoveredSchema,
+    gazeAwayStartedSchema,
+    gazeAwayEndedSchema,
+    prolongedGazeAwaySchema,
+    smileStartedSchema,
+    smileEndedSchema,
+    nodEventSchema,
+    lowExpressionActivityStartedSchema,
+    lowExpressionActivityEndedSchema,
+  ])
+  .superRefine((event, context) => {
+    const payload: object = event.payload;
+    const wall = Reflect.get(payload, "wallDurationMs");
+    const observed = Reflect.get(payload, "observedDurationMs");
+    const unobserved = Reflect.get(payload, "unobservedDurationMs");
+    if (
+      typeof wall === "number" &&
+      typeof observed === "number" &&
+      typeof unobserved === "number" &&
+      Math.abs(observed + unobserved - wall) > 0.001
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["payload", "observedDurationMs"],
+        message:
+          "observedDurationMs + unobservedDurationMs must equal wallDurationMs",
+      });
+    }
+  });
 
 export const visionMetricSnapshotSchema = eventEnvelopeSchema
   .extend({
@@ -270,7 +286,26 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
         quality: z
           .object({
             usable: z.boolean(),
+            state: z.enum([
+              "USABLE",
+              "DEGRADED_CANDIDATE",
+              "UNUSABLE",
+              "RECOVERY_CANDIDATE",
+            ]),
+            confidence: unitScoreSchema,
+            components: z
+              .object({
+                facePresence: unitScoreSchema,
+                faceSize: unitScoreSchema,
+                inFrame: unitScoreSchema,
+                brightness: unitScoreSchema,
+                blur: unitScoreSchema,
+                poseObservability: unitScoreSchema,
+                trackingStability: unitScoreSchema,
+              })
+              .strict(),
             reasons: z.array(z.enum(FACE_QUALITY_REASONS)),
+            pendingReasons: z.array(z.enum(FACE_QUALITY_REASONS)),
             faceDetected: z.boolean(),
             faceCount: z.number().int().nonnegative(),
             faceBoxRatio: unitScoreSchema.nullable(),
@@ -280,16 +315,63 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
           .strict(),
         metrics: z
           .object({
+            smile: z
+              .object({
+                configurationScore: unitScoreSchema.nullable(),
+                baselineScore: unitScoreSchema.nullable(),
+                delta: nullableFiniteNumberSchema,
+                maintained: z.boolean(),
+                promptSuppressedByBaseline: z.boolean(),
+                baselinePromptSuppressionThreshold: unitScoreSchema,
+                confidence: unitScoreSchema,
+              })
+              .strict(),
+            attention: z
+              .object({
+                score: z.number().min(0).max(100).nullable(),
+                confidence: unitScoreSchema,
+                mode: z.string().min(1),
+              })
+              .strict(),
+            activity: z
+              .object({
+                upperFaceActivityScore: unitScoreSchema.nullable(),
+                lowerFaceActivityScore: unitScoreSchema.nullable(),
+                poseAlignedLandmarkActivityScore: unitScoreSchema.nullable(),
+                expressionActivityScore: unitScoreSchema.nullable(),
+                confidence: unitScoreSchema,
+                experimentalOnly: z.literal(true),
+              })
+              .strict(),
             screenFacingScore: unitScoreSchema.nullable(),
             smileScore: unitScoreSchema.nullable(),
             expressionActivityScore: unitScoreSchema.nullable(),
+            upperFaceActivityScore: unitScoreSchema.nullable().optional(),
+            lowerFaceActivityScore: unitScoreSchema.nullable().optional(),
+            poseAlignedLandmarkActivityScore:
+              unitScoreSchema.nullable().optional(),
+            activityConfidence: unitScoreSchema.nullable().optional(),
             yawDelta: nullableFiniteNumberSchema,
             pitchDelta: nullableFiniteNumberSchema,
             rollDelta: nullableFiniteNumberSchema,
             eyeGazeScore: unitScoreSchema.nullable().optional(),
             gazeHorizontalDelta: nullableFiniteNumberSchema.optional(),
             gazeVerticalDelta: nullableFiniteNumberSchema.optional(),
-            stiffExpressionActive: z.boolean().optional(),
+            smileConfigurationScore: unitScoreSchema.nullable().optional(),
+            baselineSmileScore: unitScoreSchema.nullable().optional(),
+            smileDelta: nullableFiniteNumberSchema.optional(),
+            mouthAsymmetry: unitScoreSchema.nullable().optional(),
+            maintainedSmileConfiguration: z.boolean().optional(),
+            headPoseScore: unitScoreSchema.nullable().optional(),
+            faceCenterScore: unitScoreSchema.nullable().optional(),
+            irisProxyScore: unitScoreSchema.nullable().optional(),
+            screenAttentionScore: z.number().min(0).max(100).nullable().optional(),
+            screenAttentionConfidence: unitScoreSchema.nullable().optional(),
+            gazeReliability: unitScoreSchema.nullable().optional(),
+            binocularAgreement: unitScoreSchema.nullable().optional(),
+            gazeMode: z.string().nullable().optional(),
+            attentionMode: z.string().nullable().optional(),
+            attentionEvidenceMode: z.string().nullable().optional(),
           })
           .strict(),
         performance: z

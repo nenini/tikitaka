@@ -1,5 +1,6 @@
 export * from "./calibration/VisionBaseline.js";
 export * from "./calibration/BaselineCalibrator.js";
+export * from "./calibration/AdaptiveBaselineManager.js";
 export * from "./config/index.js";
 export * from "./core/FaceFrameNormalizer.js";
 export * from "./core/FaceLandmarkerAdapter.js";
@@ -12,7 +13,9 @@ export * from "./core/PerformanceGovernor.js";
 export * from "./core/VisionWorkerClient.js";
 export * from "./core/VisionPipeline.js";
 export * from "./core/VisionSessionRuntime.js";
+export * from "./detectors/BehaviorStateMachine.js";
 export * from "./detectors/ExpressionActivityDetector.js";
+export * from "./detectors/ExpressionActivityScore.js";
 export * from "./detectors/FaceQualityDetector.js";
 export * from "./detectors/NodDetector.js";
 export * from "./detectors/ScreenAttentionDetector.js";

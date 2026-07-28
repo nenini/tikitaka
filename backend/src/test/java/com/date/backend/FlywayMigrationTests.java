@@ -46,6 +46,15 @@ class FlywayMigrationTests {
 		Integer aiPersonaKeyColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIPERSONAKEY");
 		Integer aiResponseStateColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIRESPONSESTATE");
 		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
+		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
+		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
+		Integer matchRequestTraitSnapshotTableCount =
+				tableCount("MATCH_REQUEST_TRAIT_SNAPSHOTS");
+		Integer matchJobTableCount = tableCount("MATCH_JOBS");
+		Integer matchWaitingStartedAtColumnCount = columnCount(
+				"MATCH_REQUESTS",
+				"WAITINGSTARTEDAT"
+		);
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM `face_tag_catalog` "
@@ -69,7 +78,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isGreaterThanOrEqualTo(12);
+		assertThat(migrationCount).isEqualTo(14);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -88,6 +97,11 @@ class FlywayMigrationTests {
 		assertThat(aiPersonaKeyColumnCount).isEqualTo(1);
 		assertThat(aiResponseStateColumnCount).isEqualTo(1);
 		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
+		assertThat(activeMatchRequestTableCount).isEqualTo(1);
+		assertThat(matchRequestSlotTableCount).isEqualTo(1);
+		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
+		assertThat(matchJobTableCount).isEqualTo(1);
+		assertThat(matchWaitingStartedAtColumnCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();

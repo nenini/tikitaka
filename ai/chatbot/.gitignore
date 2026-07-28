@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 로컬 LLM 모델 (대용량 — 각자 다운로드, 저장소에 올리지 않음)
+*.gguf
+models/
+
+# 페르소나 데이터 (Nemotron-Personas-Korea, CC BY 4.0 — 각자 다운로드)
+# scripts/download_personas.py 로 생성
+personas/*.jsonl

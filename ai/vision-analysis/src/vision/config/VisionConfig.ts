@@ -67,7 +67,7 @@ const higherIsWorseAngleGateSchema = z
 
 export const visionConfigSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     model: z
       .object({
         wasmBasePath: z.string().min(1),
@@ -124,12 +124,28 @@ export const visionConfigSchema = z
         nodMinimumActualFps: z.number().positive(),
       })
       .strict(),
+    behaviorPolicy: z
+      .object({
+        suspensionGraceMs: z.number().int().positive(),
+        recoveryWarmupMs: z.number().int().nonnegative(),
+      })
+      .strict(),
     calibration: z
       .object({
+        setupRecommendedDurationMs: z.number().int().positive(),
+        stabilizationDurationMs: z.number().int().positive(),
+        stabilizationMinimumFrames: z.number().int().positive(),
+        recoveryWarmupMs: z.number().int().positive(),
         minimumUsableDurationMs: z.number().int().positive(),
         targetUsableDurationMs: z.number().int().positive(),
         maximumWallDurationMs: z.number().int().positive(),
         minimumUsableFrames: z.number().int().positive(),
+        partialMinimumUsableFrames: z.number().int().positive(),
+        readyMinimumConfidence: unitScoreSchema,
+        partialMinimumConfidence: unitScoreSchema,
+        priorShrinkageSampleCount: z.number().positive(),
+        targetFps: z.number().positive(),
+        minimumPreferredFps: z.number().positive(),
         activityBaselineDurationMs: z.number().int().positive(),
         trimRatio: z.number().nonnegative().max(0.25),
         minimumInFrameRatio: unitScoreSchema,
@@ -160,6 +176,41 @@ export const visionConfigSchema = z
             message: "maximum wall duration cannot be shorter than target duration",
           });
         }
+        if (calibration.partialMinimumUsableFrames >= calibration.minimumUsableFrames) {
+          context.addIssue({
+            code: "custom",
+            path: ["partialMinimumUsableFrames"],
+            message: "partial frame count must be lower than ready frame count",
+          });
+        }
+      }),
+    adaptiveBaseline: z
+      .object({
+        windowMs: z.number().int().positive(),
+        startEligibleRatio: unitScoreSchema,
+        maintainEligibleRatio: unitScoreSchema,
+        minimumObservableMs: z.number().int().positive(),
+        longGapMs: z.number().int().positive(),
+        recoveryWarmupMs: z.number().int().positive(),
+        poseHalfLifeMs: z.number().positive(),
+        geometryHalfLifeMs: z.number().positive(),
+        gazeHalfLifeMs: z.number().positive(),
+        maximumPoseDriftDegrees: z.number().positive(),
+        maximumCenterDrift: unitScoreSchema,
+        maximumAreaDrift: unitScoreSchema,
+        maximumGazeDrift: unitScoreSchema,
+        reanchorMinimumStableMs: z.number().int().positive(),
+        reanchorMinimumSamples: z.number().int().positive(),
+      })
+      .strict()
+      .superRefine((adaptive, context) => {
+        if (adaptive.maintainEligibleRatio >= adaptive.startEligibleRatio) {
+          context.addIssue({
+            code: "custom",
+            path: ["maintainEligibleRatio"],
+            message: "maintain ratio must be lower than start ratio",
+          });
+        }
       }),
     quality: z
       .object({
@@ -168,14 +219,31 @@ export const visionConfigSchema = z
         multipleFacesEntryDurationMs: durationSchema,
         multipleFacesRecoveryDurationMs: durationSchema,
         faceArea: lowerIsWorseGateSchema,
+        faceAreaMaximum: z
+          .object({
+            entry: unitScoreSchema,
+            recovery: unitScoreSchema,
+            entryDurationMs: durationSchema,
+            recoveryDurationMs: durationSchema,
+          })
+          .strict()
+          .superRefine((gate, context) => {
+            if (gate.recovery >= gate.entry) {
+              context.addIssue({
+                code: "custom",
+                path: ["recovery"],
+                message: "maximum face-area recovery must be lower than entry",
+              });
+            }
+          }),
         faceInFrame: lowerIsWorseGateSchema,
         brightness: lowerIsWorseGateSchema,
+        backlight: lowerIsWorseGateSchema,
         blur: lowerIsWorseGateSchema,
         extremeYaw: higherIsWorseAngleGateSchema,
         extremePitch: higherIsWorseAngleGateSchema,
         extremeRoll: higherIsWorseAngleGateSchema,
         analysisRecoveryWarmupMs: durationSchema,
-        defaultEventConfidence: unitScoreSchema,
       })
       .strict(),
     screenAttention: z
@@ -192,14 +260,38 @@ export const visionConfigSchema = z
         gazeHorizontalRecoveryDelta: unitScoreSchema,
         gazeVerticalEntryDelta: unitScoreSchema,
         gazeVerticalRecoveryDelta: unitScoreSchema,
-        maximumEyeBlinkScore: unitScoreSchema,
+        blinkEntryScore: unitScoreSchema,
+        blinkRecoveryScore: unitScoreSchema,
+        blinkRecoveryWarmupMs: durationSchema,
         minimumBinocularAgreementScore: unitScoreSchema,
+        binocularHorizontalTolerance: z.number().positive().max(1),
+        binocularVerticalTolerance: z.number().positive().max(1),
+        headWeight: unitScoreSchema,
+        faceCenterWeight: unitScoreSchema,
+        irisWeight: unitScoreSchema,
+        headOnlyWeight: unitScoreSchema,
+        centerOnlyWeight: unitScoreSchema,
+        attentionAwayScore: z.number().min(0).max(100),
+        attentionRecoveryScore: z.number().min(0).max(100),
+        minimumEventConfidence: unitScoreSchema,
+        minimumRecoveryConfidence: unitScoreSchema,
+        minimumAwayObservations: z.number().int().positive(),
+        minimumRecoveryObservations: z.number().int().positive(),
+        irisOnlyScore: z.number().min(0).max(100),
+        irisOnlyMinimumReliability: unitScoreSchema,
+        irisOnlyMinimumConfidence: unitScoreSchema,
+        irisOnlyMinimumDurationMs: durationSchema,
+        irisOnlyMinimumObservations: z.number().int().positive(),
+        suspendedConfidenceThreshold: unitScoreSchema,
+        fallbackYawDegrees: z.number().positive(),
+        fallbackPitchDegrees: z.number().positive(),
+        fallbackMinimumDurationMs: durationSchema,
+        fallbackMinimumMeasurementConfidence: unitScoreSchema,
         awayMinimumDurationMs: z.number().int().positive(),
         recoveryMinimumDurationMs: z.number().int().positive(),
         prolongedDurationMs: z.number().int().positive(),
         cooldownMs: durationSchema,
         emaAlpha: z.number().positive().max(1),
-        defaultEventConfidence: unitScoreSchema,
       })
       .strict()
       .superRefine((attention, context) => {
@@ -232,40 +324,87 @@ export const visionConfigSchema = z
       }),
     smile: z
       .object({
-        smileWeight: unitScoreSchema,
-        cheekWeight: unitScoreSchema,
-        entryAbsoluteScore: unitScoreSchema,
-        entryBaselineDelta: unitScoreSchema,
-        recoveryBaselineDelta: unitScoreSchema,
-        minimumDurationMs: z.number().int().positive(),
-        recoveryDurationMs: z.number().int().positive(),
-        mergeGapMs: z.number().int().positive(),
-        emaAlpha: z.number().positive().max(1),
-        defaultEventConfidence: unitScoreSchema,
+        /** Personalized baselines at or above this level suppress smile prompts. */
+        baselinePromptSuppressionScore: unitScoreSchema,
+        subtleAbsoluteScore: unitScoreSchema,
+        smileAbsoluteScore: unitScoreSchema,
+        strongAbsoluteScore: unitScoreSchema,
+        subtleDelta: unitScoreSchema,
+        smileDelta: unitScoreSchema,
+        strongDelta: unitScoreSchema,
+        subtleRecoveryAbsoluteScore: unitScoreSchema,
+        smileRecoveryAbsoluteScore: unitScoreSchema,
+        strongRecoveryAbsoluteScore: unitScoreSchema,
+        subtleRecoveryDelta: unitScoreSchema,
+        smileRecoveryDelta: unitScoreSchema,
+        strongRecoveryDelta: unitScoreSchema,
+        smileMinimumDurationMs: z.number().int().positive(),
+        smileRecoveryDurationMs: z.number().int().positive(),
+        smileMergeGapMs: z.number().int().positive(),
+        smileMinimumObservations: z.number().int().positive(),
+        strongMinimumDurationMs: z.number().int().positive(),
+        strongMinimumObservations: z.number().int().positive(),
+        maximumFrameGapMs: z.number().int().positive(),
+        maintainedDurationMs: z.number().int().positive(),
+        minimumMeasurementConfidence: unitScoreSchema,
+        asymmetryConfidenceStart: unitScoreSchema,
+        asymmetryHigh: unitScoreSchema,
+        asymmetryHold: unitScoreSchema,
+        fallbackMaximumAsymmetry: unitScoreSchema,
+        fallbackMinimumSideScore: unitScoreSchema,
+        fallbackMinimumDurationMs: z.number().int().positive(),
+        fallbackMinimumObservations: z.number().int().positive(),
+        fallbackMinimumMeasurementConfidence: unitScoreSchema,
+        emaHalfLifeMs: z.number().positive(),
       })
       .strict()
       .superRefine((smile, context) => {
-        if (Math.abs(smile.smileWeight + smile.cheekWeight - 1) > 0.000001) {
+        if (
+          smile.baselinePromptSuppressionScore >
+          smile.subtleAbsoluteScore
+        ) {
           context.addIssue({
             code: "custom",
-            path: ["cheekWeight"],
-            message: "smile and cheek weights must sum to 1",
+            path: ["baselinePromptSuppressionScore"],
+            message:
+              "baseline prompt suppression must not exceed the subtle smile threshold",
+          });
+        }
+        if (
+          !(
+            smile.subtleAbsoluteScore < smile.smileAbsoluteScore &&
+            smile.smileAbsoluteScore < smile.strongAbsoluteScore
+          )
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["smileAbsoluteScore"],
+            message: "absolute smile thresholds must be strictly increasing",
           });
         }
 
-        if (smile.recoveryBaselineDelta >= smile.entryBaselineDelta) {
+        if (
+          !(
+            smile.subtleDelta < smile.smileDelta &&
+            smile.smileDelta < smile.strongDelta
+          )
+        ) {
           context.addIssue({
             code: "custom",
-            path: ["recoveryBaselineDelta"],
-            message: "recovery delta must be lower than entry delta",
+            path: ["smileDelta"],
+            message: "smile delta thresholds must be strictly increasing",
           });
         }
       }),
     expressionActivity: z
       .object({
-        blendshapeNames: z.array(z.string().min(1)).min(1),
+        upperFaceBlendshapeNames: z.array(z.string().min(1)).min(1),
+        lowerFaceBlendshapeNames: z.array(z.string().min(1)).min(1),
         blendshapeWeight: unitScoreSchema,
         landmarkWeight: unitScoreSchema,
+        maximumFrameGapMs: z.number().int().positive(),
+        rateNormalizationPerSecond: z.number().positive(),
+        emitBehaviorEvents: z.literal(false),
         windowMs: z.number().int().positive(),
         warmupMs: z.number().int().positive(),
         minimumWindowSamples: z.number().int().positive(),
@@ -276,7 +415,6 @@ export const visionConfigSchema = z
         baselineLowRatio: z.number().positive().max(1),
         baselineRecoveryRatio: z.number().positive(),
         emaAlpha: z.number().positive().max(1),
-        defaultEventConfidence: unitScoreSchema,
       })
       .strict()
       .superRefine((activity, context) => {
