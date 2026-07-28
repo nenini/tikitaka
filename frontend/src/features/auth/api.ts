@@ -1,0 +1,79 @@
+import { AxiosError } from 'axios'
+import { apiClient } from '@/shared/api/client'
+import type {
+  ApiEnvelope,
+  AuthTokens,
+  LoginPayload,
+  MeResponse,
+  OAuthProviderId,
+  SignupPayload,
+} from './types'
+
+/**
+ * Auth REST 배선. (AUTH-01 ~ AUTH-03)
+ *
+ * 경로 규약
+ *  - apiClient.baseURL = '/api' (vite 프록시 → :8080, rewrite 없음)
+ *  - 백엔드는 `/api/v1/...` 라 여기서는 '/v1/...' 로 호출한다.
+ *  - 성공 응답은 `{ success, data }` 래퍼 → data 만 벗겨서 반환한다.
+ *    (전역 언랩은 room/api 등 기존 호출과 충돌하므로 이 모듈에서 지역적으로만 처리)
+ */
+const AUTH = '/v1/auth'
+
+/** 회원가입 → 토큰 발급(가입 즉시 로그인 상태). birthDate 는 'yyyy-MM-dd'. */
+export async function signup(payload: SignupPayload): Promise<AuthTokens> {
+  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/signup`, payload, {
+    skipAuthRefresh: true,
+  })
+  return data.data
+}
+
+/** 이메일/비밀번호 로그인 → 토큰 발급. (자격 오류 401 을 refresh 루프로 넘기지 않음) */
+export async function login(payload: LoginPayload): Promise<AuthTokens> {
+  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/login`, payload, {
+    skipAuthRefresh: true,
+  })
+  return data.data
+}
+
+/**
+ * refresh 토큰으로 access·refresh 재발급.
+ * client.ts 401 인터셉터에서 단일 비행(single-flight)으로 호출한다.
+ * skipAuthRefresh 플래그로 이 요청 자체는 401 재발급 루프에서 제외한다.
+ */
+export async function refresh(refreshToken: string): Promise<AuthTokens> {
+  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(
+    `${AUTH}/refresh`,
+    { refreshToken },
+    { skipAuthRefresh: true },
+  )
+  return data.data
+}
+
+/** 로그아웃 — 서버의 refresh 토큰 무효화. 실패해도 클라 토큰은 별도로 정리한다. */
+export async function logout(refreshToken: string): Promise<void> {
+  await apiClient.post(`${AUTH}/logout`, { refreshToken }, { skipAuthRefresh: true })
+}
+
+/** 현재 로그인 사용자 신원. 토큰 응답엔 유저 정보가 없어 로그인 직후 이걸로 하이드레이션한다. */
+export async function getMe(): Promise<MeResponse> {
+  const { data } = await apiClient.get<ApiEnvelope<MeResponse>>('/v1/users/me')
+  return data.data
+}
+
+/**
+ * OAuth 시작 — 브라우저를 백엔드 시작 엔드포인트로 이동시킨다.
+ *   GET /api/v1/auth/oauth2/{provider}  → 302 provider 인가 화면
+ * ⚠️ 콜백(`.../callback`)은 현재 JSON 토큰을 반환한다(백엔드 redirect-uri = 백엔드 자신).
+ *    SPA 가 토큰을 받으려면 백엔드가 FE 라우트로 리다이렉트하도록 조율이 필요하다. AUTH_FLOW.md §5 참고.
+ */
+export function oauthStart(provider: OAuthProviderId): void {
+  const base = import.meta.env.VITE_API_BASE_URL ?? '/api'
+  window.location.assign(`${base}/v1/auth/oauth2/${provider}`)
+}
+
+/** 백엔드 에러 래퍼({code,message})에서 사용자 메시지를 뽑는다. 없으면 undefined. */
+export function authErrorMessage(error: unknown): string | undefined {
+  const e = error as AxiosError<{ message?: string }>
+  return e?.response?.data?.message
+}

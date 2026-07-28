@@ -3,8 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button, Card, Field, Input, Stack } from '@/components'
+import { Button, Callout, Card, Field, Input, Stack } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
+import { authErrorMessage, login, oauthStart } from './api'
 import heroImg from '@/assets/hero.png'
 
 /* -------------------------------------------------------------------------- */
@@ -129,7 +130,8 @@ function CenteredLayout() {
 /* -------------------------------------------------------------------------- */
 function LoginCard() {
   const navigate = useNavigate()
-  const setSession = useAuthStore((s) => s.setSession)
+  const signIn = useAuthStore((s) => s.signIn)
+  const [formError, setFormError] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -137,10 +139,14 @@ function LoginCard() {
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
 
   const onSubmit = async (data: LoginForm) => {
-    // TODO(AUTH): apiClient.post('/auth/login', data) 로 교체
-    console.log('login payload', data)
-    setSession({ id: 'demo', nickname: '데모유저', isAdult: true }, 'demo-access-token')
-    navigate('/')
+    setFormError(null)
+    try {
+      const tokens = await login(data) // POST /v1/auth/login → 토큰 발급
+      await signIn(tokens) // 토큰 저장 + GET /v1/users/me 로 신원 하이드레이션
+      navigate('/')
+    } catch (error) {
+      setFormError(authErrorMessage(error) ?? '이메일 또는 비밀번호를 다시 확인해주세요.')
+    }
   }
 
   return (
@@ -186,18 +192,23 @@ function LoginCard() {
               </Link>
             </div>
 
+            {formError && <Callout tone="danger">{formError}</Callout>}
+
             <Button type="submit" variant="primary" size="lg" block loading={isSubmitting}>
               로그인
             </Button>
           </Stack>
         </form>
 
-        <p className="bt-body-sm bt-muted text-center">
-          아직 계정이 없으신가요?{' '}
-          <Link to="/signup" className="font-semibold text-link hover:underline">
-            회원가입
-          </Link>
-        </p>
+        {/* 회원가입 진입 — 주 CTA(로그인)와 경쟁하지 않도록 secondary 로 둔다 */}
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-[var(--bt-color-border)]" />
+          <span className="bt-caption">처음이신가요?</span>
+          <span className="h-px flex-1 bg-[var(--bt-color-border)]" />
+        </div>
+        <Button variant="secondary" size="lg" block onClick={() => navigate('/signup')}>
+          이메일로 회원가입
+        </Button>
         <p className="bt-caption text-center">만 19세 이상만 가입할 수 있어요.</p>
       </Stack>
     </Card>
@@ -212,21 +223,11 @@ function LoginCard() {
 function SocialButtons() {
   return (
     <Stack gap={8}>
-      <Button
-        variant="secondary"
-        size="lg"
-        block
-        onClick={() => console.log('TODO(AUTH): Google OAuth')}
-      >
+      <Button variant="secondary" size="lg" block onClick={() => oauthStart('google')}>
         <GoogleGlyph />
         Google로 계속하기
       </Button>
-      <Button
-        variant="secondary"
-        size="lg"
-        block
-        onClick={() => console.log('TODO(AUTH): Naver OAuth')}
-      >
+      <Button variant="secondary" size="lg" block onClick={() => oauthStart('naver')}>
         <NaverGlyph />
         네이버로 계속하기
       </Button>

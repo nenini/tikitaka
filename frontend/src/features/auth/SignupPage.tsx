@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
+import { useAuthStore } from '@/stores/auth.store'
+import { authErrorMessage, signup } from './api'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
@@ -14,6 +16,17 @@ import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } fr
 /* -------------------------------------------------------------------------- */
 
 const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
+
+/** 오늘(yyyy-MM-dd) — 생년월일 입력의 상한. */
+const TODAY_ISO = new Date().toISOString().slice(0, 10)
+
+/** ISO 날짜(yyyy-MM-dd)가 만 19세 이상인지. */
+function isAtLeast19(iso: string): boolean {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return false
+  const nineteenth = new Date(d.getFullYear() + 19, d.getMonth(), d.getDate())
+  return nineteenth <= new Date()
+}
 
 const signupSchema = z
   .object({
@@ -29,6 +42,11 @@ const signupSchema = z
       .string()
       .trim()
       .regex(/^01[016789]-?\d{3,4}-?\d{4}$/, '올바른 휴대폰 번호를 입력하세요'),
+    birthDate: z
+      .string()
+      .min(1, '생년월일을 선택하세요')
+      .refine((v) => !Number.isNaN(Date.parse(v)), '올바른 날짜를 입력하세요')
+      .refine(isAtLeast19, '만 19세 이상만 가입할 수 있어요'),
   })
   .refine((d) => d.password === d.passwordConfirm, {
     path: ['passwordConfirm'],
@@ -59,7 +77,9 @@ const STRENGTH = ['너무 짧아요', '약함', '보통', '강함', '아주 강�
 
 export function SignupPage() {
   const navigate = useNavigate()
+  const signIn = useAuthStore((s) => s.signIn)
   const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle')
+  const [formError, setFormError] = useState<string | null>(null)
 
   const {
     register,
@@ -69,7 +89,14 @@ export function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', passwordConfirm: '', realName: '', phone: '' },
+    defaultValues: {
+      email: '',
+      password: '',
+      passwordConfirm: '',
+      realName: '',
+      phone: '',
+      birthDate: '',
+    },
   })
 
   const email = watch('email')
@@ -92,9 +119,27 @@ export function SignupPage() {
       setError('email', { message: '이메일 중복 확인을 해주세요' })
       return
     }
-    // TODO(AUTH): apiClient.post('/api/auth/signup', { email, password }) 로 교체
-    console.log('signup payload', { email: data.email })
-    navigate('/signup/verify')
+    setFormError(null)
+    try {
+      // 가입 → 토큰 발급(가입 즉시 로그인 상태). 이후 온보딩은 인증된 상태로 진행한다.
+      const tokens = await signup({
+        email: data.email,
+        password: data.password,
+        realName: data.realName,
+        phoneNumber: data.phone,
+        birthDate: data.birthDate,
+      })
+      await signIn(tokens) // 토큰 저장 + GET /v1/users/me 하이드레이션
+      navigate('/signup/verify')
+    } catch (error) {
+      const message = authErrorMessage(error)
+      if (message && /이메일|email/i.test(message)) {
+        setError('email', { message })
+        setEmailStatus('taken')
+      } else {
+        setFormError(message ?? '가입에 실패했어요. 잠시 후 다시 시도해주세요.')
+      }
+    }
   }
 
   // 이메일이 바뀌면 중복확인 상태를 초기화한다(오래된 확인 결과 방지).
@@ -200,12 +245,23 @@ export function SignupPage() {
                   />
                 </Field>
               </div>
+
+              <Field
+                label="생년월일"
+                required
+                error={errors.birthDate?.message}
+                help={errors.birthDate ? undefined : '만 19세 이상만 가입할 수 있어요'}
+              >
+                <Input type="date" max={TODAY_ISO} autoComplete="bday" {...register('birthDate')} />
+              </Field>
             </Stack>
           </Card>
 
           <Callout tone="info">
             개인정보 동의는 다음 단계에서 <b>목적별로 나눠</b> 받아요 — 필요한 항목만 선택할 수 있어요.
           </Callout>
+
+          {formError && <Callout tone="danger">{formError}</Callout>}
 
           <Button type="submit" variant="primary" size="lg" block loading={isSubmitting} trailingAffordance>
             다음 · 본인인증

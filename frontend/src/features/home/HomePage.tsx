@@ -3,7 +3,7 @@ import { Badge, Button, CardHeader, CardLink } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
 
 export function HomePage() {
-  const { user, logout } = useAuthStore()
+  const { user, signOut } = useAuthStore()
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -14,7 +14,7 @@ export function HomePage() {
             {user ? `${user.nickname} 님, 반가워요.` : '로그인된 사용자'}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={logout}>
+        <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           로그아웃
         </Button>
       </div>
