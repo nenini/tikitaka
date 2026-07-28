@@ -3,10 +3,12 @@ package com.date.backend.domain.notification.repository;
 import com.date.backend.domain.notification.domain.Notification;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
@@ -26,4 +28,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 	);
 
 	long countByUserIdAndReadFalse(Long userId);
+
+	Optional<Notification> findByIdAndUserId(Long notificationId, Long userId);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			UPDATE Notification notification
+			SET notification.read = true,
+			    notification.readAt = :readAt
+			WHERE notification.userId = :userId
+			AND notification.read = false
+			""")
+	int markAllAsRead(
+			@Param("userId") Long userId,
+			@Param("readAt") java.time.LocalDateTime readAt
+	);
 }

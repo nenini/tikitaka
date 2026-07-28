@@ -130,6 +130,76 @@ class NotificationQueryApiTest {
 				.isEqualTo(401);
 		assertThat(get("/api/v1/notifications/unread-count", null).statusCode())
 				.isEqualTo(401);
+		assertThat(patch("/api/v1/notifications/1/read", null).statusCode())
+				.isEqualTo(401);
+		assertThat(patch("/api/v1/notifications/read-all", null).statusCode())
+				.isEqualTo(401);
+	}
+
+	@Test
+	void userCanReadOwnNotificationIdempotentlyAndReadAll() throws Exception {
+		String ownerEmail = "notification-owner-"
+				+ UUID.randomUUID() + "@example.com";
+		String ownerToken = signup(ownerEmail);
+		User owner = userRepository.findByEmail(ownerEmail).orElseThrow();
+		Notification first = saveNotification(owner.getId(), 101L);
+
+		HttpResponse<String> firstReadResponse = patch(
+				"/api/v1/notifications/" + first.getId() + "/read",
+				ownerToken
+		);
+
+		assertThat(firstReadResponse.statusCode()).isEqualTo(200);
+		JsonNode firstReadData = objectMapper.readTree(firstReadResponse.body())
+				.path("data");
+		assertThat(firstReadData.path("read").asBoolean()).isTrue();
+		String firstReadAt = firstReadData.path("readAt").asText();
+		assertThat(firstReadAt).isNotBlank();
+
+		HttpResponse<String> repeatedReadResponse = patch(
+				"/api/v1/notifications/" + first.getId() + "/read",
+				ownerToken
+		);
+		assertThat(objectMapper.readTree(repeatedReadResponse.body())
+				.path("data")
+				.path("readAt")
+				.asText()).isEqualTo(firstReadAt);
+
+		String otherEmail = "notification-other-"
+				+ UUID.randomUUID() + "@example.com";
+		String otherToken = signup(otherEmail);
+		HttpResponse<String> forbiddenReadResponse = patch(
+				"/api/v1/notifications/" + first.getId() + "/read",
+				otherToken
+		);
+		assertThat(forbiddenReadResponse.statusCode()).isEqualTo(404);
+		assertThat(forbiddenReadResponse.body())
+				.contains("\"code\":\"NOTIFICATION_NOT_FOUND\"");
+
+		saveNotification(owner.getId(), 102L);
+		saveNotification(owner.getId(), 103L);
+		HttpResponse<String> readAllResponse = patch(
+				"/api/v1/notifications/read-all",
+				ownerToken
+		);
+		assertThat(readAllResponse.statusCode()).isEqualTo(200);
+		JsonNode readAllData = objectMapper.readTree(readAllResponse.body())
+				.path("data");
+		assertThat(readAllData.path("updatedCount").asInt()).isEqualTo(2);
+		assertThat(readAllData.path("readAt").asText()).isNotBlank();
+
+		HttpResponse<String> repeatedReadAllResponse = patch(
+				"/api/v1/notifications/read-all",
+				ownerToken
+		);
+		assertThat(objectMapper.readTree(repeatedReadAllResponse.body())
+				.path("data")
+				.path("updatedCount")
+				.asInt()).isZero();
+		assertThat(objectMapper.readTree(get(
+				"/api/v1/notifications/unread-count",
+				ownerToken
+		).body()).path("data").path("unreadCount").asLong()).isZero();
 	}
 
 	private Notification saveNotification(Long userId, Long pairId) {
@@ -156,8 +226,40 @@ class NotificationQueryApiTest {
 		);
 	}
 
+	private String signup(String email) throws Exception {
+		HttpResponse<String> response = post(
+				"/api/v1/auth/signup",
+				"""
+						{
+						  "email": "%s",
+						  "password": "password123!",
+						  "realName": "알림 사용자",
+						  "phoneNumber": "010-1234-5678",
+						  "birthDate": "1995-01-01"
+						}
+						""".formatted(email)
+		);
+		assertThat(response.statusCode()).isEqualTo(201);
+		return objectMapper.readTree(response.body())
+				.path("data")
+				.path("accessToken")
+				.asText();
+	}
+
 	private HttpResponse<String> get(String path, String token) throws Exception {
 		HttpRequest.Builder builder = HttpRequest.newBuilder(uri(path)).GET();
+		if (token != null) {
+			builder.header("Authorization", "Bearer " + token);
+		}
+		return HttpClient.newHttpClient().send(
+				builder.build(),
+				HttpResponse.BodyHandlers.ofString()
+		);
+	}
+
+	private HttpResponse<String> patch(String path, String token) throws Exception {
+		HttpRequest.Builder builder = HttpRequest.newBuilder(uri(path))
+				.method("PATCH", HttpRequest.BodyPublishers.noBody());
 		if (token != null) {
 			builder.header("Authorization", "Bearer " + token);
 		}

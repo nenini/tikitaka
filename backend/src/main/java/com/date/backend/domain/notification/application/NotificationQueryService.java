@@ -41,7 +41,7 @@ public class NotificationQueryService {
 				? fetched.subList(0, size)
 				: fetched;
 		List<NotificationResponse> notifications = page.stream()
-				.map(this::toResponse)
+				.map(NotificationResponse::from)
 				.toList();
 		Long nextCursor = hasNext && !page.isEmpty()
 				? page.get(page.size() - 1).getId()
@@ -71,18 +71,4 @@ public class NotificationQueryService {
 		}
 	}
 
-	private NotificationResponse toResponse(Notification notification) {
-		return new NotificationResponse(
-				notification.getId(),
-				notification.getType(),
-				notification.getTitle(),
-				notification.getContent(),
-				notification.getReferenceType(),
-				notification.getReferenceId(),
-				notification.getPresentation(),
-				notification.isRead(),
-				notification.getCreatedAt(),
-				notification.getReadAt()
-		);
-	}
 }

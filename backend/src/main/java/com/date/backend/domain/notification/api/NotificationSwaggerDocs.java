@@ -1,6 +1,8 @@
 package com.date.backend.domain.notification.api;
 
 import com.date.backend.domain.notification.dto.response.NotificationListResponse;
+import com.date.backend.domain.notification.dto.response.NotificationResponse;
+import com.date.backend.domain.notification.dto.response.ReadAllNotificationsResponse;
 import com.date.backend.domain.notification.dto.response.UnreadNotificationCountResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
@@ -73,6 +75,54 @@ public interface NotificationSwaggerDocs {
 			)
 	})
 	ApiResponse<UnreadNotificationCountResponse> getUnreadCount(
+			@Parameter(hidden = true) AuthUser authUser
+	);
+
+	@Operation(
+			summary = "알림 개별 읽음 처리",
+			description = "본인의 알림 한 건을 읽음 처리합니다. 이미 읽은 알림은 기존 읽음 시각을 유지합니다."
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "읽음 처리 성공",
+					content = @Content(schema = @Schema(
+							implementation = NotificationResponse.class
+					))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "401",
+					description = "인증 실패"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "404",
+					description = "알림이 없거나 본인의 알림이 아님"
+			)
+	})
+	ApiResponse<NotificationResponse> read(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "읽음 처리할 알림 ID", example = "120")
+			@Positive Long notificationId
+	);
+
+	@Operation(
+			summary = "알림 전체 읽음 처리",
+			description = "로그인 사용자의 모든 미확인 알림을 한 번에 읽음 처리합니다."
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "전체 읽음 처리 성공",
+					content = @Content(schema = @Schema(
+							implementation = ReadAllNotificationsResponse.class
+					))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "401",
+					description = "인증 실패"
+			)
+	})
+	ApiResponse<ReadAllNotificationsResponse> readAll(
 			@Parameter(hidden = true) AuthUser authUser
 	);
 }

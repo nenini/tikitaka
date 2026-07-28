@@ -3,6 +3,7 @@ package com.date.backend.domain.notification.dto.response;
 import com.date.backend.domain.notification.domain.NotificationPresentation;
 import com.date.backend.domain.notification.domain.NotificationReferenceType;
 import com.date.backend.domain.notification.domain.NotificationType;
+import com.date.backend.domain.notification.domain.Notification;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -39,4 +40,18 @@ public record NotificationResponse(
 		@Schema(description = "읽은 시각")
 		LocalDateTime readAt
 ) {
+	public static NotificationResponse from(Notification notification) {
+		return new NotificationResponse(
+				notification.getId(),
+				notification.getType(),
+				notification.getTitle(),
+				notification.getContent(),
+				notification.getReferenceType(),
+				notification.getReferenceId(),
+				notification.getPresentation(),
+				notification.isRead(),
+				notification.getCreatedAt(),
+				notification.getReadAt()
+		);
+	}
 }
