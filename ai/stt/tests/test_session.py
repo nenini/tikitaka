@@ -1,77 +1,149 @@
-"""화자별 2스트림 멀티플렉싱 테스트 (STT-04). 실제 whisper 없이 mock 엔진 사용."""
+"""화자별 스트림 v2 이벤트 흐름 테스트 (요구사항.md) — VAD 패치·mock 엔진."""
+
+from typing import Any
 
 import numpy as np
+import pytest
 
-from stt.events import TranscriptEvent, TranscriptPayload
+from stt import session as session_mod
+from stt.events import SpeechEndedEvent, SpeechStartedEvent
+from stt.pipeline import TranscriptPiece
 from stt.session import SessionSttRunner, SpeakerStream, make_vad_options
 
 
 class FakeEngine:
-    """transcribe_chunk 시그니처를 흉내내는 가짜 엔진 — 발화당 이벤트 1개 반환."""
-
     def transcribe_chunk(
-        self,
-        audio,
-        *,
-        session_id,
-        speaker_id,
-        session_elapsed_ms,
-        seq_start,
-        vad_filter=False,
-        min_confidence=0.5,
-    ):
-        payload = TranscriptPayload(
-            text=f"{speaker_id}-utt",
-            segment_start_ms=session_elapsed_ms,
-            segment_end_ms=session_elapsed_ms + 500,
-        )
-        return [
-            TranscriptEvent(
-                session_id=session_id,
-                speaker_id=speaker_id,
-                seq=seq_start,
-                session_elapsed_ms=session_elapsed_ms,
-                confidence=0.9,
-                payload=payload,
-            )
-        ]
+        self, audio: np.ndarray, *, base_ms: int = 0, vad_filter: bool = False, min_confidence: float = 0.5
+    ) -> list[TranscriptPiece]:
+        return [TranscriptPiece("발화", 0.9, base_ms, base_ms + 500, "ko")]
 
 
-def _dummy_audio(ms: int = 1000) -> np.ndarray:
-    return np.zeros(int(16000 * ms / 1000), dtype=np.float32)
+def _patch_vad(monkeypatch: pytest.MonkeyPatch, *, start: int, end: int) -> None:
+    monkeypatch.setattr(
+        session_mod, "get_speech_timestamps", lambda buf, opts: [{"start": start, "end": end}]
+    )
 
 
-def test_flush_tags_speaker_and_increments_seq():
-    s = SpeakerStream(FakeEngine(), session_id="s1", speaker_id="user-A", vad_opts=make_vad_options())
-    e1 = s.flush_utterance(_dummy_audio(), start_ms=0)
-    e2 = s.flush_utterance(_dummy_audio(), start_ms=2000)
-    assert e1[0].speaker_id == "user-A"
-    assert e1[0].seq == 0
-    assert e2[0].seq == 1  # 화자별 seq 증가
+def _stream(engine: Any = None, **over: Any) -> SpeakerStream:
+    kw: dict[str, Any] = dict(
+        session_id="s1", user_id="42", participant_identity="lk-42", vad_opts=make_vad_options()
+    )
+    kw.update(over)
+    return SpeakerStream(engine or FakeEngine(), **kw)
 
 
-def test_runner_routes_to_correct_speaker():
+# ── 동기 모드(SpeakerStream 직접) — feed가 SPEECH + TRANSCRIPT 반환 ──
+
+def test_onset_emits_speech_started(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    e1 = _stream().feed(np.zeros(8000, dtype=np.float32))
+    assert [e.event_type for e in e1] == ["SPEECH_STARTED"]
+
+
+def test_endpoint_emits_ended_and_transcript(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream()
+    s.feed(np.zeros(8000, dtype=np.float32))
+    e2 = s.feed(np.zeros(12000, dtype=np.float32))
+    assert [e.event_type for e in e2] == ["SPEECH_ENDED", "TRANSCRIPT_FINALIZED"]
+
+
+def test_unified_seq_sync(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream()
+    a = s.feed(np.zeros(8000, dtype=np.float32))
+    b = s.feed(np.zeros(12000, dtype=np.float32))
+    assert [e.seq for e in a + b] == [1, 2, 3]  # 종류 무관 통합 증가
+
+
+def test_shared_utterance_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream()
+    a = s.feed(np.zeros(8000, dtype=np.float32))
+    b = s.feed(np.zeros(12000, dtype=np.float32))
+    uid = a[0].utterance_id
+    assert uid and all(e.utterance_id == uid for e in a + b)
+
+
+def test_timing_observed_vs_created(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream(stream_epoch_ms=180_000)  # 세션 3분 후 입장
+    a = s.feed(np.zeros(8000, dtype=np.float32))
+    b = s.feed(np.zeros(12000, dtype=np.float32))
+    started = a[0]
+    assert isinstance(started, SpeechStartedEvent)
+    assert started.session_elapsed_ms == 180_500                 # 생성 시각(오디오 위치)
+    assert started.payload.observed_start_elapsed_ms == 180_000  # 실제 발화 시작
+    ended = b[0]
+    assert isinstance(ended, SpeechEndedEvent)
+    assert ended.payload.observed_end_elapsed_ms == 180_500      # 마지막 음성
+    assert ended.payload.speech_duration_ms == 500
+    assert ended.payload.termination_reason == "SILENCE"
+
+
+def test_contract_camelcase(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream()
+    s.feed(np.zeros(8000, dtype=np.float32))
+    b = s.feed(np.zeros(12000, dtype=np.float32))
+    d = b[1].to_contract()  # TRANSCRIPT_FINALIZED
+    assert d["eventType"] == "TRANSCRIPT_FINALIZED"
+    assert d["kind"] == "transcript"
+    assert d["source"] == "WHISPER_STT"
+    assert d["clientInstanceId"]
+    assert d["userId"] == "42"
+    assert "client_instance_id" not in d
+
+
+# ── 비동기 모드(SessionSttRunner + worker) ─────────────────────────
+
+def test_runner_async_transcript(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
     runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
-    a = runner.flush_utterance("user-A", _dummy_audio(), start_ms=1000)
-    b = runner.flush_utterance("user-B", _dummy_audio(), start_ms=1500)
-    assert a[0].speaker_id == "user-A"
-    assert b[0].speaker_id == "user-B"
-    assert a[0].seq == 0 and b[0].seq == 0  # 화자별 독립 seq
+    e1 = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    e2 = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(12000, dtype=np.float32))
+    assert [e.event_type for e in e1] == ["SPEECH_STARTED"]
+    assert [e.event_type for e in e2] == ["SPEECH_ENDED"]  # 전사는 비동기
+    assert runner.wait_idle()
+    transcripts = runner.poll_transcripts()
+    runner.close()
+    assert [t.event_type for t in transcripts] == ["TRANSCRIPT_FINALIZED"]
+    assert transcripts[0].seq == 3       # STARTED=1, ENDED=2, TRANSCRIPT=3 통합 seq
+    assert transcripts[0].user_id == "42"
 
 
-def test_common_timeline_ordering():
+def test_runner_withdraw_stops_stream(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
     runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
-    events = []
-    events += runner.flush_utterance("user-A", _dummy_audio(), start_ms=3000)
-    events += runner.flush_utterance("user-B", _dummy_audio(), start_ms=1000)
-    events += runner.flush_utterance("user-A", _dummy_audio(), start_ms=5000)
-    events.sort(key=lambda e: e.payload.segment_start_ms)
-    order = [(e.speaker_id, e.payload.segment_start_ms) for e in events]
-    assert order == [("user-B", 1000), ("user-A", 3000), ("user-A", 5000)]
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    runner.withdraw("42")
+    after = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(12000, dtype=np.float32))
+    assert runner.wait_idle()
+    transcripts = runner.poll_transcripts()
+    runner.close()
+    assert after == []            # 철회 후 feed no-op
+    assert transcripts == []       # 전사도 폐기
 
 
-def test_streams_are_independent():
+def test_runner_close_flushes_inprogress(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
     runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
-    runner.feed("user-A", _dummy_audio(500))  # 무음 → 전사 없음
-    runner.feed("user-B", _dummy_audio(500))
-    assert runner.stream("user-A") is not runner.stream("user-B")
+    e1 = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    assert [e.event_type for e in e1] == ["SPEECH_STARTED"]  # 진행 중
+    final = runner.close()          # flush → SESSION_ENDED + 전사
+    transcripts = runner.poll_transcripts()
+    assert [e.event_type for e in final] == ["SPEECH_ENDED"]
+    assert [t.event_type for t in transcripts] == ["TRANSCRIPT_FINALIZED"]
+    ended = final[0]
+    assert isinstance(ended, SpeechEndedEvent)
+    assert ended.payload.termination_reason == "SESSION_ENDED"
+
+
+def test_runner_routes_by_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_vad(monkeypatch, start=0, end=8000)
+    runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
+    a = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    b = runner.feed(user_id="43", participant_identity="lk-43", audio=np.zeros(8000, dtype=np.float32))
+    assert a[0].user_id == "42"
+    assert b[0].user_id == "43"
+    runner.close()
