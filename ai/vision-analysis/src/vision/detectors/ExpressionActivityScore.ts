@@ -5,56 +5,162 @@ function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-/** Computes observable frame-to-frame facial motion without assigning emotion. */
-export function computeExpressionActivityScore(
+function totalVariationPerSecond(
+  names: readonly string[],
+  previous: NormalizedPrimaryFace,
+  current: NormalizedPrimaryFace,
+  observableDurationSeconds: number,
+  normalizationPerSecond: number,
+): { readonly score: number | null; readonly coverage: number } {
+  let variation = 0;
+  let observed = 0;
+  for (const name of names) {
+    const before = previous.blendshapes[name];
+    const now = current.blendshapes[name];
+    if (before === undefined || now === undefined) continue;
+    variation += Math.abs(now - before);
+    observed += 1;
+  }
+  if (observed === 0) return { score: null, coverage: 0 };
+  const rate = variation / observableDurationSeconds;
+  return {
+    score: clampUnit(rate / normalizationPerSecond),
+    coverage: observed / names.length,
+  };
+}
+
+export interface ExpressionActivityScores {
+  readonly upperFaceActivityScore: number | null;
+  readonly lowerFaceActivityScore: number | null;
+  readonly poseAlignedLandmarkActivityScore: number | null;
+  readonly expressionActivityScore: number | null;
+  readonly activityConfidence: number;
+}
+
+/**
+ * Computes total variation per observable second. The landmark displacement is
+ * already pose-aligned by the normalizer; jawOpen and cheekSquint are excluded
+ * from the default blendshape groups so speech and static categories cannot
+ * dominate the experimental metric.
+ */
+export function computeExpressionActivityScores(
   previous: NormalizedPrimaryFace | null,
   current: NormalizedPrimaryFace,
+  observableDurationMs: number,
+  qualityConfidence: number,
   config: Pick<
     VisionConfig["expressionActivity"],
-    "blendshapeNames" | "blendshapeWeight" | "landmarkWeight"
+    | "upperFaceBlendshapeNames"
+    | "lowerFaceBlendshapeNames"
+    | "blendshapeWeight"
+    | "landmarkWeight"
+    | "maximumFrameGapMs"
+    | "rateNormalizationPerSecond"
   >,
-): number | null {
-  const components: Array<{ readonly value: number; readonly weight: number }> = [];
+): ExpressionActivityScores {
+  if (
+    previous === null ||
+    observableDurationMs <= 0 ||
+    observableDurationMs > config.maximumFrameGapMs
+  ) {
+    return {
+      upperFaceActivityScore: null,
+      lowerFaceActivityScore: null,
+      poseAlignedLandmarkActivityScore: null,
+      expressionActivityScore: null,
+      activityConfidence: 0,
+    };
+  }
 
-  if (previous !== null) {
-    // Blendshape deltas describe motion between frames; absolute category values
-    // are intentionally avoided because they vary substantially by user.
-    const differences = config.blendshapeNames.map((name) =>
-      Math.abs(
-        (current.blendshapes[name] ?? 0) -
-          (previous.blendshapes[name] ?? 0),
-      ),
-    );
-    const blendshapeScore =
-      differences.reduce((sum, value) => sum + value, 0) /
-      differences.length;
-    components.push({
-      value: clampUnit(blendshapeScore),
+  const seconds = observableDurationMs / 1_000;
+  const upper = totalVariationPerSecond(
+    config.upperFaceBlendshapeNames,
+    previous,
+    current,
+    seconds,
+    config.rateNormalizationPerSecond,
+  );
+  const lower = totalVariationPerSecond(
+    config.lowerFaceBlendshapeNames,
+    previous,
+    current,
+    seconds,
+    config.rateNormalizationPerSecond,
+  );
+  const poseAlignedLandmarkActivityScore =
+    current.geometry.landmarkDisplacementScore === null
+      ? null
+      : clampUnit(
+          current.geometry.landmarkDisplacementScore /
+            seconds /
+            config.rateNormalizationPerSecond,
+        );
+
+  const blendshapeScores = [upper.score, lower.score].filter(
+    (value): value is number => value !== null,
+  );
+  const blendshapeScore =
+    blendshapeScores.length === 0
+      ? null
+      : blendshapeScores.reduce((sum, value) => sum + value, 0) /
+        blendshapeScores.length;
+  const weightedComponents: Array<{
+    readonly score: number;
+    readonly weight: number;
+  }> = [];
+  if (blendshapeScore !== null) {
+    weightedComponents.push({
+      score: blendshapeScore,
       weight: config.blendshapeWeight,
     });
   }
-
-  if (current.geometry.landmarkDisplacementScore !== null) {
-    // The normalizer already scales displacement by face size, making it a
-    // useful secondary signal when blendshape categories are weak or absent.
-    components.push({
-      value: clampUnit(current.geometry.landmarkDisplacementScore),
+  if (poseAlignedLandmarkActivityScore !== null) {
+    weightedComponents.push({
+      score: poseAlignedLandmarkActivityScore,
       weight: config.landmarkWeight,
     });
   }
-
-  const availableWeight = components.reduce(
+  const weight = weightedComponents.reduce(
     (sum, component) => sum + component.weight,
     0,
   );
-  if (availableWeight === 0) return null;
+  const expressionActivityScore =
+    weight === 0
+      ? null
+      : clampUnit(
+          weightedComponents.reduce(
+            (sum, component) => sum + component.score * component.weight,
+            0,
+          ) / weight,
+        );
+  const signalCoverage =
+    (upper.coverage +
+      lower.coverage +
+      (poseAlignedLandmarkActivityScore === null ? 0 : 1)) /
+    3;
 
-  // Re-normalize by available weight so a missing optional signal cannot make
-  // an otherwise active frame appear artificially still.
-  return clampUnit(
-    components.reduce(
-      (sum, component) => sum + component.value * component.weight,
-      0,
-    ) / availableWeight,
-  );
+  return {
+    upperFaceActivityScore: upper.score,
+    lowerFaceActivityScore: lower.score,
+    poseAlignedLandmarkActivityScore,
+    expressionActivityScore,
+    activityConfidence: clampUnit(qualityConfidence * signalCoverage),
+  };
+}
+
+/** Compatibility helper for callers that only need the combined metric. */
+export function computeExpressionActivityScore(
+  previous: NormalizedPrimaryFace | null,
+  current: NormalizedPrimaryFace,
+  observableDurationMs: number,
+  qualityConfidence: number,
+  config: Parameters<typeof computeExpressionActivityScores>[4],
+): number | null {
+  return computeExpressionActivityScores(
+    previous,
+    current,
+    observableDurationMs,
+    qualityConfidence,
+    config,
+  ).expressionActivityScore;
 }
