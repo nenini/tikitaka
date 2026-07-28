@@ -1,0 +1,25 @@
+"""Fixed message catalog used by the first rule-based MVP."""
+
+COACHING_MESSAGES: dict[str, str] = {
+    "SILENCE_RECOVERY_01": "가볍게 새로운 질문을 건네보세요.",
+    "SILENCE_RECOVERY_02": "상대방의 취미에 대해 물어보세요.",
+    "SILENCE_RECOVERY_03": "요즘 즐겨 하는 일이 있는지 물어보세요.",
+    "SILENCE_RECOVERY_04": "최근 재미있었던 일을 이야기해 보세요.",
+    "SILENCE_RECOVERY_05": "좋아하는 음식이나 장소에 관해 이야기해 보세요.",
+    "ATTENTION_RECOVERY_01": "상대방의 이야기에 다시 시선을 맞춰보세요.",
+    "ATTENTION_RECOVERY_02": "상대방을 바라보며 이야기를 들어보세요.",
+    "ATTENTION_RECOVERY_03": "화면에 시선을 두고 대화에 집중해 보세요.",
+    "FACE_VISIBILITY_01": "얼굴이 화면에 보이도록 카메라 위치를 확인해 주세요.",
+    "FACE_DISTANCE_01": "카메라에 얼굴이 조금 더 잘 보이도록 가까이 앉아주세요.",
+    "LIGHTING_GUIDANCE_01": "얼굴이 잘 보이도록 주변을 조금 밝게 해주세요.",
+    "VISION_UNAVAILABLE_01": "카메라 상태를 확인해 주세요. 현재 화면 분석이 어렵습니다.",
+    "REACTION_PROMPT_01": "가볍게 고개를 끄덕이며 반응해 보세요.",
+    "REACTION_PROMPT_02": "짧은 맞장구로 상대방의 이야기에 반응해 보세요.",
+    "REACTION_PROMPT_03": "상대방의 이야기를 듣고 있다는 표현을 가볍게 보여주세요.",
+    "RESPONSE_PROMPT_01": "짧게라도 자신의 생각을 이야기해 보세요.",
+    "RESPONSE_PROMPT_02": "떠오르는 생각부터 편하게 답해 보세요.",
+    "RESPONSE_PROMPT_03": "상대방의 질문에 자신의 경험을 덧붙여 보세요.",
+}
+
+# Backward-compatible public name used by the existing demo.
+COACHING_TEMPLATES = COACHING_MESSAGES

@@ -1,31 +1,27 @@
-"""코칭 파이프라인 — 분석 이벤트를 게이트·쿨다운·TTL을 거쳐 코칭 명령으로 바꾼다.
-
-친구 아키텍처 리뷰(#2·#3): '감지 사실(AnalysisEvent)'과 '코칭 명령(CoachingCommand)'을
-분리한다. 실시간에는 LLM을 쓰지 않고 규칙 + 템플릿(messageKey)으로만 코칭한다(6GB GPU 제약).
-MVP 코칭 트리거 = 침묵만. 질문·군말은 분석/리포트 전용(코칭 아님).
-"""
+"""Rule-based coaching policy for the control-room MVP."""
 
 from __future__ import annotations
 
 import uuid
+from collections import deque
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from aggregator.coaching_candidates import (
+    CoachingCandidate,
+    CoachingPriority,
+    CoachingType,
+)
+from aggregator.coaching_catalog import COACHING_MESSAGES, COACHING_TEMPLATES
+from aggregator.config import MvpCoachingConfig
 from aggregator.events import AnalysisEvent, SilenceDetected
 from aggregator.state import SessionState
 
-CoachingType = Literal["SILENCE_RECOVERY", "ATTENTION_RECOVERY", "SPEAKING_BALANCE"]
-CoachingPriority = Literal["LOW", "MEDIUM", "HIGH"]
-
-# messageKey → 문구. 실제로는 BE/FE가 매핑(다국어·버전 관리 용이). 여기 값은 참고/데모용.
-COACHING_TEMPLATES: dict[str, str] = {
-    "SILENCE_RECOVERY_01": "궁금한 점을 가볍게 질문해 보세요.",
-    "ATTENTION_RECOVERY_01": "상대방의 이야기에 화면을 바라보며 반응해 보세요.",
-    "SPEAKING_BALANCE_01": "상대방의 이야기도 자연스럽게 물어보세요.",
-}
+_TRIGGER_DEDUPE_CAPACITY = 4096
 
 
 def _utcnow_iso() -> str:
@@ -41,91 +37,141 @@ class _CamelModel(BaseModel):
 
 
 class CoachingCommand(_CamelModel):
-    """'사용자에게 코칭을 전달하라'는 명령. BE(#114)로 전달 요청된다."""
+    """Final command emitted after cooldown, TTL, and duplicate gates."""
 
     event_type: Literal["COACHING_REQUESTED"] = "COACHING_REQUESTED"
     session_id: str
-    target_participant_id: str | None            # None = 세션 전체(침묵)
+    target_user_id: str | None
     coaching_type: CoachingType
-    message_key: str                             # 문구 자체가 아니라 키(BE/FE가 매핑)
+    message_key: str
     priority: CoachingPriority
     reason_code: str
     triggered_at_session_elapsed_ms: int
-    expires_at_session_elapsed_ms: int           # TTL: 이 시각 지나면 전달하지 않음
+    expires_at_session_elapsed_ms: int
     deduplication_key: str
 
     event_id: str = Field(default_factory=_new_event_id)
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     occurred_at: str = Field(default_factory=_utcnow_iso)
-    source: str = "aggregator"
+    source: Literal["aggregator"] = "aggregator"
 
     def to_contract(self) -> dict[str, object]:
         return self.model_dump(by_alias=True)
 
 
 class CoachingPolicy:
-    """분석 이벤트 → (게이트·쿨다운·TTL) → 코칭 명령. 실시간 LLM 미사용.
-
-    MVP: 침묵만 코칭(SILENCE_RECOVERY). 질문·군말은 분석/리포트 전용이라 코칭을 만들지 않는다.
-    쿨다운: 같은 코칭 종류는 cooldown_ms 안에 재발동하지 않는다.
-    세션당 코칭 횟수 상한(max_per_session)도 둔다.
-    """
+    """Converts candidates into commands with common safety gates."""
 
     def __init__(
-        self, *, cooldown_ms: int = 60_000, ttl_ms: int = 15_000, max_per_session: int = 20
-    ) -> None:
-        self.cooldown_ms = cooldown_ms
-        self.ttl_ms = ttl_ms
-        self.max_per_session = max_per_session
-        self._last_by_type: dict[str, int] = {}
-        self._count = 0
-
-    def evaluate(self, event: AnalysisEvent, state: SessionState) -> CoachingCommand | None:
-        if isinstance(event, SilenceDetected):
-            return self._make(
-                state=state,
-                now_ms=event.session_elapsed_ms,
-                coaching_type="SILENCE_RECOVERY",
-                message_key="SILENCE_RECOVERY_01",
-                priority="LOW",
-                reason_code="LONG_SILENCE",
-                target_participant_id=None,
-            )
-        # 질문·군말은 코칭 트리거가 아니다(분석/리포트 전용).
-        return None
-
-    def _make(
         self,
         *,
+        config: MvpCoachingConfig | None = None,
+        cooldown_ms: int | None = None,
+        ttl_ms: int | None = None,
+        max_per_session: int | None = None,
+    ) -> None:
+        resolved = config if config is not None else MvpCoachingConfig()
+        if cooldown_ms is not None:
+            resolved = replace(resolved, default_cooldown_ms=cooldown_ms)
+        if ttl_ms is not None:
+            resolved = replace(resolved, coaching_ttl_ms=ttl_ms)
+        if max_per_session is not None:
+            resolved = replace(resolved, max_per_session=max_per_session)
+        self.config = resolved
+        self._last_by_target_and_type: dict[tuple[str, str], int] = {}
+        self._count_by_target: dict[str, int] = {}
+        self._seen_trigger_keys: set[tuple[str, str, str]] = set()
+        self._trigger_key_order: deque[tuple[str, str, str]] = deque()
+        self._count = 0
+
+    def evaluate(
+        self,
+        event: AnalysisEvent,
         state: SessionState,
-        now_ms: int,
-        coaching_type: CoachingType,
-        message_key: str,
-        priority: CoachingPriority,
-        reason_code: str,
-        target_participant_id: str | None,
     ) -> CoachingCommand | None:
-        if self._count >= self.max_per_session:
+        """Compatibility path for the existing transcript-based MVP detectors."""
+        if not isinstance(event, SilenceDetected):
             return None
-        last = self._last_by_type.get(coaching_type)
-        if last is not None and now_ms - last < self.cooldown_ms:
-            return None  # 쿨다운
-        self._last_by_type[coaching_type] = now_ms
+        return self.evaluate_candidate(
+            CoachingCandidate(
+                coaching_type="SILENCE_RECOVERY",
+                target_user_id=None,
+                message_key="SILENCE_RECOVERY_01",
+                reason_code="LONG_SILENCE",
+                triggered_at_ms=event.session_elapsed_ms,
+                trigger_id=event.event_id,
+                priority="LOW",
+            ),
+            state,
+        )
+
+    def evaluate_candidate(
+        self,
+        candidate: CoachingCandidate,
+        state: SessionState,
+    ) -> CoachingCommand | None:
+        if not state.session_active:
+            return None
+        if candidate.message_key not in COACHING_MESSAGES:
+            raise ValueError(f"Unknown coaching messageKey: {candidate.message_key}")
+        if self._count >= self.config.max_per_session:
+            return None
+
+        target = candidate.target_user_id or "session"
+        target_count = self._count_by_target.get(target, 0)
+        if target != "session" and target_count >= self.config.max_per_user:
+            return None
+
+        trigger_key = (target, candidate.coaching_type, candidate.trigger_id)
+        if trigger_key in self._seen_trigger_keys:
+            return None
+
+        cooldown_key = (target, candidate.coaching_type)
+        last = self._last_by_target_and_type.get(cooldown_key)
+        cooldown_ms = self.config.cooldown_for(candidate.coaching_type)
+        if last is not None and candidate.triggered_at_ms - last < cooldown_ms:
+            return None
+
+        self._last_by_target_and_type[cooldown_key] = candidate.triggered_at_ms
+        self._count_by_target[target] = target_count + 1
         self._count += 1
-        target = target_participant_id if target_participant_id is not None else "session"
+        self._remember_trigger(trigger_key)
         return CoachingCommand(
             session_id=state.session_id,
-            target_participant_id=target_participant_id,
-            coaching_type=coaching_type,
-            message_key=message_key,
-            priority=priority,
-            reason_code=reason_code,
-            triggered_at_session_elapsed_ms=now_ms,
-            expires_at_session_elapsed_ms=now_ms + self.ttl_ms,
-            deduplication_key=f"{state.session_id}:{target}:{coaching_type}:{self._count}",
+            target_user_id=candidate.target_user_id,
+            coaching_type=candidate.coaching_type,
+            message_key=candidate.message_key,
+            priority=candidate.priority,
+            reason_code=candidate.reason_code,
+            triggered_at_session_elapsed_ms=candidate.triggered_at_ms,
+            expires_at_session_elapsed_ms=(
+                candidate.triggered_at_ms + self.config.coaching_ttl_ms
+            ),
+            deduplication_key=(
+                f"{state.session_id}:{target}:{candidate.coaching_type}:"
+                f"{candidate.trigger_id}"
+            ),
         )
+
+    def _remember_trigger(self, trigger_key: tuple[str, str, str]) -> None:
+        self._seen_trigger_keys.add(trigger_key)
+        self._trigger_key_order.append(trigger_key)
+        if len(self._trigger_key_order) > _TRIGGER_DEDUPE_CAPACITY:
+            expired = self._trigger_key_order.popleft()
+            self._seen_trigger_keys.discard(expired)
 
 
 def noop_coaching(command: CoachingCommand) -> None:
-    """코칭 명령을 버리는 기본 싱크(테스트·분석 전용 실행용)."""
+    """Default sink used when no coaching consumer has been connected."""
     return None
+
+
+__all__ = [
+    "COACHING_TEMPLATES",
+    "CoachingCandidate",
+    "CoachingCommand",
+    "CoachingPolicy",
+    "CoachingPriority",
+    "CoachingType",
+    "noop_coaching",
+]
