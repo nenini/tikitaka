@@ -63,6 +63,7 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/surveys/**").authenticated()
 						.requestMatchers("/api/v1/match-requests/**").authenticated()
 						.requestMatchers("/api/v1/matches/**").authenticated()
+						.requestMatchers("/api/v1/notifications/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)

@@ -66,6 +66,11 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '16'",
 				Integer.class
 		);
+		Integer notificationQueryMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '17'",
+				Integer.class
+		);
 		Integer proposedScheduledAtColumnCount = columnCount(
 				"MATCH_PAIRS",
 				"PROPOSEDSCHEDULEDAT"
@@ -101,7 +106,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isGreaterThanOrEqualTo(12);
+		assertThat(migrationCount).isGreaterThanOrEqualTo(13);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -125,6 +130,7 @@ class FlywayMigrationTests {
 		assertThat(notificationDeduplicationKeyColumnCount).isEqualTo(1);
 		assertThat(notificationMigrationCount).isEqualTo(1);
 		assertThat(matchPolicyMigrationCount).isEqualTo(1);
+		assertThat(notificationQueryMigrationCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);
 		assertThat(matchWaitingStartedAtColumnCount).isEqualTo(1);
