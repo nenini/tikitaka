@@ -102,6 +102,8 @@ class SilenceDetector(Detector):
         self._fired_for_ms = -1
 
     def on_tick(self, state: SessionState, now_ms: int) -> list[AnalysisEvent]:
+        if any(user.is_speaking for user in state.users.values()):
+            return []
         if state.last_activity_ms == 0:
             return []
         silent_ms = now_ms - state.last_activity_ms

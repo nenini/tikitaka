@@ -14,7 +14,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from stt.events import TranscriptEvent
+from stt.events import (
+    SpeechEndedEvent,
+    SpeechStartedEvent,
+    SttEvent,
+    TranscriptFinalizedEvent,
+)
 
 from aggregator.coaching import CoachingCommand, CoachingPolicy, noop_coaching
 from aggregator.coaching_candidates import CoachingCandidate
@@ -26,6 +31,7 @@ from aggregator.config import MvpCoachingConfig
 from aggregator.detectors import Detector, default_detectors
 from aggregator.events import AnalysisEvent
 from aggregator.state import SessionState, Utterance
+from aggregator.speech_events import parse_stt_event
 from aggregator.vision_events import (
     VISION_EVENT_ADAPTER,
     VisionBehaviorEventBase,
@@ -38,6 +44,7 @@ AnalysisEmitter = Callable[[AnalysisEvent], None]
 CoachingEmitter = Callable[[CoachingCommand], None]
 
 _VISION_DEDUPE_CAPACITY = 4096
+_STT_DEDUPE_CAPACITY = 4096
 
 
 @dataclass
@@ -53,6 +60,14 @@ class VisionSessionMismatchError(ValueError):
 
 class VisionSequenceError(ValueError):
     """A client instance sent a sequence number that did not advance."""
+
+
+class SttSessionMismatchError(ValueError):
+    """An STT event was delivered to the wrong session aggregator."""
+
+
+class SttSequenceError(ValueError):
+    """An STT client instance sent a sequence number that did not advance."""
 
 
 class SessionAggregator:
@@ -87,6 +102,9 @@ class SessionAggregator:
         self._vision_event_ids: set[UUID] = set()
         self._vision_event_id_order: deque[UUID] = deque()
         self._vision_last_seq: dict[tuple[str, UUID], int] = {}
+        self._stt_event_ids: set[str] = set()
+        self._stt_event_id_order: deque[str] = deque()
+        self._stt_last_seq: dict[tuple[str, str], int] = {}
 
     def _dispatch(self, events: list[AnalysisEvent]) -> None:
         for event in events:
@@ -104,10 +122,65 @@ class SessionAggregator:
             if command is not None:
                 self._on_coaching(command)
 
-    def push_transcript(self, event: TranscriptEvent) -> None:
-        """STT 전사 이벤트를 상태에 반영하고 내용 기반 감지기를 돌린다."""
+    def push_stt_event(
+        self,
+        event: SttEvent | Mapping[str, object],
+    ) -> bool:
+        """Validate and apply one STT v2 event."""
+        parsed = parse_stt_event(event)
+        if parsed.session_id != self.state.session_id:
+            raise SttSessionMismatchError(
+                f"STT event session {parsed.session_id!r} does not match "
+                f"aggregator session {self.state.session_id!r}"
+            )
+        if parsed.event_id in self._stt_event_ids:
+            return False
+
+        sequence_key = (parsed.user_id, parsed.client_instance_id)
+        previous_seq = self._stt_last_seq.get(sequence_key)
+        if previous_seq is not None and parsed.seq <= previous_seq:
+            raise SttSequenceError(
+                "STT seq must increase for one user/client instance: "
+                f"received {parsed.seq}, previous {previous_seq}"
+            )
+
+        user = self.state.user(parsed.user_id)
+        if isinstance(parsed, SpeechStartedEvent):
+            user.is_speaking = True
+            user.current_utterance_id = UUID(parsed.utterance_id)
+            user.speech_started_at_ms = (
+                parsed.payload.observed_start_elapsed_ms
+            )
+            self.state.last_activity_ms = max(
+                self.state.last_activity_ms,
+                parsed.payload.observed_start_elapsed_ms,
+            )
+        elif isinstance(parsed, SpeechEndedEvent):
+            user.is_speaking = False
+            user.current_utterance_id = None
+            user.speech_started_at_ms = None
+            user.last_speech_ended_at_ms = (
+                parsed.payload.observed_end_elapsed_ms
+            )
+            self.state.last_activity_ms = max(
+                self.state.last_activity_ms,
+                parsed.payload.observed_end_elapsed_ms,
+            )
+        else:
+            self._apply_transcript(parsed)
+
+        self._stt_last_seq[sequence_key] = parsed.seq
+        self._remember_stt_event_id(parsed.event_id)
+        return True
+
+    def push_transcript(self, event: TranscriptFinalizedEvent) -> None:
+        """Compatibility entry point for finalized STT v2 transcripts."""
+        self.push_stt_event(event)
+
+    def _apply_transcript(self, event: TranscriptFinalizedEvent) -> None:
+        """Store a finalized transcript and run content detectors."""
         utterance = Utterance(
-            speaker_id=event.speaker_id,
+            speaker_id=event.user_id,
             start_ms=event.payload.segment_start_ms,
             end_ms=event.payload.segment_end_ms,
             text=event.payload.text,
@@ -115,6 +188,13 @@ class SessionAggregator:
         self.state.add_utterance(utterance)
         for detector in self.detectors:
             self._dispatch(detector.on_utterance(self.state, utterance))
+
+    def _remember_stt_event_id(self, event_id: str) -> None:
+        self._stt_event_ids.add(event_id)
+        self._stt_event_id_order.append(event_id)
+        if len(self._stt_event_id_order) > _STT_DEDUPE_CAPACITY:
+            expired = self._stt_event_id_order.popleft()
+            self._stt_event_ids.discard(expired)
 
     def push_vision_event(
         self,

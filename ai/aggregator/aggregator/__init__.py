@@ -4,6 +4,8 @@ from aggregator.aggregator import (
     AnalysisEmitter,
     CoachingEmitter,
     SessionAggregator,
+    SttSequenceError,
+    SttSessionMismatchError,
     VisionBatchIngestionResult,
     VisionSequenceError,
     VisionSessionMismatchError,
@@ -43,6 +45,7 @@ from aggregator.state import (
     Utterance,
     VisionUserState,
 )
+from aggregator.speech_events import STT_EVENT_ADAPTER, parse_stt_event
 from aggregator.vision_events import (
     VisionBehaviorEvent,
     VisionEvent,
@@ -71,6 +74,9 @@ __all__ = [
     "QuestionPayload",
     "SessionAggregator",
     "SessionState",
+    "STT_EVENT_ADAPTER",
+    "SttSequenceError",
+    "SttSessionMismatchError",
     "SilenceDetected",
     "SilenceDetector",
     "SilencePayload",
@@ -89,4 +95,5 @@ __all__ = [
     "console_emit",
     "default_detectors",
     "noop_coaching",
+    "parse_stt_event",
 ]
