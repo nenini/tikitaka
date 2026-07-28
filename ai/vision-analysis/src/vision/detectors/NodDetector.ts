@@ -75,7 +75,7 @@ export class NodDetector
     }
     if (
       context.baseline.status !== "READY" &&
-      context.baseline.status !== "FALLBACK"
+      context.baseline.status !== "GLOBAL_FALLBACK"
     ) {
       // A nod is measured relative to the user's calibrated neutral pitch.
       this.resetTracking("WAITING_FOR_BASELINE");
@@ -184,6 +184,12 @@ export class NodDetector
           events.push(
             this.eventFactory.createBehaviorEvent("NOD_EVENT", {
               confidence: this.config.defaultEventConfidence,
+              confidenceDetails: {
+                baselineMode:
+                  context.baseline.baselineModeBySignal.pose,
+                coachingEligible: false,
+                baselineEpoch: context.baseline.baselineEpoch,
+              },
               episodeId: null,
               payload: {
                 amplitudeDegrees: this.peakAmplitudeDegrees,

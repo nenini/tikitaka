@@ -95,6 +95,14 @@ face:
   analysis:
     request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
 
+ai:
+  chat:
+    base-url: ${AI_CHAT_BASE_URL:}
+    stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
+    connect-timeout: ${AI_CHAT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:60s}
+    internal-token: ${AI_CHAT_INTERNAL_TOKEN:}
+
 match:
   policy:
     late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}

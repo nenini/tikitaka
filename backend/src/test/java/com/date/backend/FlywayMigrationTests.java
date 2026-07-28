@@ -41,6 +41,11 @@ class FlywayMigrationTests {
 		Integer faceAnalysisRequestTableCount = tableCount("FACE_ANALYSIS_REQUESTS");
 		Integer faceAnalysisResultTableCount = tableCount("FACE_ANALYSIS_RESULTS");
 		Integer faceAnalysisResultTagTableCount = tableCount("FACE_ANALYSIS_RESULT_TAGS");
+		Integer aiChatPurposeColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PURPOSE");
+		Integer aiChatMessageSequenceColumnCount = columnCount("CHATBOT_MESSAGES", "SEQUENCENO");
+		Integer aiPersonaKeyColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIPERSONAKEY");
+		Integer aiResponseStateColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIRESPONSESTATE");
+		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
 		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
 		Integer matchRequestTraitSnapshotTableCount =
@@ -115,7 +120,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isGreaterThanOrEqualTo(14);
+		assertThat(migrationCount).isEqualTo(18);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -129,6 +134,11 @@ class FlywayMigrationTests {
 		assertThat(faceAnalysisRequestTableCount).isEqualTo(1);
 		assertThat(faceAnalysisResultTableCount).isEqualTo(1);
 		assertThat(faceAnalysisResultTagTableCount).isEqualTo(1);
+		assertThat(aiChatPurposeColumnCount).isEqualTo(1);
+		assertThat(aiChatMessageSequenceColumnCount).isEqualTo(1);
+		assertThat(aiPersonaKeyColumnCount).isEqualTo(1);
+		assertThat(aiResponseStateColumnCount).isEqualTo(1);
+		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);

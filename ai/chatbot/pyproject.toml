@@ -1,0 +1,28 @@
+[project]
+name = "chatbot"
+version = "0.1.0"
+description = "소개팅 연습 AI 챗봇 — 로컬 LLM + 속성 조합형 페르소나 (AI-DATE-01/02)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.13.4",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    # llama-cpp-python 은 LLM 통합 단계에서 추가 (빌드 무거움 — 모델 확정 후)
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "httpx>=0.28",   # FastAPI TestClient
+    "mypy>=1.13",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
