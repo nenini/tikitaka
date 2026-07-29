@@ -55,3 +55,10 @@ session:
     monitor-fixed-delay-ms: 5000
     monitor-initial-delay-ms: 5000
     monitor-batch-size: 100
+  timer:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 1000
+    batch-size: 100
+    ending-soon-before: 5m
+    ending-imminent-before: 1m

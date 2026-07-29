@@ -11,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
 		RoomEntryProperties.class,
 		LiveKitProperties.class,
-		SessionRealtimeProperties.class
+		SessionRealtimeProperties.class,
+		SessionTimerProperties.class
 })
 public class RoomConfig {
 

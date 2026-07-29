@@ -59,6 +59,15 @@ public class WaitingRoom {
 	@Column(name = "livekitRoomName", unique = true, length = 255)
 	private String livekitRoomName;
 
+	@Column(name = "ending_soon_notified_at")
+	private LocalDateTime endingSoonNotifiedAt;
+
+	@Column(name = "ending_imminent_notified_at")
+	private LocalDateTime endingImminentNotifiedAt;
+
+	@Column(name = "timer_expired_notified_at")
+	private LocalDateTime timerExpiredNotifiedAt;
+
 	@Column(name = "createdAt", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
@@ -127,6 +136,65 @@ public class WaitingRoom {
 
 	public String getLivekitRoomName() {
 		return livekitRoomName;
+	}
+
+	public LocalDateTime expectedEndAt() {
+		if (!isInProgress() || actualStartAt == null) {
+			throw new IllegalStateException(
+					"진행 중인 세션에만 종료 예정 시각이 존재합니다."
+			);
+		}
+		return actualStartAt.plusSeconds(
+				(long) plannedDurationSec + extensionDurationSec
+		);
+	}
+
+	public LocalDateTime getEndingSoonNotifiedAt() {
+		return endingSoonNotifiedAt;
+	}
+
+	public LocalDateTime getEndingImminentNotifiedAt() {
+		return endingImminentNotifiedAt;
+	}
+
+	public LocalDateTime getTimerExpiredNotifiedAt() {
+		return timerExpiredNotifiedAt;
+	}
+
+	public boolean claimEndingSoonNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || endingSoonNotifiedAt != null) {
+			return false;
+		}
+		endingSoonNotifiedAt = notifiedAt;
+		return true;
+	}
+
+	public boolean claimEndingImminentNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || endingImminentNotifiedAt != null) {
+			return false;
+		}
+		if (endingSoonNotifiedAt == null) {
+			endingSoonNotifiedAt = notifiedAt;
+		}
+		endingImminentNotifiedAt = notifiedAt;
+		return true;
+	}
+
+	public boolean claimTimerExpiredNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || timerExpiredNotifiedAt != null) {
+			return false;
+		}
+		if (endingSoonNotifiedAt == null) {
+			endingSoonNotifiedAt = notifiedAt;
+		}
+		if (endingImminentNotifiedAt == null) {
+			endingImminentNotifiedAt = notifiedAt;
+		}
+		timerExpiredNotifiedAt = notifiedAt;
+		return true;
 	}
 
 	public void markWaiting() {

@@ -49,6 +49,18 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSubscribeToTimerTopic() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/topic/sessions/15/timer"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
 	void sessionParticipantCanSendHeartbeat() {
 		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
 				.thenReturn(true);
