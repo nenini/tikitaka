@@ -124,6 +124,17 @@ match:
     minimum-acceptance-window-seconds: ${MATCH_MINIMUM_ACCEPTANCE_WINDOW_SECONDS:3600}
     schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}
 
+room:
+  entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
+  entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}
+
+livekit:
+  url: ${LIVEKIT_URL:}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+  empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:2}
+
 notification:
   waiting-recommendation:
     enabled: ${NOTIFICATION_WAITING_RECOMMENDATION_ENABLED:true}

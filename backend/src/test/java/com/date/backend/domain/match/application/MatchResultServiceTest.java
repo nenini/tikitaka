@@ -10,6 +10,9 @@ import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
+import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
+import com.date.backend.domain.room.domain.WaitingRoom;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -42,6 +45,10 @@ class MatchResultServiceTest {
 	private final ProfileService profileService = mock(ProfileService.class);
 	private final MatchJobEnqueueService jobEnqueueService =
 			mock(MatchJobEnqueueService.class);
+	private final WaitingRoomProvisioningService waitingRoomProvisioningService =
+			mock(WaitingRoomProvisioningService.class);
+	private final WaitingRoomRepository waitingRoomRepository =
+			mock(WaitingRoomRepository.class);
 	private final ApplicationEventPublisher eventPublisher =
 			mock(ApplicationEventPublisher.class);
 	private final Clock clock = Clock.fixed(
@@ -55,6 +62,8 @@ class MatchResultServiceTest {
 			profileService,
 			clock,
 			jobEnqueueService,
+			waitingRoomProvisioningService,
+			waitingRoomRepository,
 			eventPublisher
 	);
 
@@ -78,19 +87,25 @@ class MatchResultServiceTest {
 		when(pair.getProposedScheduledAt()).thenReturn(proposedScheduledAt);
 		when(profileService.getPublicProfile(USER_A_ID))
 				.thenReturn(mock(PublicProfileResponse.class));
+		WaitingRoom waitingRoom = mock(WaitingRoom.class);
+		when(waitingRoom.getId()).thenReturn(15L);
+		when(waitingRoomRepository.findByMatchPair_Id(PAIR_ID))
+				.thenReturn(Optional.of(waitingRoom));
 
 		MatchResultResponse result = service.accept(PAIR_ID, USER_B_ID);
 
 		verify(pair).confirm(NOW);
 		verify(requestA).confirm();
 		verify(requestB).confirm();
+		verify(waitingRoomProvisioningService).provision(pair);
 		verify(eventPublisher).publishEvent(new MatchConfirmedEvent(
 				PAIR_ID,
 				USER_A_ID,
 				USER_B_ID,
 				NOW,
-				proposedScheduledAt
+				scheduledAt
 		));
+		assertThat(result.roomId()).isEqualTo(15L);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}
 
