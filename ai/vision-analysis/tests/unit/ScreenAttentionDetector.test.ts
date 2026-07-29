@@ -78,6 +78,37 @@ describe("ScreenAttentionDetector", () => {
     expect(ended.map((event) => event.eventType)).toEqual(["GAZE_AWAY_ENDED"]);
   });
 
+  it("can enter from a low aggregate score with one meaningful signal", () => {
+    const detector = new ScreenAttentionDetector(
+      {
+        ...defaultVisionConfig.screenAttention,
+        emaAlpha: 1,
+        attentionAwayScore: 80,
+        awayMinimumDurationMs: 1_000,
+        minimumAwayObservations: 3,
+      },
+      createDetectorEventFactory(),
+    );
+    const context = { quality, baseline, performanceProfile: "HIGH" as const };
+    const events = [0, 500, 1_000, 1_500].flatMap((timestampMs) =>
+      detector.update(
+        createNormalizedFaceFrame({
+          timestampMs,
+          yaw: 25,
+          pitch: 0,
+          blendshapes: { eyeBlinkLeft: 0, eyeBlinkRight: 0 },
+        }),
+        context,
+      ),
+    );
+
+    expect(detector.getState().entryBlockReason).toBe("NONE");
+    expect(events.map((event) => event.eventType)).toContain(
+      "GAZE_AWAY_STARTED",
+    );
+    expect(detector.getState().entryBlockReason).toBe("NONE");
+  });
+
   it("uses reliable iris displacement as an additional attention signal", () => {
     const detector = new ScreenAttentionDetector(
       { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
