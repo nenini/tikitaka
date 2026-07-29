@@ -16,5 +16,10 @@ public interface PeerEvaluationRepository extends JpaRepository<PeerEvaluation, 
 			Long evaluatorUserId
 	);
 
+	Optional<PeerEvaluation> findBySessionIdAndEvaluateeUserId(
+			Long sessionId,
+			Long evaluateeUserId
+	);
+
 	List<PeerEvaluation> findAllBySessionIdOrderBySubmittedAtAsc(Long sessionId);
 }
