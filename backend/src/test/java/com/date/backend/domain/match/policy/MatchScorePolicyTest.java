@@ -44,8 +44,28 @@ class MatchScorePolicyTest {
 		MatchScore score = policy.calculate(first, firstTraits, second, secondTraits);
 
 		assertThat(score.faceScore()).isEqualByComparingTo("50.000");
-		assertThat(score.traitScore()).isEqualByComparingTo("16.666");
-		assertThat(score.totalScore()).isEqualByComparingTo("66.666");
+		assertThat(score.traitScore()).isEqualByComparingTo("16.667");
+		assertThat(score.totalScore()).isEqualByComparingTo("66.667");
+	}
+
+	@Test
+	void supportsOneHundredPercentFaceWeightAndZeroPersonalityWeight() {
+		FaceTagCatalog dog = faceTag(1L);
+		FaceTagCatalog cat = faceTag(2L);
+		MatchRequest first = request(dog, cat);
+		MatchRequest second = request(cat, dog);
+
+		MatchScore score = policy.calculate(
+				first,
+				List.of(),
+				second,
+				List.of(),
+				new MatchingPolicySnapshot(100, 0, 8, 60, 60, 7, 7, 60, 2)
+		);
+
+		assertThat(score.faceScore()).isEqualByComparingTo("100.000");
+		assertThat(score.traitScore()).isEqualByComparingTo("0.000");
+		assertThat(score.totalScore()).isEqualByComparingTo("100.000");
 	}
 
 	private MatchRequest request(FaceTagCatalog preferred, FaceTagCatalog actual) {
