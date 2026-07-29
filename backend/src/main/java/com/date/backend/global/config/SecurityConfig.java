@@ -31,6 +31,8 @@ public class SecurityConfig {
 			"/internal/livekit/webhook",
 			"/internal/ai/sessions/analysis-events/**",
 			"/internal/ai/coaching-events",
+			"/internal/ai/silence-events",
+			"/internal/ai/question-recommendations",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",

@@ -157,12 +157,28 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '34'",
 				Integer.class
 		);
+		Integer silenceQuestionMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '36'",
+				Integer.class
+		);
 		Integer missionCatalogTableCount = tableCount("MISSION_CATALOG");
 		Integer sessionMissionTableCount = tableCount("SESSION_MISSIONS");
 		Integer aiAnalysisEventTableCount =
 				tableCount("AI_SESSION_ANALYSIS_EVENTS");
 		Integer aiCoachingEventTableCount =
 				tableCount("AI_COACHING_EVENTS");
+		Integer questionCardTableCount = tableCount("QUESTION_CARDS");
+		Integer silenceEventTableCount = tableCount("SILENCE_EVENTS");
+		Integer questionRecommendationTableCount =
+				tableCount("QUESTION_RECOMMENDATION_EVENTS");
+		Integer questionRecommendationItemTableCount =
+				tableCount("QUESTION_RECOMMENDATION_ITEMS");
+		Integer safeQuestionCardCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM `question_cards` "
+						+ "WHERE `active` = TRUE AND `sensitive` = FALSE",
+				Integer.class
+		);
 		Integer missionCatalogRowCount = rowCount("mission_catalog");
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
 		Integer proposedScheduledAtColumnCount = columnCount(
@@ -204,7 +220,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(29);
+		assertThat(migrationCount).isEqualTo(30);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -254,10 +270,16 @@ class FlywayMigrationTests {
 		assertThat(sessionMissionMigrationCount).isEqualTo(1);
 		assertThat(aiAnalysisMigrationCount).isEqualTo(1);
 		assertThat(aiCoachingMigrationCount).isEqualTo(1);
+		assertThat(silenceQuestionMigrationCount).isEqualTo(1);
 		assertThat(missionCatalogTableCount).isEqualTo(1);
 		assertThat(sessionMissionTableCount).isEqualTo(1);
 		assertThat(aiAnalysisEventTableCount).isEqualTo(1);
 		assertThat(aiCoachingEventTableCount).isEqualTo(1);
+		assertThat(questionCardTableCount).isEqualTo(1);
+		assertThat(silenceEventTableCount).isEqualTo(1);
+		assertThat(questionRecommendationTableCount).isEqualTo(1);
+		assertThat(questionRecommendationItemTableCount).isEqualTo(1);
+		assertThat(safeQuestionCardCount).isEqualTo(14);
 		assertThat(missionCatalogRowCount).isEqualTo(4);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
