@@ -50,7 +50,7 @@ class MatchExpirationServiceTest {
 
 		service.expireOverdue(now);
 
-		verify(pair).expire();
+		verify(pair).expire(now);
 		verify(first).returnToWaiting(now);
 		verify(second).returnToWaiting(now);
 		verify(jobEnqueueService).enqueue(first);

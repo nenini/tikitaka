@@ -1,7 +1,8 @@
 package com.date.backend.domain.match.application;
 
-import com.date.backend.domain.match.config.MatchSchedulerProperties;
 import com.date.backend.domain.match.domain.MatchJob;
+import com.date.backend.domain.match.policy.MatchingPolicyProvider;
+import com.date.backend.domain.match.policy.MatchingPolicySnapshot;
 import com.date.backend.domain.match.repository.MatchJobRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,20 +16,20 @@ public class MatchJobProcessor {
 	private final MatchJobRepository jobRepository;
 	private final MatchCandidateService candidateService;
 	private final MatchCreationService creationService;
-	private final MatchSchedulerProperties properties;
+	private final MatchingPolicyProvider policyProvider;
 	private final Clock clock;
 
 	public MatchJobProcessor(
 			MatchJobRepository jobRepository,
 			MatchCandidateService candidateService,
 			MatchCreationService creationService,
-			MatchSchedulerProperties properties,
+			MatchingPolicyProvider policyProvider,
 			Clock clock
 	) {
 		this.jobRepository = jobRepository;
 		this.candidateService = candidateService;
 		this.creationService = creationService;
-		this.properties = properties;
+		this.policyProvider = policyProvider;
 		this.clock = clock;
 	}
 
@@ -43,19 +44,25 @@ public class MatchJobProcessor {
 		}
 
 		LocalDateTime matchedAt = LocalDateTime.now(clock);
-		LocalDateTime maximumAcceptDeadlineAt = matchedAt.plusSeconds(
-				properties.acceptanceTimeoutSeconds()
+		MatchingPolicySnapshot policy = policyProvider.current();
+		LocalDateTime maximumAcceptDeadlineAt = matchedAt.plusHours(
+				policy.acceptTimeoutHours()
 		);
-		LocalDateTime earliestSessionStart = matchedAt.plusSeconds(
-				properties.minimumAcceptanceWindowSeconds()
-						+ properties.scheduleBufferSeconds()
+		LocalDateTime earliestSessionStart = matchedAt.plusMinutes(
+				(long) policy.minimumAcceptanceWindowMinutes()
+						+ policy.minimumPreparationMinutes()
 		);
 		Long requestId = job.getMatchRequest().getId();
 
-		candidateService.findBestCandidate(requestId, earliestSessionStart)
+		candidateService.findBestCandidate(
+				requestId,
+				earliestSessionStart,
+				matchedAt,
+				policy
+		)
 				.ifPresent(candidate -> {
 					LocalDateTime slotAcceptDeadline = candidate.proposedScheduledAt()
-							.minusSeconds(properties.scheduleBufferSeconds());
+							.minusMinutes(policy.minimumPreparationMinutes());
 					LocalDateTime acceptDeadlineAt = slotAcceptDeadline.isBefore(
 							maximumAcceptDeadlineAt
 					)
@@ -66,7 +73,8 @@ public class MatchJobProcessor {
 						candidate.request().getId(),
 						matchedAt,
 						acceptDeadlineAt,
-						candidate.proposedScheduledAt()
+						candidate.proposedScheduledAt(),
+						policy
 					);
 				});
 		job.complete(LocalDateTime.now(clock));

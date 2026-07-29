@@ -101,6 +101,11 @@ class MatchCandidateServiceTest {
 				101L,
 				List.of(102L, 103L)
 		)).thenReturn(Set.of(103L));
+		when(constraintRepository.findCooldownCandidateUserIds(
+				101L,
+				List.of(102L, 103L),
+				earliestStart
+		)).thenReturn(Set.of());
 		when(pairRepository.findAllActiveByParticipantUserIds(
 				anyCollection(),
 				anyCollection()
@@ -117,13 +122,15 @@ class MatchCandidateServiceTest {
 		when(availabilityPolicy.findEarliestStart(
 				anyCollection(),
 				anyCollection(),
-				any()
+				any(),
+				org.mockito.ArgumentMatchers.eq(7)
 		)).thenReturn(Optional.of(earliestStart));
 		when(scorePolicy.calculate(
 				any(),
 				anyCollection(),
 				any(),
-				anyCollection()
+				anyCollection(),
+				any()
 		)).thenReturn(score("40.000"));
 
 		Optional<MatchCandidate> result = service.findBestCandidate(1L, earliestStart);

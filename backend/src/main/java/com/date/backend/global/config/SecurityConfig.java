@@ -52,6 +52,7 @@ public class SecurityConfig {
 				)
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
+						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 						.requestMatchers(
 								"/api/v1/auth/logout",
 								"/api/v1/auth/account"

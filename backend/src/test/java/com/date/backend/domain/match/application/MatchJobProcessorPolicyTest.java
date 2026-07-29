@@ -1,9 +1,10 @@
 package com.date.backend.domain.match.application;
 
-import com.date.backend.domain.match.config.MatchSchedulerProperties;
 import com.date.backend.domain.match.domain.MatchJob;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.policy.MatchScore;
+import com.date.backend.domain.match.policy.MatchingPolicyProvider;
+import com.date.backend.domain.match.policy.MatchingPolicySnapshot;
 import com.date.backend.domain.match.repository.MatchJobRepository;
 import org.junit.jupiter.api.Test;
 
@@ -28,13 +29,8 @@ class MatchJobProcessorPolicyTest {
 			mock(MatchCandidateService.class);
 	private final MatchCreationService creationService =
 			mock(MatchCreationService.class);
-	private final MatchSchedulerProperties properties = new MatchSchedulerProperties(
-			10_000,
-			10_000,
-			28_800,
-			3_600,
-			3_600
-	);
+	private final MatchingPolicyProvider policyProvider = mock(MatchingPolicyProvider.class);
+	private final MatchingPolicySnapshot policy = MatchingPolicySnapshot.defaults();
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-28T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -43,19 +39,22 @@ class MatchJobProcessorPolicyTest {
 			jobRepository,
 			candidateService,
 			creationService,
-			properties,
+			policyProvider,
 			clock
 	);
 
 	@Test
 	void earlierSlotDeadlineOverridesEightHourMaximum() {
 		MatchJob job = ownedJob();
+		when(policyProvider.current()).thenReturn(policy);
 		MatchRequest candidateRequest = mock(MatchRequest.class);
 		when(candidateRequest.getId()).thenReturn(2L);
 		LocalDateTime proposedScheduledAt = MATCHED_AT.plusHours(3);
 		when(candidateService.findBestCandidate(
 				1L,
-				MATCHED_AT.plusHours(2)
+				MATCHED_AT.plusHours(2),
+				MATCHED_AT,
+				policy
 		)).thenReturn(Optional.of(new MatchCandidate(
 				candidateRequest,
 				score(),
@@ -69,19 +68,23 @@ class MatchJobProcessorPolicyTest {
 				2L,
 				MATCHED_AT,
 				MATCHED_AT.plusHours(2),
-				proposedScheduledAt
+				proposedScheduledAt,
+				policy
 		);
 	}
 
 	@Test
 	void eightHourMaximumOverridesLaterSlotDeadline() {
 		MatchJob job = ownedJob();
+		when(policyProvider.current()).thenReturn(policy);
 		MatchRequest candidateRequest = mock(MatchRequest.class);
 		when(candidateRequest.getId()).thenReturn(2L);
 		LocalDateTime proposedScheduledAt = MATCHED_AT.plusHours(12);
 		when(candidateService.findBestCandidate(
 				1L,
-				MATCHED_AT.plusHours(2)
+				MATCHED_AT.plusHours(2),
+				MATCHED_AT,
+				policy
 		)).thenReturn(Optional.of(new MatchCandidate(
 				candidateRequest,
 				score(),
@@ -95,7 +98,8 @@ class MatchJobProcessorPolicyTest {
 				2L,
 				MATCHED_AT,
 				MATCHED_AT.plusHours(8),
-				proposedScheduledAt
+				proposedScheduledAt,
+				policy
 		);
 	}
 

@@ -16,7 +16,6 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.MatchErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -100,7 +99,7 @@ public class MatchResultService {
 		LocalDateTime now = LocalDateTime.now(clock);
 		MatchPair pair = getPairForResponse(matchPairId, userId, now);
 		getPendingResponse(pair.getId(), userId).reject(now);
-		pair.reject();
+		pair.reject(now);
 		MatchRequest rejectedRequest = pair.getUserAId().equals(userId)
 				? pair.getRequestA()
 				: pair.getRequestB();

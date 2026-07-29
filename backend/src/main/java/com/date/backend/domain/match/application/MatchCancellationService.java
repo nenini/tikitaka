@@ -1,6 +1,5 @@
 package com.date.backend.domain.match.application;
 
-import com.date.backend.domain.match.config.MatchPolicyProperties;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchStatus;
 import com.date.backend.domain.match.dto.request.MatchCancellationRequest;
@@ -22,20 +21,17 @@ public class MatchCancellationService {
 
 	private final MatchPairRepository pairRepository;
 	private final ActiveMatchRequestRepository activeRequestRepository;
-	private final MatchPolicyProperties properties;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public MatchCancellationService(
 			MatchPairRepository pairRepository,
 			ActiveMatchRequestRepository activeRequestRepository,
-			MatchPolicyProperties properties,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.pairRepository = pairRepository;
 		this.activeRequestRepository = activeRequestRepository;
-		this.properties = properties;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
@@ -68,7 +64,7 @@ public class MatchCancellationService {
 				userId,
 				cancelledAt,
 				reason,
-				Duration.ofSeconds(properties.lateCancellationThresholdSeconds())
+				Duration.ofMinutes(pair.getLateCancellationMinutesSnapshot())
 		);
 		pair.getRequestA().cancel(cancelledAt, reason);
 		pair.getRequestB().cancel(cancelledAt, reason);

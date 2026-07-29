@@ -23,7 +23,7 @@ import java.util.Objects;
 @Table(name = "match_pairs")
 public class MatchPair {
 
-	private static final BigDecimal MAX_COMPONENT_SCORE = new BigDecimal("50.000");
+	private static final BigDecimal MAX_COMPONENT_SCORE = new BigDecimal("100.000");
 	private static final BigDecimal MAX_TOTAL_SCORE = new BigDecimal("100.000");
 
 	@Id
@@ -85,6 +85,21 @@ public class MatchPair {
 	@Column(name = "isLateCancellation", nullable = false)
 	private boolean lateCancellation;
 
+	@Column(name = "policyVersion", nullable = false)
+	private long policyVersion = 1;
+
+	@Column(name = "lateCancellationMinutesSnapshot", nullable = false)
+	private int lateCancellationMinutesSnapshot = 60;
+
+	@Column(name = "recentMatchExclusionDaysSnapshot", nullable = false)
+	private int recentMatchExclusionDaysSnapshot = 7;
+
+	@Column(name = "closedAt")
+	private LocalDateTime closedAt;
+
+	@Column(name = "completedAt")
+	private LocalDateTime completedAt;
+
 	@Column(name = "updatedAt", nullable = false)
 	private LocalDateTime updatedAt;
 
@@ -106,7 +121,10 @@ public class MatchPair {
 				traitScore,
 				acceptDeadlineAt,
 				proposedScheduledAt,
-				null
+				null,
+				1,
+				60,
+				7
 		);
 	}
 
@@ -118,6 +136,32 @@ public class MatchPair {
 			LocalDateTime acceptDeadlineAt,
 			LocalDateTime proposedScheduledAt,
 			LocalDateTime matchedAt
+	) {
+		this(
+				firstRequest,
+				secondRequest,
+				faceScore,
+				traitScore,
+				acceptDeadlineAt,
+				proposedScheduledAt,
+				matchedAt,
+				1,
+				60,
+				7
+		);
+	}
+
+	public MatchPair(
+			MatchRequest firstRequest,
+			MatchRequest secondRequest,
+			BigDecimal faceScore,
+			BigDecimal traitScore,
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt,
+			LocalDateTime matchedAt,
+			long policyVersion,
+			int lateCancellationMinutesSnapshot,
+			int recentMatchExclusionDaysSnapshot
 	) {
 		MatchRequest left = Objects.requireNonNull(firstRequest);
 		MatchRequest right = Objects.requireNonNull(secondRequest);
@@ -152,6 +196,14 @@ public class MatchPair {
 			);
 		}
 		this.matchedAt = matchedAt;
+		if (policyVersion <= 0
+				|| lateCancellationMinutesSnapshot <= 0
+				|| recentMatchExclusionDaysSnapshot <= 0) {
+			throw new IllegalArgumentException("매칭 정책 스냅숏 값이 올바르지 않습니다.");
+		}
+		this.policyVersion = policyVersion;
+		this.lateCancellationMinutesSnapshot = lateCancellationMinutesSnapshot;
+		this.recentMatchExclusionDaysSnapshot = recentMatchExclusionDaysSnapshot;
 	}
 
 	public void confirm(LocalDateTime confirmedAt) {
@@ -171,17 +223,40 @@ public class MatchPair {
 	}
 
 	public void reject() {
+		reject(LocalDateTime.now());
+	}
+
+	public void reject(LocalDateTime rejectedAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 거절할 수 있습니다.");
 		}
 		this.status = MatchStatus.REJECTED;
+		this.closedAt = Objects.requireNonNull(rejectedAt);
 	}
 
 	public void expire() {
+		expire(LocalDateTime.now());
+	}
+
+	public void expire(LocalDateTime expiredAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 만료할 수 있습니다.");
 		}
 		this.status = MatchStatus.EXPIRED;
+		this.closedAt = Objects.requireNonNull(expiredAt);
+	}
+
+	public void complete(LocalDateTime completedAt) {
+		if (status != MatchStatus.CONFIRMED) {
+			throw new IllegalStateException("확정된 매칭만 완료할 수 있습니다.");
+		}
+		LocalDateTime completionTime = Objects.requireNonNull(completedAt);
+		if (scheduledAt == null || completionTime.isBefore(scheduledAt)) {
+			throw new IllegalArgumentException("세션 시작 이후에만 매칭을 완료할 수 있습니다.");
+		}
+		this.status = MatchStatus.COMPLETED;
+		this.completedAt = completionTime;
+		this.closedAt = completionTime;
 	}
 
 	public void cancel(
@@ -209,6 +284,7 @@ public class MatchPair {
 		this.cancelledAt = cancellationTime;
 		this.cancellationReason = normalizeReason(reason);
 		this.lateCancellation = !cancellationTime.isBefore(scheduledAt.minus(threshold));
+		this.closedAt = cancellationTime;
 	}
 
 	public boolean isParticipant(Long userId) {
@@ -328,5 +404,25 @@ public class MatchPair {
 
 	public boolean isLateCancellation() {
 		return lateCancellation;
+	}
+
+	public long getPolicyVersion() {
+		return policyVersion;
+	}
+
+	public int getLateCancellationMinutesSnapshot() {
+		return lateCancellationMinutesSnapshot;
+	}
+
+	public int getRecentMatchExclusionDaysSnapshot() {
+		return recentMatchExclusionDaysSnapshot;
+	}
+
+	public LocalDateTime getClosedAt() {
+		return closedAt;
+	}
+
+	public LocalDateTime getCompletedAt() {
+		return completedAt;
 	}
 }

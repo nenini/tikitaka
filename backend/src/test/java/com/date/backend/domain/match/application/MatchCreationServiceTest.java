@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -105,6 +106,11 @@ class MatchCreationServiceTest {
 				anyCollection()
 		)).thenReturn(List.of());
 		when(constraintRepository.areUsersBlocked(101L, 102L)).thenReturn(false);
+		when(constraintRepository.areUsersInCooldown(
+				101L,
+				102L,
+				matchedAt
+		)).thenReturn(false);
 		when(userRepository.findAllById(List.of(101L, 102L)))
 				.thenReturn(List.of(firstUser, secondUser));
 		when(profileRepository.findAllById(List.of(101L, 102L)))
@@ -123,15 +129,17 @@ class MatchCreationServiceTest {
 		when(availabilityPolicy.findEarliestStart(
 				anyCollection(),
 				anyCollection(),
-				any()
+				any(),
+				org.mockito.ArgumentMatchers.eq(7)
 		)).thenReturn(Optional.of(proposedScheduledAt));
 		when(traitRepository.findAllByMatchRequest_IdIn(List.of(1L, 2L)))
 				.thenReturn(List.of());
 		when(scorePolicy.calculate(
-				first,
-				List.of(),
-				second,
-				List.of()
+				eq(first),
+				eq(List.of()),
+				eq(second),
+				eq(List.of()),
+				any()
 		)).thenReturn(new MatchScore(
 				new BigDecimal("25.000"),
 				new BigDecimal("16.667"),

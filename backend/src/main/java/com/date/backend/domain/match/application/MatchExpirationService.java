@@ -46,7 +46,7 @@ public class MatchExpirationService {
 	}
 
 	private void expire(MatchPair pair, LocalDateTime waitingStartedAt) {
-		pair.expire();
+		pair.expire(waitingStartedAt);
 		pair.getRequestA().returnToWaiting(waitingStartedAt);
 		pair.getRequestB().returnToWaiting(waitingStartedAt);
 		jobEnqueueService.enqueue(pair.getRequestA());

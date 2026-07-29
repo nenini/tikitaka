@@ -19,4 +19,6 @@ public interface FaceTagCatalogRepository extends JpaRepository<FaceTagCatalog, 
 	List<FaceTagCatalog> findAllByCodeInAndActiveTrue(Collection<String> codes);
 
 	Optional<FaceTagCatalog> findByIdAndActiveTrue(Long id);
+
+	long countByActiveTrue();
 }

@@ -69,6 +69,9 @@ public class MatchRequest {
 	@Column(name = "expiresAt")
 	private LocalDateTime expiresAt;
 
+	@Column(name = "completedAt")
+	private LocalDateTime completedAt;
+
 	@Column(name = "cancellationReason", length = 500)
 	private String cancellationReason;
 
@@ -173,6 +176,14 @@ public class MatchRequest {
 			throw new IllegalStateException("상대가 정해진 요청만 확정할 수 있습니다.");
 		}
 		this.status = MatchRequestStatus.CONFIRMED;
+	}
+
+	public void complete(LocalDateTime completedAt) {
+		if (status != MatchRequestStatus.CONFIRMED) {
+			throw new IllegalStateException("확정된 매칭 요청만 완료할 수 있습니다.");
+		}
+		this.status = MatchRequestStatus.COMPLETED;
+		this.completedAt = Objects.requireNonNull(completedAt);
 	}
 
 	public void reject(LocalDateTime rejectedAt) {
@@ -285,6 +296,10 @@ public class MatchRequest {
 
 	public LocalDateTime getExpiresAt() {
 		return expiresAt;
+	}
+
+	public LocalDateTime getCompletedAt() {
+		return completedAt;
 	}
 
 	public String getCancellationReason() {

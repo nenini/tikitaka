@@ -67,4 +67,9 @@ public interface MatchPairRepository extends JpaRepository<MatchPair, Long> {
 			MatchStatus status,
 			java.time.LocalDateTime deadline
 	);
+
+	List<MatchPair> findAllByStatusAndScheduledAtBefore(
+			MatchStatus status,
+			java.time.LocalDateTime scheduledAt
+	);
 }
