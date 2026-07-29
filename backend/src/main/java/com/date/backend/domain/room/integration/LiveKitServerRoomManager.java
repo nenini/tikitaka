@@ -35,4 +35,22 @@ public class LiveKitServerRoomManager implements LiveKitRoomManager {
 			throw new IllegalStateException("LiveKit room creation failed.", exception);
 		}
 	}
+
+	@Override
+	public void deleteRoom(String roomName) {
+		try {
+			var response = client.deleteRoom(roomName).execute();
+			if (!response.isSuccessful() && response.code() != 404) {
+				throw new IllegalStateException(
+						"LiveKit room deletion failed. status="
+								+ response.code()
+				);
+			}
+		} catch (IOException exception) {
+			throw new IllegalStateException(
+					"LiveKit room deletion failed.",
+					exception
+			);
+		}
+	}
 }

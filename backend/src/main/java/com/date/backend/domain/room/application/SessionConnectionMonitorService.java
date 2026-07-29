@@ -3,6 +3,7 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.config.SessionRealtimeProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
+import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.event.SessionAbnormalTerminationRequestedEvent;
 import com.date.backend.domain.room.event.SessionParticipantConnectionChangedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
@@ -94,8 +95,7 @@ public class SessionConnectionMonitorService {
 					new SessionAbnormalTerminationRequestedEvent(
 							participant.getRoomId(),
 							participant.getUserId(),
-							SessionAbnormalTerminationRequestedEvent
-									.RECONNECT_TIMEOUT,
+							SessionTerminationReason.RECONNECT_TIMEOUT,
 							now
 					)
 			);

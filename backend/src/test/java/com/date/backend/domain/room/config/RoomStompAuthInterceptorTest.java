@@ -61,6 +61,18 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSubscribeToLifecycleTopic() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/topic/sessions/15/lifecycle"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
 	void sessionParticipantCanSendHeartbeat() {
 		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
 				.thenReturn(true);

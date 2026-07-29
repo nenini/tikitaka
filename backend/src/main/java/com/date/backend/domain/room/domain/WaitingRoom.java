@@ -215,11 +215,53 @@ public class WaitingRoom {
 		return status == RoomSessionStatus.IN_PROGRESS;
 	}
 
+	public boolean isEnded() {
+		return status == RoomSessionStatus.COMPLETED
+				|| status == RoomSessionStatus.CANCELLED;
+	}
+
 	public void start(LocalDateTime startedAt) {
 		if (status != RoomSessionStatus.READY) {
 			throw new IllegalStateException("준비 완료된 세션만 시작할 수 있습니다.");
 		}
 		status = RoomSessionStatus.IN_PROGRESS;
 		actualStartAt = Objects.requireNonNull(startedAt);
+	}
+
+	public void complete(
+			LocalDateTime endedAt,
+			SessionTerminationReason reason
+	) {
+		end(
+				RoomSessionStatus.COMPLETED,
+				endedAt,
+				reason
+		);
+	}
+
+	public void terminate(
+			LocalDateTime endedAt,
+			SessionTerminationReason reason
+	) {
+		end(
+				RoomSessionStatus.CANCELLED,
+				endedAt,
+				reason
+		);
+	}
+
+	private void end(
+			RoomSessionStatus endStatus,
+			LocalDateTime endedAt,
+			SessionTerminationReason reason
+	) {
+		if (!isInProgress()) {
+			throw new IllegalStateException(
+					"진행 중인 세션만 종료할 수 있습니다."
+			);
+		}
+		this.status = Objects.requireNonNull(endStatus);
+		this.actualEndAt = Objects.requireNonNull(endedAt);
+		this.terminationReason = Objects.requireNonNull(reason).name();
 	}
 }

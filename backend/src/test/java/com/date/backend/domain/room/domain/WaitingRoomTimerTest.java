@@ -65,4 +65,34 @@ class WaitingRoomTimerTest {
 		assertThat(session.getEndingImminentNotifiedAt()).isEqualTo(expiredAt);
 		assertThat(session.getTimerExpiredNotifiedAt()).isEqualTo(expiredAt);
 	}
+
+	@Test
+	void timerExpirationCompletesInProgressSession() {
+		LocalDateTime endedAt = STARTED_AT.plusMinutes(30);
+
+		session.complete(
+				endedAt,
+				SessionTerminationReason.TIME_EXPIRED
+		);
+
+		assertThat(session.getStatus())
+				.isEqualTo(RoomSessionStatus.COMPLETED);
+		assertThat(session.getActualEndAt()).isEqualTo(endedAt);
+		assertThat(session.isEnded()).isTrue();
+	}
+
+	@Test
+	void connectionFailureCancelsInProgressSession() {
+		LocalDateTime endedAt = STARTED_AT.plusMinutes(3);
+
+		session.terminate(
+				endedAt,
+				SessionTerminationReason.RECONNECT_TIMEOUT
+		);
+
+		assertThat(session.getStatus())
+				.isEqualTo(RoomSessionStatus.CANCELLED);
+		assertThat(session.getActualEndAt()).isEqualTo(endedAt);
+		assertThat(session.isEnded()).isTrue();
+	}
 }
