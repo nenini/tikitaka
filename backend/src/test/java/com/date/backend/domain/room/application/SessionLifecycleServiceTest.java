@@ -5,6 +5,7 @@ import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.event.AiSessionStartedEvent;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -12,6 +13,7 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.SessionErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +25,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +39,7 @@ class SessionLifecycleServiceTest {
 	private WaitingRoomRepository sessionRepository;
 	private RoomParticipantRepository participantRepository;
 	private LiveKitParticipantTokenIssuer tokenIssuer;
+	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
 	private WaitingRoom session;
 	private RoomParticipant participantA;
@@ -46,6 +50,7 @@ class SessionLifecycleServiceTest {
 		sessionRepository = mock(WaitingRoomRepository.class);
 		participantRepository = mock(RoomParticipantRepository.class);
 		tokenIssuer = mock(LiveKitParticipantTokenIssuer.class);
+		eventPublisher = mock(ApplicationEventPublisher.class);
 		service = new SessionLifecycleService(
 				sessionRepository,
 				participantRepository,
@@ -54,6 +59,7 @@ class SessionLifecycleServiceTest {
 						Duration.ofMinutes(10)
 				),
 				tokenIssuer,
+				eventPublisher,
 				Clock.fixed(
 						Instant.parse("2026-07-30T10:00:00Z"),
 						ZoneId.of("Asia/Seoul")
@@ -161,6 +167,9 @@ class SessionLifecycleServiceTest {
 		service.start(USER_A_ID, SESSION_ID);
 
 		verify(session).start(NOW);
+		verify(eventPublisher).publishEvent(
+				any(AiSessionStartedEvent.class)
+		);
 	}
 
 	@Test

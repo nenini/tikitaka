@@ -8,11 +8,13 @@ import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionParticipantStateResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
+import com.date.backend.domain.room.event.AiSessionStartedEvent;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.SessionErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class SessionLifecycleService {
 	private final RoomParticipantRepository participantRepository;
 	private final RoomEntryProperties entryProperties;
 	private final LiveKitParticipantTokenIssuer tokenIssuer;
+	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public SessionLifecycleService(
@@ -35,12 +38,14 @@ public class SessionLifecycleService {
 			RoomParticipantRepository participantRepository,
 			RoomEntryProperties entryProperties,
 			LiveKitParticipantTokenIssuer tokenIssuer,
+			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.entryProperties = entryProperties;
 		this.tokenIssuer = tokenIssuer;
+		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
 
@@ -110,6 +115,11 @@ public class SessionLifecycleService {
 			);
 		}
 		session.start(now);
+		eventPublisher.publishEvent(AiSessionStartedEvent.of(
+				session.getId(),
+				now.atZone(clock.getZone()).toInstant(),
+				participants
+		));
 		return createStatus(session, participants, now);
 	}
 

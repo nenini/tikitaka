@@ -2,6 +2,7 @@ package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.event.AiSessionEndedEvent;
 import com.date.backend.domain.room.event.SessionEndedEvent;
 import com.date.backend.domain.room.integration.LiveKitRoomManager;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -11,6 +12,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Service
@@ -18,15 +20,18 @@ public class SessionTerminationService {
 	private final WaitingRoomRepository sessionRepository;
 	private final LiveKitRoomManager liveKitRoomManager;
 	private final ApplicationEventPublisher eventPublisher;
+	private final Clock clock;
 
 	public SessionTerminationService(
 			WaitingRoomRepository sessionRepository,
 			LiveKitRoomManager liveKitRoomManager,
-			ApplicationEventPublisher eventPublisher
+			ApplicationEventPublisher eventPublisher,
+			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
 		this.liveKitRoomManager = liveKitRoomManager;
 		this.eventPublisher = eventPublisher;
+		this.clock = clock;
 	}
 
 	@Transactional
@@ -88,6 +93,11 @@ public class SessionTerminationService {
 						endedAt
 				)
 		);
+		eventPublisher.publishEvent(AiSessionEndedEvent.of(
+				session.getId(),
+				endedAt.atZone(clock.getZone()).toInstant(),
+				reason
+		));
 		return true;
 	}
 }

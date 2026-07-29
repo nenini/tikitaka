@@ -3,6 +3,8 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.event.AiSessionEndedEvent;
+import com.date.backend.domain.room.event.SessionEndedEvent;
 import com.date.backend.domain.room.integration.LiveKitRoomManager;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -11,7 +13,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +52,11 @@ class SessionTerminationServiceTest {
 		service = new SessionTerminationService(
 				sessionRepository,
 				liveKitRoomManager,
-				eventPublisher
+				eventPublisher,
+				Clock.fixed(
+						Instant.parse("2026-07-29T13:30:00Z"),
+						ZoneId.of("Asia/Seoul")
+				)
 		);
 	}
 
@@ -62,7 +71,8 @@ class SessionTerminationServiceTest {
 				SessionTerminationReason.TIME_EXPIRED
 		);
 		verify(liveKitRoomManager).deleteRoom("date-room-30");
-		verify(eventPublisher).publishEvent(any(Object.class));
+		verify(eventPublisher).publishEvent(any(SessionEndedEvent.class));
+		verify(eventPublisher).publishEvent(any(AiSessionEndedEvent.class));
 	}
 
 	@Test
