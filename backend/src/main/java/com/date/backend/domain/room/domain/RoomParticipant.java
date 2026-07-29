@@ -10,6 +10,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import java.time.LocalDateTime;
+import java.util.Objects;
+
 @Entity
 @Table(name = "session_participants")
 public class RoomParticipant {
@@ -32,6 +35,12 @@ public class RoomParticipant {
 	@Column(name = "participation_status", nullable = false, length = 20)
 	private String participationStatus;
 
+	@Column(name = "joined_at")
+	private LocalDateTime joinedAt;
+
+	@Column(name = "left_at")
+	private LocalDateTime leftAt;
+
 	@Column(name = "expression_analysis_enabled", nullable = false)
 	private boolean expressionAnalysisEnabled;
 
@@ -50,6 +59,10 @@ public class RoomParticipant {
 
 	public Long getUserId() {
 		return userId;
+	}
+
+	public String getParticipantRole() {
+		return participantRole;
 	}
 
 	public String getParticipationStatus() {
@@ -74,5 +87,22 @@ public class RoomParticipant {
 		}
 		this.participationStatus = "WAITING";
 		return true;
+	}
+
+	public boolean recordJoin(LocalDateTime joinedAt) {
+		if (this.joinedAt != null) {
+			return false;
+		}
+		this.joinedAt = Objects.requireNonNull(joinedAt);
+		this.leftAt = null;
+		return true;
+	}
+
+	public boolean isJoined() {
+		return joinedAt != null && leftAt == null;
+	}
+
+	public LocalDateTime getJoinedAt() {
+		return joinedAt;
 	}
 }

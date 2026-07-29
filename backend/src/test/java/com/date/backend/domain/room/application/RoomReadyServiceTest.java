@@ -67,6 +67,8 @@ class RoomReadyServiceTest {
 		when(room.getStatus()).thenReturn(RoomSessionStatus.SCHEDULED);
 		participant = new RoomParticipant(room, 101L, "USER_A");
 		when(roomRepository.findWithMatchPairById(1L)).thenReturn(Optional.of(room));
+		when(roomRepository.findWithMatchPairByIdForUpdate(1L))
+				.thenReturn(Optional.of(room));
 		when(participantRepository.findByRoomIdAndUserIdForUpdate(1L, 101L))
 				.thenReturn(Optional.of(participant));
 		when(participantRepository.findAllByRoom_IdOrderByUserIdAsc(1L))

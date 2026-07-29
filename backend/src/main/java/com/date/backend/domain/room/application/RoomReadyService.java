@@ -56,7 +56,7 @@ public class RoomReadyService {
 
 	@Transactional
 	public RoomParticipantsStatusResponse markReady(Long userId, Long roomId) {
-		WaitingRoom room = findRoom(roomId);
+		WaitingRoom room = findRoomForUpdate(roomId);
 		validateChangeable(room);
 		RoomParticipant participant = findParticipantForUpdate(userId, roomId);
 		RoomDeviceCheck latestCheck = deviceCheckRepository
@@ -68,6 +68,11 @@ public class RoomReadyService {
 
 		boolean changed = participant.markReady();
 		RoomParticipantsStatusResponse status = createStatus(roomId);
+		if (status.allReady()) {
+			room.markReady();
+		} else if (room.getStatus() == RoomSessionStatus.READY) {
+			room.markWaiting();
+		}
 		if (changed) {
 			publishChange(userId, true, status);
 		}
@@ -76,12 +81,15 @@ public class RoomReadyService {
 
 	@Transactional
 	public RoomParticipantsStatusResponse cancelReady(Long userId, Long roomId) {
-		WaitingRoom room = findRoom(roomId);
+		WaitingRoom room = findRoomForUpdate(roomId);
 		validateChangeable(room);
 		RoomParticipant participant = findParticipantForUpdate(userId, roomId);
 
 		boolean changed = participant.cancelReady();
 		RoomParticipantsStatusResponse status = createStatus(roomId);
+		if (room.getStatus() == RoomSessionStatus.READY) {
+			room.markWaiting();
+		}
 		if (changed) {
 			publishChange(userId, false, status);
 		}
@@ -98,6 +106,11 @@ public class RoomReadyService {
 
 	private WaitingRoom findRoom(Long roomId) {
 		return roomRepository.findWithMatchPairById(roomId)
+				.orElseThrow(() -> new BusinessException(RoomErrorCode.ROOM_NOT_FOUND));
+	}
+
+	private WaitingRoom findRoomForUpdate(Long roomId) {
+		return roomRepository.findWithMatchPairByIdForUpdate(roomId)
 				.orElseThrow(() -> new BusinessException(RoomErrorCode.ROOM_NOT_FOUND));
 	}
 

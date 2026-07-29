@@ -74,7 +74,7 @@ public class WaitingRoom {
 			throw new IllegalArgumentException("확정되어 일정이 지정된 매칭만 대기방을 생성할 수 있습니다.");
 		}
 		this.sessionType = "REAL_DATE";
-		this.status = RoomSessionStatus.SCHEDULED;
+		this.status = RoomSessionStatus.CREATED;
 		this.scheduledStartAt = matchPair.getScheduledAt();
 		this.plannedDurationSec = 1800;
 		this.extensionDurationSec = 0;
@@ -121,7 +121,37 @@ public class WaitingRoom {
 		return plannedDurationSec;
 	}
 
+	public int getExtensionDurationSec() {
+		return extensionDurationSec;
+	}
+
 	public String getLivekitRoomName() {
 		return livekitRoomName;
+	}
+
+	public void markWaiting() {
+		if (status == RoomSessionStatus.CREATED
+				|| status == RoomSessionStatus.SCHEDULED
+				|| status == RoomSessionStatus.READY) {
+			status = RoomSessionStatus.WAITING;
+		}
+	}
+
+	public void markReady() {
+		if (status == RoomSessionStatus.CREATED || status == RoomSessionStatus.WAITING) {
+			status = RoomSessionStatus.READY;
+		}
+	}
+
+	public boolean isInProgress() {
+		return status == RoomSessionStatus.IN_PROGRESS;
+	}
+
+	public void start(LocalDateTime startedAt) {
+		if (status != RoomSessionStatus.READY) {
+			throw new IllegalStateException("준비 완료된 세션만 시작할 수 있습니다.");
+		}
+		status = RoomSessionStatus.IN_PROGRESS;
+		actualStartAt = Objects.requireNonNull(startedAt);
 	}
 }
