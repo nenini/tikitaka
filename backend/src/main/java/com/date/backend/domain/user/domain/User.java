@@ -95,6 +95,10 @@ public class User {
 		this.passwordHash = passwordHash;
 	}
 
+	public void promoteToAdmin() {
+		this.role = UserRole.ADMIN;
+	}
+
 	public void withdraw(LocalDateTime withdrawnAt) {
 		this.accountStatus = AccountStatus.WITHDRAWN;
 		this.withdrawnAt = withdrawnAt;

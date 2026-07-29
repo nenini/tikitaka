@@ -17,4 +17,6 @@ public interface PracticeGoalCatalogRepository extends JpaRepository<PracticeGoa
 	List<PracticeGoalCatalog> findAllByIdInAndActiveTrue(Collection<Long> ids);
 
 	Optional<PracticeGoalCatalog> findByIdAndActiveTrue(Long id);
+
+	long countByActiveTrue();
 }

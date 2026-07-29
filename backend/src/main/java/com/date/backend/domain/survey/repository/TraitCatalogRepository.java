@@ -15,4 +15,6 @@ public interface TraitCatalogRepository extends JpaRepository<TraitCatalog, Long
 	List<TraitCatalog> findAllByIdInAndTypeAndActiveTrue(Collection<Long> ids, TraitType type);
 
 	Optional<TraitCatalog> findByIdAndTypeAndActiveTrue(Long id, TraitType type);
+
+	long countByTypeAndActiveTrue(TraitType type);
 }

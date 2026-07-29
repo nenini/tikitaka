@@ -19,3 +19,6 @@ spring:
 app:
   local-seed:
     match-test-users-enabled: ${LOCAL_MATCH_TEST_USERS_ENABLED:true}
+    admin-test-user-enabled: ${LOCAL_ADMIN_TEST_USER_ENABLED:true}
+    admin-email: ${LOCAL_ADMIN_EMAIL:admin@example.com}
+    admin-password: ${LOCAL_ADMIN_PASSWORD:qwer1234@}
