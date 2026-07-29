@@ -12,6 +12,7 @@ import com.date.backend.domain.match.policy.MatchAvailabilityPolicy;
 import com.date.backend.domain.match.policy.MatchEligibilityPolicy;
 import com.date.backend.domain.match.policy.MatchScore;
 import com.date.backend.domain.match.policy.MatchScorePolicy;
+import com.date.backend.domain.match.policy.MatchingPolicySnapshot;
 import com.date.backend.domain.match.repository.ActiveMatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchCandidateConstraintRepository;
 import com.date.backend.domain.match.repository.MatchPairRepository;
@@ -23,6 +24,7 @@ import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,7 @@ public class MatchCreationService {
 	private final MatchEligibilityPolicy eligibilityPolicy;
 	private final MatchAvailabilityPolicy availabilityPolicy;
 	private final MatchScorePolicy scorePolicy;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchCreationService(
 			MatchRequestRepository requestRepository,
@@ -66,7 +69,8 @@ public class MatchCreationService {
 			ProfileRepository profileRepository,
 			MatchEligibilityPolicy eligibilityPolicy,
 			MatchAvailabilityPolicy availabilityPolicy,
-			MatchScorePolicy scorePolicy
+			MatchScorePolicy scorePolicy,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.requestRepository = requestRepository;
 		this.activeRequestRepository = activeRequestRepository;
@@ -80,6 +84,7 @@ public class MatchCreationService {
 		this.eligibilityPolicy = eligibilityPolicy;
 		this.availabilityPolicy = availabilityPolicy;
 		this.scorePolicy = scorePolicy;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -88,7 +93,26 @@ public class MatchCreationService {
 			Long secondRequestId,
 			LocalDateTime matchedAt,
 			LocalDateTime acceptDeadlineAt,
-			LocalDateTime earliestSessionStart
+			LocalDateTime proposedScheduledAt
+	) {
+		return createMatch(
+				firstRequestId,
+				secondRequestId,
+				matchedAt,
+				acceptDeadlineAt,
+				proposedScheduledAt,
+				MatchingPolicySnapshot.defaults()
+		);
+	}
+
+	@Transactional
+	public boolean createMatch(
+			Long firstRequestId,
+			Long secondRequestId,
+			LocalDateTime matchedAt,
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt,
+			MatchingPolicySnapshot policy
 	) {
 		List<Long> requestIds = List.of(firstRequestId, secondRequestId);
 		List<MatchRequest> lockedRequests = requestRepository.findAllByIdForUpdate(
@@ -123,6 +147,13 @@ public class MatchCreationService {
 		if (constraintRepository.areUsersBlocked(first.getUserId(), second.getUserId())) {
 			return false;
 		}
+		if (constraintRepository.areUsersInCooldown(
+				first.getUserId(),
+				second.getUserId(),
+				matchedAt
+		)) {
+			return false;
+		}
 
 		Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
 				.collect(Collectors.toMap(User::getId, Function.identity()));
@@ -151,11 +182,13 @@ public class MatchCreationService {
 				.findAllByMatchRequest_IdIn(requestIds)
 				.stream()
 				.collect(Collectors.groupingBy(slot -> slot.getMatchRequest().getId()));
-		if (availabilityPolicy.findEarliestStart(
+		boolean proposedScheduleStillAvailable = availabilityPolicy.findEarliestStart(
 				slotsByRequest.getOrDefault(first.getId(), List.of()),
 				slotsByRequest.getOrDefault(second.getId(), List.of()),
-				earliestSessionStart
-		).isEmpty()) {
+				proposedScheduledAt,
+				policy.scheduleSearchDays()
+		).filter(proposedScheduledAt::equals).isPresent();
+		if (!proposedScheduleStillAvailable) {
 			return false;
 		}
 
@@ -169,7 +202,8 @@ public class MatchCreationService {
 				first,
 				traitsByRequest.getOrDefault(first.getId(), List.of()),
 				second,
-				traitsByRequest.getOrDefault(second.getId(), List.of())
+				traitsByRequest.getOrDefault(second.getId(), List.of()),
+				policy
 		);
 
 		MatchPair pair = pairRepository.save(new MatchPair(
@@ -178,7 +212,11 @@ public class MatchCreationService {
 				score.faceScore(),
 				score.traitScore(),
 				acceptDeadlineAt,
-				matchedAt
+				proposedScheduledAt,
+				matchedAt,
+				policy.policyVersion(),
+				policy.lateCancellationMinutes(),
+				policy.recentMatchExclusionDays()
 		));
 		responseRepository.saveAll(List.of(
 				new MatchResponse(pair, first.getUserId()),
@@ -186,6 +224,14 @@ public class MatchCreationService {
 		));
 		first.markMatchFound(matchedAt);
 		second.markMatchFound(matchedAt);
+		eventPublisher.publishEvent(new MatchFoundEvent(
+				pair.getId(),
+				pair.getUserAId(),
+				pair.getUserBId(),
+				pair.getMatchedAt(),
+				pair.getProposedScheduledAt(),
+				pair.getAcceptDeadlineAt()
+		));
 		return true;
 	}
 

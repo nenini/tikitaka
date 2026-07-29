@@ -23,7 +23,7 @@ import java.util.Objects;
 @Table(name = "match_pairs")
 public class MatchPair {
 
-	private static final BigDecimal MAX_COMPONENT_SCORE = new BigDecimal("50.000");
+	private static final BigDecimal MAX_COMPONENT_SCORE = new BigDecimal("100.000");
 	private static final BigDecimal MAX_TOTAL_SCORE = new BigDecimal("100.000");
 
 	@Id
@@ -64,6 +64,9 @@ public class MatchPair {
 	@Column(name = "matchedAt", nullable = false, updatable = false)
 	private LocalDateTime matchedAt;
 
+	@Column(name = "proposedScheduledAt", nullable = false, updatable = false)
+	private LocalDateTime proposedScheduledAt;
+
 	@Column(name = "scheduledAt")
 	private LocalDateTime scheduledAt;
 
@@ -82,6 +85,21 @@ public class MatchPair {
 	@Column(name = "isLateCancellation", nullable = false)
 	private boolean lateCancellation;
 
+	@Column(name = "policyVersion", nullable = false)
+	private long policyVersion = 1;
+
+	@Column(name = "lateCancellationMinutesSnapshot", nullable = false)
+	private int lateCancellationMinutesSnapshot = 60;
+
+	@Column(name = "recentMatchExclusionDaysSnapshot", nullable = false)
+	private int recentMatchExclusionDaysSnapshot = 7;
+
+	@Column(name = "closedAt")
+	private LocalDateTime closedAt;
+
+	@Column(name = "completedAt")
+	private LocalDateTime completedAt;
+
 	@Column(name = "updatedAt", nullable = false)
 	private LocalDateTime updatedAt;
 
@@ -93,7 +111,8 @@ public class MatchPair {
 			MatchRequest secondRequest,
 			BigDecimal faceScore,
 			BigDecimal traitScore,
-			LocalDateTime acceptDeadlineAt
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt
 	) {
 		this(
 				firstRequest,
@@ -101,7 +120,11 @@ public class MatchPair {
 				faceScore,
 				traitScore,
 				acceptDeadlineAt,
-				null
+				proposedScheduledAt,
+				null,
+				1,
+				60,
+				7
 		);
 	}
 
@@ -111,7 +134,34 @@ public class MatchPair {
 			BigDecimal faceScore,
 			BigDecimal traitScore,
 			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt,
 			LocalDateTime matchedAt
+	) {
+		this(
+				firstRequest,
+				secondRequest,
+				faceScore,
+				traitScore,
+				acceptDeadlineAt,
+				proposedScheduledAt,
+				matchedAt,
+				1,
+				60,
+				7
+		);
+	}
+
+	public MatchPair(
+			MatchRequest firstRequest,
+			MatchRequest secondRequest,
+			BigDecimal faceScore,
+			BigDecimal traitScore,
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt,
+			LocalDateTime matchedAt,
+			long policyVersion,
+			int lateCancellationMinutesSnapshot,
+			int recentMatchExclusionDaysSnapshot
 	) {
 		MatchRequest left = Objects.requireNonNull(firstRequest);
 		MatchRequest right = Objects.requireNonNull(secondRequest);
@@ -139,35 +189,74 @@ public class MatchPair {
 			throw new IllegalArgumentException("총 매칭 점수는 100점을 초과할 수 없습니다.");
 		}
 		this.acceptDeadlineAt = Objects.requireNonNull(acceptDeadlineAt);
+		this.proposedScheduledAt = Objects.requireNonNull(proposedScheduledAt);
+		if (!this.proposedScheduledAt.isAfter(this.acceptDeadlineAt)) {
+			throw new IllegalArgumentException(
+					"제안 세션 시각은 수락 마감 시각보다 늦어야 합니다."
+			);
+		}
 		this.matchedAt = matchedAt;
+		if (policyVersion <= 0
+				|| lateCancellationMinutesSnapshot <= 0
+				|| recentMatchExclusionDaysSnapshot <= 0) {
+			throw new IllegalArgumentException("매칭 정책 스냅숏 값이 올바르지 않습니다.");
+		}
+		this.policyVersion = policyVersion;
+		this.lateCancellationMinutesSnapshot = lateCancellationMinutesSnapshot;
+		this.recentMatchExclusionDaysSnapshot = recentMatchExclusionDaysSnapshot;
 	}
 
-	public void confirm(LocalDateTime confirmedAt, LocalDateTime scheduledAt) {
+	public void confirm(LocalDateTime confirmedAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 확정할 수 있습니다.");
 		}
 		LocalDateTime confirmationTime = Objects.requireNonNull(confirmedAt);
-		LocalDateTime scheduleTime = Objects.requireNonNull(scheduledAt);
-		if (!scheduleTime.isAfter(confirmationTime)) {
+		if (!confirmationTime.isBefore(acceptDeadlineAt)) {
+			throw new IllegalStateException("수락 마감이 지난 매칭은 확정할 수 없습니다.");
+		}
+		if (!proposedScheduledAt.isAfter(confirmationTime)) {
 			throw new IllegalArgumentException("예약 시각은 확정 시각보다 늦어야 합니다.");
 		}
 		this.status = MatchStatus.CONFIRMED;
 		this.confirmedAt = confirmationTime;
-		this.scheduledAt = scheduleTime;
+		this.scheduledAt = proposedScheduledAt;
 	}
 
 	public void reject() {
+		reject(LocalDateTime.now());
+	}
+
+	public void reject(LocalDateTime rejectedAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 거절할 수 있습니다.");
 		}
 		this.status = MatchStatus.REJECTED;
+		this.closedAt = Objects.requireNonNull(rejectedAt);
 	}
 
 	public void expire() {
+		expire(LocalDateTime.now());
+	}
+
+	public void expire(LocalDateTime expiredAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 만료할 수 있습니다.");
 		}
 		this.status = MatchStatus.EXPIRED;
+		this.closedAt = Objects.requireNonNull(expiredAt);
+	}
+
+	public void complete(LocalDateTime completedAt) {
+		if (status != MatchStatus.CONFIRMED) {
+			throw new IllegalStateException("확정된 매칭만 완료할 수 있습니다.");
+		}
+		LocalDateTime completionTime = Objects.requireNonNull(completedAt);
+		if (scheduledAt == null || completionTime.isBefore(scheduledAt)) {
+			throw new IllegalArgumentException("세션 시작 이후에만 매칭을 완료할 수 있습니다.");
+		}
+		this.status = MatchStatus.COMPLETED;
+		this.completedAt = completionTime;
+		this.closedAt = completionTime;
 	}
 
 	public void cancel(
@@ -195,6 +284,7 @@ public class MatchPair {
 		this.cancelledAt = cancellationTime;
 		this.cancellationReason = normalizeReason(reason);
 		this.lateCancellation = !cancellationTime.isBefore(scheduledAt.minus(threshold));
+		this.closedAt = cancellationTime;
 	}
 
 	public boolean isParticipant(Long userId) {
@@ -288,6 +378,10 @@ public class MatchPair {
 		return matchedAt;
 	}
 
+	public LocalDateTime getProposedScheduledAt() {
+		return proposedScheduledAt;
+	}
+
 	public LocalDateTime getScheduledAt() {
 		return scheduledAt;
 	}
@@ -310,5 +404,25 @@ public class MatchPair {
 
 	public boolean isLateCancellation() {
 		return lateCancellation;
+	}
+
+	public long getPolicyVersion() {
+		return policyVersion;
+	}
+
+	public int getLateCancellationMinutesSnapshot() {
+		return lateCancellationMinutesSnapshot;
+	}
+
+	public int getRecentMatchExclusionDaysSnapshot() {
+		return recentMatchExclusionDaysSnapshot;
+	}
+
+	public LocalDateTime getClosedAt() {
+		return closedAt;
+	}
+
+	public LocalDateTime getCompletedAt() {
+		return completedAt;
 	}
 }

@@ -52,6 +52,7 @@ public class SecurityConfig {
 				)
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
+						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 						.requestMatchers(
 								"/api/v1/auth/logout",
 								"/api/v1/auth/account"
@@ -64,6 +65,9 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/ai-chat/**").authenticated()
 						.requestMatchers("/api/v1/match-requests/**").authenticated()
 						.requestMatchers("/api/v1/matches/**").authenticated()
+						.requestMatchers("/api/v1/rooms/**").authenticated()
+						.requestMatchers("/api/v1/sessions/**").authenticated()
+						.requestMatchers("/api/v1/notifications/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)

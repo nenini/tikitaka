@@ -73,6 +73,9 @@ class MatchRepositoryTest {
 	private MatchPairRepository matchPairRepository;
 
 	@Autowired
+	private MatchCandidateConstraintRepository candidateConstraintRepository;
+
+	@Autowired
 	private MatchResponseRepository matchResponseRepository;
 
 	@Autowired
@@ -187,7 +190,8 @@ class MatchRepositoryTest {
 				requestA,
 				new BigDecimal("50.000"),
 				new BigDecimal("33.333"),
-				now.plusMinutes(10)
+				now.plusMinutes(10),
+				now.plusHours(2)
 		));
 		matchResponseRepository.saveAll(List.of(
 				new MatchResponse(pair, userA.getId()),
@@ -264,6 +268,84 @@ class MatchRepositoryTest {
 					assertThat(target.matchRequestId()).isEqualTo(dueRequest.getId());
 					assertThat(target.waitingStartedAt()).isEqualTo(now.minusHours(24));
 				});
+	}
+
+	@Test
+	void appliesStatusSpecificPairCooldownsUsingCreationPolicySnapshot() {
+		List<FaceTagCatalog> faceTags =
+				faceTagCatalogRepository.findAllByActiveTrueOrderByDisplayOrderAsc();
+		User userA = saveUser("cooldown-a@example.com", LocalDate.of(2000, 1, 1));
+		User userB = saveUser("cooldown-b@example.com", LocalDate.of(2000, 1, 2));
+		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 29, 10, 0);
+
+		MatchPair rejected = savePendingPair(
+				userA,
+				userB,
+				faceTags,
+				matchedAt,
+				7
+		);
+		rejected.reject(matchedAt.plusHours(1));
+
+		MatchPair expired = savePendingPair(
+				userA,
+				userB,
+				faceTags,
+				matchedAt.plusDays(10),
+				30
+		);
+		expired.expire(matchedAt.plusDays(10).plusHours(1));
+		entityManager.flush();
+
+		assertThat(candidateConstraintRepository.areUsersInCooldown(
+				userA.getId(),
+				userB.getId(),
+				matchedAt.plusDays(7)
+		)).isTrue();
+		assertThat(candidateConstraintRepository.areUsersInCooldown(
+				userA.getId(),
+				userB.getId(),
+				matchedAt.plusDays(8).plusHours(1)
+		)).isFalse();
+		assertThat(candidateConstraintRepository.areUsersInCooldown(
+				userA.getId(),
+				userB.getId(),
+				matchedAt.plusDays(11)
+		)).isTrue();
+		assertThat(candidateConstraintRepository.areUsersInCooldown(
+				userA.getId(),
+				userB.getId(),
+				matchedAt.plusDays(11).plusHours(2)
+		)).isFalse();
+	}
+
+	private MatchPair savePendingPair(
+			User userA,
+			User userB,
+			List<FaceTagCatalog> faceTags,
+			LocalDateTime matchedAt,
+			int recentMatchExclusionDays
+	) {
+		MatchRequest requestA = matchRequestRepository.save(new MatchRequest(
+				userA.getId(), (short) 20, (short) 40, faceTags.get(0), faceTags.get(0)
+		));
+		MatchRequest requestB = matchRequestRepository.save(new MatchRequest(
+				userB.getId(), (short) 20, (short) 40, faceTags.get(0), faceTags.get(0)
+		));
+		requestA.markMatchFound(matchedAt);
+		requestB.markMatchFound(matchedAt);
+		return matchPairRepository.save(new MatchPair(
+				requestA,
+				requestB,
+				new BigDecimal("50.000"),
+				new BigDecimal("50.000"),
+				matchedAt.plusHours(1),
+				matchedAt.plusHours(2),
+				matchedAt,
+				1,
+				60,
+				recentMatchExclusionDays
+		));
 	}
 
 	private User saveUser(String email, LocalDate birthDate) {

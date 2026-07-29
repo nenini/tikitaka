@@ -5,16 +5,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "match.scheduler")
 public record MatchSchedulerProperties(
 		long fixedDelayMs,
-		long initialDelayMs,
-		long acceptanceTimeoutSeconds,
-		long scheduleBufferSeconds
+		long initialDelayMs
 ) {
 
 	public MatchSchedulerProperties {
-		if (fixedDelayMs <= 0
-				|| initialDelayMs < 0
-				|| acceptanceTimeoutSeconds <= 0
-				|| scheduleBufferSeconds < 0) {
+		if (fixedDelayMs <= 0 || initialDelayMs < 0) {
 			throw new IllegalArgumentException("매칭 스케줄러 설정값이 올바르지 않습니다.");
 		}
 	}

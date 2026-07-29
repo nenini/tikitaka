@@ -105,7 +105,6 @@ ai:
 
 match:
   policy:
-    late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
     setting-recommendation-delay-seconds: ${MATCH_SETTING_RECOMMENDATION_DELAY_SECONDS:86400}
   worker:
     enabled: ${MATCH_WORKER_ENABLED:true}
@@ -120,5 +119,34 @@ match:
     enabled: ${MATCH_SCHEDULER_ENABLED:true}
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
     initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
-    acceptance-timeout-seconds: ${MATCH_ACCEPTANCE_TIMEOUT_SECONDS:300}
-    schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}
+
+room:
+  entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
+  entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}
+
+livekit:
+  url: ${LIVEKIT_URL:}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+  empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:2}
+
+notification:
+  waiting-recommendation:
+    enabled: ${NOTIFICATION_WAITING_RECOMMENDATION_ENABLED:true}
+    fixed-delay-ms: ${NOTIFICATION_WAITING_RECOMMENDATION_FIXED_DELAY_MS:600000}
+    initial-delay-ms: ${NOTIFICATION_WAITING_RECOMMENDATION_INITIAL_DELAY_MS:60000}
+    batch-size: ${NOTIFICATION_WAITING_RECOMMENDATION_BATCH_SIZE:100}
+  sse:
+    enabled: ${NOTIFICATION_SSE_ENABLED:true}
+    timeout-ms: ${NOTIFICATION_SSE_TIMEOUT_MS:1800000}
+    retry-ms: ${NOTIFICATION_SSE_RETRY_MS:3000}
+    heartbeat-interval-ms: ${NOTIFICATION_SSE_HEARTBEAT_INTERVAL_MS:30000}
+  worker:
+    enabled: ${NOTIFICATION_WORKER_ENABLED:true}
+    fixed-delay-ms: ${NOTIFICATION_WORKER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${NOTIFICATION_WORKER_INITIAL_DELAY_MS:10000}
+    batch-size: ${NOTIFICATION_WORKER_BATCH_SIZE:20}
+    max-attempts: ${NOTIFICATION_WORKER_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${NOTIFICATION_WORKER_RETRY_DELAY_SECONDS:5}
+    processing-timeout-seconds: ${NOTIFICATION_WORKER_PROCESSING_TIMEOUT_SECONDS:60}

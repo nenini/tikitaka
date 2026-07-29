@@ -14,17 +14,34 @@ import java.util.stream.Collectors;
 @Component
 public class MatchScorePolicy {
 
-	private static final BigDecimal DIRECTION_SCORE = new BigDecimal("25.000");
-	private static final BigDecimal PREFERRED_TRAIT_COUNT = new BigDecimal("3");
-
 	public MatchScore calculate(
 			MatchRequest first,
 			Collection<MatchRequestTraitSnapshot> firstTraits,
 			MatchRequest second,
 			Collection<MatchRequestTraitSnapshot> secondTraits
 	) {
-		BigDecimal faceScore = scoreFace(first, second);
-		BigDecimal traitScore = scoreTraits(firstTraits, secondTraits);
+		return calculate(
+				first,
+				firstTraits,
+				second,
+				secondTraits,
+				MatchingPolicySnapshot.defaults()
+		);
+	}
+
+	public MatchScore calculate(
+			MatchRequest first,
+			Collection<MatchRequestTraitSnapshot> firstTraits,
+			MatchRequest second,
+			Collection<MatchRequestTraitSnapshot> secondTraits,
+			MatchingPolicySnapshot policy
+	) {
+		BigDecimal faceScore = scoreFace(first, second, policy.faceTypeWeight());
+		BigDecimal traitScore = scoreTraits(
+				firstTraits,
+				secondTraits,
+				policy.personalityWeight()
+		);
 		return new MatchScore(
 				faceScore,
 				traitScore,
@@ -32,36 +49,48 @@ public class MatchScorePolicy {
 		);
 	}
 
-	private BigDecimal scoreFace(MatchRequest first, MatchRequest second) {
-		BigDecimal score = BigDecimal.ZERO.setScale(3);
+	private BigDecimal scoreFace(
+			MatchRequest first,
+			MatchRequest second,
+			int weight
+	) {
+		int matches = 0;
 		if (first.getPreferredFaceTag().getId().equals(second.getActualFaceTag().getId())) {
-			score = score.add(DIRECTION_SCORE);
+			matches++;
 		}
 		if (second.getPreferredFaceTag().getId().equals(first.getActualFaceTag().getId())) {
-			score = score.add(DIRECTION_SCORE);
+			matches++;
 		}
-		return score;
+		return weightedScore(matches, 2, weight);
 	}
 
 	private BigDecimal scoreTraits(
 			Collection<MatchRequestTraitSnapshot> firstTraits,
-			Collection<MatchRequestTraitSnapshot> secondTraits
+			Collection<MatchRequestTraitSnapshot> secondTraits,
+			int weight
 	) {
 		Set<Long> firstPreferred = traitIds(firstTraits, TraitSnapshotType.PREFERRED);
 		Set<Long> firstSelf = traitIds(firstTraits, TraitSnapshotType.SELF);
 		Set<Long> secondPreferred = traitIds(secondTraits, TraitSnapshotType.PREFERRED);
 		Set<Long> secondSelf = traitIds(secondTraits, TraitSnapshotType.SELF);
 
-		return directionalTraitScore(firstPreferred, secondSelf)
-				.add(directionalTraitScore(secondPreferred, firstSelf))
-				.setScale(3, RoundingMode.HALF_UP);
+		long matches = directionalTraitMatches(firstPreferred, secondSelf)
+				+ directionalTraitMatches(secondPreferred, firstSelf);
+		int possibleMatches = firstPreferred.size() + secondPreferred.size();
+		return weightedScore(matches, possibleMatches, weight);
 	}
 
-	private BigDecimal directionalTraitScore(Set<Long> preferred, Set<Long> actual) {
-		long matches = preferred.stream().filter(actual::contains).count();
+	private long directionalTraitMatches(Set<Long> preferred, Set<Long> actual) {
+		return preferred.stream().filter(actual::contains).count();
+	}
+
+	private BigDecimal weightedScore(long matches, int possibleMatches, int weight) {
+		if (possibleMatches == 0 || weight == 0) {
+			return BigDecimal.ZERO.setScale(3);
+		}
 		return BigDecimal.valueOf(matches)
-				.multiply(DIRECTION_SCORE)
-				.divide(PREFERRED_TRAIT_COUNT, 3, RoundingMode.HALF_UP);
+				.multiply(BigDecimal.valueOf(weight))
+				.divide(BigDecimal.valueOf(possibleMatches), 3, RoundingMode.HALF_UP);
 	}
 
 	private Set<Long> traitIds(

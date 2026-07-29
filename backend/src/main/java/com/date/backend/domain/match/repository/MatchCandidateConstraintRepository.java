@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 @Repository
 public class MatchCandidateConstraintRepository {
@@ -59,5 +60,87 @@ public class MatchCandidateConstraintRepository {
 				)
 				""", parameters, Integer.class);
 		return count != null && count > 0;
+	}
+
+	public Set<Long> findCooldownCandidateUserIds(
+			Long sourceUserId,
+			Collection<Long> candidateUserIds,
+			LocalDateTime now
+	) {
+		if (candidateUserIds.isEmpty()) {
+			return Set.of();
+		}
+		MapSqlParameterSource parameters = cooldownParameters(
+				sourceUserId,
+				null,
+				now
+		).addValue("candidateUserIds", candidateUserIds);
+		return new HashSet<>(jdbcTemplate.queryForList("""
+				SELECT DISTINCT CASE
+					WHEN userAId = :sourceUserId THEN userBId
+					ELSE userAId
+				END AS candidateUserId
+				FROM match_pairs
+				WHERE (
+					(userAId = :sourceUserId AND userBId IN (:candidateUserIds))
+					OR (userBId = :sourceUserId AND userAId IN (:candidateUserIds))
+				)
+				AND (
+					(status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+						AND COALESCE(completedAt, closedAt, cancelledAt) <= :now
+						AND TIMESTAMPADD(
+							DAY,
+							recentMatchExclusionDaysSnapshot,
+							COALESCE(completedAt, closedAt, cancelledAt)
+						) > :now)
+					OR (status = 'EXPIRED'
+						AND closedAt <= :now
+						AND TIMESTAMPADD(HOUR, 24, closedAt) > :now)
+				)
+				""", parameters, Long.class));
+	}
+
+	public boolean areUsersInCooldown(
+			Long firstUserId,
+			Long secondUserId,
+			LocalDateTime now
+	) {
+		MapSqlParameterSource parameters = cooldownParameters(
+				firstUserId,
+				secondUserId,
+				now
+		);
+		Integer count = jdbcTemplate.queryForObject("""
+				SELECT COUNT(*)
+				FROM match_pairs
+				WHERE (
+					(userAId = :sourceUserId AND userBId = :candidateUserId)
+					OR (userBId = :sourceUserId AND userAId = :candidateUserId)
+				)
+				AND (
+					(status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+						AND COALESCE(completedAt, closedAt, cancelledAt) <= :now
+						AND TIMESTAMPADD(
+							DAY,
+							recentMatchExclusionDaysSnapshot,
+							COALESCE(completedAt, closedAt, cancelledAt)
+						) > :now)
+					OR (status = 'EXPIRED'
+						AND closedAt <= :now
+						AND TIMESTAMPADD(HOUR, 24, closedAt) > :now)
+				)
+				""", parameters, Integer.class);
+		return count != null && count > 0;
+	}
+
+	private MapSqlParameterSource cooldownParameters(
+			Long sourceUserId,
+			Long candidateUserId,
+			LocalDateTime now
+	) {
+		return new MapSqlParameterSource()
+				.addValue("sourceUserId", sourceUserId)
+				.addValue("candidateUserId", candidateUserId)
+				.addValue("now", now);
 	}
 }

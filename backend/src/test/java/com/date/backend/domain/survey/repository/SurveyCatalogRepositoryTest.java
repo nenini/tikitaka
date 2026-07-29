@@ -48,6 +48,10 @@ class SurveyCatalogRepositoryTest {
 		assertThat(traits).extracting(TraitCatalog::getDisplayOrder).isSorted();
 		assertThat(practiceGoals).hasSize(5);
 		assertThat(practiceGoals).extracting(PracticeGoalCatalog::getDisplayOrder).isSorted();
+		assertThat(faceTagCatalogRepository.countByActiveTrue()).isEqualTo(10);
+		assertThat(traitCatalogRepository.countByTypeAndActiveTrue(TraitType.PERSONALITY))
+				.isEqualTo(11);
+		assertThat(practiceGoalCatalogRepository.countByActiveTrue()).isEqualTo(5);
 	}
 
 	@Test

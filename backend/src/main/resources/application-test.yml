@@ -13,8 +13,6 @@ spring:
       ddl-auto: create-drop
 
 match:
-  policy:
-    late-cancellation-threshold-seconds: 86400
   worker:
     enabled: false
     fixed-delay-ms: 1000
@@ -28,5 +26,23 @@ match:
     enabled: false
     fixed-delay-ms: 10000
     initial-delay-ms: 10000
-    acceptance-timeout-seconds: 300
-    schedule-buffer-seconds: 3600
+
+notification:
+  waiting-recommendation:
+    enabled: false
+    fixed-delay-ms: 600000
+    initial-delay-ms: 60000
+    batch-size: 100
+  sse:
+    enabled: false
+    timeout-ms: 1800000
+    retry-ms: 3000
+    heartbeat-interval-ms: 30000
+  worker:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 10000
+    batch-size: 20
+    max-attempts: 3
+    retry-delay-seconds: 5
+    processing-timeout-seconds: 60

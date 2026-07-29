@@ -1,18 +1,20 @@
 package com.date.backend.domain.match.application;
 
-import com.date.backend.domain.match.config.MatchSchedulerProperties;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchResponse;
 import com.date.backend.domain.match.domain.MatchStatus;
 import com.date.backend.domain.match.dto.response.MatchResultResponse;
-import com.date.backend.domain.match.policy.MatchAvailabilityPolicy;
+import com.date.backend.domain.match.repository.ActiveMatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchPairRepository;
-import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
+import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
+import com.date.backend.domain.room.domain.WaitingRoom;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -23,9 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -39,32 +40,31 @@ class MatchResultServiceTest {
 	private final MatchPairRepository pairRepository = mock(MatchPairRepository.class);
 	private final MatchResponseRepository responseRepository =
 			mock(MatchResponseRepository.class);
-	private final MatchRequestSlotRepository slotRepository =
-			mock(MatchRequestSlotRepository.class);
-	private final MatchAvailabilityPolicy availabilityPolicy =
-			mock(MatchAvailabilityPolicy.class);
+	private final ActiveMatchRequestRepository activeRequestRepository =
+			mock(ActiveMatchRequestRepository.class);
 	private final ProfileService profileService = mock(ProfileService.class);
 	private final MatchJobEnqueueService jobEnqueueService =
 			mock(MatchJobEnqueueService.class);
+	private final WaitingRoomProvisioningService waitingRoomProvisioningService =
+			mock(WaitingRoomProvisioningService.class);
+	private final WaitingRoomRepository waitingRoomRepository =
+			mock(WaitingRoomRepository.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
 	);
-	private final MatchSchedulerProperties properties = new MatchSchedulerProperties(
-			10_000,
-			10_000,
-			300,
-			3_600
-	);
 	private final MatchResultService service = new MatchResultService(
 			pairRepository,
 			responseRepository,
-			slotRepository,
-			availabilityPolicy,
+			activeRequestRepository,
 			profileService,
-			properties,
 			clock,
-			jobEnqueueService
+			jobEnqueueService,
+			waitingRoomProvisioningService,
+			waitingRoomRepository,
+			eventPublisher
 	);
 
 	@Test
@@ -75,7 +75,7 @@ class MatchResultServiceTest {
 		MatchResponse responseA = new MatchResponse(pair, USER_A_ID);
 		MatchResponse responseB = new MatchResponse(pair, USER_B_ID);
 		responseA.accept(NOW.minusMinutes(1));
-		LocalDateTime scheduledAt = NOW.plusHours(2);
+		LocalDateTime proposedScheduledAt = NOW.plusHours(2);
 
 		when(pairRepository.findByIdForUpdate(PAIR_ID)).thenReturn(Optional.of(pair));
 		when(responseRepository.findForUpdateByMatchPair_IdAndUserId(
@@ -84,30 +84,33 @@ class MatchResultServiceTest {
 		)).thenReturn(Optional.of(responseB));
 		when(responseRepository.findAllByMatchPair_IdOrderByUserIdAsc(PAIR_ID))
 				.thenReturn(List.of(responseA, responseB));
-		when(slotRepository.findAllByMatchRequest_IdOrderByDayOfWeekAscStartTimeAsc(
-				requestA.getId()
-		)).thenReturn(List.of());
-		when(slotRepository.findAllByMatchRequest_IdOrderByDayOfWeekAscStartTimeAsc(
-				requestB.getId()
-		)).thenReturn(List.of());
-		when(availabilityPolicy.findEarliestStart(
-				anyCollection(),
-				anyCollection(),
-				eq(NOW.plusHours(1))
-		)).thenReturn(Optional.of(scheduledAt));
+		when(pair.getProposedScheduledAt()).thenReturn(proposedScheduledAt);
 		when(profileService.getPublicProfile(USER_A_ID))
 				.thenReturn(mock(PublicProfileResponse.class));
+		WaitingRoom waitingRoom = mock(WaitingRoom.class);
+		when(waitingRoom.getId()).thenReturn(15L);
+		when(waitingRoomRepository.findByMatchPair_Id(PAIR_ID))
+				.thenReturn(Optional.of(waitingRoom));
 
 		MatchResultResponse result = service.accept(PAIR_ID, USER_B_ID);
 
-		verify(pair).confirm(NOW, scheduledAt);
+		verify(pair).confirm(NOW);
 		verify(requestA).confirm();
 		verify(requestB).confirm();
+		verify(waitingRoomProvisioningService).provision(pair);
+		verify(eventPublisher).publishEvent(new MatchConfirmedEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				NOW,
+				proposedScheduledAt
+		));
+		assertThat(result.roomId()).isEqualTo(15L);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}
 
 	@Test
-	void rejectsPairAndReturnsBothRequestsToWaiting() {
+	void rejectionEndsRejectingRequestAndRequeuesOnlyPartner() {
 		MatchPair pair = pair(MatchStatus.PENDING_ACCEPTANCE);
 		MatchRequest requestA = pair.getRequestA();
 		MatchRequest requestB = pair.getRequestB();
@@ -126,9 +129,18 @@ class MatchResultServiceTest {
 
 		MatchResultResponse result = service.reject(PAIR_ID, USER_A_ID);
 
-		verify(pair).reject();
-		verify(requestA).returnToWaiting(NOW);
+		verify(pair).reject(NOW);
+		verify(requestA).reject(NOW);
 		verify(requestB).returnToWaiting(NOW);
+		verify(activeRequestRepository).deleteById(USER_A_ID);
+		verify(jobEnqueueService).enqueue(requestB);
+		verify(jobEnqueueService, never()).enqueue(requestA);
+		verify(eventPublisher).publishEvent(new MatchRejectedEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				NOW
+		));
 		assertThat(result.myResponse().name()).isEqualTo("REJECTED");
 	}
 
@@ -148,8 +160,9 @@ class MatchResultServiceTest {
 		when(pair.getFaceScore()).thenReturn(new BigDecimal("25.000"));
 		when(pair.getTraitScore()).thenReturn(new BigDecimal("25.000"));
 		when(pair.getTotalScore()).thenReturn(new BigDecimal("50.000"));
-		when(pair.getAcceptDeadlineAt()).thenReturn(NOW.plusMinutes(5));
+		when(pair.getAcceptDeadlineAt()).thenReturn(NOW.plusHours(8));
 		when(pair.getMatchedAt()).thenReturn(NOW.minusMinutes(1));
+		when(pair.getProposedScheduledAt()).thenReturn(NOW.plusHours(10));
 		return pair;
 	}
 

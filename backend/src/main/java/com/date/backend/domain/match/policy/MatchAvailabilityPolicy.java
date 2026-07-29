@@ -16,15 +16,25 @@ import java.util.Optional;
 public class MatchAvailabilityPolicy {
 
 	private static final Duration SESSION_DURATION = Duration.ofMinutes(30);
-	private static final int HORIZON_DAYS = 7;
-
 	public Optional<LocalDateTime> findEarliestStart(
 			Collection<MatchRequestSlot> firstSlots,
 			Collection<MatchRequestSlot> secondSlots,
 			LocalDateTime earliestStart
 	) {
+		return findEarliestStart(firstSlots, secondSlots, earliestStart, 7);
+	}
+
+	public Optional<LocalDateTime> findEarliestStart(
+			Collection<MatchRequestSlot> firstSlots,
+			Collection<MatchRequestSlot> secondSlots,
+			LocalDateTime earliestStart,
+			int horizonDays
+	) {
+		if (horizonDays < 1) {
+			throw new IllegalArgumentException("세션 탐색 기간은 1일 이상이어야 합니다.");
+		}
 		LocalDateTime normalizedStart = ceilToMinute(earliestStart);
-		LocalDateTime horizonEnd = normalizedStart.plusDays(HORIZON_DAYS);
+		LocalDateTime horizonEnd = normalizedStart.plusDays(horizonDays);
 
 		return firstSlots.stream()
 				.flatMap(first -> secondSlots.stream()
@@ -33,7 +43,8 @@ public class MatchAvailabilityPolicy {
 								first,
 								second,
 								normalizedStart,
-								horizonEnd
+								horizonEnd,
+								horizonDays
 						)))
 				.flatMap(Optional::stream)
 				.min(Comparator.naturalOrder());
@@ -43,7 +54,8 @@ public class MatchAvailabilityPolicy {
 			MatchRequestSlot first,
 			MatchRequestSlot second,
 			LocalDateTime earliestStart,
-			LocalDateTime horizonEnd
+			LocalDateTime horizonEnd,
+			int horizonDays
 	) {
 		LocalTime commonStart = later(first.getStartTime(), second.getStartTime());
 		LocalTime commonEnd = earlier(first.getEndTime(), second.getEndTime());
@@ -51,7 +63,7 @@ public class MatchAvailabilityPolicy {
 			return Optional.empty();
 		}
 
-		for (int dayOffset = 0; dayOffset <= HORIZON_DAYS; dayOffset++) {
+		for (int dayOffset = 0; dayOffset <= horizonDays; dayOffset++) {
 			LocalDate date = earliestStart.toLocalDate().plusDays(dayOffset);
 			if (date.getDayOfWeek() != first.getDayOfWeek()) {
 				continue;

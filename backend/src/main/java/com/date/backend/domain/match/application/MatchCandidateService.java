@@ -10,6 +10,7 @@ import com.date.backend.domain.match.policy.MatchAvailabilityPolicy;
 import com.date.backend.domain.match.policy.MatchEligibilityPolicy;
 import com.date.backend.domain.match.policy.MatchScore;
 import com.date.backend.domain.match.policy.MatchScorePolicy;
+import com.date.backend.domain.match.policy.MatchingPolicySnapshot;
 import com.date.backend.domain.match.repository.MatchCandidateConstraintRepository;
 import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
@@ -90,6 +91,21 @@ public class MatchCandidateService {
 			Long sourceRequestId,
 			LocalDateTime earliestSessionStart
 	) {
+		return findBestCandidate(
+				sourceRequestId,
+				earliestSessionStart,
+				earliestSessionStart,
+				MatchingPolicySnapshot.defaults()
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public Optional<MatchCandidate> findBestCandidate(
+			Long sourceRequestId,
+			LocalDateTime earliestSessionStart,
+			LocalDateTime evaluatedAt,
+			MatchingPolicySnapshot policy
+	) {
 		MatchRequest source = matchRequestRepository.findByIdWithFaceTags(sourceRequestId)
 				.orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다."));
 		if (source.getStatus() != MatchRequestStatus.WAITING) {
@@ -127,6 +143,12 @@ public class MatchCandidateService {
 				source.getUserId(),
 				candidates.stream().map(MatchRequest::getUserId).toList()
 		);
+		Set<Long> cooldownCandidateIds = constraintRepository
+				.findCooldownCandidateUserIds(
+						source.getUserId(),
+						candidates.stream().map(MatchRequest::getUserId).toList(),
+						evaluatedAt
+				);
 		Set<Long> usersWithActiveMatch = activeMatchUserIds(
 				matchPairRepository.findAllActiveByParticipantUserIds(
 						userIds,
@@ -153,6 +175,7 @@ public class MatchCandidateService {
 
 		return candidates.stream()
 				.filter(candidate -> !blockedCandidateIds.contains(candidate.getUserId()))
+				.filter(candidate -> !cooldownCandidateIds.contains(candidate.getUserId()))
 				.filter(candidate -> !usersWithActiveMatch.contains(candidate.getUserId()))
 				.map(candidate -> toCandidate(
 						source,
@@ -165,7 +188,8 @@ public class MatchCandidateService {
 						profilesByUserId.get(candidate.getUserId()),
 						slotsByRequestId.getOrDefault(candidate.getId(), List.of()),
 						traitsByRequestId.getOrDefault(candidate.getId(), List.of()),
-						earliestSessionStart
+						earliestSessionStart,
+						policy
 				))
 				.flatMap(Optional::stream)
 				.min(CANDIDATE_ORDER);
@@ -182,7 +206,8 @@ public class MatchCandidateService {
 			Profile candidateProfile,
 			List<MatchRequestSlot> candidateSlots,
 			List<MatchRequestTraitSnapshot> candidateTraits,
-			LocalDateTime earliestSessionStart
+			LocalDateTime earliestSessionStart,
+			MatchingPolicySnapshot policy
 	) {
 		if (candidateUser == null
 				|| candidateProfile == null
@@ -200,14 +225,16 @@ public class MatchCandidateService {
 		return availabilityPolicy.findEarliestStart(
 						sourceSlots,
 						candidateSlots,
-						earliestSessionStart
+						earliestSessionStart,
+						policy.scheduleSearchDays()
 				)
 				.map(start -> {
 					MatchScore score = scorePolicy.calculate(
 							source,
 							sourceTraits,
 							candidate,
-							candidateTraits
+							candidateTraits,
+							policy
 					);
 					return new MatchCandidate(candidate, score, start);
 				});
