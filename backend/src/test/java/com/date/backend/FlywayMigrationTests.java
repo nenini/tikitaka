@@ -142,6 +142,14 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '28'",
 				Integer.class
 		);
+		Integer sessionMissionMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '30'",
+				Integer.class
+		);
+		Integer missionCatalogTableCount = tableCount("MISSION_CATALOG");
+		Integer sessionMissionTableCount = tableCount("SESSION_MISSIONS");
+		Integer missionCatalogRowCount = rowCount("mission_catalog");
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
 		Integer proposedScheduledAtColumnCount = columnCount(
 				"MATCH_PAIRS",
@@ -182,7 +190,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(26);
+		assertThat(migrationCount).isEqualTo(27);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -229,6 +237,10 @@ class FlywayMigrationTests {
 		assertThat(sessionRecoveryMigrationCount).isEqualTo(1);
 		assertThat(sessionMediaMigrationCount).isEqualTo(1);
 		assertThat(sessionTimerMigrationCount).isEqualTo(1);
+		assertThat(sessionMissionMigrationCount).isEqualTo(1);
+		assertThat(missionCatalogTableCount).isEqualTo(1);
+		assertThat(sessionMissionTableCount).isEqualTo(1);
+		assertThat(missionCatalogRowCount).isEqualTo(4);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);

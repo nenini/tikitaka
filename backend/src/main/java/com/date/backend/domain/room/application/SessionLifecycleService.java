@@ -1,5 +1,6 @@
 package com.date.backend.domain.room.application;
 
+import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
@@ -30,6 +31,7 @@ public class SessionLifecycleService {
 	private final RoomParticipantRepository participantRepository;
 	private final RoomEntryProperties entryProperties;
 	private final LiveKitParticipantTokenIssuer tokenIssuer;
+	private final SessionMissionProvisioningService missionProvisioningService;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
@@ -38,6 +40,7 @@ public class SessionLifecycleService {
 			RoomParticipantRepository participantRepository,
 			RoomEntryProperties entryProperties,
 			LiveKitParticipantTokenIssuer tokenIssuer,
+			SessionMissionProvisioningService missionProvisioningService,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
@@ -45,6 +48,7 @@ public class SessionLifecycleService {
 		this.participantRepository = participantRepository;
 		this.entryProperties = entryProperties;
 		this.tokenIssuer = tokenIssuer;
+		this.missionProvisioningService = missionProvisioningService;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
@@ -115,6 +119,7 @@ public class SessionLifecycleService {
 			);
 		}
 		session.start(now);
+		missionProvisioningService.provision(session, participants, now);
 		eventPublisher.publishEvent(AiSessionStartedEvent.of(
 				session.getId(),
 				now.atZone(clock.getZone()).toInstant(),

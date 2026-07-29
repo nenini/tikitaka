@@ -1,5 +1,6 @@
 package com.date.backend.domain.room.application;
 
+import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
@@ -39,6 +40,7 @@ class SessionLifecycleServiceTest {
 	private WaitingRoomRepository sessionRepository;
 	private RoomParticipantRepository participantRepository;
 	private LiveKitParticipantTokenIssuer tokenIssuer;
+	private SessionMissionProvisioningService missionProvisioningService;
 	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
 	private WaitingRoom session;
@@ -50,6 +52,8 @@ class SessionLifecycleServiceTest {
 		sessionRepository = mock(WaitingRoomRepository.class);
 		participantRepository = mock(RoomParticipantRepository.class);
 		tokenIssuer = mock(LiveKitParticipantTokenIssuer.class);
+		missionProvisioningService =
+				mock(SessionMissionProvisioningService.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
 		service = new SessionLifecycleService(
 				sessionRepository,
@@ -59,6 +63,7 @@ class SessionLifecycleServiceTest {
 						Duration.ofMinutes(10)
 				),
 				tokenIssuer,
+				missionProvisioningService,
 				eventPublisher,
 				Clock.fixed(
 						Instant.parse("2026-07-30T10:00:00Z"),
@@ -167,6 +172,11 @@ class SessionLifecycleServiceTest {
 		service.start(USER_A_ID, SESSION_ID);
 
 		verify(session).start(NOW);
+		verify(missionProvisioningService).provision(
+				session,
+				List.of(participantA, participantB),
+				NOW
+		);
 		verify(eventPublisher).publishEvent(
 				any(AiSessionStartedEvent.class)
 		);
