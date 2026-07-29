@@ -184,14 +184,4 @@ export function ConsentManagePage() {
   )
 }
 
-/** 개인정보 수정·관리(W-19b · FE-ACCOUNT-02 · 465) — 별도 스토리. 다음 차수 구현. */
-export function AccountEditPage() {
-  return (
-    <AuthPlaceholder
-      title="개인정보 수정·관리 (W-19b)"
-      note="얼굴 재촬영 · 이상형 설문 · 기본 프로필 · 지역 수정 — 다음 차수에서 구현합니다."
-      backTo="/me"
-      backLabel="마이페이지로 돌아가기"
-    />
-  )
-}
+/* 개인정보 수정·관리(W-19b)는 features/account/AccountEditPage.tsx 로 분리 구현됨 */

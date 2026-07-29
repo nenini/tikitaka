@@ -9,7 +9,14 @@ import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
-import { MyPage, ConsentManagePage, AccountEditPage } from '@/features/account/MyPage'
+import { MyPage, ConsentManagePage } from '@/features/account/MyPage'
+import {
+  AccountEditPage,
+  FaceRecapturePage,
+  SurveyEditPage,
+  ProfileEditPage,
+  RegionEditPage,
+} from '@/features/account/AccountEditPage'
 import { SessionPage } from '@/features/session/SessionPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 
@@ -42,7 +49,12 @@ export const router = createBrowserRouter([
           { path: '/growth', element: <ComingSoon title="성장" /> },
           { path: '/me', element: <MyPage /> },
           { path: '/me/consent', element: <ConsentManagePage /> },
+          // 개인정보 수정·관리(W-19b) 허브 + 항목별 별도 편집 화면(이번 차수 스텁)
           { path: '/me/edit', element: <AccountEditPage /> },
+          { path: '/me/edit/face', element: <FaceRecapturePage /> },
+          { path: '/me/edit/survey', element: <SurveyEditPage /> },
+          { path: '/me/edit/profile', element: <ProfileEditPage /> },
+          { path: '/me/edit/region', element: <RegionEditPage /> },
         ],
       },
       // ── 몰입형(다크 고정) — 셸 밖 ──
