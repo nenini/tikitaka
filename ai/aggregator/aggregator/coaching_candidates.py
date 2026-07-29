@@ -11,6 +11,7 @@ CoachingType: TypeAlias = Literal[
     "VISION_SETUP_GUIDANCE",
     "REACTION_PROMPT",
     "RESPONSE_PROMPT",
+    "EXPRESSION_GUIDANCE",
     "SPEAKING_BALANCE",
 ]
 CoachingPriority: TypeAlias = Literal["LOW", "MEDIUM", "HIGH"]
@@ -27,4 +28,3 @@ class CoachingCandidate:
     triggered_at_ms: int
     trigger_id: str
     priority: CoachingPriority = "LOW"
-

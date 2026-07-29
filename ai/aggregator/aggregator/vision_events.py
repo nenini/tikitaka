@@ -514,7 +514,7 @@ VisionEvent: TypeAlias = Annotated[
     VisionBehaviorEvent | VisionMetricSnapshot,
     Field(discriminator="kind"),
 ]
-VISION_EVENT_ADAPTER = TypeAdapter(VisionEvent)
+VISION_EVENT_ADAPTER: TypeAdapter[VisionEvent] = TypeAdapter(VisionEvent)
 
 
 class VisionEventBatch(_ContractModel):

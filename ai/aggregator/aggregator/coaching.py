@@ -16,7 +16,11 @@ from aggregator.coaching_candidates import (
     CoachingPriority,
     CoachingType,
 )
-from aggregator.coaching_catalog import COACHING_MESSAGES, COACHING_TEMPLATES
+from aggregator.coaching_catalog import (
+    COACHING_KEYS_BY_TYPE,
+    COACHING_MESSAGES,
+    COACHING_TEMPLATES,
+)
 from aggregator.config import MvpCoachingConfig
 from aggregator.events import AnalysisEvent, SilenceDetected
 from aggregator.state import SessionState
@@ -80,6 +84,8 @@ class CoachingPolicy:
         self.config = resolved
         self._last_by_target_and_type: dict[tuple[str, str], int] = {}
         self._count_by_target: dict[str, int] = {}
+        self._count_by_target_and_type: dict[tuple[str, str], int] = {}
+        self._message_index_by_target_and_type: dict[tuple[str, str], int] = {}
         self._seen_trigger_keys: set[tuple[str, str, str]] = set()
         self._trigger_key_order: deque[tuple[str, str, str]] = deque()
         self._count = 0
@@ -121,12 +127,28 @@ class CoachingPolicy:
         target_count = self._count_by_target.get(target, 0)
         if target != "session" and target_count >= self.config.max_per_user:
             return None
+        target_type_key = (target, candidate.coaching_type)
+        target_type_count = self._count_by_target_and_type.get(
+            target_type_key, 0
+        )
+        if (
+            candidate.coaching_type == "EXPRESSION_GUIDANCE"
+            and target_type_count >= self.config.low_smile_max_per_user
+        ):
+            return None
 
         trigger_key = (target, candidate.coaching_type, candidate.trigger_id)
         if trigger_key in self._seen_trigger_keys:
             return None
 
-        cooldown_key = (target, candidate.coaching_type)
+        # Setup problems are independent: an initialization hiccup must not
+        # silence a later face-missing or low-light instruction.
+        cooldown_scope = (
+            candidate.reason_code
+            if candidate.coaching_type == "VISION_SETUP_GUIDANCE"
+            else candidate.coaching_type
+        )
+        cooldown_key = (target, cooldown_scope)
         last = self._last_by_target_and_type.get(cooldown_key)
         cooldown_ms = self.config.cooldown_for(candidate.coaching_type)
         if last is not None and candidate.triggered_at_ms - last < cooldown_ms:
@@ -134,13 +156,15 @@ class CoachingPolicy:
 
         self._last_by_target_and_type[cooldown_key] = candidate.triggered_at_ms
         self._count_by_target[target] = target_count + 1
+        self._count_by_target_and_type[target_type_key] = target_type_count + 1
         self._count += 1
         self._remember_trigger(trigger_key)
+        message_key = self._next_message_key(candidate, target)
         return CoachingCommand(
             session_id=state.session_id,
             target_user_id=candidate.target_user_id,
             coaching_type=candidate.coaching_type,
-            message_key=candidate.message_key,
+            message_key=message_key,
             priority=candidate.priority,
             reason_code=candidate.reason_code,
             triggered_at_session_elapsed_ms=candidate.triggered_at_ms,
@@ -152,6 +176,19 @@ class CoachingPolicy:
                 f"{candidate.trigger_id}"
             ),
         )
+
+    def _next_message_key(
+        self,
+        candidate: CoachingCandidate,
+        target: str,
+    ) -> str:
+        keys = COACHING_KEYS_BY_TYPE.get(candidate.coaching_type)
+        if not keys:
+            return candidate.message_key
+        counter_key = (target, candidate.coaching_type)
+        index = self._message_index_by_target_and_type.get(counter_key, 0)
+        self._message_index_by_target_and_type[counter_key] = index + 1
+        return keys[index % len(keys)]
 
     def _remember_trigger(self, trigger_key: tuple[str, str, str]) -> None:
         self._seen_trigger_keys.add(trigger_key)

@@ -63,6 +63,8 @@ class VisionUserState:
     active_episodes: dict[UUID, VisionBehaviorEvent] = field(default_factory=dict)
     behavior_event_counts: dict[str, int] = field(default_factory=dict)
     vision_available: bool = False
+    low_smile_observed_ms: float = 0.0
+    low_smile_episode: int = 0
 
     def apply_behavior(self, event: VisionBehaviorEvent) -> None:
         self.latest_behavior = event
@@ -73,6 +75,9 @@ class VisionUserState:
             self.vision_available = False
         elif event.event_type == "ANALYSIS_RECOVERED":
             self.vision_available = True
+        elif event.event_type == "SMILE_STARTED":
+            self.low_smile_observed_ms = 0
+            self.low_smile_episode += 1
         if event.episode_id is None:
             return
         if event.event_type in _VISION_EPISODE_START_TYPES:
@@ -90,7 +95,11 @@ class UserRuntimeState:
     is_speaking: bool = False
     current_utterance_id: UUID | None = None
     speech_started_at_ms: int | None = None
+    last_speech_started_at_ms: int | None = None
     last_speech_ended_at_ms: int | None = None
+    last_question_ended_at_ms: int | None = None
+    last_question_trigger_id: str | None = None
+    last_verbal_reaction_at_ms: int | None = None
 
 
 @dataclass
@@ -99,6 +108,7 @@ class SessionState:
     speakers: dict[str, SpeakerState] = field(default_factory=dict)
     vision_users: dict[str, VisionUserState] = field(default_factory=dict)
     users: dict[str, UserRuntimeState] = field(default_factory=dict)
+    participant_user_ids: list[str] = field(default_factory=list)
     session_active: bool = True
     last_activity_ms: int = 0              # 마지막으로 누군가 발화를 끝낸 시각
 
@@ -119,6 +129,8 @@ class SessionState:
         return self.user(user_id).vision
 
     def user(self, user_id: str) -> UserRuntimeState:
+        if user_id not in self.participant_user_ids:
+            self.participant_user_ids.append(user_id)
         state = self.users.get(user_id)
         if state is None:
             vision = self.vision_users.get(user_id)
@@ -128,6 +140,10 @@ class SessionState:
             state = UserRuntimeState(user_id=user_id, vision=vision)
             self.users[user_id] = state
         return state
+
+    def register_participants(self, user_ids: list[str]) -> None:
+        for user_id in user_ids:
+            self.user(user_id)
 
     def apply_vision_behavior(self, event: VisionBehaviorEvent) -> None:
         self.vision_user(event.user_id).apply_behavior(event)

@@ -22,14 +22,17 @@ from stt.events import (
 )
 
 from aggregator.coaching import CoachingCommand, CoachingPolicy, noop_coaching
+from aggregator.coaching_arbitrator import CoachingArbitrator
 from aggregator.coaching_candidates import CoachingCandidate
 from aggregator.coaching_detectors import (
     AttentionCoachingDetector,
+    ConversationCoachingDetector,
+    SmileCoachingDetector,
     VisionSetupCoachingDetector,
 )
 from aggregator.config import MvpCoachingConfig
 from aggregator.detectors import Detector, default_detectors
-from aggregator.events import AnalysisEvent
+from aggregator.events import AnalysisEvent, SilenceDetected
 from aggregator.state import SessionState, Utterance
 from aggregator.speech_events import parse_stt_event
 from aggregator.vision_events import (
@@ -82,8 +85,10 @@ class SessionAggregator:
         detectors: Sequence[Detector] | None = None,
         policy: CoachingPolicy | None = None,
         config: MvpCoachingConfig | None = None,
+        participant_user_ids: Sequence[str] | None = None,
     ) -> None:
         self.state = SessionState(session_id=session_id)
+        self.state.register_participants(list(participant_user_ids or ()))
         self._on_analysis = on_analysis
         self._on_coaching = on_coaching
         self.detectors: list[Detector] = (
@@ -98,7 +103,10 @@ class SessionAggregator:
             policy if policy is not None else CoachingPolicy(config=self.config)
         )
         self._attention_detector = AttentionCoachingDetector(self.config)
+        self._conversation_detector = ConversationCoachingDetector(self.config)
         self._vision_setup_detector = VisionSetupCoachingDetector(self.config)
+        self._smile_detector = SmileCoachingDetector(self.config)
+        self._coaching_arbitrator = CoachingArbitrator()
         self._vision_event_ids: set[UUID] = set()
         self._vision_event_id_order: deque[UUID] = deque()
         self._vision_last_seq: dict[tuple[str, UUID], int] = {}
@@ -151,6 +159,9 @@ class SessionAggregator:
             user.speech_started_at_ms = (
                 parsed.payload.observed_start_elapsed_ms
             )
+            user.last_speech_started_at_ms = (
+                parsed.payload.observed_start_elapsed_ms
+            )
             self.state.last_activity_ms = max(
                 self.state.last_activity_ms,
                 parsed.payload.observed_start_elapsed_ms,
@@ -186,6 +197,7 @@ class SessionAggregator:
             text=event.payload.text,
         )
         self.state.add_utterance(utterance)
+        self._conversation_detector.on_utterance(self.state, utterance)
         for detector in self.detectors:
             self._dispatch(detector.on_utterance(self.state, utterance))
 
@@ -224,6 +236,7 @@ class SessionAggregator:
 
         if isinstance(parsed, VisionMetricSnapshot):
             self.state.apply_vision_metric(parsed)
+            self._smile_detector.on_metric(self.state, parsed)
         else:
             self.state.apply_vision_behavior(parsed)
             self._dispatch_candidates(
@@ -289,8 +302,31 @@ class SessionAggregator:
 
     def tick(self, now_ms: int) -> None:
         """시간 기반 감지(침묵 등)를 구동한다. now_ms = 세션 경과 시간."""
+        candidates: list[CoachingCandidate] = []
         for detector in self.detectors:
-            self._dispatch(detector.on_tick(self.state, now_ms))
-        self._dispatch_candidates(
+            events = detector.on_tick(self.state, now_ms)
+            for event in events:
+                self._on_analysis(event)
+                if isinstance(event, SilenceDetected):
+                    for target_user_id in self.state.participant_user_ids:
+                        candidates.append(
+                            CoachingCandidate(
+                                coaching_type="SILENCE_RECOVERY",
+                                target_user_id=target_user_id,
+                                message_key="SILENCE_RECOVERY_01",
+                                reason_code="LONG_SILENCE",
+                                triggered_at_ms=event.session_elapsed_ms,
+                                trigger_id=f"{event.event_id}:{target_user_id}",
+                                priority="LOW",
+                            )
+                        )
+        candidates.extend(
+            self._conversation_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(
             self._vision_setup_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
+        self._dispatch_candidates(
+            self._coaching_arbitrator.select(candidates)
         )
