@@ -18,6 +18,31 @@ public enum RoomErrorCode implements ErrorCode {
 			HttpStatus.CONFLICT,
 			"ROOM_NOT_ENTERABLE",
 			"현재 대기방에 입장할 수 없습니다."
+	),
+	DEVICE_CHECK_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"DEVICE_CHECK_NOT_FOUND",
+			"기기 점검 결과를 찾을 수 없습니다."
+	),
+	DEVICE_CHECK_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"DEVICE_CHECK_NOT_ALLOWED",
+			"현재 상태에서는 기기 점검 결과를 저장할 수 없습니다."
+	),
+	DEVICE_CHECK_REQUIRED(
+			HttpStatus.CONFLICT,
+			"DEVICE_CHECK_REQUIRED",
+			"준비 완료 전에 기기 점검이 필요합니다."
+	),
+	DEVICE_CHECK_FAILED(
+			HttpStatus.CONFLICT,
+			"DEVICE_CHECK_FAILED",
+			"기기 점검의 모든 항목을 통과해야 준비 완료할 수 있습니다."
+	),
+	ROOM_READY_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"ROOM_READY_NOT_ALLOWED",
+			"현재 상태에서는 준비 상태를 변경할 수 없습니다."
 	);
 
 	private final HttpStatus status;

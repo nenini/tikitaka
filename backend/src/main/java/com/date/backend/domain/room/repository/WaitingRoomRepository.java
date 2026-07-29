@@ -12,4 +12,6 @@ public interface WaitingRoomRepository extends JpaRepository<WaitingRoom, Long> 
 	Optional<WaitingRoom> findWithMatchPairById(Long id);
 
 	boolean existsByMatchPair_Id(Long matchPairId);
+
+	Optional<WaitingRoom> findByMatchPair_Id(Long matchPairId);
 }

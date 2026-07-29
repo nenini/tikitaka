@@ -55,4 +55,24 @@ public class RoomParticipant {
 	public String getParticipationStatus() {
 		return participationStatus;
 	}
+
+	public boolean isReady() {
+		return "READY".equals(participationStatus);
+	}
+
+	public boolean markReady() {
+		if (isReady()) {
+			return false;
+		}
+		this.participationStatus = "READY";
+		return true;
+	}
+
+	public boolean cancelReady() {
+		if (!isReady()) {
+			return false;
+		}
+		this.participationStatus = "WAITING";
+		return true;
+	}
 }

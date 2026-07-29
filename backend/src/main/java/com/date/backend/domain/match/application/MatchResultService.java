@@ -13,6 +13,7 @@ import com.date.backend.domain.match.repository.MatchRequestSlotRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.MatchErrorCode;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +42,7 @@ public class MatchResultService {
 	private final Clock clock;
 	private final MatchJobEnqueueService jobEnqueueService;
 	private final WaitingRoomProvisioningService waitingRoomProvisioningService;
+	private final WaitingRoomRepository waitingRoomRepository;
 
 	public MatchResultService(
 			MatchPairRepository pairRepository,
@@ -51,7 +53,8 @@ public class MatchResultService {
 			MatchSchedulerProperties properties,
 			Clock clock,
 			MatchJobEnqueueService jobEnqueueService,
-			WaitingRoomProvisioningService waitingRoomProvisioningService
+			WaitingRoomProvisioningService waitingRoomProvisioningService,
+			WaitingRoomRepository waitingRoomRepository
 	) {
 		this.pairRepository = pairRepository;
 		this.responseRepository = responseRepository;
@@ -62,6 +65,7 @@ public class MatchResultService {
 		this.clock = clock;
 		this.jobEnqueueService = jobEnqueueService;
 		this.waitingRoomProvisioningService = waitingRoomProvisioningService;
+		this.waitingRoomRepository = waitingRoomRepository;
 	}
 
 	public MatchResultResponse getCurrent(Long userId) {
@@ -176,6 +180,9 @@ public class MatchResultService {
 		MatchResponseStatus partnerResponse = responseStatus(responses, partnerId);
 		return new MatchResultResponse(
 				pair.getId(),
+				waitingRoomRepository.findByMatchPair_Id(pair.getId())
+						.map(room -> room.getId())
+						.orElse(null),
 				pair.getStatus(),
 				myResponse,
 				partnerResponse,

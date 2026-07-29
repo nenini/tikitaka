@@ -47,6 +47,7 @@ class FlywayMigrationTests {
 		Integer aiResponseStateColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIRESPONSESTATE");
 		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
 		Integer liveKitRoomNameColumnCount = columnCount("SESSIONS", "LIVEKITROOMNAME");
+		Integer roomDeviceCheckTableCount = tableCount("ROOM_DEVICE_CHECKS");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
 		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
 		Integer matchRequestTraitSnapshotTableCount =
@@ -79,7 +80,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(15);
+		assertThat(migrationCount).isEqualTo(16);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -99,6 +100,7 @@ class FlywayMigrationTests {
 		assertThat(aiResponseStateColumnCount).isEqualTo(1);
 		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
 		assertThat(liveKitRoomNameColumnCount).isEqualTo(1);
+		assertThat(roomDeviceCheckTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);

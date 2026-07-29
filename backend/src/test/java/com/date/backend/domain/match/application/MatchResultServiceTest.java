@@ -13,6 +13,8 @@ import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
 import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
+import com.date.backend.domain.room.domain.WaitingRoom;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -49,6 +51,8 @@ class MatchResultServiceTest {
 			mock(MatchJobEnqueueService.class);
 	private final WaitingRoomProvisioningService waitingRoomProvisioningService =
 			mock(WaitingRoomProvisioningService.class);
+	private final WaitingRoomRepository waitingRoomRepository =
+			mock(WaitingRoomRepository.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -68,7 +72,8 @@ class MatchResultServiceTest {
 			properties,
 			clock,
 			jobEnqueueService,
-			waitingRoomProvisioningService
+			waitingRoomProvisioningService,
+			waitingRoomRepository
 	);
 
 	@Test
@@ -101,6 +106,10 @@ class MatchResultServiceTest {
 		)).thenReturn(Optional.of(scheduledAt));
 		when(profileService.getPublicProfile(USER_A_ID))
 				.thenReturn(mock(PublicProfileResponse.class));
+		WaitingRoom waitingRoom = mock(WaitingRoom.class);
+		when(waitingRoom.getId()).thenReturn(15L);
+		when(waitingRoomRepository.findByMatchPair_Id(PAIR_ID))
+				.thenReturn(Optional.of(waitingRoom));
 
 		MatchResultResponse result = service.accept(PAIR_ID, USER_B_ID);
 
@@ -108,6 +117,7 @@ class MatchResultServiceTest {
 		verify(requestA).confirm();
 		verify(requestB).confirm();
 		verify(waitingRoomProvisioningService).provision(pair);
+		assertThat(result.roomId()).isEqualTo(15L);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}
 
