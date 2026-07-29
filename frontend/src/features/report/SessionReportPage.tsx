@@ -1,24 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, EmptyState, Icon, Skeleton, TagChip } from '@/components'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Badge, Button, Callout, Card, Cluster, EmptyState, Icon, Skeleton } from '@/components'
 import { getReportStatus, getSessionReport, requestReportGeneration } from './api'
-import { FeedbackList, IssueCard, MetricStat, RadarChart, RadarLegend, TopicCloud } from './parts'
+import { FeedbackList, IssueCard, MetricStat, RadarChart, RadarLegend, TemperatureCard, TopicCloud } from './parts'
 import type { ReportStatus, SessionReport } from './types'
 
 /** PENDING/GENERATING 동안 상태를 다시 물어보는 주기. */
 const POLL_MS = 15_000
 
-/**
- * W-16 AI 세션 리포트 (`REPORT-01 · 01-1 · 02 · 04`, FE-B).
- *
- * 규칙(와이어플로우):
- *  - **리포트 생성은 단 한 번** — 상대 평가를 최대 48h 대기한 뒤 확정 생성한다.
- *    '먼저 만들고 나중에 완성판' 2단계가 아니므로, 대기 중에는 대기 화면을 보여준다.
- *  - 48h 확정 후 지각 제출은 재산정하지 않는다(온도도 갱신 없음).
- *  - 상대 평가를 AI 분석보다 **우선 표시**(D-13 → 시각 강조로 해석, parts.tsx 주석 참고).
- *  - 이슈는 맥락 요약 + 근거 + 대체 제안 형식. 이슈가 0건이어도 **긍정 피드백을 반드시** 보여준다(D-14).
- *  - 필러워드는 실시간이 아니라 여기서만 안내한다(COACH-03 이관).
- */
+
 export function SessionReportPage() {
   const { sessionId = 'demo' } = useParams()
   const navigate = useNavigate()
@@ -131,33 +121,7 @@ export function SessionReportPage() {
       </div>
 
       {/* 온도 변화는 이 리포트의 한 줄 결론이다 — 스크롤 맨 아래가 아니라 헤더 바로 아래에 둔다 */}
-      {temp && (
-        <Card variant="inset" className="mb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Icon
-                name={temp.delta >= 0 ? 'arrow-up' : 'arrow-down'}
-                size={20}
-                style={{ color: temp.delta >= 0 ? 'var(--bt-color-success)' : 'var(--bt-color-warning)' }}
-              />
-              <div>
-                <span className="bt-caption bt-muted">사랑의 온도</span>
-                <p className="bt-body-sm mt-0.5">
-                  <span className="bt-numeric">{temp.before.toFixed(1)}</span>° →{' '}
-                  <b className="bt-numeric" style={{ fontSize: 18 }}>
-                    {temp.after.toFixed(1)}
-                  </b>
-                  ° <span className="bt-numeric bt-muted">({formatDelta(temp.delta)})</span>
-                </p>
-              </div>
-            </div>
-            <Link className="bt-body-sm" to="/growth" style={{ color: 'var(--bt-color-text-link)' }}>
-              성장 대시보드에서 추이 보기
-            </Link>
-          </div>
-          {temp.reason && <p className="bt-caption bt-muted mt-2">{temp.reason}</p>}
-        </Card>
-      )}
+      {temp && <TemperatureCard temp={temp} className="mb-4" />}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 레이더 */}
@@ -196,13 +160,13 @@ export function SessionReportPage() {
           <div className="flex flex-col gap-4 sm:flex-row">
             <Card className="sm:flex-1">
               <div className="bt-h3 mb-2">
-                잘한 점 <span className="bt-numeric">{report.strengths.length}</span>
+                잘한 점
               </div>
               <FeedbackList items={report.strengths} />
             </Card>
             <Card className="sm:flex-1">
               <div className="bt-h3 mb-2">
-                개선점 <span className="bt-numeric">{report.improvements.length}</span>
+                개선점
               </div>
               <FeedbackList items={report.improvements} />
             </Card>
@@ -218,9 +182,13 @@ export function SessionReportPage() {
           {report.nextMissions.length > 0 && (
             <Card>
               <div className="bt-h3 mb-3">다음 세션 미션</div>
+              {/* TagChip 은 브랜드색+링크색이라 누를 수 있는 것처럼 보인다 — 미션은
+                  그냥 정보 라벨이라 중립 톤의 정적 칩(.bt-mission-chip)으로 그린다. */}
               <Cluster gap={6}>
                 {report.nextMissions.map((m) => (
-                  <TagChip key={m.missionId}>{m.label}</TagChip>
+                  <span key={m.missionId} className="bt-mission-chip">
+                    {m.label}
+                  </span>
                 ))}
               </Cluster>
             </Card>
@@ -263,8 +231,4 @@ function formatDate(iso: string): string {
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short' })
-}
-
-function formatDelta(delta: number): string {
-  return `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}`
 }

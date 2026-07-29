@@ -64,7 +64,8 @@ export function FreeTextField({ label, placeholder, value, onChange, disabled }:
     <Field
       label={
         <>
-          {label} <span className="bt-caption bt-muted">(선택)</span>
+          {label}
+          {/* <span className="bt-caption bt-muted">(선택)</span> */}
         </>
       }
       help={`${value.length} / ${PEER_REVIEW_TEXT_MAX}자`}

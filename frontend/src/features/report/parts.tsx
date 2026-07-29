@@ -1,6 +1,43 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Badge, Card, Icon } from '@/components'
-import type { IssueSeverity, RadarAxis, ReportIssue, ReportMetric, ReportTopic } from './types'
+import type { IssueSeverity, RadarAxis, ReportIssue, ReportMetric, ReportTopic, TemperatureDelta } from './types'
+
+/* ── 온도 변화 카드 ─────────────────────────────────────── */
+
+/**
+ * 세션 전후 사랑의 온도 변화 (`REPORT-02`).
+ *
+ * 성장 대시보드 히어로(`.bt-hero`)와 같은 "따뜻해지는 코너 그라디언트" 어휘를 쓰지만,
+ * 여기서는 리포트 안의 한 섹션일 뿐이라 그 히어로보다 작고 조용하게 만든다.
+ * 증감 표기는 `.bt-delta` 를 그대로 재사용해 성장 대시보드와 같은 시각 언어를 유지한다.
+ */
+export function TemperatureCard({ temp, className }: { temp: TemperatureDelta; className?: string }) {
+  const up = temp.delta >= 0
+  return (
+    <div className={`bt-temp-card ${className ?? ''}`}>
+      <div className="bt-temp-card__top">
+        <div>
+          <span className="bt-overline">사랑의 온도</span>
+          <div className="bt-temp-card__row">
+            <span className="bt-temp-card__before bt-numeric">{temp.before.toFixed(1)}°</span>
+            <Icon name="chevron-right" size={16} className="bt-temp-card__arrow" />
+            <span className="bt-temp-card__after bt-numeric">{temp.after.toFixed(1)}°</span>
+            <span className={`bt-delta ${up ? 'bt-delta--up' : 'bt-delta--down'}`}>
+              <Icon name={up ? 'arrow-up' : 'arrow-down'} size={14} />
+              {Math.abs(temp.delta).toFixed(1)}
+            </span>
+          </div>
+        </div>
+        <Link className="bt-temp-card__cta" to="/growth">
+          추이 보기
+          <Icon name="chevron-right" size={14} />
+        </Link>
+      </div>
+      {temp.reason && <p className="bt-caption bt-muted mt-3">{temp.reason}</p>}
+    </div>
+  )
+}
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
@@ -89,36 +126,34 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
           />
         )}
 
-        {/* 축 라벨 + 점수. 그래프에서 값을 못 읽으면 도형은 장식일 뿐이라 숫자를 함께 적는다 */}
+        {/* 축 라벨. 점수는 여기 적지 않는다 — 아래 툴팁 슬롯이 hover/focus 시 정확한 값을
+            보여주므로, 기본 상태에서까지 숫자를 박아두면 도형 위가 시끄러워진다. */}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1.26)
           const dx = x - cx
           const anchor = Math.abs(dx) < 4 ? 'middle' : dx > 0 ? 'start' : 'end'
           const active = hovered === axis.key
           return (
-            <g key={axis.key} opacity={hovered && !active ? 0.45 : 1}>
-              <text
-                x={x}
-                y={y - 6}
-                fill="var(--bt-color-text-secondary)"
-                fontSize={11}
-                fontWeight={600}
-                textAnchor={anchor}
-              >
-                {axis.label}
-              </text>
-              <text x={x} y={y + 8} fontSize={11} fontWeight={700} textAnchor={anchor}>
-                {axis.peerScore != null && (
-                  <tspan fill="var(--bt-color-success-marker)">{axis.peerScore}</tspan>
-                )}
-                {axis.peerScore != null && <tspan fill="var(--bt-color-text-tertiary)"> / </tspan>}
-                <tspan fill="var(--bt-color-brand)">{axis.aiScore}</tspan>
-              </text>
-            </g>
+            <text
+              key={axis.key}
+              x={x}
+              y={y}
+              fill={active ? 'var(--bt-color-text)' : 'var(--bt-color-text-secondary)'}
+              fontSize={11}
+              fontWeight={active ? 700 : 600}
+              textAnchor={anchor}
+              dominantBaseline="middle"
+              opacity={hovered && !active ? 0.45 : 1}
+            >
+              {axis.label}
+            </text>
           )
         })}
 
-        {/* 축별 hover/focus 히트 영역. 마우스와 키보드가 같은 정보를 얻게 한다 */}
+        {/* 축별 hover/focus 히트 영역. 마우스와 키보드가 같은 정보를 얻게 한다.
+            outline 을 명시적으로 지운다 — 지우지 않으면 이 원의 사각 바운딩 박스에
+            브라우저 기본 포커스 사각형이 그대로 그려져 클릭할 때마다 "검정 네모"가 나타난다.
+            대신 위 라벨의 굵기·색·주변 축 옅어짐으로 포커스 상태를 표시한다. */}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1)
           return (
@@ -131,7 +166,7 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
               tabIndex={0}
               role="img"
               aria-label={`${axis.label}. ${axis.peerScore != null ? `상대 평가 ${axis.peerScore}점, ` : ''}AI 분석 ${axis.aiScore}점`}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', outline: 'none' }}
               onMouseEnter={() => setHovered(axis.key)}
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(axis.key)}

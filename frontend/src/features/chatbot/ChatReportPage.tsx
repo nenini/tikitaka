@@ -173,9 +173,7 @@ export function ChatReportPage() {
       {report.patterns.length > 0 && (
         <Card className="mb-4">
           <div className="bt-h3 mb-1">반복된 패턴</div>
-          {/* <p className="bt-caption bt-muted mb-3">
-            대화에서 몇 번 나타났는지만 세어 둔 거예요. 좋고 나쁨을 매긴 값이 아닙니다.
-          </p> */}
+
           <Cluster gap={6}>
             {report.patterns.map((p) => (
               <TagChip key={p.label}>

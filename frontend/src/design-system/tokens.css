@@ -200,6 +200,12 @@
   --bt-color-warning:        var(--bt-pollen-700);
   --bt-color-warning-bg:     var(--bt-pollen-100);
   --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* `*-bg` **위에** 얹는 글자색.
+     `--bt-color-success`(4.50:1)는 **흰 배경 기준** 값이라, 같은 계열 틴트 위에 올리면
+     4.0:1 로 떨어져 AA 를 놓친다. 틴트 배경을 쓰는 칩·배지는 이쪽을 쓴다. */
+  --bt-color-success-on-bg: var(--bt-leaf-800);
+  --bt-color-warning-on-bg: var(--bt-pollen-800);
   --bt-color-danger:         var(--bt-rose-700);
   --bt-color-danger-bg:      var(--bt-rose-100);
   --bt-color-danger-fill:    var(--bt-rose-600);
@@ -255,6 +261,11 @@
   --bt-color-warning:        var(--bt-pollen-200);
   --bt-color-warning-bg:     rgba(240, 169, 60, 0.16);
   --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* 다크에서는 틴트가 반투명이라 배경이 어두운 쪽으로 남는다 —
+     밝은 톤이 그대로 대비를 얻으므로 본색과 같은 값을 쓴다(라이트에서만 갈린다). */
+  --bt-color-success-on-bg: var(--bt-leaf-400);
+  --bt-color-warning-on-bg: var(--bt-pollen-200);
   --bt-color-danger:         var(--bt-rose-400);
   --bt-color-danger-bg:      rgba(228, 64, 79, 0.18);
   --bt-color-danger-fill:    var(--bt-rose-500);

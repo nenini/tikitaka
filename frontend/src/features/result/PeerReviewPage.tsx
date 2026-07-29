@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
+import { Avatar, Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
   getPeerReviewForm,
@@ -109,16 +109,27 @@ export function PeerReviewPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
-      {/* 헤더 — 파괴적 액션(신고·차단)은 제출 버튼 옆이 아니라 여기 '더보기'에 둔다 */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="bt-h1">{form.opponent.nickname}님과의 대화, 어떠셨나요?</h1>
-          <p className="bt-body-sm bt-muted mt-1">
-            외모나 조건이 아니라 대화 행동만 평가해요. 익명으로 전달됩니다.
-          </p>
+      {/*
+        헤더.
+        - 세로 스택(모바일) → 가로 배치(sm 이상)를 **명시적으로** 나눈다. 이전에는 flex-wrap
+          하나로만 처리해서, 닉네임 길이에 따라 배지·메뉴 줄이 문장 중간 아무 데서나
+          꺾여 내려왔다. 지금은 항상 "이름 블록 위 · 메타 줄 아래"로 줄바꿈 지점이 고정된다.
+        - 아바타를 붙여 "누구를 평가하는 화면인지"를 텍스트보다 먼저 눈에 들어오게 한다.
+        - 회차·시간은 상태 경고가 아니라 그냥 메타 정보라 배지 톤을 warning → neutral 로 고친다
+          (warning 은 "주의가 필요함"을 뜻하는데, 완료된 세션 정보에 쓰면 잘못된 신호를 준다).
+      */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <Avatar name={form.opponent.nickname} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="bt-h1">{form.opponent.nickname}님과의 대화, 어떠셨나요?</h1>
+            <p className="bt-body-sm bt-muted mt-1">
+              외모나 조건이 아니라 대화 행동만 평가해요. 익명으로 전달됩니다.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge tone="warning">
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge tone="neutral">
             <span className="bt-numeric">{form.sessionRoundNo}</span>회차 ·{' '}
             <span className="bt-numeric">{form.durationMin}</span>분 완료
           </Badge>

@@ -128,13 +128,14 @@ interface TrackFact {
   muted?: boolean
 }
 
+// note 는 현재 렌더하지 않는다(아래 주석 처리된 <p> 참고). 호출부의 문구는 그대로 두고
+// 여기서 구조 분해만 하지 않아, 다시 켤 때 값을 새로 채워 넣지 않아도 되게 남겨둔다.
 function TrackCard({
   icon,
   badge,
   title,
   subtitle,
   facts,
-  note,
   cta,
   recommended = false,
 }: {

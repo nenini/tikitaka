@@ -61,11 +61,26 @@ export async function getMyBadges(): Promise<EarnedBadge[]> {
     const { data } = await apiClient.get<EarnedBadge[]>('/v1/users/me/badges')
     return data
   } catch {
+    // 코드는 badges.ts 의 아트 카탈로그와 맞춘다 — 아트가 없는 코드는 화면에 그려지지 않는다.
     return [
-      { code: 'FIRST_PRACTICE', name: '첫 연습 완료', emoji: '🌱', condition: '첫 세션을 끝까지 마쳤어요', acquiredAt: daysAgo(30) },
-      { code: 'LISTENING_UP', name: '경청 향상', emoji: '👂', condition: '경청 지표가 연속 3회 올랐어요', acquiredAt: daysAgo(12) },
-      { code: 'BALANCED_TALK', name: '균형 잡힌 대화', emoji: '⚖️', condition: '발화 비율 40~60%를 유지했어요', acquiredAt: daysAgo(6) },
-      { code: 'STREAK_5', name: '5회 연속', emoji: '🔥', condition: '노쇼 없이 5회 연속 참여했어요', acquiredAt: daysAgo(1) },
+      {
+        code: 'FIRST_CHAT',
+        name: '첫 대화',
+        condition: '첫 연습 세션을 끝까지 마쳤어요.',
+        acquiredAt: daysAgo(30),
+      },
+      {
+        code: 'GOOD_LISTENER',
+        name: '경청왕',
+        condition: '경청 지표가 세 세션 연속으로 올랐어요.',
+        acquiredAt: daysAgo(12),
+      },
+      {
+        code: 'AQUAMAN',
+        name: '아쿠아맨',
+        condition: '연락처 교환에 3번 실패했어요.',
+        acquiredAt: daysAgo(6),
+      },
     ]
   }
 }
@@ -103,7 +118,7 @@ function demoDashboard(): GrowthDashboard {
     realSessionCount: 6,
     aiSessionCount: 2,
     noShowCount: 0,
-    badgeCount: 4,
+    badgeCount: 3,
     history,
   }
 }
