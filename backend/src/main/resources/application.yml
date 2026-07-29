@@ -96,6 +96,8 @@ face:
     request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
 
 ai:
+  session:
+    internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
