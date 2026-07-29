@@ -167,6 +167,11 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '38'",
 				Integer.class
 		);
+		Integer resultMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '40'",
+				Integer.class
+		);
 		Integer missionCatalogTableCount = tableCount("MISSION_CATALOG");
 		Integer sessionMissionTableCount = tableCount("SESSION_MISSIONS");
 		Integer aiAnalysisEventTableCount =
@@ -185,6 +190,13 @@ class FlywayMigrationTests {
 				Integer.class
 		);
 		Integer safetyEventTableCount = tableCount("SAFETY_EVENTS");
+		Integer peerEvaluationTableCount = tableCount("PEER_EVALUATIONS");
+		Integer peerEvaluationLegacyTableCount =
+				tableCount("PEER_EVALUATIONS_LEGACY");
+		Integer evaluationCompletionColumnCount = columnCount(
+				"SESSIONS",
+				"EVALUATION_COMPLETION_NOTIFIED_AT"
+		);
 		Integer missionCatalogRowCount = rowCount("mission_catalog");
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
 		Integer proposedScheduledAtColumnCount = columnCount(
@@ -226,7 +238,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(31);
+		assertThat(migrationCount).isEqualTo(32);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -278,6 +290,7 @@ class FlywayMigrationTests {
 		assertThat(aiCoachingMigrationCount).isEqualTo(1);
 		assertThat(silenceQuestionMigrationCount).isEqualTo(1);
 		assertThat(safetyMigrationCount).isEqualTo(1);
+		assertThat(resultMigrationCount).isEqualTo(1);
 		assertThat(missionCatalogTableCount).isEqualTo(1);
 		assertThat(sessionMissionTableCount).isEqualTo(1);
 		assertThat(aiAnalysisEventTableCount).isEqualTo(1);
@@ -288,6 +301,9 @@ class FlywayMigrationTests {
 		assertThat(questionRecommendationItemTableCount).isEqualTo(1);
 		assertThat(safeQuestionCardCount).isEqualTo(14);
 		assertThat(safetyEventTableCount).isEqualTo(1);
+		assertThat(peerEvaluationTableCount).isEqualTo(1);
+		assertThat(peerEvaluationLegacyTableCount).isEqualTo(1);
+		assertThat(evaluationCompletionColumnCount).isEqualTo(1);
 		assertThat(missionCatalogRowCount).isEqualTo(4);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
