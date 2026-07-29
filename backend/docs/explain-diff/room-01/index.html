@@ -197,7 +197,7 @@
   </section>
 
   <section>
-    <h2>DB 마이그레이션 V15</h2>
+    <h2>DB 마이그레이션 V19</h2>
     <div class="grid">
       <div class="card"><h3>sessions 확장</h3><p><code>livekitRoomName</code>을 추가하고 matchPairId와 Room 이름에 UNIQUE 제약을 적용해 하나의 확정 매칭이 중복 방을 만들지 못하게 한다.</p></div>
       <div class="card"><h3>기존 데이터 보정</h3><p>이미 CONFIRMED인 match_pairs를 찾아 sessions와 session_participants에 대기방 및 두 참가자를 안전하게 백필한다.</p></div>
@@ -213,7 +213,7 @@
       <p class="file"><code>domain/room/application/WaitingRoomProvisioningService.java</code></p>
       <p class="file"><code>domain/room/integration/LiveKitServerRoomManager.java</code></p>
       <p class="file"><code>domain/room/domain/WaitingRoom.java</code></p>
-      <p class="file"><code>V15__add_waiting_room_livekit_session.sql</code></p>
+      <p class="file"><code>V19__add_waiting_room_livekit_session.sql</code></p>
       <p class="file"><code>WaitingRoomServiceTest.java</code></p>
     </div>
   </section>
