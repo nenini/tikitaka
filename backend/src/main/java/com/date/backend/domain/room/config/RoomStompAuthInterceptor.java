@@ -33,7 +33,8 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 			"^/topic/sessions/(\\d+)/participants$"
 	);
 	private static final Pattern SESSION_COMMAND = Pattern.compile(
-			"^/app/sessions/(\\d+)/(heartbeat|connection-state)$"
+			"^/app/sessions/(\\d+)/(heartbeat|connection-state|"
+					+ "media-state|network-quality)$"
 	);
 
 	private final JwtTokenProvider jwtTokenProvider;

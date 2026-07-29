@@ -39,6 +39,11 @@ public enum SessionErrorCode implements ErrorCode {
 			"SESSION_PARTICIPANTS_NOT_CONNECTED",
 			"모든 참여자가 LiveKit에 연결되어야 세션을 시작할 수 있습니다."
 	),
+	SESSION_NOT_IN_PROGRESS(
+			HttpStatus.CONFLICT,
+			"SESSION_NOT_IN_PROGRESS",
+			"진행 중인 세션에서만 실시간 상태를 변경할 수 있습니다."
+	),
 	LIVEKIT_WEBHOOK_UNAUTHORIZED(
 			HttpStatus.UNAUTHORIZED,
 			"LIVEKIT_WEBHOOK_UNAUTHORIZED",

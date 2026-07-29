@@ -61,6 +61,25 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSendMediaAndNetworkState() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> mediaMessage = message(
+				StompCommand.SEND,
+				"/app/sessions/15/media-state"
+		);
+		Message<?> networkMessage = message(
+				StompCommand.SEND,
+				"/app/sessions/15/network-quality"
+		);
+
+		assertThat(interceptor.preSend(mediaMessage, null))
+				.isSameAs(mediaMessage);
+		assertThat(interceptor.preSend(networkMessage, null))
+				.isSameAs(networkMessage);
+	}
+
+	@Test
 	void nonParticipantCannotSendSessionCommand() {
 		Message<?> message = message(
 				StompCommand.SEND,

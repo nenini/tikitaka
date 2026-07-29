@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.dto.response;
 
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
+import com.date.backend.domain.room.domain.SessionNetworkQuality;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +18,11 @@ public record SessionParticipantStateResponse(
 		LocalDateTime reconnectDeadlineAt,
 		LocalDateTime reconnectedAt,
 		LocalDateTime recoveryFailedAt,
-		int reconnectAttemptCount
+		int reconnectAttemptCount,
+		boolean cameraEnabled,
+		boolean microphoneEnabled,
+		SessionNetworkQuality networkQuality,
+		LocalDateTime mediaStateUpdatedAt,
+		LocalDateTime networkQualityUpdatedAt
 ) {
 }

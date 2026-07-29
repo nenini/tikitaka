@@ -83,6 +83,22 @@ public class RoomParticipant {
 	@Column(name = "reconnect_attempt_count", nullable = false)
 	private int reconnectAttemptCount;
 
+	@Column(name = "camera_enabled", nullable = false)
+	private boolean cameraEnabled;
+
+	@Column(name = "microphone_enabled", nullable = false)
+	private boolean microphoneEnabled;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "network_quality", nullable = false, length = 20)
+	private SessionNetworkQuality networkQuality;
+
+	@Column(name = "media_state_updated_at")
+	private LocalDateTime mediaStateUpdatedAt;
+
+	@Column(name = "network_quality_updated_at")
+	private LocalDateTime networkQualityUpdatedAt;
+
 	@Column(name = "expression_analysis_enabled", nullable = false)
 	private boolean expressionAnalysisEnabled;
 
@@ -99,6 +115,7 @@ public class RoomParticipant {
 		this.participationStatus = "WAITING";
 		this.participantIdentity = identityOf(userId);
 		this.connectionStatus = SessionConnectionStatus.DISCONNECTED;
+		this.networkQuality = SessionNetworkQuality.UNKNOWN;
 	}
 
 	public Long getUserId() {
@@ -210,6 +227,26 @@ public class RoomParticipant {
 		return reconnectAttemptCount;
 	}
 
+	public boolean isCameraEnabled() {
+		return cameraEnabled;
+	}
+
+	public boolean isMicrophoneEnabled() {
+		return microphoneEnabled;
+	}
+
+	public SessionNetworkQuality getNetworkQuality() {
+		return networkQuality;
+	}
+
+	public LocalDateTime getMediaStateUpdatedAt() {
+		return mediaStateUpdatedAt;
+	}
+
+	public LocalDateTime getNetworkQualityUpdatedAt() {
+		return networkQualityUpdatedAt;
+	}
+
 	public boolean recordConnected(
 			String participantIdentity,
 			String participantSid,
@@ -234,7 +271,12 @@ public class RoomParticipant {
 		this.recoveryFailedAt = null;
 		if (newConnection) {
 			this.clientInstanceId = null;
+			this.cameraEnabled = false;
+			this.microphoneEnabled = false;
+			this.mediaStateUpdatedAt = occurredAt;
 		}
+		this.networkQuality = SessionNetworkQuality.UNKNOWN;
+		this.networkQualityUpdatedAt = occurredAt;
 		return changed;
 	}
 
@@ -257,6 +299,7 @@ public class RoomParticipant {
 		this.connectionStatus = SessionConnectionStatus.DISCONNECTED;
 		this.disconnectedAt = occurredAt;
 		this.lastConnectionEventAt = occurredAt;
+		resetUnavailableRealtimeState(occurredAt);
 		return changed;
 	}
 
@@ -316,6 +359,8 @@ public class RoomParticipant {
 		this.reconnectingAt = reconnectingAt;
 		this.reconnectDeadlineAt = reconnectDeadlineAt;
 		this.reconnectAttemptCount++;
+		this.networkQuality = SessionNetworkQuality.LOST;
+		this.networkQualityUpdatedAt = reconnectingAt;
 		return true;
 	}
 
@@ -335,6 +380,8 @@ public class RoomParticipant {
 		this.reconnectingAt = null;
 		this.reconnectDeadlineAt = null;
 		this.recoveryFailedAt = null;
+		this.networkQuality = SessionNetworkQuality.UNKNOWN;
+		this.networkQualityUpdatedAt = reconnectedAt;
 		return true;
 	}
 
@@ -350,6 +397,44 @@ public class RoomParticipant {
 		this.recoveryFailedAt = failedAt;
 		this.reconnectingAt = null;
 		this.reconnectDeadlineAt = null;
+		resetUnavailableRealtimeState(failedAt);
+		return true;
+	}
+
+	public boolean updateMediaState(
+			String participantSid,
+			String clientInstanceId,
+			boolean cameraEnabled,
+			boolean microphoneEnabled,
+			LocalDateTime updatedAt
+	) {
+		validateConnectedClient(participantSid, clientInstanceId);
+		Objects.requireNonNull(updatedAt);
+		boolean changed = this.cameraEnabled != cameraEnabled
+				|| this.microphoneEnabled != microphoneEnabled;
+		if (!changed) {
+			return false;
+		}
+		this.cameraEnabled = cameraEnabled;
+		this.microphoneEnabled = microphoneEnabled;
+		this.mediaStateUpdatedAt = updatedAt;
+		return true;
+	}
+
+	public boolean updateNetworkQuality(
+			String participantSid,
+			String clientInstanceId,
+			SessionNetworkQuality networkQuality,
+			LocalDateTime updatedAt
+	) {
+		validateActiveClient(participantSid, clientInstanceId);
+		Objects.requireNonNull(networkQuality);
+		Objects.requireNonNull(updatedAt);
+		if (this.networkQuality == networkQuality) {
+			return false;
+		}
+		this.networkQuality = networkQuality;
+		this.networkQualityUpdatedAt = updatedAt;
 		return true;
 	}
 
@@ -374,6 +459,7 @@ public class RoomParticipant {
 		this.connectionStatus = SessionConnectionStatus.DISCONNECTED;
 		this.disconnectedAt = occurredAt;
 		this.lastConnectionEventAt = occurredAt;
+		resetUnavailableRealtimeState(occurredAt);
 		return changed;
 	}
 
@@ -412,6 +498,26 @@ public class RoomParticipant {
 				&& !this.clientInstanceId.equals(clientInstanceId)) {
 			throw new IllegalStateException("현재 접속 클라이언트와 일치하지 않습니다.");
 		}
+	}
+
+	private void validateConnectedClient(
+			String participantSid,
+			String clientInstanceId
+	) {
+		validateActiveClient(participantSid, clientInstanceId);
+		if (connectionStatus != SessionConnectionStatus.CONNECTED) {
+			throw new IllegalStateException(
+					"연결 중인 참여자만 미디어 상태를 변경할 수 있습니다."
+			);
+		}
+	}
+
+	private void resetUnavailableRealtimeState(LocalDateTime occurredAt) {
+		this.cameraEnabled = false;
+		this.microphoneEnabled = false;
+		this.networkQuality = SessionNetworkQuality.LOST;
+		this.mediaStateUpdatedAt = occurredAt;
+		this.networkQualityUpdatedAt = occurredAt;
 	}
 
 	private static String identityOf(Long userId) {

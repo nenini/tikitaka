@@ -193,6 +193,121 @@ class RoomParticipantConnectionTest {
 		assertThat(participant.getClientInstanceId()).isNull();
 	}
 
+	@Test
+	void connectedClientCanUpdateMediaAndNetworkState() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(1)
+		);
+
+		boolean mediaChanged = participant.updateMediaState(
+				"PA_current",
+				"client-a",
+				true,
+				false,
+				CONNECTED_AT.plusSeconds(2)
+		);
+		boolean qualityChanged = participant.updateNetworkQuality(
+				"PA_current",
+				"client-a",
+				SessionNetworkQuality.GOOD,
+				CONNECTED_AT.plusSeconds(3)
+		);
+
+		assertThat(mediaChanged).isTrue();
+		assertThat(qualityChanged).isTrue();
+		assertThat(participant.isCameraEnabled()).isTrue();
+		assertThat(participant.isMicrophoneEnabled()).isFalse();
+		assertThat(participant.getNetworkQuality())
+				.isEqualTo(SessionNetworkQuality.GOOD);
+		assertThat(participant.getMediaStateUpdatedAt())
+				.isEqualTo(CONNECTED_AT.plusSeconds(2));
+	}
+
+	@Test
+	void duplicateRealtimeStateDoesNotProduceAChange() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(1)
+		);
+
+		assertThat(participant.updateMediaState(
+				"PA_current",
+				"client-a",
+				false,
+				false,
+				CONNECTED_AT.plusSeconds(2)
+		)).isFalse();
+		assertThat(participant.updateNetworkQuality(
+				"PA_current",
+				"client-a",
+				SessionNetworkQuality.UNKNOWN,
+				CONNECTED_AT.plusSeconds(2)
+		)).isFalse();
+	}
+
+	@Test
+	void reconnectingMarksNetworkLostAndDisconnectResetsMedia() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(1)
+		);
+		participant.updateMediaState(
+				"PA_current",
+				"client-a",
+				true,
+				true,
+				CONNECTED_AT.plusSeconds(2)
+		);
+
+		participant.startReconnecting(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(3),
+				CONNECTED_AT.plusSeconds(23)
+		);
+		participant.failRecovery(CONNECTED_AT.plusSeconds(23));
+
+		assertThat(participant.getNetworkQuality())
+				.isEqualTo(SessionNetworkQuality.LOST);
+		assertThat(participant.isCameraEnabled()).isFalse();
+		assertThat(participant.isMicrophoneEnabled()).isFalse();
+	}
+
+	@Test
+	void reconnectingClientCannotChangeMediaState() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(1)
+		);
+		participant.startReconnecting(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(2),
+				CONNECTED_AT.plusSeconds(22)
+		);
+
+		assertThatThrownBy(() -> participant.updateMediaState(
+				"PA_current",
+				"client-a",
+				true,
+				true,
+				CONNECTED_AT.plusSeconds(3)
+		)).isInstanceOf(IllegalStateException.class);
+	}
+
 	private RoomParticipant participant() {
 		return new RoomParticipant(mock(WaitingRoom.class), 101L, "A");
 	}

@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.event;
 
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
+import com.date.backend.domain.room.domain.SessionNetworkQuality;
 import com.date.backend.domain.room.dto.response.SessionParticipantConnectionChangedResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -31,6 +32,11 @@ class SessionParticipantConnectionChangedEventListenerTest {
 						LocalDateTime.of(2026, 7, 29, 21, 1, 20),
 						null,
 						1,
+						false,
+						false,
+						SessionNetworkQuality.LOST,
+						LocalDateTime.of(2026, 7, 29, 21, 1),
+						LocalDateTime.of(2026, 7, 29, 21, 1),
 						LocalDateTime.of(2026, 7, 29, 21, 1)
 				);
 

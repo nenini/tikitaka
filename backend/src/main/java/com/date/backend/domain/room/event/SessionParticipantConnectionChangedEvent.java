@@ -25,6 +25,11 @@ public record SessionParticipantConnectionChangedEvent(
 						participant.getReconnectDeadlineAt(),
 						participant.getReconnectedAt(),
 						participant.getReconnectAttemptCount(),
+						participant.isCameraEnabled(),
+						participant.isMicrophoneEnabled(),
+						participant.getNetworkQuality(),
+						participant.getMediaStateUpdatedAt(),
+						participant.getNetworkQualityUpdatedAt(),
 						occurredAt
 				)
 		);

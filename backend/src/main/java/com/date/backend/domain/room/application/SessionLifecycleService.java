@@ -210,7 +210,12 @@ public class SessionLifecycleService {
 								participant.getReconnectDeadlineAt(),
 								participant.getReconnectedAt(),
 								participant.getRecoveryFailedAt(),
-								participant.getReconnectAttemptCount()
+								participant.getReconnectAttemptCount(),
+								participant.isCameraEnabled(),
+								participant.isMicrophoneEnabled(),
+								participant.getNetworkQuality(),
+								participant.getMediaStateUpdatedAt(),
+								participant.getNetworkQualityUpdatedAt()
 						))
 						.toList()
 		);
