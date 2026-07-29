@@ -13,6 +13,26 @@ public enum SessionErrorCode implements ErrorCode {
 			HttpStatus.FORBIDDEN,
 			"SESSION_NOT_PARTICIPANT",
 			"해당 세션의 참여자가 아닙니다."
+	),
+	SESSION_JOIN_TIME_NOT_ALLOWED(
+			HttpStatus.CONFLICT,
+			"SESSION_JOIN_TIME_NOT_ALLOWED",
+			"현재는 세션에 입장할 수 있는 시간이 아닙니다."
+	),
+	SESSION_STATE_CONFLICT(
+			HttpStatus.CONFLICT,
+			"SESSION_STATE_CONFLICT",
+			"현재 세션 상태에서는 요청을 처리할 수 없습니다."
+	),
+	SESSION_PARTICIPANTS_NOT_JOINED(
+			HttpStatus.CONFLICT,
+			"SESSION_PARTICIPANTS_NOT_JOINED",
+			"모든 참여자가 입장해야 세션을 시작할 수 있습니다."
+	),
+	SESSION_PARTICIPANTS_NOT_READY(
+			HttpStatus.CONFLICT,
+			"SESSION_PARTICIPANTS_NOT_READY",
+			"모든 참여자가 준비 완료해야 세션을 시작할 수 있습니다."
 	);
 
 	private final HttpStatus status;

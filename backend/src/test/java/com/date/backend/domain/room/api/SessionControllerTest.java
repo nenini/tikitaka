@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.api;
 
 import com.date.backend.domain.room.application.SessionQueryService;
+import com.date.backend.domain.room.application.SessionLifecycleService;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.dto.response.SessionDetailResponse;
 import com.date.backend.domain.user.domain.UserRole;
@@ -20,7 +21,10 @@ class SessionControllerTest {
 	@Test
 	void delegatesAuthenticatedParticipantAndSessionId() {
 		SessionQueryService service = mock(SessionQueryService.class);
-		SessionController controller = new SessionController(service);
+		SessionController controller = new SessionController(
+				service,
+				mock(SessionLifecycleService.class)
+		);
 		AuthUser authUser =
 				new AuthUser(101L, "session@example.com", UserRole.USER);
 		SessionDetailResponse detail = new SessionDetailResponse(
