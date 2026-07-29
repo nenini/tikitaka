@@ -19,6 +19,7 @@ public record MatchResultResponse(
 		BigDecimal totalScore,
 		LocalDateTime acceptDeadlineAt,
 		LocalDateTime matchedAt,
+		LocalDateTime proposedScheduledAt,
 		LocalDateTime scheduledAt,
 		LocalDateTime confirmedAt
 ) {

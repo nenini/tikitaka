@@ -46,9 +46,23 @@ _add_cuda_dll_dirs()
 import numpy as np  # noqa: E402
 from faster_whisper import WhisperModel  # noqa: E402
 
-from stt.events import TranscriptEvent, TranscriptPayload  # noqa: E402
+from dataclasses import dataclass  # noqa: E402
 
 SAMPLE_RATE = 16_000
+
+
+@dataclass(frozen=True)
+class TranscriptPiece:
+    """whisper 세그먼트 하나의 전사 결과 — 이벤트 조립 전 원자료.
+
+    이벤트 계약(TranscriptEvent) 조립은 session 계층이 담당한다(식별자·utteranceId 주입).
+    """
+
+    text: str
+    confidence: float
+    segment_start_ms: int
+    segment_end_ms: int
+    language: str
 
 
 class SttEngine:
@@ -74,17 +88,13 @@ class SttEngine:
         self,
         audio: np.ndarray,
         *,
-        session_id: str,
-        speaker_id: str,
-        session_elapsed_ms: int,
-        seq_start: int = 0,
-        is_final: bool = True,
+        base_ms: int = 0,
         vad_filter: bool = False,
         min_confidence: float = 0.5,
-    ) -> List[TranscriptEvent]:
-        """오디오 청크(float32 mono 16kHz)를 STT하여 TranscriptEvent 리스트 반환.
+    ) -> list[TranscriptPiece]:
+        """오디오 청크(float32 mono 16kHz) → 전사 조각 리스트.
 
-        타임스탬프는 청크 시작 시각(session_elapsed_ms) + 세그먼트 상대시각으로 절대화한다.
+        세그먼트 시각은 base_ms(발화 시작 sessionElapsedMs) + 세그먼트 상대시각으로 절대화한다.
         무음/노이즈에서 흔한 whisper 환각("감사합니다" 등)은 no_speech_prob·confidence로 거른다.
         """
         segments, info = self.model.transcribe(
@@ -98,8 +108,7 @@ class SttEngine:
             condition_on_previous_text=False,  # 청크 간 환각 전파 방지
         )
 
-        events: List[TranscriptEvent] = []
-        seq = seq_start
+        pieces: list[TranscriptPiece] = []
         for seg in segments:
             text = seg.text.strip()
             if not text:
@@ -110,22 +119,13 @@ class SttEngine:
             confidence = round(min(max(math.exp(seg.avg_logprob), 0.0), 1.0), 2)
             if confidence < min_confidence:
                 continue
-            payload = TranscriptPayload(
-                text=text,
-                is_final=is_final,
-                language=info.language,
-                segment_start_ms=session_elapsed_ms + int(seg.start * 1000),
-                segment_end_ms=session_elapsed_ms + int(seg.end * 1000),
-            )
-            events.append(
-                TranscriptEvent(
-                    session_id=session_id,
-                    speaker_id=speaker_id,
-                    seq=seq,
-                    session_elapsed_ms=session_elapsed_ms,
+            pieces.append(
+                TranscriptPiece(
+                    text=text,
                     confidence=confidence,
-                    payload=payload,
+                    segment_start_ms=base_ms + int(seg.start * 1000),
+                    segment_end_ms=base_ms + int(seg.end * 1000),
+                    language=info.language,
                 )
             )
-            seq += 1
-        return events
+        return pieces

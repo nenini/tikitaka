@@ -5,6 +5,8 @@ import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchStatus;
 import com.date.backend.domain.match.repository.MatchPairRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,9 +23,12 @@ class MatchExpirationServiceTest {
 		MatchPairRepository pairRepository = mock(MatchPairRepository.class);
 		MatchJobEnqueueService jobEnqueueService =
 				mock(MatchJobEnqueueService.class);
+		ApplicationEventPublisher eventPublisher =
+				mock(ApplicationEventPublisher.class);
 		MatchExpirationService service = new MatchExpirationService(
 				pairRepository,
-				jobEnqueueService
+				jobEnqueueService,
+				eventPublisher
 		);
 		MatchPair pair = mock(MatchPair.class);
 		MatchRequest first = mock(MatchRequest.class);
@@ -35,6 +40,8 @@ class MatchExpirationServiceTest {
 		when(pair.isAcceptanceExpired(now)).thenReturn(true);
 		when(pair.getRequestA()).thenReturn(first);
 		when(pair.getRequestB()).thenReturn(second);
+		when(pair.getUserAId()).thenReturn(10L);
+		when(pair.getUserBId()).thenReturn(20L);
 		when(pairRepository.findAllByStatusAndAcceptDeadlineAtBefore(
 				MatchStatus.PENDING_ACCEPTANCE,
 				now
@@ -48,5 +55,12 @@ class MatchExpirationServiceTest {
 		verify(second).returnToWaiting(now);
 		verify(jobEnqueueService).enqueue(first);
 		verify(jobEnqueueService).enqueue(second);
+		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		MatchExpiredEvent expired = (MatchExpiredEvent) eventCaptor.getValue();
+		org.assertj.core.api.Assertions.assertThat(expired.matchPairId()).isEqualTo(1L);
+		org.assertj.core.api.Assertions.assertThat(expired.userAId()).isEqualTo(10L);
+		org.assertj.core.api.Assertions.assertThat(expired.userBId()).isEqualTo(20L);
+		org.assertj.core.api.Assertions.assertThat(expired.expiredAt()).isEqualTo(now);
 	}
 }

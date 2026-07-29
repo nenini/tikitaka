@@ -187,7 +187,8 @@ class MatchRepositoryTest {
 				requestA,
 				new BigDecimal("50.000"),
 				new BigDecimal("33.333"),
-				now.plusMinutes(10)
+				now.plusMinutes(10),
+				now.plusHours(2)
 		));
 		matchResponseRepository.saveAll(List.of(
 				new MatchResponse(pair, userA.getId()),

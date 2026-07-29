@@ -23,6 +23,7 @@ import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +54,7 @@ public class MatchCreationService {
 	private final MatchEligibilityPolicy eligibilityPolicy;
 	private final MatchAvailabilityPolicy availabilityPolicy;
 	private final MatchScorePolicy scorePolicy;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchCreationService(
 			MatchRequestRepository requestRepository,
@@ -66,7 +68,8 @@ public class MatchCreationService {
 			ProfileRepository profileRepository,
 			MatchEligibilityPolicy eligibilityPolicy,
 			MatchAvailabilityPolicy availabilityPolicy,
-			MatchScorePolicy scorePolicy
+			MatchScorePolicy scorePolicy,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.requestRepository = requestRepository;
 		this.activeRequestRepository = activeRequestRepository;
@@ -80,6 +83,7 @@ public class MatchCreationService {
 		this.eligibilityPolicy = eligibilityPolicy;
 		this.availabilityPolicy = availabilityPolicy;
 		this.scorePolicy = scorePolicy;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -88,7 +92,7 @@ public class MatchCreationService {
 			Long secondRequestId,
 			LocalDateTime matchedAt,
 			LocalDateTime acceptDeadlineAt,
-			LocalDateTime earliestSessionStart
+			LocalDateTime proposedScheduledAt
 	) {
 		List<Long> requestIds = List.of(firstRequestId, secondRequestId);
 		List<MatchRequest> lockedRequests = requestRepository.findAllByIdForUpdate(
@@ -151,11 +155,12 @@ public class MatchCreationService {
 				.findAllByMatchRequest_IdIn(requestIds)
 				.stream()
 				.collect(Collectors.groupingBy(slot -> slot.getMatchRequest().getId()));
-		if (availabilityPolicy.findEarliestStart(
+		boolean proposedScheduleStillAvailable = availabilityPolicy.findEarliestStart(
 				slotsByRequest.getOrDefault(first.getId(), List.of()),
 				slotsByRequest.getOrDefault(second.getId(), List.of()),
-				earliestSessionStart
-		).isEmpty()) {
+				proposedScheduledAt
+		).filter(proposedScheduledAt::equals).isPresent();
+		if (!proposedScheduleStillAvailable) {
 			return false;
 		}
 
@@ -178,6 +183,7 @@ public class MatchCreationService {
 				score.faceScore(),
 				score.traitScore(),
 				acceptDeadlineAt,
+				proposedScheduledAt,
 				matchedAt
 		));
 		responseRepository.saveAll(List.of(
@@ -186,6 +192,14 @@ public class MatchCreationService {
 		));
 		first.markMatchFound(matchedAt);
 		second.markMatchFound(matchedAt);
+		eventPublisher.publishEvent(new MatchFoundEvent(
+				pair.getId(),
+				pair.getUserAId(),
+				pair.getUserBId(),
+				pair.getMatchedAt(),
+				pair.getProposedScheduledAt(),
+				pair.getAcceptDeadlineAt()
+		));
 		return true;
 	}
 

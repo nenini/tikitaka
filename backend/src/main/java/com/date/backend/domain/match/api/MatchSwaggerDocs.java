@@ -50,7 +50,7 @@ public interface MatchSwaggerDocs {
 			summary = "매칭 수락",
 			description = """
 					수락 제한 시간 안에 매칭을 수락합니다.
-					양쪽 모두 수락하면 마지막 수락 시각에서 설정된 버퍼 이후의 가장 이른 공통 30분으로 예약을 확정합니다.
+					양쪽 모두 수락하면 매칭 성립 시 제시된 공통 세션 시각으로 예약을 확정합니다.
 					"""
 	)
 	@ApiResponses({
@@ -81,7 +81,10 @@ public interface MatchSwaggerDocs {
 
 	@Operation(
 			summary = "매칭 거절",
-			description = "수락 대기 중인 매칭을 거절하고 양쪽 매칭 신청을 다시 대기 상태로 변경합니다."
+			description = """
+					수락 대기 중인 매칭을 거절합니다.
+					거절한 사용자의 매칭 신청은 종료하고 상대방만 다시 매칭 대기 상태로 변경합니다.
+					"""
 	)
 	@ApiResponses({
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(

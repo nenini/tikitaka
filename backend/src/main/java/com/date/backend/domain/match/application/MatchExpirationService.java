@@ -3,6 +3,7 @@ package com.date.backend.domain.match.application;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchStatus;
 import com.date.backend.domain.match.repository.MatchPairRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,13 +15,16 @@ public class MatchExpirationService {
 
 	private final MatchPairRepository pairRepository;
 	private final MatchJobEnqueueService jobEnqueueService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchExpirationService(
 			MatchPairRepository pairRepository,
-			MatchJobEnqueueService jobEnqueueService
+			MatchJobEnqueueService jobEnqueueService,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.pairRepository = pairRepository;
 		this.jobEnqueueService = jobEnqueueService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -47,5 +51,11 @@ public class MatchExpirationService {
 		pair.getRequestB().returnToWaiting(waitingStartedAt);
 		jobEnqueueService.enqueue(pair.getRequestA());
 		jobEnqueueService.enqueue(pair.getRequestB());
+		eventPublisher.publishEvent(new MatchExpiredEvent(
+				pair.getId(),
+				pair.getUserAId(),
+				pair.getUserBId(),
+				waitingStartedAt
+		));
 	}
 }

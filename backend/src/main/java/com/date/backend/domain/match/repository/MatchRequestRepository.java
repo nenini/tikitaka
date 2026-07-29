@@ -37,6 +37,10 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
 			FROM MatchRequest request
 			WHERE request.status = :status
 			AND request.waitingStartedAt <= :waitingStartedBefore
+			AND (
+				request.settingRecommendationSentAt IS NULL
+				OR request.settingRecommendationSentAt < request.waitingStartedAt
+			)
 			AND EXISTS (
 				SELECT active.userId
 				FROM ActiveMatchRequest active
@@ -45,6 +49,29 @@ public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long
 			ORDER BY request.waitingStartedAt, request.id
 			""")
 	List<MatchRequest> findWaitingRecommendationTargets(
+			@Param("status") MatchRequestStatus status,
+			@Param("waitingStartedBefore") LocalDateTime waitingStartedBefore,
+			Pageable pageable
+	);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			SELECT request
+			FROM MatchRequest request
+			WHERE request.status = :status
+			AND request.waitingStartedAt <= :waitingStartedBefore
+			AND (
+				request.settingRecommendationSentAt IS NULL
+				OR request.settingRecommendationSentAt < request.waitingStartedAt
+			)
+			AND EXISTS (
+				SELECT active.userId
+				FROM ActiveMatchRequest active
+				WHERE active.matchRequest = request
+			)
+			ORDER BY request.waitingStartedAt, request.id
+			""")
+	List<MatchRequest> findUnnotifiedWaitingRecommendationTargetsForUpdate(
 			@Param("status") MatchRequestStatus status,
 			@Param("waitingStartedBefore") LocalDateTime waitingStartedBefore,
 			Pageable pageable

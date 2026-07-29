@@ -53,9 +53,51 @@ class FlywayMigrationTests {
 		Integer matchRequestTraitSnapshotTableCount =
 				tableCount("MATCH_REQUEST_TRAIT_SNAPSHOTS");
 		Integer matchJobTableCount = tableCount("MATCH_JOBS");
+		Integer notificationTableCount = tableCount("NOTIFICATIONS");
+		Integer notificationJobTableCount = tableCount("NOTIFICATION_JOBS");
+		Integer notificationPresentationColumnCount = columnCount(
+				"NOTIFICATIONS",
+				"PRESENTATION"
+		);
+		Integer notificationDeduplicationKeyColumnCount = columnCount(
+				"NOTIFICATIONS",
+				"DEDUPLICATIONKEY"
+		);
+		Integer notificationMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '15'",
+				Integer.class
+		);
+		Integer matchPolicyMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '16'",
+				Integer.class
+		);
+		Integer notificationQueryMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '17'",
+				Integer.class
+		);
+		Integer waitingRecommendationMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '18'",
+				Integer.class
+		);
+		Integer proposedScheduledAtColumnCount = columnCount(
+				"MATCH_PAIRS",
+				"PROPOSEDSCHEDULEDAT"
+		);
+		Integer rejectedAtColumnCount = columnCount(
+				"MATCH_REQUESTS",
+				"REJECTEDAT"
+		);
 		Integer matchWaitingStartedAtColumnCount = columnCount(
 				"MATCH_REQUESTS",
 				"WAITINGSTARTEDAT"
+		);
+		Integer settingRecommendationSentAtColumnCount = columnCount(
+				"MATCH_REQUESTS",
+				"SETTINGRECOMMENDATIONSENTAT"
 		);
 		Integer faceTagCount = rowCount("face_tag_catalog");
 		Integer aiFaceTagCodeCount = jdbcTemplate.queryForObject(
@@ -105,7 +147,18 @@ class FlywayMigrationTests {
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
 		assertThat(matchJobTableCount).isEqualTo(1);
+		assertThat(notificationTableCount).isEqualTo(1);
+		assertThat(notificationJobTableCount).isEqualTo(1);
+		assertThat(notificationPresentationColumnCount).isEqualTo(1);
+		assertThat(notificationDeduplicationKeyColumnCount).isEqualTo(1);
+		assertThat(notificationMigrationCount).isEqualTo(1);
+		assertThat(matchPolicyMigrationCount).isEqualTo(1);
+		assertThat(notificationQueryMigrationCount).isEqualTo(1);
+		assertThat(waitingRecommendationMigrationCount).isEqualTo(1);
+		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
+		assertThat(rejectedAtColumnCount).isEqualTo(1);
 		assertThat(matchWaitingStartedAtColumnCount).isEqualTo(1);
+		assertThat(settingRecommendationSentAtColumnCount).isEqualTo(1);
 		assertThat(faceTagCount).isEqualTo(10);
 		assertThat(aiFaceTagCodeCount).isEqualTo(10);
 		assertThat(legacyFaceTagCodeCount).isZero();
