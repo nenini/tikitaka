@@ -105,7 +105,6 @@ ai:
 
 match:
   policy:
-    late-cancellation-threshold-seconds: ${MATCH_LATE_CANCELLATION_THRESHOLD_SECONDS:86400}
     setting-recommendation-delay-seconds: ${MATCH_SETTING_RECOMMENDATION_DELAY_SECONDS:86400}
   worker:
     enabled: ${MATCH_WORKER_ENABLED:true}
@@ -120,9 +119,6 @@ match:
     enabled: ${MATCH_SCHEDULER_ENABLED:true}
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
     initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
-    acceptance-timeout-seconds: ${MATCH_ACCEPTANCE_TIMEOUT_SECONDS:28800}
-    minimum-acceptance-window-seconds: ${MATCH_MINIMUM_ACCEPTANCE_WINDOW_SECONDS:3600}
-    schedule-buffer-seconds: ${MATCH_SCHEDULE_BUFFER_SECONDS:3600}
 
 notification:
   waiting-recommendation:

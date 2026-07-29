@@ -1,6 +1,5 @@
 package com.date.backend.domain.match.application;
 
-import com.date.backend.domain.match.config.MatchPolicyProperties;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchStatus;
@@ -40,7 +39,6 @@ class MatchCancellationServiceTest {
 		MatchCancellationService service = new MatchCancellationService(
 				pairRepository,
 				activeRequestRepository,
-				new MatchPolicyProperties(86_400, 86_400),
 				eventPublisher,
 				clock
 		);
@@ -53,6 +51,7 @@ class MatchCancellationServiceTest {
 		when(pair.getId()).thenReturn(1L);
 		when(pair.isParticipant(101L)).thenReturn(true);
 		when(pair.getStatus()).thenReturn(MatchStatus.CONFIRMED);
+		when(pair.getLateCancellationMinutesSnapshot()).thenReturn(60);
 		when(pair.getScheduledAt()).thenReturn(cancelledAt.plusDays(1));
 		when(pair.getRequestA()).thenReturn(firstRequest);
 		when(pair.getRequestB()).thenReturn(secondRequest);
@@ -73,7 +72,7 @@ class MatchCancellationServiceTest {
 				101L,
 				cancelledAt,
 				"일정 변경",
-				Duration.ofHours(24)
+				Duration.ofMinutes(60)
 		);
 		verify(firstRequest).cancel(cancelledAt, "일정 변경");
 		verify(secondRequest).cancel(cancelledAt, "일정 변경");

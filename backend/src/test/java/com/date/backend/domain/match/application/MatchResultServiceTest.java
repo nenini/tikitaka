@@ -114,7 +114,7 @@ class MatchResultServiceTest {
 
 		MatchResultResponse result = service.reject(PAIR_ID, USER_A_ID);
 
-		verify(pair).reject();
+		verify(pair).reject(NOW);
 		verify(requestA).reject(NOW);
 		verify(requestB).returnToWaiting(NOW);
 		verify(activeRequestRepository).deleteById(USER_A_ID);

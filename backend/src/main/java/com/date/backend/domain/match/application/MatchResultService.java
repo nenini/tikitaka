@@ -91,7 +91,7 @@ public class MatchResultService {
 		LocalDateTime now = LocalDateTime.now(clock);
 		MatchPair pair = getPairForResponse(matchPairId, userId, now);
 		getPendingResponse(pair.getId(), userId).reject(now);
-		pair.reject();
+		pair.reject(now);
 		MatchRequest rejectedRequest = pair.getUserAId().equals(userId)
 				? pair.getRequestA()
 				: pair.getRequestB();
