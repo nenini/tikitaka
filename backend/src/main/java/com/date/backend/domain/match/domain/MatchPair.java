@@ -64,6 +64,9 @@ public class MatchPair {
 	@Column(name = "matchedAt", nullable = false, updatable = false)
 	private LocalDateTime matchedAt;
 
+	@Column(name = "proposedScheduledAt", nullable = false, updatable = false)
+	private LocalDateTime proposedScheduledAt;
+
 	@Column(name = "scheduledAt")
 	private LocalDateTime scheduledAt;
 
@@ -93,7 +96,8 @@ public class MatchPair {
 			MatchRequest secondRequest,
 			BigDecimal faceScore,
 			BigDecimal traitScore,
-			LocalDateTime acceptDeadlineAt
+			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt
 	) {
 		this(
 				firstRequest,
@@ -101,6 +105,7 @@ public class MatchPair {
 				faceScore,
 				traitScore,
 				acceptDeadlineAt,
+				proposedScheduledAt,
 				null
 		);
 	}
@@ -111,6 +116,7 @@ public class MatchPair {
 			BigDecimal faceScore,
 			BigDecimal traitScore,
 			LocalDateTime acceptDeadlineAt,
+			LocalDateTime proposedScheduledAt,
 			LocalDateTime matchedAt
 	) {
 		MatchRequest left = Objects.requireNonNull(firstRequest);
@@ -139,21 +145,29 @@ public class MatchPair {
 			throw new IllegalArgumentException("총 매칭 점수는 100점을 초과할 수 없습니다.");
 		}
 		this.acceptDeadlineAt = Objects.requireNonNull(acceptDeadlineAt);
+		this.proposedScheduledAt = Objects.requireNonNull(proposedScheduledAt);
+		if (!this.proposedScheduledAt.isAfter(this.acceptDeadlineAt)) {
+			throw new IllegalArgumentException(
+					"제안 세션 시각은 수락 마감 시각보다 늦어야 합니다."
+			);
+		}
 		this.matchedAt = matchedAt;
 	}
 
-	public void confirm(LocalDateTime confirmedAt, LocalDateTime scheduledAt) {
+	public void confirm(LocalDateTime confirmedAt) {
 		if (status != MatchStatus.PENDING_ACCEPTANCE) {
 			throw new IllegalStateException("수락 대기 중인 매칭만 확정할 수 있습니다.");
 		}
 		LocalDateTime confirmationTime = Objects.requireNonNull(confirmedAt);
-		LocalDateTime scheduleTime = Objects.requireNonNull(scheduledAt);
-		if (!scheduleTime.isAfter(confirmationTime)) {
+		if (!confirmationTime.isBefore(acceptDeadlineAt)) {
+			throw new IllegalStateException("수락 마감이 지난 매칭은 확정할 수 없습니다.");
+		}
+		if (!proposedScheduledAt.isAfter(confirmationTime)) {
 			throw new IllegalArgumentException("예약 시각은 확정 시각보다 늦어야 합니다.");
 		}
 		this.status = MatchStatus.CONFIRMED;
 		this.confirmedAt = confirmationTime;
-		this.scheduledAt = scheduleTime;
+		this.scheduledAt = proposedScheduledAt;
 	}
 
 	public void reject() {
@@ -286,6 +300,10 @@ public class MatchPair {
 
 	public LocalDateTime getMatchedAt() {
 		return matchedAt;
+	}
+
+	public LocalDateTime getProposedScheduledAt() {
+		return proposedScheduledAt;
 	}
 
 	public LocalDateTime getScheduledAt() {

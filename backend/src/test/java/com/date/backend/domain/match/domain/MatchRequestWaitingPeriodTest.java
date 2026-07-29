@@ -32,7 +32,7 @@ class MatchRequestWaitingPeriodTest {
 	}
 
 	@Test
-	void rejectionOrExpirationRestartsWaitingPeriod() {
+	void rematchingRestartsWaitingPeriod() {
 		LocalDateTime initialWaitingStartedAt =
 				LocalDateTime.of(2026, 7, 27, 10, 0);
 		LocalDateTime matchedAt =
@@ -46,6 +46,19 @@ class MatchRequestWaitingPeriodTest {
 
 		assertThat(request.getStatus()).isEqualTo(MatchRequestStatus.WAITING);
 		assertThat(request.getWaitingStartedAt()).isEqualTo(returnedToWaitingAt);
+	}
+
+	@Test
+	void explicitRejectionEndsRequestWithoutReturningToWaiting() {
+		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 11, 0);
+		LocalDateTime rejectedAt = LocalDateTime.of(2026, 7, 27, 12, 0);
+		MatchRequest request = request(LocalDateTime.of(2026, 7, 27, 10, 0));
+		request.markMatchFound(matchedAt);
+
+		request.reject(rejectedAt);
+
+		assertThat(request.getStatus()).isEqualTo(MatchRequestStatus.REJECTED);
+		assertThat(request.getRejectedAt()).isEqualTo(rejectedAt);
 	}
 
 	private MatchRequest request(LocalDateTime waitingStartedAt) {

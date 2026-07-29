@@ -23,6 +23,8 @@ import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,6 +62,8 @@ class MatchCreationServiceTest {
 	private final MatchAvailabilityPolicy availabilityPolicy =
 			mock(MatchAvailabilityPolicy.class);
 	private final MatchScorePolicy scorePolicy = mock(MatchScorePolicy.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 
 	private final MatchCreationService service = new MatchCreationService(
 			requestRepository,
@@ -73,7 +77,8 @@ class MatchCreationServiceTest {
 			profileRepository,
 			eligibilityPolicy,
 			availabilityPolicy,
-			scorePolicy
+			scorePolicy,
+			eventPublisher
 	);
 
 	@Test
@@ -88,8 +93,8 @@ class MatchCreationServiceTest {
 		Profile secondProfile = new Profile(102L, "second", Gender.FEMALE, "서울");
 		List<MatchRequestSlot> slots = List.of(slot(first), slot(second));
 		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 10, 0);
-		LocalDateTime deadline = matchedAt.plusMinutes(5);
-		LocalDateTime earliestSessionStart = deadline.plusHours(1);
+		LocalDateTime proposedScheduledAt = matchedAt.plusHours(8);
+		LocalDateTime deadline = proposedScheduledAt.minusHours(1);
 
 		when(requestRepository.findAllByIdForUpdate(List.of(1L, 2L)))
 				.thenReturn(List.of(first, second));
@@ -119,7 +124,7 @@ class MatchCreationServiceTest {
 				anyCollection(),
 				anyCollection(),
 				any()
-		)).thenReturn(Optional.of(earliestSessionStart));
+		)).thenReturn(Optional.of(proposedScheduledAt));
 		when(traitRepository.findAllByMatchRequest_IdIn(List.of(1L, 2L)))
 				.thenReturn(List.of());
 		when(scorePolicy.calculate(
@@ -133,14 +138,18 @@ class MatchCreationServiceTest {
 				new BigDecimal("41.667")
 		));
 		when(pairRepository.save(any(MatchPair.class)))
-				.thenAnswer(invocation -> invocation.getArgument(0));
+				.thenAnswer(invocation -> {
+					MatchPair pair = invocation.getArgument(0);
+					ReflectionTestUtils.setField(pair, "id", 1000L);
+					return pair;
+				});
 
 		boolean created = service.createMatch(
 				1L,
 				2L,
 				matchedAt,
 				deadline,
-				earliestSessionStart
+				proposedScheduledAt
 		);
 
 		assertThat(created).isTrue();
@@ -149,8 +158,17 @@ class MatchCreationServiceTest {
 		verify(pairRepository).save(argThat(
 				pair -> pair.getMatchedAt().equals(matchedAt)
 						&& pair.getAcceptDeadlineAt().equals(deadline)
+						&& pair.getProposedScheduledAt().equals(proposedScheduledAt)
 		));
 		verify(responseRepository).saveAll(anyCollection());
+		verify(eventPublisher).publishEvent(new MatchFoundEvent(
+				1000L,
+				101L,
+				102L,
+				matchedAt,
+				proposedScheduledAt,
+				deadline
+		));
 	}
 
 	@Test

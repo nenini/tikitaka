@@ -7,6 +7,7 @@ public record MatchSchedulerProperties(
 		long fixedDelayMs,
 		long initialDelayMs,
 		long acceptanceTimeoutSeconds,
+		long minimumAcceptanceWindowSeconds,
 		long scheduleBufferSeconds
 ) {
 
@@ -14,6 +15,8 @@ public record MatchSchedulerProperties(
 		if (fixedDelayMs <= 0
 				|| initialDelayMs < 0
 				|| acceptanceTimeoutSeconds <= 0
+				|| minimumAcceptanceWindowSeconds <= 0
+				|| minimumAcceptanceWindowSeconds > acceptanceTimeoutSeconds
 				|| scheduleBufferSeconds < 0) {
 			throw new IllegalArgumentException("매칭 스케줄러 설정값이 올바르지 않습니다.");
 		}

@@ -54,11 +54,17 @@ public class MatchRequest {
 	@Column(name = "waitingStartedAt", nullable = false)
 	private LocalDateTime waitingStartedAt;
 
+	@Column(name = "settingRecommendationSentAt")
+	private LocalDateTime settingRecommendationSentAt;
+
 	@Column(name = "matchedAt")
 	private LocalDateTime matchedAt;
 
 	@Column(name = "cancelledAt")
 	private LocalDateTime cancelledAt;
+
+	@Column(name = "rejectedAt")
+	private LocalDateTime rejectedAt;
 
 	@Column(name = "expiresAt")
 	private LocalDateTime expiresAt;
@@ -147,11 +153,34 @@ public class MatchRequest {
 		this.waitingStartedAt = Objects.requireNonNull(waitingStartedAt);
 	}
 
+	public void markSettingRecommendationSent(LocalDateTime sentAt) {
+		if (status != MatchRequestStatus.WAITING) {
+			throw new IllegalStateException(
+					"대기 중인 매칭 요청만 설정 변경 안내를 처리할 수 있습니다."
+			);
+		}
+		LocalDateTime notificationTime = Objects.requireNonNull(sentAt);
+		if (notificationTime.isBefore(waitingStartedAt)) {
+			throw new IllegalArgumentException(
+					"알림 시각은 대기 시작 시각보다 빠를 수 없습니다."
+			);
+		}
+		this.settingRecommendationSentAt = notificationTime;
+	}
+
 	public void confirm() {
 		if (status != MatchRequestStatus.MATCH_FOUND) {
 			throw new IllegalStateException("상대가 정해진 요청만 확정할 수 있습니다.");
 		}
 		this.status = MatchRequestStatus.CONFIRMED;
+	}
+
+	public void reject(LocalDateTime rejectedAt) {
+		if (status != MatchRequestStatus.MATCH_FOUND) {
+			throw new IllegalStateException("매칭된 요청만 거절로 종료할 수 있습니다.");
+		}
+		this.status = MatchRequestStatus.REJECTED;
+		this.rejectedAt = Objects.requireNonNull(rejectedAt);
 	}
 
 	public void cancel(LocalDateTime cancelledAt, String reason) {
@@ -238,12 +267,20 @@ public class MatchRequest {
 		return waitingStartedAt;
 	}
 
+	public LocalDateTime getSettingRecommendationSentAt() {
+		return settingRecommendationSentAt;
+	}
+
 	public LocalDateTime getMatchedAt() {
 		return matchedAt;
 	}
 
 	public LocalDateTime getCancelledAt() {
 		return cancelledAt;
+	}
+
+	public LocalDateTime getRejectedAt() {
+		return rejectedAt;
 	}
 
 	public LocalDateTime getExpiresAt() {

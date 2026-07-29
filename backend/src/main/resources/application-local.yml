@@ -15,3 +15,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+app:
+  local-seed:
+    match-test-users-enabled: ${LOCAL_MATCH_TEST_USERS_ENABLED:true}

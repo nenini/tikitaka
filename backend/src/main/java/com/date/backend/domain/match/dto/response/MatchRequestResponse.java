@@ -22,7 +22,8 @@ public record MatchRequestResponse(
 		LocalDateTime requestedAt,
 		LocalDateTime waitingStartedAt,
 		LocalDateTime matchedAt,
-		LocalDateTime cancelledAt
+		LocalDateTime cancelledAt,
+		LocalDateTime rejectedAt
 ) {
 	public static MatchRequestResponse of(
 			MatchRequest request,
@@ -42,7 +43,8 @@ public record MatchRequestResponse(
 				request.getRequestedAt(),
 				request.getWaitingStartedAt(),
 				request.getMatchedAt(),
-				request.getCancelledAt()
+				request.getCancelledAt(),
+				request.getRejectedAt()
 		);
 	}
 

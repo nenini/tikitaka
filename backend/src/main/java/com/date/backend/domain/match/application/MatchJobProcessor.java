@@ -43,22 +43,32 @@ public class MatchJobProcessor {
 		}
 
 		LocalDateTime matchedAt = LocalDateTime.now(clock);
-		LocalDateTime acceptDeadlineAt = matchedAt.plusSeconds(
+		LocalDateTime maximumAcceptDeadlineAt = matchedAt.plusSeconds(
 				properties.acceptanceTimeoutSeconds()
 		);
-		LocalDateTime earliestSessionStart = acceptDeadlineAt.plusSeconds(
-				properties.scheduleBufferSeconds()
+		LocalDateTime earliestSessionStart = matchedAt.plusSeconds(
+				properties.minimumAcceptanceWindowSeconds()
+						+ properties.scheduleBufferSeconds()
 		);
 		Long requestId = job.getMatchRequest().getId();
 
 		candidateService.findBestCandidate(requestId, earliestSessionStart)
-				.ifPresent(candidate -> creationService.createMatch(
+				.ifPresent(candidate -> {
+					LocalDateTime slotAcceptDeadline = candidate.proposedScheduledAt()
+							.minusSeconds(properties.scheduleBufferSeconds());
+					LocalDateTime acceptDeadlineAt = slotAcceptDeadline.isBefore(
+							maximumAcceptDeadlineAt
+					)
+							? slotAcceptDeadline
+							: maximumAcceptDeadlineAt;
+					creationService.createMatch(
 						requestId,
 						candidate.request().getId(),
 						matchedAt,
 						acceptDeadlineAt,
-						earliestSessionStart
-				));
+						candidate.proposedScheduledAt()
+					);
+				});
 		job.complete(LocalDateTime.now(clock));
 	}
 }
