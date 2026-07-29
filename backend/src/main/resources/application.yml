@@ -120,6 +120,17 @@ match:
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
     initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
 
+room:
+  entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
+  entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}
+
+livekit:
+  url: ${LIVEKIT_URL:}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+  empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:2}
+
 notification:
   waiting-recommendation:
     enabled: ${NOTIFICATION_WAITING_RECOMMENDATION_ENABLED:true}

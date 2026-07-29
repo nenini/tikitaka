@@ -698,6 +698,33 @@ textarea.bt-input { min-height: 96px; resize: vertical; line-height: var(--bt-lh
 .bt-question-card__caption { color: var(--bt-color-text-tertiary); }
 .bt-question-card__notice { font-size: var(--bt-text-sm); color: var(--bt-color-text-secondary); }
 
+/* --row : 옵션을 가로 캐러셀로 흘린다.
+   세로 스택은 좁은 화면에서 카드가 212px(스테이지의 45%)까지 자라 **상대 얼굴을 덮는다**.
+   원칙 2("코칭은 상대 영상을 가리지 않는다")는 하드 룰이므로 세션 화면에서는 가로로 눕힌다.
+   기본값(--row 없음)은 그대로 세로 스택이라 다른 화면에는 영향이 없다. */
+.bt-question-card__options { display: contents; } /* 세로 모드에서는 카드의 flex 흐름에 그대로 참여 */
+.bt-question-card--row { max-width: none; }
+.bt-question-card--row .bt-question-card__options {
+  display: flex;
+  gap: var(--bt-space-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain; /* 캐러셀 끝에서 페이지가 함께 밀리지 않게 */
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px; /* 스냅 중 옵션 테두리가 잘려 보이지 않게 */
+}
+.bt-question-card--row .bt-question-card__options::-webkit-scrollbar { display: none; }
+.bt-question-card--row .bt-question-card__option {
+  flex: 1 1 0;
+  min-width: 190px; /* 질문 한 문장이 뭉개지지 않는 최소 폭 */
+  scroll-snap-align: start;
+}
+/* 좁은 화면: 다음 카드가 살짝 보이게(peek) 해서 더 있다는 걸 알린다 */
+@media (max-width: 639px) {
+  .bt-question-card--row .bt-question-card__option { flex: 0 0 62%; min-width: 0; }
+}
+
 /* --------------------------------------------------------------------------
    Connection indicator — 통화 종료와 네트워크 단절은 다른 사건이다(§6.7)
    -------------------------------------------------------------------------- */

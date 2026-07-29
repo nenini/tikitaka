@@ -25,6 +25,11 @@ export interface QuestionCardProps {
   disabled?: boolean
   /** error 상태일 때 재시도 버튼 */
   onRetry?: () => void
+  /**
+   * 옵션 배치. 기본 'column'(세로 스택).
+   * 'row' 는 가로 캐러셀 — 영상 위에 얹혀 **상대 얼굴을 가리면 안 되는** 세션 화면에서 쓴다.
+   */
+  orientation?: 'column' | 'row'
   className?: string
 }
 
@@ -42,6 +47,7 @@ export function QuestionCard({
   selectedId,
   disabled = false,
   onRetry,
+  orientation = 'column',
   className,
 }: QuestionCardProps) {
   const captionId = `${useId()}-caption`
@@ -49,7 +55,7 @@ export function QuestionCard({
 
   return (
     <div
-      className={cn('bt-question-card', className)}
+      className={cn('bt-question-card', orientation === 'row' && 'bt-question-card--row', className)}
       role="group"
       aria-labelledby={captionId}
       aria-busy={resolvedState === 'loading' || undefined}
@@ -80,19 +86,24 @@ export function QuestionCard({
         </>
       )}
 
-      {resolvedState === 'ready' &&
-        options?.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            className="bt-question-card__option"
-            aria-pressed={selectedId === option.id}
-            disabled={disabled}
-            onClick={() => onSelect(option.id)}
-          >
-            {option.text}
-          </button>
-        ))}
+      {/* row 모드에서 이 래퍼만 가로 스크롤러가 된다. column 모드에서는 display:contents 라
+          카드의 flex 흐름에 그대로 참여해 렌더 결과가 기존과 동일하다. */}
+      {resolvedState === 'ready' && (
+        <div className="bt-question-card__options">
+          {options?.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className="bt-question-card__option"
+              aria-pressed={selectedId === option.id}
+              disabled={disabled}
+              onClick={() => onSelect(option.id)}
+            >
+              {option.text}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

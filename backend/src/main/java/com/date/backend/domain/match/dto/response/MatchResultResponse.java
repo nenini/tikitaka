@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 public record MatchResultResponse(
 		Long matchPairId,
+		Long roomId,
 		MatchStatus status,
 		MatchResponseStatus myResponse,
 		MatchResponseStatus partnerResponse,

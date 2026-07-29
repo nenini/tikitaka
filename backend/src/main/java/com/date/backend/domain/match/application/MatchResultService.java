@@ -10,6 +10,8 @@ import com.date.backend.domain.match.repository.ActiveMatchRequestRepository;
 import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
+import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.MatchErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,6 +38,8 @@ public class MatchResultService {
 	private final ProfileService profileService;
 	private final Clock clock;
 	private final MatchJobEnqueueService jobEnqueueService;
+	private final WaitingRoomProvisioningService waitingRoomProvisioningService;
+	private final WaitingRoomRepository waitingRoomRepository;
 	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchResultService(
@@ -45,6 +49,8 @@ public class MatchResultService {
 			ProfileService profileService,
 			Clock clock,
 			MatchJobEnqueueService jobEnqueueService,
+			WaitingRoomProvisioningService waitingRoomProvisioningService,
+			WaitingRoomRepository waitingRoomRepository,
 			ApplicationEventPublisher eventPublisher
 	) {
 		this.pairRepository = pairRepository;
@@ -53,6 +59,8 @@ public class MatchResultService {
 		this.profileService = profileService;
 		this.clock = clock;
 		this.jobEnqueueService = jobEnqueueService;
+		this.waitingRoomProvisioningService = waitingRoomProvisioningService;
+		this.waitingRoomRepository = waitingRoomRepository;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -155,6 +163,7 @@ public class MatchResultService {
 		pair.confirm(confirmedAt);
 		first.confirm();
 		second.confirm();
+		waitingRoomProvisioningService.provision(pair);
 		eventPublisher.publishEvent(new MatchConfirmedEvent(
 				pair.getId(),
 				pair.getUserAId(),
@@ -174,6 +183,9 @@ public class MatchResultService {
 		MatchResponseStatus partnerResponse = responseStatus(responses, partnerId);
 		return new MatchResultResponse(
 				pair.getId(),
+				waitingRoomRepository.findByMatchPair_Id(pair.getId())
+						.map(room -> room.getId())
+						.orElse(null),
 				pair.getStatus(),
 				myResponse,
 				partnerResponse,
