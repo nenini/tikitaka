@@ -3,6 +3,7 @@ package com.date.backend.domain.room.api;
 import com.date.backend.domain.room.dto.request.RoomDeviceCheckRequest;
 import com.date.backend.domain.room.dto.response.RoomDeviceCheckResponse;
 import com.date.backend.domain.room.dto.response.WaitingRoomDetailResponse;
+import com.date.backend.domain.room.dto.response.RoomParticipantsStatusResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
@@ -133,6 +134,47 @@ public interface WaitingRoomSwaggerDocs {
 			)
 	})
 	ApiResponse<RoomDeviceCheckResponse> getLatestDeviceCheck(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "대기방 ID", example = "15")
+			@Positive Long roomId
+	);
+
+	@Operation(
+			summary = "준비 완료",
+			description = """
+					최신 기기 점검의 카메라·마이크·스피커·네트워크 항목을 모두 통과한 참여자를 준비 완료로 변경합니다.
+					이미 준비 완료 상태이면 같은 결과를 반환하는 멱등 요청이며 중복 이벤트는 발행하지 않습니다.
+					상태가 변경되면 /topic/rooms/{roomId}/participants 토픽으로 전체 참여자 상태를 전송합니다.
+					"""
+	)
+	ApiResponse<RoomParticipantsStatusResponse> markReady(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "대기방 ID", example = "15")
+			@Positive Long roomId
+	);
+
+	@Operation(
+			summary = "준비 취소",
+			description = """
+					현재 참여자의 준비 완료 상태를 취소합니다.
+					이미 대기 상태이면 같은 결과를 반환하는 멱등 요청이며 중복 이벤트는 발행하지 않습니다.
+					"""
+	)
+	ApiResponse<RoomParticipantsStatusResponse> cancelReady(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "대기방 ID", example = "15")
+			@Positive Long roomId
+	);
+
+	@Operation(
+			summary = "참여자 준비 상태 조회",
+			description = """
+					대기방 참여자별 준비 여부와 전원 준비 완료 여부를 조회합니다.
+					실시간 변경은 STOMP WebSocket /ws에 연결한 뒤
+					/topic/rooms/{roomId}/participants를 구독하여 받을 수 있습니다.
+					"""
+	)
+	ApiResponse<RoomParticipantsStatusResponse> getParticipantStatuses(
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "대기방 ID", example = "15")
 			@Positive Long roomId

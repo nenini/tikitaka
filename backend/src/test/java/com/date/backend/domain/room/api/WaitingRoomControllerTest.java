@@ -2,11 +2,13 @@ package com.date.backend.domain.room.api;
 
 import com.date.backend.domain.room.application.WaitingRoomService;
 import com.date.backend.domain.room.application.RoomDeviceCheckService;
+import com.date.backend.domain.room.application.RoomReadyService;
 import com.date.backend.domain.room.domain.RoomEntryStatus;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.dto.request.RoomDeviceCheckRequest;
 import com.date.backend.domain.room.dto.response.RoomDeviceCheckResponse;
 import com.date.backend.domain.room.dto.response.WaitingRoomDetailResponse;
+import com.date.backend.domain.room.dto.response.RoomParticipantsStatusResponse;
 import com.date.backend.domain.user.domain.UserRole;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.Validation;
@@ -29,7 +31,7 @@ class WaitingRoomControllerTest {
 		WaitingRoomService service = mock(WaitingRoomService.class);
 		RoomDeviceCheckService deviceCheckService = mock(RoomDeviceCheckService.class);
 		WaitingRoomController controller =
-				new WaitingRoomController(service, deviceCheckService);
+				new WaitingRoomController(service, deviceCheckService, mock(RoomReadyService.class));
 		AuthUser authUser = new AuthUser(101L, "room@example.com", UserRole.USER);
 		LocalDateTime scheduledAt = LocalDateTime.of(2026, 7, 28, 19, 0);
 		WaitingRoomDetailResponse detail = new WaitingRoomDetailResponse(
@@ -57,7 +59,7 @@ class WaitingRoomControllerTest {
 		WaitingRoomService waitingRoomService = mock(WaitingRoomService.class);
 		RoomDeviceCheckService deviceCheckService = mock(RoomDeviceCheckService.class);
 		WaitingRoomController controller =
-				new WaitingRoomController(waitingRoomService, deviceCheckService);
+				new WaitingRoomController(waitingRoomService, deviceCheckService, mock(RoomReadyService.class));
 		AuthUser authUser = new AuthUser(101L, "room@example.com", UserRole.USER);
 		RoomDeviceCheckRequest request =
 				new RoomDeviceCheckRequest(true, true, true, true);
@@ -86,7 +88,7 @@ class WaitingRoomControllerTest {
 	@Test
 	void swaggerInterfaceAndControllerDoNotRedefineMethodConstraints()
 			throws NoSuchMethodException {
-		WaitingRoomController controller = new WaitingRoomController(null, null);
+		WaitingRoomController controller = new WaitingRoomController(null, null, null);
 		Method method = WaitingRoomController.class.getMethod(
 				"saveDeviceCheck",
 				AuthUser.class,
@@ -107,5 +109,29 @@ class WaitingRoomControllerTest {
 							}
 					));
 		}
+	}
+
+	@Test
+	void delegatesReadyCommandsAndStatusLookupToService() {
+		RoomReadyService readyService = mock(RoomReadyService.class);
+		WaitingRoomController controller = new WaitingRoomController(
+				mock(WaitingRoomService.class),
+				mock(RoomDeviceCheckService.class),
+				readyService
+		);
+		AuthUser authUser = new AuthUser(101L, "room@example.com", UserRole.USER);
+		RoomParticipantsStatusResponse status =
+				new RoomParticipantsStatusResponse(1L, false, List.of());
+		when(readyService.markReady(101L, 1L)).thenReturn(status);
+		when(readyService.cancelReady(101L, 1L)).thenReturn(status);
+		when(readyService.getStatus(101L, 1L)).thenReturn(status);
+
+		assertThat(controller.markReady(authUser, 1L).data()).isEqualTo(status);
+		assertThat(controller.cancelReady(authUser, 1L).data()).isEqualTo(status);
+		assertThat(controller.getParticipantStatuses(authUser, 1L).data())
+				.isEqualTo(status);
+		verify(readyService).markReady(101L, 1L);
+		verify(readyService).cancelReady(101L, 1L);
+		verify(readyService).getStatus(101L, 1L);
 	}
 }
