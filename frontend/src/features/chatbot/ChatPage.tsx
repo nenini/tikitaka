@@ -260,7 +260,7 @@ export function ChatPage() {
             <LoadingBubbles />
           ) : messages.length === 0 ? (
             <p className="bt-body-sm bt-muted m-auto max-w-[28ch] text-center">
-              먼저 가볍게 인사를 건네볼까요? 편하게 쓰셔도 돼요.
+              먼저 가볍게 인사를 건네볼까요?<br /> 편하게 쓰셔도 돼요.
             </p>
           ) : (
             messages.map((message, i) => (
@@ -290,9 +290,16 @@ export function ChatPage() {
           {error && <Callout tone="danger">{error}</Callout>}
           {ended ? (
             <Callout tone="info">
-              <b>대화를 마쳤어요.</b> 종합 피드백을 만들고 있어요. 준비되면 알림으로 알려드릴게요.
-              <div className="mt-2 flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+              대화를 마쳤어요. 주고받은 대화를 정리해 종합 피드백을 만들고 있어요.
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate(`/chatbot/${session?.chatSessionId}/report`)}
+                >
+                  종합 피드백 보기
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                   홈으로
                 </Button>
               </div>
@@ -335,13 +342,14 @@ export function ChatPage() {
             <Button variant="ghost" onClick={() => setEndOpen(false)}>
               계속하기
             </Button>
-            <Button variant="secondary" loading={ending} onClick={handleEnd}>
+            {/* 되돌릴 수 없는 액션이라 주 버튼으로 세운다 */}
+            <Button variant="primary" loading={ending} onClick={handleEnd}>
               종료하고 피드백 받기
             </Button>
           </>
         }
       >
-        종료하면 이 대화에는 더 이상 메시지를 보낼 수 없어요. 대신 <b>대화 전체에 대한 종합 피드백</b>을
+        종료하면 이 대화에는 더 이상 메시지를 보낼 수 없어요. 대신 대화 전체에 대한 종합 피드백을
         만들어 드려요. 챗봇 연습은 사랑의 온도에 반영되지 않습니다.
       </Modal>
 

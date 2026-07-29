@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, Spinner, Stack } from '@/components'
+import { Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
   getPeerReviewForm,
@@ -9,7 +9,7 @@ import {
   getSubmittedReview,
   submitPeerReview,
 } from './api'
-import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
+import { FreeTextField, MetricRow, OverflowMenu, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
 import type {
   PeerReviewForm,
@@ -71,7 +71,8 @@ export function PeerReviewPage() {
 
   const metrics = form?.metrics ?? []
   // 6개짜리 배열이라 메모이즈할 이유가 없다(매 렌더 새 배열이면 useMemo 가 오히려 헛돈다).
-  const allRated = metrics.length > 0 && metrics.every((m) => scores[m.key] != null)
+  const ratedCount = metrics.filter((m) => scores[m.key] != null).length
+  const allRated = metrics.length > 0 && ratedCount === metrics.length
 
   const submitted = Boolean(form?.submitted || status?.mySubmitted)
   const expired = Boolean(status?.expired)
@@ -108,31 +109,53 @@ export function PeerReviewPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
-      {/* 헤더 */}
+      {/* 헤더 — 파괴적 액션(신고·차단)은 제출 버튼 옆이 아니라 여기 '더보기'에 둔다 */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="bt-h1">{form.opponent.nickname}님과의 대화, 어떠셨나요?</h1>
           <p className="bt-body-sm bt-muted mt-1">
-            외모·조건이 아니라 <b>대화 행동만</b> 평가해요. 익명으로 전달됩니다.
+            외모나 조건이 아니라 대화 행동만 평가해요. 익명으로 전달됩니다.
           </p>
         </div>
-        <Badge tone="warning">
-          <span className="bt-numeric">{form.sessionRoundNo}</span>회차 ·{' '}
-          <span className="bt-numeric">{form.durationMin}</span>분 완료
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge tone="warning">
+            <span className="bt-numeric">{form.sessionRoundNo}</span>회차 ·{' '}
+            <span className="bt-numeric">{form.durationMin}</span>분 완료
+          </Badge>
+          <OverflowMenu
+            label="이 세션 관리"
+            items={[{ label: '신고 · 차단', danger: true, onSelect: () => setReportOpen(true) }]}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 정량 6항목 */}
         <Card className="flex flex-col lg:flex-1">
-          <div className="bt-h3 mb-1">
-            정량 평가 <span className="bt-caption bt-muted">(1~5점)</span>
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+            <span className="bt-h3">
+              정량 평가 <span className="bt-caption bt-muted">(1~5점)</span>
+            </span>
+            {/* 몇 개 남았는지는 제출 버튼까지 내려가서 알 일이 아니다 — 항목 바로 위에 둔다 */}
+            {!submitted && !expired && (
+              <span className="bt-caption bt-muted" role="status" aria-live="polite">
+                <span className="bt-numeric">{ratedCount}</span> / <span className="bt-numeric">{metrics.length}</span> 선택함
+              </span>
+            )}
           </div>
-          {metrics.map((m) => (
+          {!submitted && !expired && (
+            <Progress
+              className="mb-1"
+              value={metrics.length ? (ratedCount / metrics.length) * 100 : 0}
+              aria-label={`정량 평가 진행 ${ratedCount} / ${metrics.length}`}
+            />
+          )}
+          {metrics.map((m, i) => (
             <MetricRow
               key={m.key}
               metric={m}
               compact={compact}
+              last={i === metrics.length - 1}
               value={scores[m.key]}
               disabled={submitted || expired}
               onChange={(v) => setScores((prev) => ({ ...prev, [m.key]: v }))}
@@ -140,9 +163,13 @@ export function PeerReviewPage() {
           ))}
         </Card>
 
-        {/* 우: 서술형 · 게이트 안내 · 제출 */}
+        {/* 우: 서술형 · 열람 안내 · 제출 */}
         <aside className="flex w-full flex-col gap-4 lg:w-[420px]">
-          <Card>
+          {/* 성격이 같은 두 입력이라 카드 하나로 묶는다 — 카드를 나누면 우측 컬럼만 길어진다 */}
+          <Card className="flex flex-col gap-4">
+            <div className="bt-h3">
+              한마디 <span className="bt-caption bt-muted">(선택)</span>
+            </div>
             <FreeTextField
               label="잘했던 행동"
               placeholder="어떤 행동이 좋았는지 적어주세요"
@@ -150,11 +177,9 @@ export function PeerReviewPage() {
               onChange={setGoodText}
               disabled={submitted || expired}
             />
-          </Card>
-          <Card>
             <FreeTextField
               label="개선하면 좋을 행동"
-              placeholder="완곡하게 적어주세요 · 욕설은 필터링됩니다"
+              placeholder="완곡하게 적어주세요. 욕설은 필터링됩니다"
               value={improveText}
               onChange={setImproveText}
               disabled={submitted || expired}
@@ -169,47 +194,32 @@ export function PeerReviewPage() {
             </span>
           )}
 
-          {!submitted && !expired && (
-            <div className="flex gap-2">
-              <Button variant="ghost" leadingIcon="report" onClick={() => setReportOpen(true)}>
-                신고 · 차단
-              </Button>
+          {!submitted && !expired ? (
+            <>
               <Button
                 variant="primary"
-                style={{ flex: 2 }}
+                block
                 loading={submitting}
                 disabled={!allRated}
                 onClick={handleSubmit}
               >
                 평가 제출
               </Button>
-            </div>
-          )}
-
-          {!submitted && !expired && !allRated && (
-            <p className="bt-caption bt-muted">
-              정량 6항목을 모두 선택하면 제출할 수 있어요. 서술형은 비워두셔도 됩니다.
-            </p>
-          )}
-
-          {(submitted || expired) && (
-            <div className="flex gap-2">
-              <Button variant="ghost" leadingIcon="report" onClick={() => setReportOpen(true)}>
-                신고 · 차단
-              </Button>
-              <Button
-                variant="primary"
-                style={{ flex: 2 }}
-                onClick={() => navigate(`/session/${sessionId}/report`)}
-              >
-                내 리포트 보기
-              </Button>
-            </div>
+              {!allRated && (
+                <p className="bt-caption bt-muted">
+                  정량 6항목을 모두 선택하면 제출할 수 있어요. 한마디는 비워두셔도 됩니다.
+                </p>
+              )}
+            </>
+          ) : (
+            <Button variant="primary" block onClick={() => navigate(`/session/${sessionId}/report`)}>
+              내 리포트 보기
+            </Button>
           )}
         </aside>
       </div>
 
-      {/* 상대가 남긴 평가 — 게이트를 통과했을 때만 서버가 내려준다 */}
+      {/* 상대가 남긴 평가 — 내 제출이 확인됐을 때만 서버가 내려준다 */}
       {received && (
         <Card className="mt-4">
           <div className="bt-h3 mb-3">{form.opponent.nickname}님이 남긴 평가</div>
@@ -222,14 +232,16 @@ export function PeerReviewPage() {
               ))}
             </Cluster>
             {received.goodBehaviorText && (
-              <p className="bt-body-sm">
-                <b>잘했던 행동</b> — {received.goodBehaviorText}
-              </p>
+              <div>
+                <span className="bt-overline">잘했던 행동</span>
+                <p className="bt-body-sm mt-1">{received.goodBehaviorText}</p>
+              </div>
             )}
             {received.improvementText && (
-              <p className="bt-body-sm">
-                <b>개선하면 좋을 행동</b> — {received.improvementText}
-              </p>
+              <div>
+                <span className="bt-overline">개선하면 좋을 행동</span>
+                <p className="bt-body-sm mt-1">{received.improvementText}</p>
+              </div>
             )}
             <p className="bt-caption bt-muted">
               익명으로 전달된 의견이에요. 사실과 다르거나 불쾌한 내용이면 신고할 수 있어요.
@@ -248,32 +260,35 @@ export function PeerReviewPage() {
   )
 }
 
-/** 상호성 게이트 안내. 제출 전/후 · 마감 초과에 따라 문구가 갈린다. */
+/**
+ * 상대 평가 열람 안내. 제출 전/후·마감 초과에 따라 문구가 갈린다.
+ *
+ * 내부 용어("상호성 게이트")는 화면에 쓰지 않는다 — 규칙을 그대로 풀어 쓰면 설명이 끝난다.
+ */
 function GateCallout({ status, submitted }: { status: ReceivedReviewStatus; submitted: boolean }) {
   if (status.expired) {
     return (
       <Callout tone="warning" icon="lock">
-        <b>48시간이 지나 평가가 확정됐어요.</b> 상대가 남긴 평가는 더 이상 열리지 않지만,
-        <b> 내 AI 리포트는 그대로 볼 수 있어요.</b>
+        48시간이 지나 평가가 확정됐어요. 상대가 남긴 평가는 더 이상 열리지 않지만, 내 AI 리포트는
+        그대로 볼 수 있어요.
       </Callout>
     )
   }
   if (submitted) {
     return status.unlocked ? (
       <Callout tone="success" icon="check">
-        제출 완료 — 상대가 남긴 평가가 열렸어요.
+        제출 완료. 상대가 남긴 평가가 열렸어요.
       </Callout>
     ) : (
       <Callout tone="success" icon="check">
-        제출 완료 — 상대가 평가를 제출하면 바로 열려요. 마감은 {formatDeadline(status.deadlineAt)}이에요.
+        제출 완료. 상대가 평가를 제출하면 바로 열려요. 마감은 {formatDeadline(status.deadlineAt)}이에요.
       </Callout>
     )
   }
   return (
     <Callout tone="warning" icon="lock">
-      <b>상호성 게이트</b> — 내 평가를 제출해야 상대가 남긴 평가를 볼 수 있어요.
-      <b> {formatDeadline(status.deadlineAt)}까지 미제출</b> 시 상대 평가는 영구히 열리지 않고 매칭
-      후순위가 됩니다.
+      내 평가를 제출해야 상대가 남긴 평가를 볼 수 있어요. {formatDeadline(status.deadlineAt)}까지 내지
+      않으면 상대 평가는 열리지 않고 매칭 후순위가 됩니다.
     </Callout>
   )
 }

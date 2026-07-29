@@ -1,5 +1,6 @@
-import { Badge, Card, VisuallyHidden } from '@/components'
-import type { RadarAxis, ReportIssue, ReportMetric, ReportTopic } from './types'
+import { useState } from 'react'
+import { Badge, Card, Icon } from '@/components'
+import type { IssueSeverity, RadarAxis, ReportIssue, ReportMetric, ReportTopic } from './types'
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
@@ -13,12 +14,20 @@ import type { RadarAxis, ReportIssue, ReportMetric, ReportTopic } from './types'
  *    의존성 추가 없이 **인라인 SVG**로 그렸다(축 6개 고정 도형이라 라이브러리 이득이 적다).
  * ⚠️ 임의 구현 2(D-13): "상대 평가 우선"을 **시각 강조**로 해석했다 —
  *    상대 계열을 위에, 더 굵고 진하게 그린다. 온도 가중치 해석이면 서버 산식이 따로 필요하다.
+ *
+ * 좌표계 주의: 라벨은 도형 바깥(반지름 ×1.26)에 놓이므로 viewBox 는 **도형 크기 + 라벨 여백**이다.
+ * 예전처럼 정사각 260 에 도형과 라벨을 함께 넣으면 좌우 라벨이 뷰박스 밖으로 잘렸다.
  */
 export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?: string }) {
-  const size = 260
+  /** 도형 반지름 */
+  const r = 74
+  /** 라벨이 차지하는 바깥 여백. 5~6글자 축 이름이 잘리지 않을 만큼 잡는다 */
+  const pad = 56
+  const size = (r + pad) * 2
   const cx = size / 2
   const cy = size / 2
-  const r = 82
+
+  const [hovered, setHovered] = useState<string | null>(null)
 
   const point = (index: number, ratio: number) => {
     const angle = (-90 + (360 / axes.length) * index) * (Math.PI / 180)
@@ -26,8 +35,7 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
     return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)] as const
   }
 
-  const polygon = (values: number[]) =>
-    values.map((v, i) => point(i, v / 100).join(',')).join(' ')
+  const polygon = (values: number[]) => values.map((v, i) => point(i, v / 100).join(',')).join(' ')
 
   const hasPeer = axes.some((a) => a.peerScore != null)
   // 상대 평가가 없는 축(비언어 등)은 AI 값으로 이어 붙여 도형이 원점으로 꺾이지 않게 한다
@@ -35,11 +43,12 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
 
   return (
     <div className={className}>
-      {/* 정사각 viewBox 라 폭을 막지 않으면 넓은 카드에서 세로로도 그만큼 커진다 */}
       <svg
         viewBox={`0 0 ${size} ${size}`}
-        className="mx-auto block w-full max-w-[300px]"
-        role="img"
+        className="mx-auto block w-full max-w-[340px]"
+        // role="img" 로 두면 그래프가 **잎 노드**가 되어 안의 축 요소들이 접근성 트리에서 사라진다.
+        // 축마다 점수를 읽히려면 컨테이너 역할이어야 한다.
+        role="group"
         aria-label="AI 분석과 상대 평가 비교 레이더 차트"
       >
         {/* 눈금 링 */}
@@ -80,37 +89,70 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
           />
         )}
 
-        {/* 축 라벨 */}
+        {/* 축 라벨 + 점수. 그래프에서 값을 못 읽으면 도형은 장식일 뿐이라 숫자를 함께 적는다 */}
         {axes.map((axis, i) => {
-          const [x, y] = point(i, 1.24)
+          const [x, y] = point(i, 1.26)
           const dx = x - cx
+          const anchor = Math.abs(dx) < 4 ? 'middle' : dx > 0 ? 'start' : 'end'
+          const active = hovered === axis.key
           return (
-            <text
-              key={axis.key}
-              x={x}
-              y={y}
-              fill="var(--bt-color-text-secondary)"
-              fontSize={11}
-              fontWeight={600}
-              textAnchor={Math.abs(dx) < 4 ? 'middle' : dx > 0 ? 'start' : 'end'}
-              dominantBaseline="middle"
-            >
-              {axis.label}
-            </text>
+            <g key={axis.key} opacity={hovered && !active ? 0.45 : 1}>
+              <text
+                x={x}
+                y={y - 6}
+                fill="var(--bt-color-text-secondary)"
+                fontSize={11}
+                fontWeight={600}
+                textAnchor={anchor}
+              >
+                {axis.label}
+              </text>
+              <text x={x} y={y + 8} fontSize={11} fontWeight={700} textAnchor={anchor}>
+                {axis.peerScore != null && (
+                  <tspan fill="var(--bt-color-success-marker)">{axis.peerScore}</tspan>
+                )}
+                {axis.peerScore != null && <tspan fill="var(--bt-color-text-tertiary)"> / </tspan>}
+                <tspan fill="var(--bt-color-brand)">{axis.aiScore}</tspan>
+              </text>
+            </g>
+          )
+        })}
+
+        {/* 축별 hover/focus 히트 영역. 마우스와 키보드가 같은 정보를 얻게 한다 */}
+        {axes.map((axis, i) => {
+          const [x, y] = point(i, 1)
+          return (
+            <circle
+              key={`hit-${axis.key}`}
+              cx={x}
+              cy={y}
+              r={18}
+              fill="transparent"
+              tabIndex={0}
+              role="img"
+              aria-label={`${axis.label}. ${axis.peerScore != null ? `상대 평가 ${axis.peerScore}점, ` : ''}AI 분석 ${axis.aiScore}점`}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setHovered(axis.key)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(axis.key)}
+              onBlur={() => setHovered(null)}
+            />
           )
         })}
       </svg>
 
-      {/* 그래프를 못 읽는 환경을 위한 값 목록 */}
-      <VisuallyHidden>
-        <ul>
-          {axes.map((a) => (
-            <li key={a.key}>
-              {a.label}: 상대 평가 {a.peerScore ?? '없음'}, AI 분석 {a.aiScore}
-            </li>
-          ))}
-        </ul>
-      </VisuallyHidden>
+      {/* 강조된 축의 상세. 툴팁을 SVG 안에 그리면 잘리므로 차트 아래 고정 슬롯에 둔다 */}
+      <div className="bt-caption mt-1 min-h-[1.4em] text-center" aria-hidden="true">
+        {hovered
+          ? (() => {
+            const axis = axes.find((a) => a.key === hovered)
+            if (!axis) return null
+            return axis.peerScore != null
+              ? `${axis.label} · 상대 평가 ${axis.peerScore} / AI 분석 ${axis.aiScore}`
+              : `${axis.label} · AI 분석 ${axis.aiScore}`
+          })()
+          : '축을 짚으면 점수를 볼 수 있어요'}
+      </div>
     </div>
   )
 }
@@ -141,23 +183,39 @@ export function LegendDot({ color, label }: { color: string; label: string }) {
 /* ── 이슈 맥락 카드 ─────────────────────────────────────── */
 
 /**
+ * 심각도별 표시. 색만으로 구분하지 않고 **아이콘과 배지 문구**를 함께 바꾼다
+ * — 색각 이상에서도 "참고"와 "주의"가 구분돼야 한다.
+ */
+const SEVERITY_STYLE = {
+  info: { tone: 'neutral', icon: 'info-circle', label: '참고', color: 'var(--bt-color-border-strong)' },
+  warning: { tone: 'warning', icon: 'warning', label: '주의', color: 'var(--bt-color-warning-marker)' },
+  critical: { tone: 'danger', icon: 'error-circle', label: '집중 확인', color: 'var(--bt-color-danger-marker)' },
+} as const satisfies Record<IssueSeverity, { tone: 'neutral' | 'warning' | 'danger'; icon: 'info-circle' | 'warning' | 'error-circle'; label: string; color: string }>
+
+/**
  * 부적절 이슈 1건 (`REPORT-01-1`).
  * 형식은 **맥락 요약 + 전후 근거 + 대체 제안** 고정 — 발언만 나열하지 않는다.
  */
 export function IssueCard({ issue }: { issue: ReportIssue }) {
+  const severity = SEVERITY_STYLE[issue.severity ?? 'warning']
+
   return (
-    <Card style={{ borderColor: 'var(--bt-color-warning-marker)' }}>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Badge tone="warning">감지</Badge>
-        <b className="bt-body-sm">
-          {issue.categoryLabel} · <span className="bt-numeric">{formatClock(issue.eventTimeSec)}</span>
-        </b>
-      </div>
+    // <Card style={{ borderColor: severity.color, borderLeftWidth: 3 }}>
+    <Card><div className="mb-2 flex flex-wrap items-center gap-2">
+      <Badge tone={severity.tone}>
+        <Icon name={severity.icon} size={12} />
+        {severity.label}
+      </Badge>
+      <b className="bt-body-sm">
+        {issue.categoryLabel} · <span className="bt-numeric">{formatClock(issue.eventTimeSec)}</span>
+      </b>
+    </div>
 
       <div className="flex flex-col gap-2.5">
-        <p className="bt-body-sm">
-          <b>맥락 요약</b> — {issue.contextSummary}
-        </p>
+        <div>
+          <span className="bt-overline">맥락 요약</span>
+          <p className="bt-body-sm mt-1">{issue.contextSummary}</p>
+        </div>
 
         {issue.evidenceExcerpt ? (
           <blockquote
@@ -174,8 +232,9 @@ export function IssueCard({ issue }: { issue: ReportIssue }) {
         )}
 
         {issue.alternativeExpression && (
-          <p className="bt-body-sm" style={{ color: 'var(--bt-color-success)' }}>
-            💡 대체 제안 — “{issue.alternativeExpression}”
+          <p className="bt-body-sm flex items-start gap-2" style={{ color: 'var(--bt-color-success)' }}>
+            <Icon name="bulb" size={16} className="mt-0.5 shrink-0" />
+            <span>대체 제안 — “{issue.alternativeExpression}”</span>
           </p>
         )}
       </div>
@@ -196,31 +255,54 @@ export function MetricStat({ metric }: { metric: ReportMetric }) {
   )
 }
 
+/* ── 잘한 점 / 개선점 ───────────────────────────────────── */
+
+/**
+ * 목록은 실제 `<ul><li>` 로 그린다. `<p>· 텍스트</p>` 는 눈에만 목록이고
+ * 스크린리더에는 "항목 3개"라는 정보가 전달되지 않는다.
+ */
+export function FeedbackList({ items }: { items: readonly string[] }) {
+  if (items.length === 0) {
+    return <p className="bt-body-sm bt-muted">해당하는 내용이 없어요.</p>
+  }
+  return (
+    <ul className="bt-body-sm flex list-disc flex-col gap-1.5 pl-5">
+      {items.map((text) => (
+        <li key={text}>{text}</li>
+      ))}
+    </ul>
+  )
+}
+
 /* ── 대화 주제 ──────────────────────────────────────────── */
 
 /**
- * 주제별 점유 시간을 글자 크기로 표현한다(목업의 워드 클라우드).
- * 크기만으로는 값을 알 수 없으므로 분 수를 라벨에 함께 적는다.
+ * 주제별 점유 시간.
+ *
+ * 예전에는 글자 크기(11~17px)로 비중을 표현했는데, 11px 는 본문 하한(12px)보다 작고 6px 차이는
+ * 눈으로 구분되지 않아 "작아서 못 읽는 워드 클라우드"만 남았다. 길이로 비교하는 막대로 바꾼다.
  */
 export function TopicCloud({ topics }: { topics: ReportTopic[] }) {
   const max = Math.max(1, ...topics.map((t) => t.minutes))
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <ul className="flex flex-col gap-2" aria-label="주제별 대화 시간">
       {topics.map((t) => (
-        <span
-          key={t.label}
-          className="rounded-full px-3 py-1"
-          style={{
-            fontSize: 11 + Math.round((t.minutes / max) * 6),
-            fontWeight: 700,
-            background: 'var(--bt-color-action-subtle)',
-            color: 'var(--bt-color-action)',
-          }}
-        >
-          {t.label} <span className="bt-numeric">{t.minutes}</span>분
-        </span>
+        <li key={t.label} className="flex items-center gap-3">
+          <span className="bt-body-sm w-[7.5rem] shrink-0 truncate">{t.label}</span>
+          <span
+            className="h-2.5 flex-1 overflow-hidden rounded-full"
+            style={{ background: 'var(--bt-color-surface-sunken)' }}
+            aria-hidden="true"
+          >
+            <span
+              className="block h-full rounded-full"
+              style={{ width: `${(t.minutes / max) * 100}%`, background: 'var(--bt-color-action)' }}
+            />
+          </span>
+          <span className="bt-caption bt-muted bt-numeric w-9 shrink-0 text-right">{t.minutes}분</span>
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
 

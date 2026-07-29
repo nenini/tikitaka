@@ -31,11 +31,20 @@ export interface RadarAxis {
   peerScore: number | null
 }
 
+/**
+ * 이슈 심각도(safety_events.severity).
+ * 모든 이슈를 같은 노랑으로 그리면 "말버릇 한 번"과 "반복된 압박 발언"이 같은 무게로 보인다.
+ * 서버가 값을 주지 않으면 `warning` 으로 취급한다.
+ */
+export type IssueSeverity = 'info' | 'warning' | 'critical'
+
 /** 부적절 이슈 맥락(safety_events). 발언 나열이 아니라 **맥락 요약 + 근거 + 대체 제안** 형식. */
 export interface ReportIssue {
   issueId: string
   /** 감지 유형 표시명 (예: "결혼·출산 압박 표현") */
   categoryLabel: string
+  /** 심각도. 미지정이면 warning */
+  severity?: IssueSeverity | null
   /** 세션 시작 기준 감지 시각(초) */
   eventTimeSec: number
   contextSummary: string

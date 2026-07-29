@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, EmptyState, Skeleton, Stack, TagChip } from '@/components'
+import { Badge, Button, Callout, Card, Cluster, EmptyState, Icon, Skeleton, TagChip } from '@/components'
 import { getReportStatus, getSessionReport, requestReportGeneration } from './api'
-import { IssueCard, MetricStat, RadarChart, RadarLegend, TopicCloud } from './parts'
+import { FeedbackList, IssueCard, MetricStat, RadarChart, RadarLegend, TopicCloud } from './parts'
 import type { ReportStatus, SessionReport } from './types'
 
 /** PENDING/GENERATING 동안 상태를 다시 물어보는 주기. */
@@ -73,20 +73,14 @@ export function SessionReportPage() {
     return (
       <main className="mx-auto w-full max-w-[560px] px-5 py-16" aria-busy="true">
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
-          <span style={{ fontSize: 32 }} aria-hidden="true">
-            🌱
-          </span>
+          <Icon name="sparkle" size={30} style={{ color: 'var(--bt-color-brand)' }} />
           <b className="bt-h3">리포트를 준비하고 있어요</b>
           <p className="bt-body-sm bt-muted">
             {status === 'PENDING'
               ? '상대의 평가를 기다리는 중이에요. 리포트는 평가가 도착하거나 48시간이 지나면 한 번에 만들어져요.'
               : '분석 결과를 정리하는 중이에요. 잠시만 기다려 주세요.'}
           </p>
-          {deadlineAt && (
-            <p className="bt-caption bt-muted">
-              대기 마감 {new Date(deadlineAt).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}
-            </p>
-          )}
+          {deadlineAt && <p className="bt-caption bt-muted">대기 마감 {formatDateTime(deadlineAt)}</p>}
           <Button variant="ghost" onClick={() => navigate('/growth')}>
             성장 대시보드 보기
           </Button>
@@ -100,7 +94,7 @@ export function SessionReportPage() {
       <main className="mx-auto w-full max-w-[560px] px-5 py-16">
         <Card>
           <EmptyState
-            icon={<span style={{ fontSize: 28 }}>🛠</span>}
+            icon={<Icon name="wrench" size={28} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
             title="리포트를 만들지 못했어요"
             text="분석에 문제가 있었어요. 다시 시도하면 저장된 세션 지표로 새로 만들어 드려요."
             action={
@@ -131,17 +125,39 @@ export function SessionReportPage() {
             {report.themeName ? ` · ${report.themeName} 테마` : ''}
           </p>
         </div>
-        <Cluster gap={6}>
-          <Badge tone={report.peerReviewIncluded ? 'success' : 'neutral'}>
-            {report.peerReviewIncluded ? '상대 평가 반영됨' : 'AI 단독 확정'}
-          </Badge>
-          {temp && (
-            <Badge tone={temp.delta >= 0 ? 'info' : 'warning'}>
-              온도 <span className="bt-numeric">{formatDelta(temp.delta)}</span>°
-            </Badge>
-          )}
-        </Cluster>
+        <Badge tone={report.peerReviewIncluded ? 'success' : 'neutral'}>
+          {report.peerReviewIncluded ? '상대 평가 반영됨' : 'AI 분석만으로 확정'}
+        </Badge>
       </div>
+
+      {/* 온도 변화는 이 리포트의 한 줄 결론이다 — 스크롤 맨 아래가 아니라 헤더 바로 아래에 둔다 */}
+      {temp && (
+        <Card variant="inset" className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Icon
+                name={temp.delta >= 0 ? 'arrow-up' : 'arrow-down'}
+                size={20}
+                style={{ color: temp.delta >= 0 ? 'var(--bt-color-success)' : 'var(--bt-color-warning)' }}
+              />
+              <div>
+                <span className="bt-caption bt-muted">사랑의 온도</span>
+                <p className="bt-body-sm mt-0.5">
+                  <span className="bt-numeric">{temp.before.toFixed(1)}</span>° →{' '}
+                  <b className="bt-numeric" style={{ fontSize: 18 }}>
+                    {temp.after.toFixed(1)}
+                  </b>
+                  ° <span className="bt-numeric bt-muted">({formatDelta(temp.delta)})</span>
+                </p>
+              </div>
+            </div>
+            <Link className="bt-body-sm" to="/growth" style={{ color: 'var(--bt-color-text-link)' }}>
+              성장 대시보드에서 추이 보기
+            </Link>
+          </div>
+          {temp.reason && <p className="bt-caption bt-muted mt-2">{temp.reason}</p>}
+        </Card>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 레이더 */}
@@ -150,15 +166,9 @@ export function SessionReportPage() {
           <RadarChart axes={report.radar} />
           <RadarLegend hasPeer={hasPeer} />
           <p className="bt-caption bt-muted">
-            {hasPeer ? (
-              <>
-                두 점수가 다를 때는 <b>상대 체감</b>을 먼저 보세요.
-              </>
-            ) : (
-              <>
-                상대 평가가 도착하지 않아 <b>AI 분석만</b>으로 확정됐어요. 이후 제출분은 반영되지 않아요.
-              </>
-            )}
+            {hasPeer
+              ? '두 점수가 다를 때는 상대가 실제로 느낀 쪽을 먼저 보세요.'
+              : '상대 평가가 도착하지 않아 AI 분석만으로 확정됐어요. 이후 제출분은 반영되지 않아요.'}
           </p>
         </Card>
 
@@ -169,7 +179,7 @@ export function SessionReportPage() {
           ) : (
             // D-14: 이슈 0건이어도 리포트가 비지 않게 긍정 피드백을 기본 포함한다
             <Callout tone="success" icon="check">
-              이번 세션에서는 <b>주의가 필요한 표현이 감지되지 않았어요.</b> 아래 행동 지표를 보며 다음 세션
+              이번 세션에서는 주의가 필요한 표현이 감지되지 않았어요. 아래 행동 지표를 보며 다음 세션
               목표를 잡아보세요.
             </Callout>
           )}
@@ -181,7 +191,6 @@ export function SessionReportPage() {
                 <MetricStat key={m.key} metric={m} />
               ))}
             </div>
-
           </Card>
 
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -189,25 +198,13 @@ export function SessionReportPage() {
               <div className="bt-h3 mb-2">
                 잘한 점 <span className="bt-numeric">{report.strengths.length}</span>
               </div>
-              <Stack gap={6}>
-                {report.strengths.map((s) => (
-                  <p key={s} className="bt-body-sm">
-                    · {s}
-                  </p>
-                ))}
-              </Stack>
+              <FeedbackList items={report.strengths} />
             </Card>
             <Card className="sm:flex-1">
               <div className="bt-h3 mb-2">
                 개선점 <span className="bt-numeric">{report.improvements.length}</span>
               </div>
-              <Stack gap={6}>
-                {report.improvements.map((s) => (
-                  <p key={s} className="bt-body-sm">
-                    · {s}
-                  </p>
-                ))}
-              </Stack>
+              <FeedbackList items={report.improvements} />
             </Card>
           </div>
 
@@ -229,20 +226,6 @@ export function SessionReportPage() {
             </Card>
           )}
 
-          {temp && (
-            <Card variant="inset">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="bt-body-sm">
-                  사랑의 온도 <span className="bt-numeric">{temp.before.toFixed(1)}</span>° →{' '}
-                  <b className="bt-numeric">{temp.after.toFixed(1)}</b>°
-                </span>
-                <Link className="bt-body-sm" to="/growth" style={{ color: 'var(--bt-color-text-link)' }}>
-                  성장 대시보드에서 추이 보기
-                </Link>
-              </div>
-              {temp.reason && <p className="bt-caption bt-muted mt-1">{temp.reason}</p>}
-            </Card>
-          )}
         </div>
       </div>
     </main>
@@ -270,12 +253,16 @@ function ReportSkeleton() {
   )
 }
 
-/** ISO → "2026-07-19". 리포트는 확정 문서라 상대 시간 표기를 쓰지 않는다. */
+/**
+ * 리포트는 확정 문서라 상대 시간("3일 전") 표기를 쓰지 않는다.
+ * 화면 안에서 날짜 표기가 갈리지 않도록 **한 곳에서 로케일 포매터로만** 만든다.
+ */
 function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mm}-${dd}`
+  return new Date(iso).toLocaleDateString('ko-KR', { dateStyle: 'long' })
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short' })
 }
 
 function formatDelta(delta: number): string {

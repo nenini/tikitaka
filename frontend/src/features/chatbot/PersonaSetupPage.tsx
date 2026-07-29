@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, Field, Segmented, Spinner } from '@/components'
+import { Badge, Button, Card, Field, Segmented, Select, Spinner } from '@/components'
 import { createChatSession, getPersonaOptions, requestPersonaRecommendation, saveRegionCity } from './api'
 import {
   PERSONALITY_DESC,
@@ -79,9 +79,10 @@ export function PersonaSetupPage() {
   return (
     <main className="mx-auto w-full max-w-[720px] px-5 py-6">
       <header className="mb-5">
-        <h1 className="bt-h1">어떤 상대와 연습할까요?</h1>
+        <h1 className="bt-h1">챗봇 상대를 설정할까요?</h1>
         <p className="bt-body bt-muted mt-1">
-          AI 채팅은 <b>텍스트</b>로 진행됩니다. 소개팅 전후 대화 감각을 익혀요. </p>
+          AI 채팅은 텍스트로 진행됩니다. 소개팅 전후 대화 감각을 익혀요.
+        </p>
       </header>
 
       <div className="flex flex-col gap-4">
@@ -92,23 +93,12 @@ export function PersonaSetupPage() {
               <Badge tone="info">최초 1회</Badge>
             </div>
             <Field label="시 · 도" required>
-              {({ id }) => (
-                <select
-                  id={id}
-                  className="bt-input"
-                  value={regionCity}
-                  onChange={(e) => setRegionCity(e.currentTarget.value)}
-                >
-                  <option value="" disabled>
-                    선택해 주세요
-                  </option>
-                  {REGION_CITIES.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <Select
+                placeholder="선택해 주세요"
+                options={REGION_CITIES.map((city) => ({ value: city, label: city }))}
+                value={regionCity}
+                onChange={(e) => setRegionCity(e.currentTarget.value)}
+              />
             </Field>
             <p className="bt-caption bt-muted">
               챗봇을 처음 쓸 때만 받아요. 대화 중 약속 장소 선정에 활용돼요.

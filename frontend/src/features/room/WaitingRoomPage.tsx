@@ -116,13 +116,13 @@ export function WaitingRoomPage() {
             <Card>
               <div className="flex items-center justify-between">
                 <Cluster gap={8} style={{ alignItems: 'center' }}>
-                  <Icon name="bell" size={18} />
+                  <Icon name="speaker" size={18} />
                   <b className="bt-body-sm">스피커</b>
                 </Cluster>
                 <Button
                   variant="secondary"
                   size="sm"
-                  leadingIcon="bell"
+                  leadingIcon="speaker"
                   onClick={device.playTestTone}
                   disabled={device.speakerPlaying}
                 >
@@ -152,31 +152,45 @@ export function WaitingRoomPage() {
             {bundle?.practiceGoal && (
               <Card variant="inset">
                 <span className="bt-caption text-faint">이번 세션 목표</span>
-                <p className="bt-body-sm mt-1">🎯 {bundle.practiceGoal}</p>
+                <p className="bt-body-sm mt-1 flex items-start gap-2">
+                  <Icon name="target" size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--bt-color-action)' }} />
+                  {bundle.practiceGoal}
+                </p>
               </Card>
             )}
 
-            {/* 규칙 안내 배너 */}
+            {/* 규칙 안내 — 성격이 다른 세 가지라 목록으로 나눈다(가운뎃점으로 이으면 하나도 안 읽힌다) */}
             <Callout tone="info">
-              AI 코칭은 <b>나에게만</b> 보여요 · 침묵 10초까지는 개입하지 않아요 · 언제든 신고·퇴장할 수
-              있어요.
+              <ul className="flex list-disc flex-col gap-1 pl-4">
+                <li>AI 코칭은 나에게만 보여요.</li>
+                <li>침묵 10초까지는 개입하지 않아요.</li>
+                <li>언제든 신고하거나 나갈 수 있어요.</li>
+              </ul>
             </Callout>
           </div>
 
           {/* 하단 고정: 상대 입장 대기 + 입장 CTA */}
           <div className="flex shrink-0 flex-col gap-2">
             <Cluster gap={8} style={{ alignItems: 'center' }}>
-              <span
-                className="inline-block h-2 w-2 rounded-full"
+              <Icon
+                name={opponentJoined ? 'check-circle' : 'clock'}
+                size={15}
                 style={{
-                  background: opponentJoined ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)',
+                  color: opponentJoined ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)',
                 }}
-                aria-hidden="true"
               />
               <span className="bt-caption bt-muted">
                 {opponentJoined ? '상대가 입장했어요' : '상대 입장 대기 중…'}
               </span>
             </Cluster>
+
+            {/* CTA 가 잠긴 이유는 CTA 옆에 있어야 한다 — 카드까지 눈을 올려 원인을 찾게 하지 않는다 */}
+            <BlockingDeviceHint
+              camera={device.camera}
+              microphone={device.microphone}
+              ready={device.ready}
+              loading={loading}
+            />
 
             <Button
               variant="primary"
@@ -188,11 +202,6 @@ export function WaitingRoomPage() {
             >
               {device.ready ? '입장하기' : '기기 점검 중…'}
             </Button>
-            {!device.ready && !device.errorReason && (
-              <p className="bt-caption text-faint text-center">
-                카메라·마이크가 준비되면 입장할 수 있어요.
-              </p>
-            )}
           </div>
         </aside>
       </div>
@@ -202,7 +211,11 @@ export function WaitingRoomPage() {
 
 /* ────────────────────────── 하위 조각 ────────────────────────── */
 
-/** 카메라 미리보기 타일 — 얼굴 가이드 원 + 상태 칩. 영상은 좌우 반전(셀피). */
+/**
+ * 카메라 미리보기 타일 — 얼굴 가이드 타원 + 상태 칩. 영상은 좌우 반전(셀피).
+ *
+ * 크기는 전부 **비율 기반**이다. 가이드 타원을 px 로 고정하면 좁은 화면에서 타일 밖으로 삐져나간다.
+ */
 function CameraPreview({
   status,
   videoRef,
@@ -212,8 +225,14 @@ function CameraPreview({
 }) {
   return (
     <div
-      className="relative flex flex-1 items-center justify-center overflow-hidden rounded-2xl"
-      style={{ background: 'var(--bt-color-surface-sunken)', minHeight: 300 }}
+      className="relative flex w-full flex-1 items-center justify-center overflow-hidden rounded-2xl"
+      style={{
+        background: 'var(--bt-color-surface-sunken)',
+        // 세로 배치(모바일)에서는 16:9 로 자리를 잡고, 가로 2단(데스크탑)에서는 남는 높이를 채운다.
+        // 최소 높이도 vh 로 둬서 작은 화면에서 타일이 찌그러지지 않게 한다(px 고정 금지).
+        aspectRatio: '16 / 9',
+        minHeight: '32vh',
+      }}
     >
       <video
         ref={videoRef}
@@ -239,14 +258,15 @@ function CameraPreview({
         </div>
       )}
 
-      {/* 얼굴 위치 가이드 원 */}
+      {/* 얼굴 위치 가이드 — 타일 높이의 72%, 세로:가로 = 1:0.78 비율 */}
       {status === 'ready' && (
         <>
           <div
             className="pointer-events-none absolute rounded-[50%]"
             style={{
-              width: 210,
-              height: 270,
+              height: '72%',
+              aspectRatio: '0.78',
+              maxWidth: '80%',
               border: '2px dashed rgba(255,255,255,.55)',
             }}
             aria-hidden="true"
@@ -257,6 +277,44 @@ function CameraPreview({
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * 입장 CTA 바로 위의 차단 원인 안내. 어떤 기기가 왜 막고 있는지를 **버튼 옆에서** 말한다.
+ * 정상이거나 아직 점검 중이면 아무것도 그리지 않는다(문제 없을 때 자리를 차지하지 않게).
+ */
+function BlockingDeviceHint({
+  camera,
+  microphone,
+  ready,
+  loading,
+}: {
+  camera: DeviceStatus
+  microphone: DeviceStatus
+  ready: boolean
+  loading: boolean
+}) {
+  if (ready) return null
+
+  const failed = [
+    camera === 'error' && '카메라',
+    microphone === 'error' && '마이크',
+  ].filter((v): v is string => typeof v === 'string')
+
+  if (failed.length > 0) {
+    return (
+      <p className="bt-caption flex items-center justify-center gap-1.5" style={{ color: 'var(--bt-color-danger)' }}>
+        <Icon name="error-circle" size={14} />
+        {failed.join('·')}가 연결되지 않아 입장할 수 없어요
+      </p>
+    )
+  }
+
+  return (
+    <p className="bt-caption text-faint text-center">
+      {loading ? '대기방 정보를 불러오는 중이에요.' : '카메라·마이크가 준비되면 입장할 수 있어요.'}
+    </p>
   )
 }
 

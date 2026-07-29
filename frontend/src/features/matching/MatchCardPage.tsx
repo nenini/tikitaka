@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Avatar, Badge, Button, Callout, Card, Cluster, Spinner, Stack, TagChip } from '@/components'
+import { Avatar, Badge, Button, Callout, Card, Cluster, Icon, Modal, Spinner, Stack, TagChip } from '@/components'
 import { getMatchPair, respondToPair } from './api'
 import { InfoRow } from './parts'
 import { formatMMSS, formatSessionTime, useNow } from './format'
@@ -18,6 +18,7 @@ export function MatchCardPage() {
 
   const [pair, setPair] = useState<MatchPair | null>(null)
   const [responding, setResponding] = useState<'ACCEPTED' | 'REJECTED' | null>(null)
+  const [policyOpen, setPolicyOpen] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -60,9 +61,7 @@ export function MatchCardPage() {
     return (
       <main className="mx-auto w-full max-w-[520px] px-5 py-16 text-center">
         <Card className="flex flex-col items-center gap-3 py-10">
-          <span style={{ fontSize: 32 }} aria-hidden="true">
-            ⏰
-          </span>
+          <Icon name="clock" size={32} style={{ color: 'var(--bt-color-text-tertiary)' }} />
           <b className="bt-h3">수락 시간이 만료됐어요</b>
           <p className="bt-body-sm bt-muted">다시 대기 큐에 등록하면 새 상대를 찾아드려요.</p>
           <Button variant="primary" onClick={() => navigate('/matching')}>
@@ -87,20 +86,19 @@ export function MatchCardPage() {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Avatar size="lg" round name={pair.opponent.nickname} />
-            <div className="flex flex-col gap-1.5">
-              <b style={{ fontSize: 19 }}>{pair.opponent.nickname}</b>
-              <Cluster gap={6}>
-                <TagChip>{pair.opponent.ageBand}</TagChip>
-                <TagChip>{pair.opponent.faceTag}</TagChip>
-              </Cluster>
-            </div>
+          {/* 공개 정보가 셋뿐이라 텍스트로만 두면 카드가 빈다 — 얼굴상을 인물의 얼굴 자리에 크게 세운다 */}
+          <FaceTagPortrait nickname={pair.opponent.nickname} faceTag={pair.opponent.faceTag} />
+
+          <div className="flex flex-col items-center gap-2 text-center">
+            <b style={{ fontSize: 21 }}>{pair.opponent.nickname}</b>
+            <Cluster gap={6} style={{ justifyContent: 'center' }}>
+              <TagChip>{pair.opponent.ageBand}</TagChip>
+              <TagChip>{pair.opponent.faceTag}</TagChip>
+            </Cluster>
           </div>
 
           <Callout tone="info" icon="lock">
-            공개되는 정보는 <b>닉네임 · 연령대 · 얼굴상</b>뿐이에요. 실명·연락처·정확한 지역·키는 공개되지
-            않습니다.
+            공개되는 정보는 닉네임 · 연령대 · 얼굴상뿐이에요. 실명·연락처·정확한 지역은 공개되지 않습니다.
           </Callout>
 
           <div className="mt-auto flex gap-2">
@@ -125,7 +123,7 @@ export function MatchCardPage() {
           </div>
         </Card>
 
-        {/* 우: 세션 정보 · 취소 정책 · 수락 현황 */}
+        {/* 우: 세션 정보 · 수락 현황 */}
         <aside className="flex w-full flex-col gap-4 lg:flex-1">
           <Card>
             <div className="bt-h3 mb-3">세션 정보</div>
@@ -134,30 +132,19 @@ export function MatchCardPage() {
                 label="일시"
                 value={`${formatSessionTime(pair.session.scheduledStartAt)} · ${pair.session.plannedDurationMin}분`}
               />
-              <InfoRow
-                label="대기방 테마"
-                value={`${pair.session.themeEmoji} ${pair.session.themeName} (자동 배정)`}
-              />
+              <InfoRow label="대기방 테마" value={`${pair.session.themeName} (자동 배정)`} />
               <InfoRow label="내 개선 목표" value={pair.session.myPracticeGoal} />
             </Stack>
-          </Card>
 
-          <Card>
-            <div className="bt-h3 mb-3">취소 정책</div>
-            <Stack gap={10}>
-              <Cluster gap={8} style={{ alignItems: 'center' }}>
-                <Badge tone="success">1시간 이전</Badge>
-                <span className="bt-caption bt-muted">온도 소폭 감소 · 노쇼 패널티 없음</span>
-              </Cluster>
-              <Cluster gap={8} style={{ alignItems: 'center' }}>
-                <Badge tone="danger">1시간 이내</Badge>
-                <span className="bt-caption bt-muted">온도 대폭 감소 · 노쇼 1회 부과</span>
-              </Cluster>
+            {/* 취소 정책은 요약 한 줄 + '자세히'. 수락 전에 전문을 읽힐 필요가 없다 */}
+            <div className="mt-4 flex items-start justify-between gap-3 border-t pt-3" style={{ borderColor: 'var(--bt-color-border)' }}>
               <p className="bt-caption bt-muted">
-                세션 시각 후 <b>5분</b>까지 미입장하면 노쇼로 처리돼요. 노쇼 패널티는 6개월 단위로
-                소멸합니다.
+                세션 1시간 이내 취소·5분 초과 미입장은 노쇼로 처리돼요.
               </p>
-            </Stack>
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPolicyOpen(true)}>
+                자세히
+              </Button>
+            </div>
           </Card>
 
           <Card variant="inset">
@@ -169,7 +156,68 @@ export function MatchCardPage() {
           </Card>
         </aside>
       </div>
+
+      <CancelPolicyModal open={policyOpen} onClose={() => setPolicyOpen(false)} />
     </main>
+  )
+}
+
+/**
+ * 얼굴상 초상. 얼굴상 태그는 `"🐰 토끼상"` 처럼 **서버가 글리프까지 포함해 내려주는 도메인 값**이라
+ * 아이콘으로 치환하지 않고, 아바타 자리에 그대로 세워 인물의 인상을 대신하게 한다.
+ */
+function FaceTagPortrait({ nickname, faceTag }: { nickname: string; faceTag: string }) {
+  const glyph = Array.from(faceTag.trim())[0]
+  return (
+    <div className="flex justify-center py-2">
+      <div
+        className="grid place-items-center rounded-[50%]"
+        style={{
+          width: 128,
+          height: 128,
+          background: 'linear-gradient(150deg, var(--bt-color-action-subtle), var(--bt-color-surface-sunken))',
+          border: '1px solid var(--bt-color-border)',
+        }}
+      >
+        {glyph ? (
+          <span style={{ fontSize: 56, lineHeight: 1 }} aria-hidden="true">
+            {glyph}
+          </span>
+        ) : (
+          <Avatar size="lg" round name={nickname} decorative />
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** 취소 정책 전문. 요약에서 '자세히'로 들어온다. */
+function CancelPolicyModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="취소 · 노쇼 정책"
+      actions={
+        <Button variant="primary" onClick={onClose}>
+          확인
+        </Button>
+      }
+    >
+      <Stack gap={12}>
+        <Cluster gap={8} style={{ alignItems: 'center' }}>
+          <Badge tone="success">1시간 이전 취소</Badge>
+          <span className="bt-caption bt-muted">온도 소폭 감소 · 노쇼 패널티 없음</span>
+        </Cluster>
+        <Cluster gap={8} style={{ alignItems: 'center' }}>
+          <Badge tone="danger">1시간 이내 취소</Badge>
+          <span className="bt-caption bt-muted">온도 대폭 감소 · 노쇼 1회 부과</span>
+        </Cluster>
+        <p className="bt-body-sm">
+          세션 시각 후 5분까지 입장하지 않으면 노쇼로 처리돼요. 노쇼 패널티는 6개월 단위로 소멸합니다.
+        </p>
+      </Stack>
+    </Modal>
   )
 }
 
@@ -177,10 +225,10 @@ export function MatchCardPage() {
 function AcceptDot({ done, label }: { done: boolean; label: string }) {
   return (
     <Cluster gap={8} style={{ alignItems: 'center' }}>
-      <span
-        className="inline-block h-2.5 w-2.5 rounded-full"
-        style={{ background: done ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)' }}
-        aria-hidden="true"
+      <Icon
+        name={done ? 'check-circle' : 'clock'}
+        size={16}
+        style={{ color: done ? 'var(--bt-color-success)' : 'var(--bt-color-text-tertiary)' }}
       />
       <span className={done ? 'bt-body-sm font-medium' : 'bt-body-sm bt-muted'}>{label}</span>
     </Cluster>
