@@ -9,6 +9,9 @@ import { MatchQueuePage } from '@/features/matching/MatchQueuePage'
 import { MatchCardPage } from '@/features/matching/MatchCardPage'
 import { ChatPage } from '@/features/chatbot/ChatPage'
 import { PersonaSetupPage } from '@/features/chatbot/PersonaSetupPage'
+import { PeerReviewPage } from '@/features/result/PeerReviewPage'
+import { SessionReportPage } from '@/features/report/SessionReportPage'
+import { GrowthDashboardPage } from '@/features/growth/GrowthDashboardPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
 
@@ -35,11 +38,14 @@ export const router = createBrowserRouter([
       { path: '/chatbot/persona', element: <PersonaSetupPage /> },
       { path: '/chatbot', element: <ChatPage /> },
       { path: '/chatbot/:chatSessionId', element: <ChatPage /> },
-      // TODO(FE-B 다음 배치): /ai-video/setup(W-21) · /report/:id, /dashboard, /contact ...
+      // 세션 후 F4: 상호 평가 W-14 → AI 세션 리포트 W-16 → 성장 대시보드 W-17
+      { path: '/session/:sessionId/review', element: <PeerReviewPage /> },
+      { path: '/session/:sessionId/report', element: <SessionReportPage /> },
+      { path: '/growth', element: <GrowthDashboardPage /> },
+      // TODO(FE-B 다음 배치): /ai-video/setup(W-21) · W-13 신고 전용 화면 · W-18 알림 ...
 
       //-----------
       // 개발용, 추후 삭제
-      { path: '/dev', element: <ComponentGallery /> },
       { path: '/livekit-demo', element: <LiveKitDemoPage /> }
     ],
   },

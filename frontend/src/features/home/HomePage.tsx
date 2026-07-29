@@ -35,6 +35,27 @@ export function HomePage() {
             카메라·마이크·스피커를 점검하고 세션에 입장합니다. 통과하면 WebRTC 세션(다크 고정)으로 이어져요.
           </p>
         </CardLink>
+
+        <CardLink as={Link} to="/session/demo/review">
+          <CardHeader title="상대 평가" />
+          <p className="bt-body-sm bt-muted">
+            정량평가 6개 지표, 글 피드백, 신고/차단
+          </p>
+        </CardLink>
+
+        <CardLink as={Link} to="/session/demo/report">
+          <CardHeader title="세션 리포트" />
+          <p className="bt-body-sm bt-muted">
+            ai 분석 및 상대 평가
+          </p>
+        </CardLink>
+
+        <CardLink as={Link} to="/growth">
+          <CardHeader title="성장 대시보드" />
+          <p className="bt-body-sm bt-muted">
+            사랑의 온도 추이, 강약점, 뱃지
+          </p>
+        </CardLink>
       </div>
     </main>
   )

@@ -24,11 +24,8 @@ apiClient.interceptors.response.use(
   (res) => res,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // TODO(AUTH): refresh 토큰으로 재발급 시도 후 실패 시에만 로그아웃 처리
+      // TODO(AUTH): auth 기능 붙기 전까지 임시로 401 리다이렉트 비활성화
       tokenStore.clear()
-      if (location.pathname !== '/login') {
-        location.assign('/login')
-      }
     }
     return Promise.reject(error)
   },
