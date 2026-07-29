@@ -16,6 +16,7 @@ import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -53,6 +54,8 @@ class MatchResultServiceTest {
 			mock(WaitingRoomProvisioningService.class);
 	private final WaitingRoomRepository waitingRoomRepository =
 			mock(WaitingRoomRepository.class);
+	private final ApplicationEventPublisher eventPublisher =
+			mock(ApplicationEventPublisher.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-27T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -73,7 +76,8 @@ class MatchResultServiceTest {
 			clock,
 			jobEnqueueService,
 			waitingRoomProvisioningService,
-			waitingRoomRepository
+			waitingRoomRepository,
+			eventPublisher
 	);
 
 	@Test
@@ -117,6 +121,13 @@ class MatchResultServiceTest {
 		verify(requestA).confirm();
 		verify(requestB).confirm();
 		verify(waitingRoomProvisioningService).provision(pair);
+		verify(eventPublisher).publishEvent(new MatchConfirmedEvent(
+				PAIR_ID,
+				USER_A_ID,
+				USER_B_ID,
+				NOW,
+				scheduledAt
+		));
 		assertThat(result.roomId()).isEqualTo(15L);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");
 	}

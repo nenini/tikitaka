@@ -17,6 +17,7 @@ import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.MatchErrorCode;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ public class MatchResultService {
 	private final MatchJobEnqueueService jobEnqueueService;
 	private final WaitingRoomProvisioningService waitingRoomProvisioningService;
 	private final WaitingRoomRepository waitingRoomRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MatchResultService(
 			MatchPairRepository pairRepository,
@@ -54,7 +56,8 @@ public class MatchResultService {
 			Clock clock,
 			MatchJobEnqueueService jobEnqueueService,
 			WaitingRoomProvisioningService waitingRoomProvisioningService,
-			WaitingRoomRepository waitingRoomRepository
+			WaitingRoomRepository waitingRoomRepository,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.pairRepository = pairRepository;
 		this.responseRepository = responseRepository;
@@ -66,6 +69,7 @@ public class MatchResultService {
 		this.jobEnqueueService = jobEnqueueService;
 		this.waitingRoomProvisioningService = waitingRoomProvisioningService;
 		this.waitingRoomRepository = waitingRoomRepository;
+		this.eventPublisher = eventPublisher;
 	}
 
 	public MatchResultResponse getCurrent(Long userId) {
@@ -168,6 +172,13 @@ public class MatchResultService {
 		first.confirm();
 		second.confirm();
 		waitingRoomProvisioningService.provision(pair);
+		eventPublisher.publishEvent(new MatchConfirmedEvent(
+				pair.getId(),
+				pair.getUserAId(),
+				pair.getUserBId(),
+				confirmedAt,
+				scheduledAt
+		));
 	}
 
 	private MatchResultResponse toResponse(MatchPair pair, Long userId) {
