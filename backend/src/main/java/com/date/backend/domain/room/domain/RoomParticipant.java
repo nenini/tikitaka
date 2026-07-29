@@ -52,6 +52,10 @@ public class RoomParticipant {
 		return userId;
 	}
 
+	public String getParticipantRole() {
+		return participantRole;
+	}
+
 	public String getParticipationStatus() {
 		return participationStatus;
 	}

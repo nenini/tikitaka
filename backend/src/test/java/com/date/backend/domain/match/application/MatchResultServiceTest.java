@@ -103,7 +103,7 @@ class MatchResultServiceTest {
 				USER_A_ID,
 				USER_B_ID,
 				NOW,
-				scheduledAt
+				proposedScheduledAt
 		));
 		assertThat(result.roomId()).isEqualTo(15L);
 		assertThat(result.myResponse().name()).isEqualTo("ACCEPTED");

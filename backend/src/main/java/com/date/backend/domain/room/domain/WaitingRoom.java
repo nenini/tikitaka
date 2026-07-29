@@ -121,6 +121,10 @@ public class WaitingRoom {
 		return plannedDurationSec;
 	}
 
+	public int getExtensionDurationSec() {
+		return extensionDurationSec;
+	}
+
 	public String getLivekitRoomName() {
 		return livekitRoomName;
 	}
