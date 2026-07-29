@@ -98,6 +98,7 @@ face:
 ai:
   session:
     internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
+    coaching-min-interval: ${AI_COACHING_MIN_INTERVAL:10s}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}

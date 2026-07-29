@@ -28,6 +28,11 @@ public enum CoachErrorCode implements ErrorCode {
 			HttpStatus.BAD_REQUEST,
 			"AI_ANALYSIS_PAYLOAD_INVALID",
 			"AI 분석 결과 payload를 저장할 수 없습니다."
+	),
+	AI_COACHING_CONTRACT_INVALID(
+			HttpStatus.BAD_REQUEST,
+			"AI_COACHING_CONTRACT_INVALID",
+			"AI 코칭 이벤트 계약이 올바르지 않습니다."
 	);
 
 	private final HttpStatus status;

@@ -30,6 +30,7 @@ public class SecurityConfig {
 			"/api/v1/consents",
 			"/internal/livekit/webhook",
 			"/internal/ai/sessions/analysis-events/**",
+			"/internal/ai/coaching-events",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",

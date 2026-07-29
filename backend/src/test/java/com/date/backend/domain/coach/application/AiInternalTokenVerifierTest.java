@@ -5,6 +5,8 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.CoachErrorCode;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,7 +16,10 @@ class AiInternalTokenVerifierTest {
 	@Test
 	void acceptsConfiguredToken() {
 		AiInternalTokenVerifier verifier =
-				new AiInternalTokenVerifier(new AiSessionProperties("secret"));
+				new AiInternalTokenVerifier(new AiSessionProperties(
+						"secret",
+						Duration.ofSeconds(10)
+				));
 
 		assertThatCode(() -> verifier.verify("secret")).doesNotThrowAnyException();
 	}
@@ -22,7 +27,10 @@ class AiInternalTokenVerifierTest {
 	@Test
 	void rejectsMissingConfigurationInsteadOfBypassingAuthentication() {
 		AiInternalTokenVerifier verifier =
-				new AiInternalTokenVerifier(new AiSessionProperties(""));
+				new AiInternalTokenVerifier(new AiSessionProperties(
+						"",
+						Duration.ofSeconds(10)
+				));
 
 		assertThatThrownBy(() -> verifier.verify(""))
 				.isInstanceOfSatisfying(
