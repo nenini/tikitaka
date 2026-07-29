@@ -217,6 +217,16 @@
      반드시 아이콘+라벨을 동반할 것. DESIGN_SYSTEM.md §3.3 참고. */
   --bt-color-like: var(--bt-rose-500);
 
+  /* 면 틴트 — 같은 흰 카드를 여러 장 늘어놓지 않기 위한 "의미별로 물든 면".
+     의미색 램프의 가장 옅은 단계라 채도가 낮고(원칙 6), 본문색을 그대로 얹어도 AA 를 지킨다.
+     `*-bg`(칩·배지 틴트)와는 다른 역할이다 — 저쪽은 글자를 감싸는 알약, 이쪽은 섹션 하나를 담는 면. */
+  --bt-color-panel-success:      var(--bt-leaf-50);
+  --bt-color-panel-success-line: var(--bt-leaf-200);
+  --bt-color-panel-warning:      var(--bt-pollen-50);
+  --bt-color-panel-warning-line: var(--bt-pollen-200);
+  --bt-color-panel-brand:        var(--bt-blue-50);
+  --bt-color-panel-brand-line:   var(--bt-blue-200);
+
   --bt-color-focus: var(--bt-blue-600);
   --bt-color-scrim: rgba(23, 24, 31, 0.44);
 
@@ -274,6 +284,15 @@
   --bt-color-info-bg:        rgba(91, 139, 239, 0.16);
 
   --bt-color-like: var(--bt-rose-400);
+
+  /* 다크에서는 램프의 50 단계가 오히려 밝은 면이 된다. 어두운 표면 위에 의미색을
+     아주 낮은 알파로 얹어 "물든 면"의 인상만 남긴다. */
+  --bt-color-panel-success:      rgba(87, 201, 126, 0.10);
+  --bt-color-panel-success-line: rgba(87, 201, 126, 0.22);
+  --bt-color-panel-warning:      rgba(240, 169, 60, 0.10);
+  --bt-color-panel-warning-line: rgba(240, 169, 60, 0.22);
+  --bt-color-panel-brand:        rgba(91, 139, 239, 0.12);
+  --bt-color-panel-brand-line:   rgba(91, 139, 239, 0.24);
 
   --bt-color-focus: var(--bt-blue-300);
   --bt-color-scrim: rgba(0, 0, 0, 0.64);

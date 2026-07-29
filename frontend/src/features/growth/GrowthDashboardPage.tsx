@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Icon, Skeleton } from '@/components'
 import { getGrowthDashboard, getImprovementKeywords, getMyBadges, getStrengthKeywords } from './api'
-import { BadgeGrid, InlineStats, KeywordChips, TemperatureTrend, TrendPager } from './parts'
+import {
+  BadgeGrid,
+  GrowthPanel,
+  InlineStats,
+  KeywordChips,
+  TemperatureTrend,
+  TrendPager,
+} from './parts'
 import type { EarnedBadge, GrowthDashboard, GrowthKeyword } from './types'
 
 /** 한 화면에 그릴 점의 수. 이보다 많아지면 점이 붙어 흐름이 읽히지 않는다. */
@@ -57,6 +64,7 @@ export function GrowthDashboardPage() {
   const pagePoints = points.slice(Math.max(0, end - TREND_PAGE_SIZE), end)
 
   if (!dashboard) return <DashboardSkeleton />
+
 
   // 세션이 한 번도 없으면 빈 카드 여러 장 대신 다음 행동을 제안한다
   if (dashboard.completedSessionCount === 0) {
@@ -125,10 +133,6 @@ export function GrowthDashboardPage() {
           <InlineStats items={stats} />
         </div>
 
-        {/* 추이는 히어로 면 위에 그대로 얹는다 — 안쪽에 카드를 한 겹 더 두르지 않는다.
-            단, 좌우 여백은 위 스탯 줄(.bt-hero__body)과 같은 값(24px 모바일 · 32px 이상)으로
-            맞춘다 — 이 여백이 없으면 차트가 히어로 바깥 테두리까지 그대로 붙어서
-            y축 라벨이 카드 모서리에 닿아 보인다. */}
         <div className="px-6 sm:px-8">
           <TemperatureTrend points={pagePoints} />
         </div>
@@ -149,31 +153,32 @@ export function GrowthDashboardPage() {
         )}
       </section>
 
-      {/* ── 패턴 · 뱃지 ── */}
-      <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-start">
-        <Card className="flex flex-col gap-5 lg:flex-1">
+      <div className="bt-growth-grid mt-5">
+        <GrowthPanel
+          tone="brand"
+          title="반복되는 패턴"
+          meta="지난 리포트 집계"
+          mark="petal"
+          className="bt-growth-grid__pattern"
+        >
+          <div className="flex flex-col gap-5">
+            <div>
+              <div className="bt-overline mb-3" style={{ color: 'var(--bt-color-success)' }}>
+                강점
+              </div>
+              <KeywordChips keywords={strengths} tone="success" />
+            </div>
+            <div>
+              <div className="bt-overline mb-3" style={{ color: 'var(--bt-color-warning)' }}>
+                보완점
+              </div>
+              <KeywordChips keywords={improvements} tone="warning" />
+            </div>
+          </div>
+        </GrowthPanel>
+
+        <Card className="bt-growth-grid__badges flex flex-col gap-4">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="bt-h3">반복되는 패턴</span>
-            <span className="bt-caption bt-muted">지난 리포트 집계</span>
-          </div>
-
-          <div>
-            <div className="bt-overline mb-3" style={{ color: 'var(--bt-color-success)' }}>
-              강점
-            </div>
-            <KeywordChips keywords={strengths} tone="success" />
-          </div>
-
-          <div>
-            <div className="bt-overline mb-3" style={{ color: 'var(--bt-color-warning)' }}>
-              보완점
-            </div>
-            <KeywordChips keywords={improvements} tone="warning" />
-          </div>
-        </Card>
-
-        <Card className="w-full lg:w-[340px] lg:shrink-0">
-          <div className="mb-4 flex items-baseline justify-between gap-3">
             <span className="bt-h3">획득 뱃지</span>
             <span className="bt-caption bt-muted bt-numeric">{dashboard.badgeCount}</span>
           </div>
@@ -184,6 +189,8 @@ export function GrowthDashboardPage() {
   )
 }
 
+const panelSkeleton = { borderRadius: 'var(--bt-radius-xl)' } as const
+
 function DashboardSkeleton() {
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-8" aria-busy="true">
@@ -193,13 +200,10 @@ function DashboardSkeleton() {
         className="mt-5"
         style={{ borderRadius: 'var(--bt-radius-2xl)' }}
       />
-      <div className="mt-5 flex flex-col gap-5 lg:flex-row">
-        <Card className="lg:flex-1">
-          <Skeleton height={160} />
-        </Card>
-        <Card className="lg:w-[340px]">
-          <Skeleton height={160} />
-        </Card>
+      {/* 로드 후 실제 배치와 같은 자리를 잡아 둔다 — 골격이 다르면 데이터가 도착할 때 화면이 튄다 */}
+      <div className="bt-growth-grid mt-5">
+        <Skeleton height={260} className="bt-growth-grid__pattern" style={panelSkeleton} />
+        <Skeleton height={260} className="bt-growth-grid__badges" style={panelSkeleton} />
       </div>
     </main>
   )

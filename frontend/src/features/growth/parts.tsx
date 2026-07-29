@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Button, Modal, VisuallyHidden } from '@/components'
 import { badgeArtOf } from './badges'
 import type { EarnedBadge, GrowthKeyword, TemperaturePoint } from './types'
@@ -360,6 +360,72 @@ export function InlineStats({ items, className }: InlineStatsProps) {
         </div>
       ))}
     </dl>
+  )
+}
+
+/* ── 면(패널) ───────────────────────────────────────────── */
+
+/**
+ * 면을 물들이는 장식 도형.
+ *
+ * 아이콘이 아니라 **배경 도형**이다. 의미를 나르지 않으므로 접근성 트리에서 감춘다.
+ * 면 밖으로 흘러넘치도록 잘려 나가는 게 정상이다 — 가운데 세운 원판 아이콘은
+ * 어느 대시보드에나 있는 모양이라, 잘린 큰 도형 하나가 오히려 이 화면의 표식이 된다.
+ */
+const PANEL_MARKS = {
+  /* 꽃잎 — 강점. 이 서비스의 "피어남" 어휘 */
+  petal: <path d="M64 6c30 26 30 74 0 100C34 80 34 32 64 6Z" />,
+  /* 반짝임 — 보완점. 아직 다듬는 중이라는 뜻으로 뾰족하지 않은 4각 별 */
+  spark: <path d="M64 6c5 34 18 47 52 52-34 5-47 18-52 52-5-34-18-47-52-52 34-5 47-18 52-52Z" />,
+  /* 꽃 — 뱃지. 잎 다섯 장이 도는 형태 */
+  bloom: (
+    <>
+      {[0, 72, 144, 216, 288].map((deg) => (
+        <ellipse key={deg} cx="64" cy="38" rx="19" ry="32" transform={`rotate(${deg} 64 64)`} />
+      ))}
+    </>
+  ),
+} as const
+
+export type PanelMarkName = keyof typeof PANEL_MARKS
+
+const PANEL_TONE_CLASS = {
+  success: 'bt-panel--success',
+  warning: 'bt-panel--warning',
+  brand: 'bt-panel--brand',
+} as const
+
+export interface GrowthPanelProps {
+  /** 면의 색. 내용의 성격을 글자보다 먼저 알린다 */
+  tone: keyof typeof PANEL_TONE_CLASS
+  title: string
+  /** 제목 오른쪽 보조 표기(집계 기준·개수 등) */
+  meta?: ReactNode
+  mark: PanelMarkName
+  className?: string
+  children: ReactNode
+}
+
+
+export function GrowthPanel({ tone, title, meta, mark, className, children }: GrowthPanelProps) {
+  return (
+    <section className={`bt-panel ${PANEL_TONE_CLASS[tone]} ${className ?? ''}`}>
+      <svg
+        className="bt-panel__mark"
+        viewBox="0 0 128 128"
+        fill="currentColor"
+        aria-hidden="true"
+        focusable="false"
+      >
+        {PANEL_MARKS[mark]}
+      </svg>
+
+      <div className="bt-panel__head">
+        <h2 className="bt-panel__title">{title}</h2>
+        {meta != null && <span className="bt-caption bt-muted">{meta}</span>}
+      </div>
+      <div className="bt-panel__body">{children}</div>
+    </section>
   )
 }
 
