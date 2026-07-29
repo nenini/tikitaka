@@ -7,6 +7,7 @@ import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+import { OAuthCallbackPage } from '@/features/auth/OAuthCallbackPage'
 import { SessionPage } from '@/features/session/SessionPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 
@@ -22,6 +23,8 @@ export const router = createBrowserRouter([
   { path: '/signup/profile', element: <ProfilePage /> },
   { path: '/signup/survey', element: <SurveyPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  // OAuth 콜백 수신(공개) — 백엔드가 302로 토큰을 URL 프래그먼트에 실어 되돌려보낸다
+  { path: '/oauth/callback', element: <OAuthCallbackPage /> },
   // 공용 컴포넌트 갤러리 (개발/디자인 QA 전용, 인증 불필요)
   { path: '/gallery', element: <ComponentGallery /> },
   {
