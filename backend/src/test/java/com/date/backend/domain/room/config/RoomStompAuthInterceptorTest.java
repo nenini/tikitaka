@@ -104,6 +104,18 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSubscribeToOwnSafetyQueue() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/user/queue/sessions/15/safety"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
 	void sessionParticipantCanSendHeartbeat() {
 		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
 				.thenReturn(true);

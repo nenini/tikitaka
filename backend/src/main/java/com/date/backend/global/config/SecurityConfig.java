@@ -33,6 +33,7 @@ public class SecurityConfig {
 			"/internal/ai/coaching-events",
 			"/internal/ai/silence-events",
 			"/internal/ai/question-recommendations",
+			"/internal/ai/safety-events",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",

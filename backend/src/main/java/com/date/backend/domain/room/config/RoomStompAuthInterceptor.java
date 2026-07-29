@@ -47,6 +47,9 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 	private static final Pattern SESSION_QUESTION_QUEUE = Pattern.compile(
 			"^/user/queue/sessions/(\\d+)/questions$"
 	);
+	private static final Pattern SESSION_SAFETY_QUEUE = Pattern.compile(
+			"^/user/queue/sessions/(\\d+)/safety$"
+	);
 	private static final Pattern SESSION_COMMAND = Pattern.compile(
 			"^/app/sessions/(\\d+)/(heartbeat|connection-state|"
 					+ "media-state|network-quality)$"
@@ -166,6 +169,15 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 		if (questionMatcher.matches()) {
 			assertSessionParticipant(
 					Long.parseLong(questionMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher safetyMatcher = SESSION_SAFETY_QUEUE.matcher(destination);
+		if (safetyMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(safetyMatcher.group(1)),
 					authUser(accessor).userId()
 			);
 			return;
