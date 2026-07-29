@@ -3,6 +3,7 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
+import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionParticipantStateResponse;
@@ -173,6 +174,11 @@ public class SessionLifecycleService {
 				&& participants.stream().allMatch(RoomParticipant::isJoined);
 		boolean allReady = participants.size() == 2
 				&& participants.stream().allMatch(RoomParticipant::isReady);
+		boolean allConnected = participants.size() == 2
+				&& participants.stream().allMatch(
+						participant -> participant.getConnectionStatus()
+								== SessionConnectionStatus.CONNECTED
+				);
 		return new SessionStatusResponse(
 				session.getId(),
 				session.getStatus(),
@@ -181,12 +187,16 @@ public class SessionLifecycleService {
 				remainingSeconds(session, now),
 				allJoined,
 				allReady,
+				allConnected,
 				participants.stream()
 						.map(participant -> new SessionParticipantStateResponse(
 								participant.getUserId(),
 								participant.isJoined(),
 								participant.isReady(),
-								participant.getJoinedAt()
+								participant.getJoinedAt(),
+								participant.getConnectionStatus(),
+								participant.getConnectedAt(),
+								participant.getDisconnectedAt()
 						))
 						.toList()
 		);

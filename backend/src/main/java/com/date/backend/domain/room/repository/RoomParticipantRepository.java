@@ -27,4 +27,17 @@ public interface RoomParticipantRepository extends JpaRepository<RoomParticipant
 			@Param("roomId") Long roomId,
 			@Param("userId") Long userId
 	);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("""
+			select participant
+			from RoomParticipant participant
+			join fetch participant.room room
+			where room.livekitRoomName = :roomName
+			  and participant.userId = :userId
+			""")
+	Optional<RoomParticipant> findByLiveKitRoomNameAndUserIdForUpdate(
+			@Param("roomName") String roomName,
+			@Param("userId") Long userId
+	);
 }

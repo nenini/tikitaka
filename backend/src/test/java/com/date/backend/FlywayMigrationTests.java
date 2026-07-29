@@ -48,6 +48,16 @@ class FlywayMigrationTests {
 		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
 		Integer liveKitRoomNameColumnCount = columnCount("SESSIONS", "LIVEKITROOMNAME");
 		Integer roomDeviceCheckTableCount = tableCount("ROOM_DEVICE_CHECKS");
+		Integer participantIdentityColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"PARTICIPANT_IDENTITY"
+		);
+		Integer participantConnectionStatusColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"CONNECTION_STATUS"
+		);
+		Integer liveKitWebhookEventTableCount =
+				tableCount("LIVEKIT_WEBHOOK_EVENTS");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
 		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
 		Integer matchRequestTraitSnapshotTableCount =
@@ -86,6 +96,11 @@ class FlywayMigrationTests {
 		Integer adminMatchingPolicyMigrationCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
 						+ "WHERE \"success\" = TRUE AND \"version\" = '20'",
+				Integer.class
+		);
+		Integer sessionRealtimeMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '22'",
 				Integer.class
 		);
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
@@ -128,7 +143,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(21);
+		assertThat(migrationCount).isEqualTo(23);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -149,6 +164,9 @@ class FlywayMigrationTests {
 		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
 		assertThat(liveKitRoomNameColumnCount).isEqualTo(1);
 		assertThat(roomDeviceCheckTableCount).isEqualTo(1);
+		assertThat(participantIdentityColumnCount).isEqualTo(1);
+		assertThat(participantConnectionStatusColumnCount).isEqualTo(1);
+		assertThat(liveKitWebhookEventTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
@@ -162,6 +180,7 @@ class FlywayMigrationTests {
 		assertThat(notificationQueryMigrationCount).isEqualTo(1);
 		assertThat(waitingRecommendationMigrationCount).isEqualTo(1);
 		assertThat(adminMatchingPolicyMigrationCount).isEqualTo(1);
+		assertThat(sessionRealtimeMigrationCount).isEqualTo(1);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);
