@@ -46,3 +46,12 @@ notification:
     max-attempts: 3
     retry-delay-seconds: 5
     processing-timeout-seconds: 60
+
+session:
+  realtime:
+    heartbeat-timeout: 15s
+    reconnect-grace-period: 20s
+    monitor-enabled: false
+    monitor-fixed-delay-ms: 5000
+    monitor-initial-delay-ms: 5000
+    monitor-batch-size: 100

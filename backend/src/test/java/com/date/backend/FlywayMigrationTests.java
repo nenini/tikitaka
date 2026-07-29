@@ -56,6 +56,14 @@ class FlywayMigrationTests {
 				"SESSION_PARTICIPANTS",
 				"CONNECTION_STATUS"
 		);
+		Integer participantHeartbeatColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"LAST_HEARTBEAT_AT"
+		);
+		Integer participantReconnectDeadlineColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"RECONNECT_DEADLINE_AT"
+		);
 		Integer liveKitWebhookEventTableCount =
 				tableCount("LIVEKIT_WEBHOOK_EVENTS");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
@@ -103,6 +111,11 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '22'",
 				Integer.class
 		);
+		Integer sessionRecoveryMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '24'",
+				Integer.class
+		);
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
 		Integer proposedScheduledAtColumnCount = columnCount(
 				"MATCH_PAIRS",
@@ -143,7 +156,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(23);
+		assertThat(migrationCount).isEqualTo(24);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -166,6 +179,8 @@ class FlywayMigrationTests {
 		assertThat(roomDeviceCheckTableCount).isEqualTo(1);
 		assertThat(participantIdentityColumnCount).isEqualTo(1);
 		assertThat(participantConnectionStatusColumnCount).isEqualTo(1);
+		assertThat(participantHeartbeatColumnCount).isEqualTo(1);
+		assertThat(participantReconnectDeadlineColumnCount).isEqualTo(1);
 		assertThat(liveKitWebhookEventTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
@@ -181,6 +196,7 @@ class FlywayMigrationTests {
 		assertThat(waitingRecommendationMigrationCount).isEqualTo(1);
 		assertThat(adminMatchingPolicyMigrationCount).isEqualTo(1);
 		assertThat(sessionRealtimeMigrationCount).isEqualTo(1);
+		assertThat(sessionRecoveryMigrationCount).isEqualTo(1);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);

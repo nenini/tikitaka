@@ -62,6 +62,27 @@ public class RoomParticipant {
 	@Column(name = "last_connection_event_at")
 	private LocalDateTime lastConnectionEventAt;
 
+	@Column(name = "client_instance_id", length = 100)
+	private String clientInstanceId;
+
+	@Column(name = "last_heartbeat_at")
+	private LocalDateTime lastHeartbeatAt;
+
+	@Column(name = "reconnecting_at")
+	private LocalDateTime reconnectingAt;
+
+	@Column(name = "reconnect_deadline_at")
+	private LocalDateTime reconnectDeadlineAt;
+
+	@Column(name = "reconnected_at")
+	private LocalDateTime reconnectedAt;
+
+	@Column(name = "recovery_failed_at")
+	private LocalDateTime recoveryFailedAt;
+
+	@Column(name = "reconnect_attempt_count", nullable = false)
+	private int reconnectAttemptCount;
+
 	@Column(name = "expression_analysis_enabled", nullable = false)
 	private boolean expressionAnalysisEnabled;
 
@@ -153,6 +174,42 @@ public class RoomParticipant {
 		return lastConnectionEventAt;
 	}
 
+	public Long getRoomId() {
+		return room.getId();
+	}
+
+	public boolean isSessionInProgress() {
+		return room.isInProgress();
+	}
+
+	public String getClientInstanceId() {
+		return clientInstanceId;
+	}
+
+	public LocalDateTime getLastHeartbeatAt() {
+		return lastHeartbeatAt;
+	}
+
+	public LocalDateTime getReconnectingAt() {
+		return reconnectingAt;
+	}
+
+	public LocalDateTime getReconnectDeadlineAt() {
+		return reconnectDeadlineAt;
+	}
+
+	public LocalDateTime getReconnectedAt() {
+		return reconnectedAt;
+	}
+
+	public LocalDateTime getRecoveryFailedAt() {
+		return recoveryFailedAt;
+	}
+
+	public int getReconnectAttemptCount() {
+		return reconnectAttemptCount;
+	}
+
 	public boolean recordConnected(
 			String participantIdentity,
 			String participantSid,
@@ -165,11 +222,19 @@ public class RoomParticipant {
 
 		boolean changed = connectionStatus != SessionConnectionStatus.CONNECTED
 				|| !Objects.equals(this.participantSid, participantSid);
+		boolean newConnection = !Objects.equals(this.participantSid, participantSid);
 		this.participantSid = participantSid;
 		this.connectionStatus = SessionConnectionStatus.CONNECTED;
 		this.connectedAt = occurredAt;
 		this.disconnectedAt = null;
 		this.lastConnectionEventAt = occurredAt;
+		this.lastHeartbeatAt = occurredAt;
+		this.reconnectingAt = null;
+		this.reconnectDeadlineAt = null;
+		this.recoveryFailedAt = null;
+		if (newConnection) {
+			this.clientInstanceId = null;
+		}
 		return changed;
 	}
 
@@ -193,6 +258,99 @@ public class RoomParticipant {
 		this.disconnectedAt = occurredAt;
 		this.lastConnectionEventAt = occurredAt;
 		return changed;
+	}
+
+	public void recordHeartbeat(
+			String participantSid,
+			String clientInstanceId,
+			LocalDateTime heartbeatAt
+	) {
+		validateActiveClient(participantSid, clientInstanceId);
+		if (connectionStatus == SessionConnectionStatus.DISCONNECTED) {
+			throw new IllegalStateException("연결이 종료된 참여자의 Heartbeat입니다.");
+		}
+		this.clientInstanceId = clientInstanceId;
+		this.lastHeartbeatAt = Objects.requireNonNull(heartbeatAt);
+	}
+
+	public boolean startReconnecting(
+			String participantSid,
+			String clientInstanceId,
+			LocalDateTime reconnectingAt,
+			LocalDateTime reconnectDeadlineAt
+	) {
+		validateActiveClient(participantSid, clientInstanceId);
+		this.clientInstanceId = clientInstanceId;
+		return startReconnecting(reconnectingAt, reconnectDeadlineAt);
+	}
+
+	public boolean startReconnectingForParticipantSid(
+			String participantSid,
+			LocalDateTime reconnectingAt,
+			LocalDateTime reconnectDeadlineAt
+	) {
+		if (participantSid == null
+				|| participantSid.isBlank()
+				|| !participantSid.equals(this.participantSid)) {
+			return false;
+		}
+		return startReconnecting(reconnectingAt, reconnectDeadlineAt);
+	}
+
+	public boolean startReconnecting(
+			LocalDateTime reconnectingAt,
+			LocalDateTime reconnectDeadlineAt
+	) {
+		Objects.requireNonNull(reconnectingAt);
+		Objects.requireNonNull(reconnectDeadlineAt);
+		if (!reconnectDeadlineAt.isAfter(reconnectingAt)) {
+			throw new IllegalArgumentException("재접속 제한시간은 시작 시각 이후여야 합니다.");
+		}
+		if (connectionStatus == SessionConnectionStatus.DISCONNECTED) {
+			return false;
+		}
+		if (connectionStatus == SessionConnectionStatus.RECONNECTING) {
+			return false;
+		}
+		this.connectionStatus = SessionConnectionStatus.RECONNECTING;
+		this.reconnectingAt = reconnectingAt;
+		this.reconnectDeadlineAt = reconnectDeadlineAt;
+		this.reconnectAttemptCount++;
+		return true;
+	}
+
+	public boolean recordReconnected(
+			String participantSid,
+			String clientInstanceId,
+			LocalDateTime reconnectedAt
+	) {
+		validateActiveClient(participantSid, clientInstanceId);
+		this.clientInstanceId = clientInstanceId;
+		if (connectionStatus != SessionConnectionStatus.RECONNECTING) {
+			return false;
+		}
+		this.connectionStatus = SessionConnectionStatus.CONNECTED;
+		this.reconnectedAt = Objects.requireNonNull(reconnectedAt);
+		this.lastHeartbeatAt = reconnectedAt;
+		this.reconnectingAt = null;
+		this.reconnectDeadlineAt = null;
+		this.recoveryFailedAt = null;
+		return true;
+	}
+
+	public boolean failRecovery(LocalDateTime failedAt) {
+		Objects.requireNonNull(failedAt);
+		if (connectionStatus != SessionConnectionStatus.RECONNECTING
+				|| reconnectDeadlineAt == null
+				|| reconnectDeadlineAt.isAfter(failedAt)) {
+			return false;
+		}
+		this.connectionStatus = SessionConnectionStatus.DISCONNECTED;
+		this.disconnectedAt = failedAt;
+		this.recoveryFailedAt = failedAt;
+		this.reconnectingAt = null;
+		this.reconnectDeadlineAt = null;
+		return true;
 	}
 
 	public boolean recordConnectionAborted(
@@ -236,6 +394,24 @@ public class RoomParticipant {
 	private boolean isOlderThanLastEvent(LocalDateTime occurredAt) {
 		return lastConnectionEventAt != null
 				&& occurredAt.isBefore(lastConnectionEventAt);
+	}
+
+	private void validateActiveClient(
+			String participantSid,
+			String clientInstanceId
+	) {
+		if (participantSid == null
+				|| participantSid.isBlank()
+				|| !participantSid.equals(this.participantSid)) {
+			throw new IllegalStateException("현재 LiveKit 연결과 일치하지 않습니다.");
+		}
+		if (clientInstanceId == null || clientInstanceId.isBlank()) {
+			throw new IllegalArgumentException("clientInstanceId가 필요합니다.");
+		}
+		if (this.clientInstanceId != null
+				&& !this.clientInstanceId.equals(clientInstanceId)) {
+			throw new IllegalStateException("현재 접속 클라이언트와 일치하지 않습니다.");
+		}
 	}
 
 	private static String identityOf(Long userId) {

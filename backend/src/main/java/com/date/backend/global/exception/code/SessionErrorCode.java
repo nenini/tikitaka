@@ -34,6 +34,11 @@ public enum SessionErrorCode implements ErrorCode {
 			"SESSION_PARTICIPANTS_NOT_READY",
 			"모든 참여자가 준비 완료해야 세션을 시작할 수 있습니다."
 	),
+	SESSION_PARTICIPANTS_NOT_CONNECTED(
+			HttpStatus.CONFLICT,
+			"SESSION_PARTICIPANTS_NOT_CONNECTED",
+			"모든 참여자가 LiveKit에 연결되어야 세션을 시작할 수 있습니다."
+	),
 	LIVEKIT_WEBHOOK_UNAUTHORIZED(
 			HttpStatus.UNAUTHORIZED,
 			"LIVEKIT_WEBHOOK_UNAUTHORIZED",
@@ -43,6 +48,11 @@ public enum SessionErrorCode implements ErrorCode {
 			HttpStatus.SERVICE_UNAVAILABLE,
 			"LIVEKIT_WEBHOOK_NOT_CONFIGURED",
 			"LiveKit Webhook 인증 설정이 필요합니다."
+	),
+	SESSION_CONNECTION_CONFLICT(
+			HttpStatus.CONFLICT,
+			"SESSION_CONNECTION_CONFLICT",
+			"현재 세션 연결과 일치하지 않는 요청입니다."
 	);
 
 	private final HttpStatus status;

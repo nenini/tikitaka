@@ -3,6 +3,7 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
+import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
@@ -81,6 +82,10 @@ class SessionLifecycleServiceTest {
 				.thenReturn(List.of(participantA, participantB));
 		when(participantA.getUserId()).thenReturn(USER_A_ID);
 		when(participantB.getUserId()).thenReturn(102L);
+		when(participantA.getConnectionStatus())
+				.thenReturn(SessionConnectionStatus.CONNECTED);
+		when(participantB.getConnectionStatus())
+				.thenReturn(SessionConnectionStatus.CONNECTED);
 		when(tokenIssuer.issue(USER_A_ID, "date-room-30"))
 				.thenReturn(new LiveKitParticipantTokenIssuer.IssuedLiveKitToken(
 						true,
@@ -169,6 +174,26 @@ class SessionLifecycleServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(
 								SessionErrorCode.SESSION_PARTICIPANTS_NOT_JOINED
+						)
+				);
+	}
+
+	@Test
+	void startBeforeBothParticipantsConnectToLiveKitIsRejected() {
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
+		when(session.isInProgress()).thenReturn(false);
+		when(participantA.isJoined()).thenReturn(true);
+		when(participantB.isJoined()).thenReturn(true);
+		when(participantA.isReady()).thenReturn(true);
+		when(participantB.isReady()).thenReturn(true);
+		when(participantB.getConnectionStatus())
+				.thenReturn(SessionConnectionStatus.DISCONNECTED);
+
+		assertThatThrownBy(() -> service.start(USER_A_ID, SESSION_ID))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(
+								SessionErrorCode
+										.SESSION_PARTICIPANTS_NOT_CONNECTED
 						)
 				);
 	}

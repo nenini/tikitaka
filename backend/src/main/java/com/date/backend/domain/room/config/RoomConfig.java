@@ -8,7 +8,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties({RoomEntryProperties.class, LiveKitProperties.class})
+@EnableConfigurationProperties({
+		RoomEntryProperties.class,
+		LiveKitProperties.class,
+		SessionRealtimeProperties.class
+})
 public class RoomConfig {
 
 	@Bean

@@ -101,6 +101,14 @@ public class SessionLifecycleService {
 					SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
 			);
 		}
+		if (participants.stream().anyMatch(
+				participant -> participant.getConnectionStatus()
+						!= SessionConnectionStatus.CONNECTED
+		)) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_PARTICIPANTS_NOT_CONNECTED
+			);
+		}
 		session.start(now);
 		return createStatus(session, participants, now);
 	}
@@ -196,7 +204,13 @@ public class SessionLifecycleService {
 								participant.getJoinedAt(),
 								participant.getConnectionStatus(),
 								participant.getConnectedAt(),
-								participant.getDisconnectedAt()
+								participant.getDisconnectedAt(),
+								participant.getLastHeartbeatAt(),
+								participant.getReconnectingAt(),
+								participant.getReconnectDeadlineAt(),
+								participant.getReconnectedAt(),
+								participant.getRecoveryFailedAt(),
+								participant.getReconnectAttemptCount()
 						))
 						.toList()
 		);

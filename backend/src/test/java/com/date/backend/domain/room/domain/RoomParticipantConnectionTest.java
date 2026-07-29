@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 class RoomParticipantConnectionTest {
@@ -87,6 +88,109 @@ class RoomParticipantConnectionTest {
 				.isEqualTo(SessionConnectionStatus.CONNECTED);
 		assertThat(participant.getLastConnectionEventAt())
 				.isEqualTo(CONNECTED_AT.plusMinutes(1));
+	}
+
+	@Test
+	void heartbeatIsAcceptedOnlyFromCurrentSidAndClientInstance() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(5)
+		);
+
+		assertThat(participant.getClientInstanceId()).isEqualTo("client-a");
+		assertThat(participant.getLastHeartbeatAt())
+				.isEqualTo(CONNECTED_AT.plusSeconds(5));
+		assertThatThrownBy(() -> participant.recordHeartbeat(
+				"PA_current",
+				"client-b",
+				CONNECTED_AT.plusSeconds(10)
+		)).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> participant.recordHeartbeat(
+				"PA_old",
+				"client-a",
+				CONNECTED_AT.plusSeconds(10)
+		)).isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void reconnectingUsesFixedDeadlineAndCanRecover() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(5)
+		);
+
+		boolean started = participant.startReconnecting(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(10),
+				CONNECTED_AT.plusSeconds(30)
+		);
+		boolean duplicate = participant.startReconnecting(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(15),
+				CONNECTED_AT.plusSeconds(35)
+		);
+		boolean recovered = participant.recordReconnected(
+				"PA_current",
+				"client-a",
+				CONNECTED_AT.plusSeconds(20)
+		);
+
+		assertThat(started).isTrue();
+		assertThat(duplicate).isFalse();
+		assertThat(recovered).isTrue();
+		assertThat(participant.getConnectionStatus())
+				.isEqualTo(SessionConnectionStatus.CONNECTED);
+		assertThat(participant.getReconnectDeadlineAt()).isNull();
+		assertThat(participant.getReconnectAttemptCount()).isEqualTo(1);
+	}
+
+	@Test
+	void expiredRecoveryChangesParticipantToDisconnected() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_current", CONNECTED_AT);
+		participant.startReconnecting(
+				CONNECTED_AT.plusSeconds(10),
+				CONNECTED_AT.plusSeconds(30)
+		);
+
+		assertThat(participant.failRecovery(
+				CONNECTED_AT.plusSeconds(29)
+		)).isFalse();
+		assertThat(participant.failRecovery(
+				CONNECTED_AT.plusSeconds(30)
+		)).isTrue();
+		assertThat(participant.getConnectionStatus())
+				.isEqualTo(SessionConnectionStatus.DISCONNECTED);
+		assertThat(participant.getRecoveryFailedAt())
+				.isEqualTo(CONNECTED_AT.plusSeconds(30));
+	}
+
+	@Test
+	void newLiveKitSidReleasesPreviousClientInstanceClaim() {
+		RoomParticipant participant = participant();
+		participant.recordConnected("user-101", "PA_old", CONNECTED_AT);
+		participant.recordHeartbeat(
+				"PA_old",
+				"client-old",
+				CONNECTED_AT.plusSeconds(5)
+		);
+
+		participant.recordConnected(
+				"user-101",
+				"PA_new",
+				CONNECTED_AT.plusSeconds(10)
+		);
+
+		assertThat(participant.getParticipantSid()).isEqualTo("PA_new");
+		assertThat(participant.getClientInstanceId()).isNull();
 	}
 
 	private RoomParticipant participant() {

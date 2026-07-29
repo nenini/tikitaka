@@ -6,6 +6,7 @@ import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.AuthErrorCode;
 import com.date.backend.global.exception.code.RoomErrorCode;
+import com.date.backend.global.exception.code.SessionErrorCode;
 import com.date.backend.global.exception.code.UserErrorCode;
 import com.date.backend.global.security.AuthUser;
 import com.date.backend.global.security.JwtTokenProvider;
@@ -27,6 +28,12 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 	private static final String BEARER_PREFIX = "Bearer ";
 	private static final Pattern PARTICIPANT_TOPIC = Pattern.compile(
 			"^/topic/rooms/(\\d+)/participants$"
+	);
+	private static final Pattern SESSION_PARTICIPANT_TOPIC = Pattern.compile(
+			"^/topic/sessions/(\\d+)/participants$"
+	);
+	private static final Pattern SESSION_COMMAND = Pattern.compile(
+			"^/app/sessions/(\\d+)/(heartbeat|connection-state)$"
 	);
 
 	private final JwtTokenProvider jwtTokenProvider;
@@ -51,6 +58,9 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 			authorizeSubscription(accessor);
+		}
+		if (StompCommand.SEND.equals(accessor.getCommand())) {
+			authorizeSend(accessor);
 		}
 		return message;
 	}
@@ -81,18 +91,64 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 		if (destination == null) {
 			return;
 		}
-		Matcher matcher = PARTICIPANT_TOPIC.matcher(destination);
+		Matcher roomMatcher = PARTICIPANT_TOPIC.matcher(destination);
+		if (roomMatcher.matches()) {
+			assertRoomParticipant(
+					Long.parseLong(roomMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher sessionMatcher = SESSION_PARTICIPANT_TOPIC.matcher(destination);
+		if (sessionMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(sessionMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
+	}
+
+	private void authorizeSend(StompHeaderAccessor accessor) {
+		String destination = accessor.getDestination();
+		if (destination == null) {
+			return;
+		}
+		Matcher matcher = SESSION_COMMAND.matcher(destination);
 		if (!matcher.matches()) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_NOT_PARTICIPANT
+			);
+		}
+		assertSessionParticipant(
+				Long.parseLong(matcher.group(1)),
+				authUser(accessor).userId()
+		);
+	}
+
+	private AuthUser authUser(StompHeaderAccessor accessor) {
+		if (accessor.getUser()
+				instanceof UsernamePasswordAuthenticationToken authentication
+				&& authentication.getPrincipal() instanceof AuthUser authUser) {
+			return authUser;
+		}
+		throw new BusinessException(AuthErrorCode.UNAUTHORIZED);
+	}
+
+	private void assertRoomParticipant(Long roomId, Long userId) {
+		if (!participantRepository.existsByRoom_IdAndUserId(roomId, userId)) {
 			throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
 		}
-		if (accessor.getUser() == null
-				|| !(accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication)
-				|| !(authentication.getPrincipal() instanceof AuthUser authUser)) {
-			throw new BusinessException(AuthErrorCode.UNAUTHORIZED);
-		}
-		Long roomId = Long.parseLong(matcher.group(1));
-		if (!participantRepository.existsByRoom_IdAndUserId(roomId, authUser.userId())) {
-			throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
+	}
+
+	private void assertSessionParticipant(Long sessionId, Long userId) {
+		if (!participantRepository.existsByRoom_IdAndUserId(sessionId, userId)) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_NOT_PARTICIPANT
+			);
 		}
 	}
 }
