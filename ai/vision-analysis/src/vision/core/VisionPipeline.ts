@@ -14,7 +14,10 @@ import {
   ExpressionActivityDetector,
 } from "../detectors/ExpressionActivityDetector.js";
 import { NodDetector } from "../detectors/NodDetector.js";
-import { ScreenAttentionDetector } from "../detectors/ScreenAttentionDetector.js";
+import {
+  ScreenAttentionDetector,
+  type ScreenAttentionDetectorState,
+} from "../detectors/ScreenAttentionDetector.js";
 import { SmileExpressionDetector } from "../detectors/SmileExpressionDetector.js";
 import type {
   DetectorSuspensionReason,
@@ -83,6 +86,10 @@ export interface VisionPipelineOutput {
   readonly calibration: BaselineCalibrationState;
   readonly baseline: VisionBaseline;
   readonly detectorErrors: readonly VisionPipelineError[];
+  /** Browser-local observability only; never published in Vision v4 events. */
+  readonly diagnostics: {
+    readonly screenAttention: Readonly<ScreenAttentionDetectorState> | null;
+  };
 }
 
 export interface VisionSessionFinalOutput {
@@ -392,6 +399,12 @@ export class VisionPipeline {
       calibration,
       baseline,
       detectorErrors: errors,
+      diagnostics: {
+        screenAttention:
+          this.screenAttention instanceof ScreenAttentionDetector
+            ? this.screenAttention.getState()
+            : null,
+      },
     };
   }
 
