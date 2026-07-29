@@ -134,6 +134,10 @@ public class WaitingRoom {
 		return extensionDurationSec;
 	}
 
+	public String getTerminationReason() {
+		return terminationReason;
+	}
+
 	public String getLivekitRoomName() {
 		return livekitRoomName;
 	}
