@@ -19,17 +19,7 @@ import type {
   ReceivedReviewStatus,
 } from './types'
 
-/**
- * W-14 상호 평가 (`RESULT-02`, FE-B).
- *
- * 규칙(와이어플로우):
- *  - 외모·조건이 아닌 **대화 행동만** 평가한다. 익명 전달 · 욕설은 서버에서 필터링.
- *  - 서술형 2종은 **선택** — 필수 입력으로 만들지 않는다.
- *  - 🔒 상호성 게이트: 내 평가를 제출해야 상대 평가를 열람할 수 있다. 판정은 **서버**가 한다
- *    (여기서는 status.unlocked 를 신뢰만 하고, 화면 숨김을 잠금 대용으로 쓰지 않는다).
- *  - 48시간 내 미제출이면 상대 평가는 영구히 열리지 않고 매칭 후순위가 된다(D-12).
- *    다만 **영구 잠금이 아니다** — 내 AI 리포트(W-16)는 제출 여부와 무관하게 열람 가능하다.
- */
+
 export function PeerReviewPage() {
   const { sessionId = 'demo' } = useParams()
   const navigate = useNavigate()
@@ -109,15 +99,7 @@ export function PeerReviewPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
-      {/*
-        헤더.
-        - 세로 스택(모바일) → 가로 배치(sm 이상)를 **명시적으로** 나눈다. 이전에는 flex-wrap
-          하나로만 처리해서, 닉네임 길이에 따라 배지·메뉴 줄이 문장 중간 아무 데서나
-          꺾여 내려왔다. 지금은 항상 "이름 블록 위 · 메타 줄 아래"로 줄바꿈 지점이 고정된다.
-        - 아바타를 붙여 "누구를 평가하는 화면인지"를 텍스트보다 먼저 눈에 들어오게 한다.
-        - 회차·시간은 상태 경고가 아니라 그냥 메타 정보라 배지 톤을 warning → neutral 로 고친다
-          (warning 은 "주의가 필요함"을 뜻하는데, 완료된 세션 정보에 쓰면 잘못된 신호를 준다).
-      */}
+
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <Avatar name={form.opponent.nickname} className="mt-0.5 shrink-0" />
@@ -133,10 +115,11 @@ export function PeerReviewPage() {
             <span className="bt-numeric">{form.sessionRoundNo}</span>회차 ·{' '}
             <span className="bt-numeric">{form.durationMin}</span>분 완료
           </Badge>
-          <OverflowMenu
+          {/* TODO: 추후 global header 생기면 신고/차단 기능 더보기로 넣기 */}
+          {/* <OverflowMenu
             label="이 세션 관리"
             items={[{ label: '신고 · 차단', danger: true, onSelect: () => setReportOpen(true) }]}
-          />
+          /> */}
         </div>
       </div>
 
@@ -218,7 +201,7 @@ export function PeerReviewPage() {
               </Button>
               {!allRated && (
                 <p className="bt-caption bt-muted">
-                  정량 6항목을 모두 선택하면 제출할 수 있어요. 한마디는 비워두셔도 됩니다.
+                  6개 지표를 모두 평가하면 제출할 수 있어요. 한마디는 비워두셔도 됩니다.
                 </p>
               )}
             </>
