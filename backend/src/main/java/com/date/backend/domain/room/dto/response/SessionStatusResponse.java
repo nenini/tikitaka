@@ -13,6 +13,7 @@ public record SessionStatusResponse(
 		long remainingSeconds,
 		boolean allJoined,
 		boolean allReady,
+		boolean allConnected,
 		List<SessionParticipantStateResponse> participants
 ) {
 }

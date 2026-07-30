@@ -1,0 +1,10 @@
+package com.date.backend.domain.room.application;
+
+public enum LiveKitWebhookHandlingResult {
+	PROCESSED,
+	DUPLICATE,
+	IGNORED_UNSUPPORTED_EVENT,
+	IGNORED_NON_USER_PARTICIPANT,
+	IGNORED_UNKNOWN_PARTICIPANT,
+	IGNORED_STALE_CONNECTION
+}

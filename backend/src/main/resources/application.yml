@@ -124,6 +124,22 @@ room:
   entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
   entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}
 
+session:
+  realtime:
+    heartbeat-timeout: ${SESSION_HEARTBEAT_TIMEOUT:15s}
+    reconnect-grace-period: ${SESSION_RECONNECT_GRACE_PERIOD:20s}
+    monitor-enabled: ${SESSION_REALTIME_MONITOR_ENABLED:true}
+    monitor-fixed-delay-ms: ${SESSION_REALTIME_MONITOR_FIXED_DELAY_MS:5000}
+    monitor-initial-delay-ms: ${SESSION_REALTIME_MONITOR_INITIAL_DELAY_MS:5000}
+    monitor-batch-size: ${SESSION_REALTIME_MONITOR_BATCH_SIZE:100}
+  timer:
+    enabled: ${SESSION_TIMER_ENABLED:true}
+    fixed-delay-ms: ${SESSION_TIMER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${SESSION_TIMER_INITIAL_DELAY_MS:1000}
+    batch-size: ${SESSION_TIMER_BATCH_SIZE:100}
+    ending-soon-before: ${SESSION_ENDING_SOON_BEFORE:5m}
+    ending-imminent-before: ${SESSION_ENDING_IMMINENT_BEFORE:1m}
+
 livekit:
   url: ${LIVEKIT_URL:}
   api-key: ${LIVEKIT_API_KEY:}
