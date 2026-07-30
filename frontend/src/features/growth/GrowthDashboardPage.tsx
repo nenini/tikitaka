@@ -133,12 +133,15 @@ export function GrowthDashboardPage() {
           <InlineStats items={stats} />
         </div>
 
-        <div className="px-6 sm:px-8">
-          <TemperatureTrend points={pagePoints} />
+        {/* 히어로 본문과 **같은** 좌우 여백을 쓴다(bt-hero__body: 20px / sm 이상 32px).
+            몇 px 좁게 두면 y축 라벨 줄이 위의 "사랑의 온도" 글줄과 어긋나 어긴 것처럼 보인다.
+            scaleFrom 은 전체 이력 — 페이지를 넘겨도 y축이 흔들리지 않게 한다. */}
+        <div className="mt-6 px-5 pb-4 sm:px-8">
+          <TemperatureTrend points={pagePoints} scaleFrom={points} />
         </div>
 
         {pageCount > 1 && (
-          <div className="px-6 pb-4 sm:px-8">
+          <div className="px-6 pb-4 sm:px-8 mt-2">
             <TrendPager
               page={safePage}
               pageCount={pageCount}
@@ -196,7 +199,7 @@ function DashboardSkeleton() {
     <main className="mx-auto w-full max-w-[1080px] px-5 py-8" aria-busy="true">
       <Skeleton width={220} height={32} />
       <Skeleton
-        height={380}
+        height={500}
         className="mt-5"
         style={{ borderRadius: 'var(--bt-radius-2xl)' }}
       />

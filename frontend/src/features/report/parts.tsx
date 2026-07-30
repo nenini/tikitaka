@@ -6,36 +6,82 @@ import type { IssueSeverity, RadarAxis, ReportIssue, ReportMetric, ReportTopic, 
 /* ── 온도 변화 카드 ─────────────────────────────────────── */
 
 /**
+ * 온도 척도의 최댓값. 성장 대시보드(`features/growth/types.ts` 의 `TEMPERATURE_MAX`)와 같은
+ * 척도다 — 두 화면이 같은 0~100 위에서 같은 위치를 가리켜야 한다.
+ */
+const TEMPERATURE_SCALE_MAX = 100
+
+/** 온도 → 척도상 위치(%). 서버 값이 범위를 벗어나도 트랙 밖으로 삐져나가지 않게 자른다. */
+function scalePct(value: number): number {
+  return Math.max(0, Math.min(100, (value / TEMPERATURE_SCALE_MAX) * 100))
+}
+
+/**
  * 세션 전후 사랑의 온도 변화 (`REPORT-02`).
  *
- * 성장 대시보드 히어로(`.bt-hero`)와 같은 "따뜻해지는 코너 그라디언트" 어휘를 쓰지만,
- * 여기서는 리포트 안의 한 섹션일 뿐이라 그 히어로보다 작고 조용하게 만든다.
- * 증감 표기는 `.bt-delta` 를 그대로 재사용해 성장 대시보드와 같은 시각 언어를 유지한다.
+ * 이 카드는 리포트의 한 줄 결론이라 헤더 바로 아래에 온다. 그래서 묻는 건 딱 둘이다 —
+ * **지금 몇 도이고, 이번 세션이 어디로 얼마나 움직였나.**
+ *
+ * - 큰 활자는 현재 온도 하나뿐이다. 전·후를 같은 크기로 나란히 놓으면 어느 쪽이 지금인지
+ *   매번 읽어서 판단해야 한다. 세션 전 값은 캡션으로 내려 참조값 자리에 둔다.
+ * - 변화는 숫자만으로는 크기를 알 수 없어(2.1 이 큰가?) 0~100 **척도 트랙** 위에 그린다.
+ *   움직인 폭이 트랙에서 차지하는 길이가 곧 이번 세션의 폭이다.
+ * - 증감 표기는 `.bt-delta` 를 그대로 재사용해 성장 대시보드와 같은 시각 언어를 유지한다.
  */
 export function TemperatureCard({ temp, className }: { temp: TemperatureDelta; className?: string }) {
-  const up = temp.delta >= 0
+  // 0.05 미만은 소수 첫째 자리 표기에서 "0.0" 으로 보이므로 변화 없음으로 취급한다
+  const flat = Math.abs(temp.delta) < 0.05
+  const up = temp.delta > 0
+  const lo = Math.min(temp.before, temp.after)
+  const hi = Math.max(temp.before, temp.after)
+
   return (
-    <div className={`bt-temp-card ${className ?? ''}`}>
-      <div className="bt-temp-card__top">
-        <div>
-          <span className="bt-overline">사랑의 온도</span>
-          <div className="bt-temp-card__row">
-            <span className="bt-temp-card__before bt-numeric">{temp.before.toFixed(1)}°</span>
-            <Icon name="chevron-right" size={16} className="bt-temp-card__arrow" />
-            <span className="bt-temp-card__after bt-numeric">{temp.after.toFixed(1)}°</span>
-            <span className={`bt-delta ${up ? 'bt-delta--up' : 'bt-delta--down'}`}>
-              <Icon name={up ? 'arrow-up' : 'arrow-down'} size={14} />
-              {Math.abs(temp.delta).toFixed(1)}
-            </span>
-          </div>
-        </div>
+    <section className={`bt-temp-card ${className ?? ''}`} aria-label="사랑의 온도 변화">
+      <div className="bt-temp-card__head">
+        <span className="bt-overline">사랑의 온도</span>
         <Link className="bt-temp-card__cta" to="/growth">
           추이 보기
           <Icon name="chevron-right" size={14} />
         </Link>
       </div>
-      {temp.reason && <p className="bt-caption bt-muted mt-3">{temp.reason}</p>}
-    </div>
+
+      <div className="bt-temp-card__figures">
+        <span className="bt-temp-card__value bt-numeric">
+          {temp.after.toFixed(1)}
+          <span className="bt-temp-card__unit">°</span>
+        </span>
+        {flat ? (
+          <span className="bt-temp-card__flat">변화 없음</span>
+        ) : (
+          <span className={`bt-delta ${up ? 'bt-delta--up' : 'bt-delta--down'}`}>
+            <Icon name={up ? 'arrow-up' : 'arrow-down'} size={15} />
+            {Math.abs(temp.delta).toFixed(1)}
+          </span>
+        )}
+        <span className="bt-temp-card__from bt-caption bt-muted">
+          세션 전 <span className="bt-numeric">{temp.before.toFixed(1)}°</span>
+        </span>
+      </div>
+
+      <div className="bt-temp-card__scale" aria-hidden="true">
+        <div className="bt-temp-card__track">
+          <span className="bt-temp-card__base" style={{ width: `${scalePct(lo)}%` }} />
+          {!flat && (
+            <span
+              className={`bt-temp-card__move ${up ? '' : 'bt-temp-card__move--down'}`}
+              style={{ left: `${scalePct(lo)}%`, width: `${scalePct(hi) - scalePct(lo)}%` }}
+            />
+          )}
+          <span className="bt-temp-card__thumb" style={{ left: `${scalePct(temp.after)}%` }} />
+        </div>
+        <div className="bt-temp-card__ticks bt-numeric">
+          <span>0°</span>
+          <span>{TEMPERATURE_SCALE_MAX}°</span>
+        </div>
+      </div>
+
+      {temp.reason && <p className="bt-temp-card__reason bt-caption">{temp.reason}</p>}
+    </section>
   )
 }
 
@@ -43,17 +89,7 @@ export function TemperatureCard({ temp, className }: { temp: TemperatureDelta; c
 
 /**
  * AI 분석 vs 상대 평가 레이더 (`REPORT-01`).
- *
- * 디자인 시스템 §6: AI 분석 = `--bt-color-brand`, 상대 평가 = `--bt-color-success-marker`.
- * 두 계열은 색상환에서 충분히 떨어져 있고 색각 이상에서도 명도차로 구분된다.
- *
- * ⚠️ 임의 구현 1: 시스템 문서는 Chart.js 를 전제하지만 프로젝트에 차트 의존성이 없어
- *    의존성 추가 없이 **인라인 SVG**로 그렸다(축 6개 고정 도형이라 라이브러리 이득이 적다).
- * ⚠️ 임의 구현 2(D-13): "상대 평가 우선"을 **시각 강조**로 해석했다 —
- *    상대 계열을 위에, 더 굵고 진하게 그린다. 온도 가중치 해석이면 서버 산식이 따로 필요하다.
- *
  * 좌표계 주의: 라벨은 도형 바깥(반지름 ×1.26)에 놓이므로 viewBox 는 **도형 크기 + 라벨 여백**이다.
- * 예전처럼 정사각 260 에 도형과 라벨을 함께 넣으면 좌우 라벨이 뷰박스 밖으로 잘렸다.
  */
 export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?: string }) {
   /** 도형 반지름 */

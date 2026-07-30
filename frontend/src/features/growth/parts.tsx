@@ -1,115 +1,215 @@
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
-import { Button, Modal, VisuallyHidden } from '@/components'
+import { Button, Icon, Modal, VisuallyHidden } from '@/components'
 import { badgeArtOf } from './badges'
-import type { EarnedBadge, GrowthKeyword, TemperaturePoint } from './types'
+import { TEMPERATURE_MAX, type EarnedBadge, type GrowthKeyword, type TemperaturePoint } from './types'
 
 /* ── 온도 추이 ──────────────────────────────────────────── */
 
-/** 차트 안쪽 여백. 좌측은 y축 라벨, 하단은 회차 라벨 자리다. */
-const PAD = { top: 22, right: 20, bottom: 26, left: 38 }
-const CHART_HEIGHT = 200
+/**
+ * 차트 안쪽 여백.
+ * 위는 지금 온도 말풍선, 왼쪽은 구간 라벨(`50° 따뜻해요`), 아래는 날짜 라벨 자리다.
+ */
+const PAD = { top: 40, right: 26, bottom: 34, left: 96 }
+/** 좁은 화면에서는 왼쪽 여백을 숫자 폭만 남긴다 */
+const PAD_NARROW = { top: 40, right: 20, bottom: 32, left: 46 }
+/** 이 폭 아래에서는 구간 설명 텍스트가 그래프를 밀어낸다 */
+const NARROW_WIDTH = 560
+const CHART_HEIGHT = 320
 
+/** 눈금 숫자를 5 의 배수로 떨어뜨린다 — 축에 31.4° 같은 값이 서면 온도계로 읽히지 않는다 */
+const AXIS_STEP = 5
+/** 데이터가 창의 천장·바닥에 닿지 않게 두는 여유 */
+const AXIS_MARGIN = 3
+/** 창의 최소 폭. 1° 흔들림이 산맥처럼 보이는 것을 막는다 */
+const AXIS_MIN_SPAN = 20
 
-export function TemperatureTrend({ points }: { points: TemperaturePoint[] }) {
+/**
+ * y축이 보여줄 온도 창(window).
+ *
+ * 0~100 전체를 늘 그리면 실제 데이터(대개 30~40°)가 아래쪽 8% 에 눌려 붙어 **성장이
+ * 보이지 않는다** — 성장 대시보드에서 이건 그래프가 제 일을 못 하는 것이다. 반대로 페이지마다
+ * 다시 계산하면 구간을 넘길 때 축이 흔들려 선 모양을 견줄 수 없다.
+ *
+ * 그래서 **전체 이력**으로 한 번 계산해 창을 고정한다. 페이지를 넘겨도 축은 그대로다.
+ */
+function temperatureWindow(values: readonly number[]): { floor: number; ceil: number } {
+  if (values.length === 0) return { floor: 0, ceil: AXIS_MIN_SPAN }
+
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  let floor = Math.max(0, Math.floor((lo - AXIS_MARGIN) / AXIS_STEP) * AXIS_STEP)
+  let ceil = Math.min(TEMPERATURE_MAX, Math.ceil((hi + AXIS_MARGIN) / AXIS_STEP) * AXIS_STEP)
+
+  // 좁으면 넓히고, 0·100 에 부딪히면 반대쪽으로 밀어 폭을 지킨다
+  if (ceil - floor < AXIS_MIN_SPAN) {
+    ceil = Math.min(TEMPERATURE_MAX, floor + AXIS_MIN_SPAN)
+    floor = Math.max(0, ceil - AXIS_MIN_SPAN)
+  }
+  return { floor, ceil }
+}
+
+/** 말풍선 반폭(px) 추정치. 가장자리에서 밀어 넣을 때만 쓰므로 대략이면 된다. */
+const CALLOUT_HALF = 58
+/** 말풍선 실측 높이. 위로 띄울 자리가 있는지 판단할 때만 쓴다. */
+const CALLOUT_HEIGHT = 62
+/** 말풍선 꼬리 끝과 점 사이 간격 */
+const CALLOUT_GAP = 18
+
+/** 날짜 라벨 한 칸이 차지하는 폭("07.26" @12px ≈ 33px)과 라벨 사이 최소 간격 */
+const DATE_LABEL_W = 34
+const DATE_LABEL_GAP = 8
+
+/** x축 라벨. 회차 번호보다 날짜가 "언제의 나"인지 바로 읽힌다. */
+function toMonthDay(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+export interface TemperatureTrendProps {
+  /** 이 화면에 그릴 점(현재 페이지) */
+  points: TemperaturePoint[]
+  /**
+   * y축 창을 계산할 기준 집합. **전체 이력**을 넘긴다 — 페이지마다 다시 재면 축이 흔들려
+   * 구간을 넘길 때 선 모양을 견줄 수 없다. 생략하면 현재 페이지로 계산한다.
+   */
+  scaleFrom?: TemperaturePoint[]
+}
+
+export function TemperatureTrend({ points, scaleFrom }: TemperatureTrendProps) {
   const gradientId = useId()
   const wrapRef = useRef<HTMLDivElement>(null)
   const width = useElementWidth(wrapRef)
-  const [active, setActive] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
+  // 키보드로 짚었을 때만 포커스 링을 그린다. 마우스 클릭에는 활성 점 자체가 이미 응답이다.
+  const [keyboard, setKeyboard] = useState(false)
 
   if (points.length === 0) {
     // 히어로 면 위에 얹히므로 배경을 따로 깔지 않는다 — 면 안에 또 면을 만들면 카드가 겹친다
     return (
-      <div className="grid place-items-center" style={{ height: CHART_HEIGHT }}>
+      <div className="bt-trend grid place-items-center" style={{ height: CHART_HEIGHT }}>
         <p className="bt-body-sm bt-muted">아직 기록된 세션이 없어요.</p>
       </div>
     )
   }
 
-  const values = points.map((p) => p.temperatureAfter)
-  const floor = Math.floor(Math.min(...values) - 1)
-  const ceil = Math.ceil(Math.max(...values) + 1)
-  const span = Math.max(1, ceil - floor)
+  const narrow = width > 0 && width < NARROW_WIDTH
+  const pad = narrow ? PAD_NARROW : PAD
 
-  const innerW = Math.max(1, width - PAD.left - PAD.right)
-  const innerH = CHART_HEIGHT - PAD.top - PAD.bottom
+  const innerW = Math.max(1, width - pad.left - pad.right)
+  const innerH = CHART_HEIGHT - pad.top - pad.bottom
+  const baseY = pad.top + innerH
+
+  const { floor, ceil } = temperatureWindow((scaleFrom ?? points).map((p) => p.temperatureAfter))
+  const span = Math.max(1, ceil - floor)
 
   // 점이 하나뿐이면 가운데에 세운다(0 으로 나누지 않기 위해서이기도 하다)
   const xOf = (i: number) =>
-    PAD.left + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW)
-  const yOf = (v: number) => PAD.top + innerH - ((v - floor) / span) * innerH
+    pad.left + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW)
+  const yOf = (v: number) => baseY - ((clamp(v, floor, ceil) - floor) / span) * innerH
 
   const coords = points.map((p, i) => [xOf(i), yOf(p.temperatureAfter)] as const)
   const linePath = smoothPath(coords)
-  const areaPath =
-    coords.length > 0
-      ? `${linePath} L ${coords[coords.length - 1][0]},${PAD.top + innerH} L ${coords[0][0]},${PAD.top + innerH} Z`
-      : ''
+  const areaPath = `${linePath} L ${coords[coords.length - 1][0]},${baseY} L ${coords[0][0]},${baseY} Z`
 
-  const gridValues = [ceil, floor + span / 2, floor]
-  // 회차 라벨이 겹치지 않도록 건너뛰며 그린다
-  const labelStep = Math.ceil(points.length / 8)
+  // 구간 라벨이 끝나는 x. 첫 점의 날짜 라벨은 축(pad.left) 기준 가운데 정렬이라
+  // 축보다 왼쪽으로 반 글자 넘어온다 — 여백을 축 바로 앞까지 쓰면 그 라벨과 맞닿는다.
+  // 좁은 화면에서는 축 아래 설명을 접어서 겹칠 상대가 없으므로 간격을 좁혀 "100°" 를 살린다.
+  const tierLabelRight = pad.left - (narrow ? 10 : 20)
 
-  const activeIndex = points.findIndex((p) => p.sessionId === active)
-  const activePoint = activeIndex >= 0 ? points[activeIndex] : null
+  const gap = points.length > 1 ? innerW / (points.length - 1) : innerW
+  const lastIndex = points.length - 1
+
+  // 양 끝 라벨은 안쪽으로 정렬한다. 가운데 정렬로 두면 첫 라벨은 y축 라벨과 맞닿고
+  // 마지막 라벨은 면 밖으로 반 글자 넘어간다(좁은 화면에서 잘린 것처럼 보인다).
+  const anchorOf = (i: number) => (i === 0 ? 'start' : i === lastIndex ? 'end' : 'middle')
+
+  // 날짜 라벨을 몇 칸마다 그릴지는 **픽셀**로 정한다. 점 개수로 정하면 폭이 줄어도 단계가
+  // 그대로라 라벨이 서로 파고든다(폭 460~500px 구간에서 07.22 와 07.26 이 7px 겹쳤다).
+  const dateStep = Math.max(1, Math.ceil((DATE_LABEL_W + DATE_LABEL_GAP) / gap))
+  // 양 끝 라벨은 안쪽 정렬이라 자기 자리를 한 글자 폭만큼 더 차지한다. 그 자리를 침범하는
+  // 중간 라벨은 접는다 — 양 끝(처음과 지금)이 항상 이긴다.
+  const firstRight = coords[0][0] + DATE_LABEL_W + DATE_LABEL_GAP
+  const lastLeft = coords[lastIndex][0] - DATE_LABEL_W - DATE_LABEL_GAP
+  const clearsEnds = (x: number, i: number) =>
+    i === 0 || i === lastIndex || (x - DATE_LABEL_W / 2 > firstRight && x + DATE_LABEL_W / 2 < lastLeft)
+
+  // 처음 들어왔을 때는 말풍선을 띄우지 않는다. 히어로의 큰 숫자가 이미 "지금 몇 도"를
+  // 말하고 있어서, 같은 값을 말풍선으로 한 번 더 강조하면 둘 다 주인공이 되어 초점이 흩어진다.
+  // 말풍선은 **짚었을 때의 응답**으로만 나타난다.
+  const hoveredIndex = points.findIndex((p) => p.sessionId === hovered)
+  const activeIndex = hoveredIndex >= 0 ? hoveredIndex : null
+  const activePoint = activeIndex != null ? points[activeIndex] : null
+  const [activeX, activeY] = activeIndex != null ? coords[activeIndex] : [0, 0]
+
+  // 말풍선은 가장자리에서 안으로 밀어 넣고, 꼬리만 점 위에 남겨 둔다 —
+  // 상자를 통째로 옮기면 어느 점의 값인지가 끊긴다.
+  const calloutHalf = Math.min(CALLOUT_HALF, width / 2)
+  const calloutX = clamp(activeX, calloutHalf, width - calloutHalf)
+  // 위로 띄울 자리가 없으면 점 아래로 뒤집는다. 자리를 늘 비워 두면(위쪽 여백을 크게 잡으면)
+  // 말풍선이 없는 평소에 그만큼이 빈 띠로 남는다.
+  const flipped = activeY - CALLOUT_GAP - CALLOUT_HEIGHT < 4
+  const calloutY = flipped ? activeY + CALLOUT_GAP : activeY - CALLOUT_GAP
 
   return (
     // min-w-0 + overflow-hidden 이 없으면 SVG 의 고유 폭(width 속성)이 카드의 최소 폭이 되어
     // 화면이 좁아져도 카드가 줄지 않고, 그래서 여기서 잰 폭도 영영 줄지 않는다(측정 되먹임).
-    <div ref={wrapRef} className="relative w-full min-w-0 overflow-hidden">
+    <div ref={wrapRef} className="bt-trend relative w-full min-w-0 overflow-hidden">
       {width > 0 && (
         <svg
           width={width}
           height={CHART_HEIGHT}
           // role="img" 로 두면 안의 점들이 접근성 트리에서 사라진다 — 값을 읽히려면 컨테이너여야 한다
           role="group"
-          aria-label="세션별 사랑의 온도 추이"
-          style={{ display: 'block', overflow: 'visible' }}
-          onMouseLeave={() => setActive(null)}
+          aria-label="날짜별 사랑의 온도 추이"
+          style={{ display: 'block' }}
+          onMouseLeave={() => setHovered(null)}
         >
           <defs>
-            {/* 선은 왼쪽(과거)에서 오른쪽(지금)으로 갈수록 따뜻해진다  */}
-            <linearGradient id={`${gradientId}-line`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="var(--bt-blue-400)" />
-              <stop offset="100%" stopColor="var(--bt-rose-500)" />
-            </linearGradient>
+            {/* 면은 선 아래에서 아래로 갈수록 옅어진다. 선은 한 색으로 둔다 —
+                구간 이름이 이미 높이의 뜻을 말하고 있어서 색까지 변하면 두 번 말하는 셈이다 */}
             <linearGradient id={`${gradientId}-area`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--bt-rose-400)" stopOpacity="0.26" />
-              <stop offset="55%" stopColor="var(--bt-blue-400)" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="var(--bt-blue-400)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--bt-color-brand)" stopOpacity="0.3" />
+              <stop offset="70%" stopColor="var(--bt-color-brand)" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="var(--bt-color-brand)" stopOpacity="0.02" />
             </linearGradient>
           </defs>
 
-          {/* 눈금선 + y 라벨. 선 높이만으로는 값을 견줄 수 없다 */}
-          {gridValues.map((v) => (
-            <g key={v}>
-              <line
-                x1={PAD.left}
-                x2={width - PAD.right}
-                y1={yOf(v)}
-                y2={yOf(v)}
-                stroke="var(--bt-color-border)"
-                strokeWidth={1}
-                strokeDasharray={v === floor ? undefined : '2 5'}
-              />
-              <text
-                x={PAD.left - 10}
-                y={yOf(v)}
-                textAnchor="end"
-                dominantBaseline="middle"
-                fontSize={10}
-                fill="var(--bt-color-text-tertiary)"
-              >
-                {v.toFixed(0)}°
-              </text>
-            </g>
-          ))}
+          {/* 눈금선 + 구간 라벨. 선 높이만으로는 값을 견줄 수 없다 */}
+          {[ceil, (ceil + floor) / 2, floor].map((value) => {
+            const y = yOf(value)
+            return (
+              <g key={value}>
+                <line
+                  x1={pad.left}
+                  x2={width - pad.right}
+                  y1={y}
+                  y2={y}
+                  stroke="var(--bt-color-border)"
+                  strokeWidth={1}
+                  strokeDasharray={value === floor ? undefined : '3 7'}
+                />
+                <text
+                  x={tierLabelRight}
+                  y={y}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  fontSize={12}
+                  fontWeight={600}
+                  fill="var(--bt-color-action)"
+                  className="bt-numeric"
+                >
+                  {value}°
+                </text>
+              </g>
+            )
+          })}
 
-          <path d={areaPath} fill={`url(#${gradientId}-area)`} />
+          <path className="bt-trend__area" d={areaPath} fill={`url(#${gradientId}-area)`} />
           <path
             className="bt-trend__line"
             d={linePath}
             fill="none"
-            stroke={`url(#${gradientId}-line)`}
+            stroke="var(--bt-color-brand)"
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -118,65 +218,104 @@ export function TemperatureTrend({ points }: { points: TemperaturePoint[] }) {
             pathLength={1}
           />
 
-          {/* 활성 점의 세로 가이드 */}
-          {activePoint && (
+          {/* 선택된 점에서 축까지 내려오는 기둥. 말풍선이 가장자리에서 밀려나도
+              이 기둥이 x축의 굵은 날짜와 점을 이어 줘서 어느 날의 값인지 끊기지 않는다 */}
+          {activeIndex != null && (
             <line
-              x1={coords[activeIndex][0]}
-              x2={coords[activeIndex][0]}
-              y1={PAD.top}
-              y2={PAD.top + innerH}
-              stroke="var(--bt-color-text-tertiary)"
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              opacity={0.6}
+              x1={activeX}
+              x2={activeX}
+              y1={activeY}
+              y2={baseY}
+              stroke="var(--bt-color-brand)"
+              strokeWidth={1.5}
+              opacity={0.3}
             />
           )}
 
           {points.map((p, i) => {
             const [x, y] = coords[i]
-            const isActive = p.sessionId === active
-            // 마지막 점이 '지금'이다. 눈이 어디서 끝나야 하는지 표시해 준다.
-            const isLatest = i === points.length - 1
-            const dotColor = isLatest ? 'var(--bt-rose-500)' : 'var(--bt-color-brand)'
+            const isActive = i === activeIndex
+            // 마지막 점은 '지금'이다. 짚지 않아도 눈이 어디서 끝나야 하는지 표시해 준다.
+            const isLatest = i === lastIndex
+            const showDate = (i % dateStep === 0 || isLatest) && clearsEnds(x, i)
             return (
               <g key={p.sessionId}>
-                {isLatest && (
-                  <circle cx={x} cy={y} r={9} fill="var(--bt-rose-500)" opacity={0.16} />
+                {isActive ? (
+                  <>
+                    {/* 키보드 포커스 링. 시스템 규칙(2px 링 + 2px offset)을 SVG 로 옮긴 것 —
+                        히트 영역은 지름 100px 이 넘어서 브라우저 기본 outline 을 쓰면
+                        차트 절반을 감싸는 사각형이 그려진다. */}
+                    {keyboard && (
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={14}
+                        fill="none"
+                        stroke="var(--bt-color-focus)"
+                        strokeWidth={2}
+                      />
+                    )}
+                    <circle cx={x} cy={y} r={12} fill="var(--bt-color-surface)" />
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={12}
+                      fill="none"
+                      stroke="var(--bt-color-brand)"
+                      strokeWidth={1.5}
+                      opacity={0.35}
+                    />
+                    <circle cx={x} cy={y} r={6.5} fill="var(--bt-color-brand)" />
+                  </>
+                ) : isLatest ? (
+                  // 짚기 전의 '지금'. 활성 점보다 조용하게, 그래도 다른 점과는 구별되게.
+                  <>
+                    <circle cx={x} cy={y} r={7} fill="var(--bt-color-surface)" />
+                    <circle cx={x} cy={y} r={5.5} fill="var(--bt-color-brand)" />
+                  </>
+                ) : (
+                  <circle cx={x} cy={y} r={4} fill="var(--bt-color-brand)" />
                 )}
+
+                {/* 점 위에 값을 적지 않는다 — 숫자 여덟 개가 늘어서면 선의 모양보다 숫자가
+                    먼저 읽혀서 추이 그래프가 성적표가 된다(원칙 1). 값은 짚었을 때 말풍선이 답한다. */}
+
+                {/* 히트 영역 실제 점보다 넓게 */}
                 <circle
                   cx={x}
                   cy={y}
-                  r={isActive ? 5.5 : isLatest ? 4.5 : 3.5}
-                  fill="var(--bt-color-surface)"
-                  stroke={dotColor}
-                  strokeWidth={isActive ? 3 : 2.25}
-                />
-                {/* 손가락·마우스가 닿는 넉넉한 히트 영역. 점 자체는 작아도 짚기 쉬워야 한다 */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={Math.max(14, innerW / points.length / 2)}
+                  r={Math.max(14, gap / 2)}
                   fill="transparent"
                   tabIndex={0}
                   role="img"
-                  aria-label={`${p.sessionNo}회차, ${p.temperatureAfter.toFixed(1)}도, 이전 대비 ${p.delta >= 0 ? '상승' : '하락'} ${Math.abs(p.delta).toFixed(1)}도`}
+                  aria-label={`${toMonthDay(p.createdAt)} ${p.sessionNo}회차, ${p.temperatureAfter.toFixed(1)}도, 이전 대비 ${p.delta >= 0 ? '상승' : '하락'} ${Math.abs(p.delta).toFixed(1)}도`}
+                  // outline 을 지우는 대신 위의 SVG 링으로 대체한다 —
+                  // 이 코드베이스에서 대체 없는 outline:none 은 버그다(DESIGN_SYSTEM §8).
                   style={{ cursor: 'pointer', outline: 'none' }}
-                  onMouseEnter={() => setActive(p.sessionId)}
-                  onFocus={() => setActive(p.sessionId)}
-                  onBlur={() => setActive(null)}
+                  onMouseEnter={() => setHovered(p.sessionId)}
+                  onFocus={(e) => {
+                    setHovered(p.sessionId)
+                    setKeyboard(e.currentTarget.matches(':focus-visible'))
+                  }}
+                  onBlur={() => {
+                    setHovered(null)
+                    setKeyboard(false)
+                  }}
                   // 토글이 아니라 선택이다 — 클릭은 focus 뒤에 오므로 토글로 두면 방금 켠 값이 곧바로 꺼진다
-                  onClick={() => setActive(p.sessionId)}
+                  onClick={() => setHovered(p.sessionId)}
                 />
-                {i % labelStep === 0 && (
+
+                {showDate && (
                   <text
                     x={x}
-                    y={CHART_HEIGHT - 6}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fill={isActive ? 'var(--bt-color-action)' : 'var(--bt-color-text-tertiary)'}
+                    y={CHART_HEIGHT - 10}
+                    textAnchor={anchorOf(i)}
+                    fontSize={12}
+                    fill={isActive ? 'var(--bt-color-action)' : 'var(--bt-color-text-secondary)'}
                     fontWeight={isActive ? 700 : 400}
+                    className="bt-numeric"
                   >
-                    {p.sessionNo}
+                    {toMonthDay(p.createdAt)}
                   </text>
                 )}
               </g>
@@ -185,31 +324,27 @@ export function TemperatureTrend({ points }: { points: TemperaturePoint[] }) {
         </svg>
       )}
 
-      {/* 값 툴팁. SVG 안에 그리면 잘리므로 위에 겹쳐 띄우고, 가장자리에서 밀어 넣는다 */}
-      {activePoint && width > 0 && (
+      {/* 값 말풍선. SVG 안에 그리면 글자 렌더와 그림자를 다루기 어려워 위에 겹쳐 띄운다.
+          날짜를 함께 적는다 — 양 끝 점에서는 상자가 안쪽으로 밀려 꼬리만으로는 어느 점인지
+          단정하기 어렵다. 여기의 날짜와 x축에서 굵어진 날짜가 같은 값이라 짝이 분명해진다. */}
+      {width > 0 && activePoint && (
         <div
-          className="bt-trend__tip"
+          className={`bt-trend__callout ${flipped ? 'bt-trend__callout--below' : ''}`}
           style={{
-            left: clamp(coords[activeIndex][0], 62, width - 62),
-            top: Math.max(0, coords[activeIndex][1] - 56),
+            left: calloutX,
+            top: calloutY,
+            // 꼬리는 상자가 밀려난 만큼 되돌려 실제 점을 가리킨다
+            ['--_tail-x' as string]: `${activeX - calloutX}px`,
           }}
           aria-hidden="true"
         >
-          <span className="bt-caption">
-            <span className="bt-numeric">{activePoint.sessionNo}</span>회차
+          <span className="bt-trend__callout-value">
+            <span className="bt-numeric">{activePoint.temperatureAfter.toFixed(1)}°</span>
+            <Icon name="bloom" size={16} />
           </span>
-          <b className="bt-numeric" style={{ fontSize: 17 }}>
-            {activePoint.temperatureAfter.toFixed(1)}°
-          </b>
-          {/* <span
-            className="bt-caption bt-numeric"
-            style={{
-              color: activePoint.delta >= 0 ? 'var(--bt-color-success)' : 'var(--bt-color-warning)',
-            }}
-          >
-            {activePoint.delta >= 0 ? '+' : ''}
-            {activePoint.delta.toFixed(1)}
-          </span> */}
+          <span className="bt-trend__callout-date bt-numeric">
+            {toMonthDay(activePoint.createdAt)}
+          </span>
         </div>
       )}
 
@@ -217,7 +352,7 @@ export function TemperatureTrend({ points }: { points: TemperaturePoint[] }) {
         <ul>
           {points.map((p) => (
             <li key={p.sessionId}>
-              {p.sessionNo}회차: {p.temperatureAfter.toFixed(1)}도
+              {toMonthDay(p.createdAt)} {p.sessionNo}회차: {p.temperatureAfter.toFixed(1)}도
             </li>
           ))}
         </ul>
