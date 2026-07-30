@@ -3,6 +3,8 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.event.AiSessionEndedEvent;
+import com.date.backend.domain.room.event.SessionEndedEvent;
 import com.date.backend.domain.room.event.LiveKitRoomDeletionRequestedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -74,6 +76,8 @@ class SessionTerminationServiceTest {
 		verify(eventPublisher).publishEvent(
 				new LiveKitRoomDeletionRequestedEvent(15L, "date-room-30")
 		);
+		verify(eventPublisher).publishEvent(any(SessionEndedEvent.class));
+		verify(eventPublisher).publishEvent(any(AiSessionEndedEvent.class));
 	}
 
 	@Test

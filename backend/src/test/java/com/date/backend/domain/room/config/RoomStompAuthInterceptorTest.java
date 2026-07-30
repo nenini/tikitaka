@@ -73,6 +73,49 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSubscribeToOwnCoachingQueue() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/user/queue/sessions/15/coaching"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
+	void sessionParticipantCanSubscribeToSilenceAndQuestionDestinations() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> silenceMessage = message(
+				StompCommand.SUBSCRIBE,
+				"/topic/sessions/15/silence"
+		);
+		Message<?> questionMessage = message(
+				StompCommand.SUBSCRIBE,
+				"/user/queue/sessions/15/questions"
+		);
+
+		assertThat(interceptor.preSend(silenceMessage, null))
+				.isSameAs(silenceMessage);
+		assertThat(interceptor.preSend(questionMessage, null))
+				.isSameAs(questionMessage);
+	}
+
+	@Test
+	void sessionParticipantCanSubscribeToOwnSafetyQueue() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/user/queue/sessions/15/safety"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
 	void sessionParticipantCanSendHeartbeat() {
 		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
 				.thenReturn(true);

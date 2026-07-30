@@ -3,6 +3,7 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.dto.response.SessionEndedResponse;
+import com.date.backend.domain.room.event.AiSessionEndedEvent;
 import com.date.backend.domain.room.event.SessionEndedEvent;
 import com.date.backend.domain.room.event.LiveKitRoomDeletionRequestedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
@@ -139,6 +140,11 @@ public class SessionTerminationService {
 						session.getLivekitRoomName()
 				)
 		);
+		eventPublisher.publishEvent(AiSessionEndedEvent.of(
+				session.getId(),
+				persistedEndedAt.atZone(clock.getZone()).toInstant(),
+				reason
+		));
 		return new EndResult(true, response);
 	}
 

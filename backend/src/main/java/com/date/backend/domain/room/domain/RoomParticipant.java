@@ -247,6 +247,22 @@ public class RoomParticipant {
 		return networkQualityUpdatedAt;
 	}
 
+	public boolean isExpressionAnalysisEnabled() {
+		return expressionAnalysisEnabled;
+	}
+
+	public boolean isVoiceAnalysisEnabled() {
+		return voiceAnalysisEnabled;
+	}
+
+	public void updateAnalysisSettings(
+			boolean voiceAnalysisEnabled,
+			boolean expressionAnalysisEnabled
+	) {
+		this.voiceAnalysisEnabled = voiceAnalysisEnabled;
+		this.expressionAnalysisEnabled = expressionAnalysisEnabled;
+	}
+
 	public boolean recordConnected(
 			String participantIdentity,
 			String participantSid,

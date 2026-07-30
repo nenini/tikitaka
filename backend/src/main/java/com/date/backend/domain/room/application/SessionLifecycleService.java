@@ -1,18 +1,25 @@
 package com.date.backend.domain.room.application;
 
+import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.dto.request.SessionAnalysisSettingsRequest;
+import com.date.backend.domain.room.dto.response.SessionAnalysisSettingsResponse;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionParticipantStateResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
+import com.date.backend.domain.room.event.AiSessionLiveKitConnection;
+import com.date.backend.domain.room.event.AiSessionStartedEvent;
+import com.date.backend.domain.room.integration.LiveKitAiWorkerTokenIssuer;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.SessionErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +35,9 @@ public class SessionLifecycleService {
 	private final RoomParticipantRepository participantRepository;
 	private final RoomEntryProperties entryProperties;
 	private final LiveKitParticipantTokenIssuer tokenIssuer;
+	private final LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer;
+	private final SessionMissionProvisioningService missionProvisioningService;
+	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public SessionLifecycleService(
@@ -35,12 +45,18 @@ public class SessionLifecycleService {
 			RoomParticipantRepository participantRepository,
 			RoomEntryProperties entryProperties,
 			LiveKitParticipantTokenIssuer tokenIssuer,
+			LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer,
+			SessionMissionProvisioningService missionProvisioningService,
+			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.entryProperties = entryProperties;
 		this.tokenIssuer = tokenIssuer;
+		this.aiWorkerTokenIssuer = aiWorkerTokenIssuer;
+		this.missionProvisioningService = missionProvisioningService;
+		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
 
@@ -110,7 +126,37 @@ public class SessionLifecycleService {
 			);
 		}
 		session.start(now);
+		missionProvisioningService.provision(session, participants, now);
+		var aiWorkerToken = aiWorkerTokenIssuer.issue(
+				session.getId(),
+				session.getLivekitRoomName()
+		);
+		eventPublisher.publishEvent(AiSessionStartedEvent.of(
+				session.getId(),
+				now.atZone(clock.getZone()).toInstant(),
+				AiSessionLiveKitConnection.from(aiWorkerToken),
+				participants
+		));
 		return createStatus(session, participants, now);
+	}
+
+	@Transactional
+	public SessionAnalysisSettingsResponse updateAnalysisSettings(
+			Long userId,
+			Long sessionId,
+			SessionAnalysisSettingsRequest request
+	) {
+		WaitingRoom session = findSessionForUpdate(sessionId);
+		if (session.isInProgress() || session.isEnded()) {
+			throw new BusinessException(SessionErrorCode.SESSION_STATE_CONFLICT);
+		}
+		RoomParticipant participant =
+				findParticipantForUpdate(userId, sessionId);
+		participant.updateAnalysisSettings(
+				request.voiceAnalysisEnabled(),
+				request.expressionAnalysisEnabled()
+		);
+		return SessionAnalysisSettingsResponse.from(sessionId, participant);
 	}
 
 	public SessionStatusResponse getStatus(Long userId, Long sessionId) {
