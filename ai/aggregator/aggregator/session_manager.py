@@ -25,7 +25,7 @@ from aggregator.backend_client import (
 )
 from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
-from aggregator.events import AnalysisEvent
+from aggregator.events import AnalysisEvent, SilenceDetected
 from aggregator.livekit_stt import LiveKitSttAdapterFactory
 from aggregator.session_contracts import (
     SessionEventRequest,
@@ -33,8 +33,15 @@ from aggregator.session_contracts import (
 )
 from aggregator.settings import IntegrationSettings
 from aggregator.vision_events import (
+    VisionBehaviorEvent,
     VisionEvent,
     VisionEventBatch,
+)
+from aggregator.vision_backend import (
+    IMPORTANT_VISION_BEHAVIOR_TYPES,
+    BackendVisionClient,
+    BackendVisionDeliveryError,
+    BackendVisionReceipt,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +54,16 @@ class CoachingSender(Protocol):
         self,
         command: CoachingCommand,
     ) -> BackendCoachingReceipt: ...
+
+    async def close(self) -> None: ...
+
+
+class VisionAnalysisSender(Protocol):
+    async def send(
+        self,
+        event: VisionBehaviorEvent,
+        participant_identity: str,
+    ) -> BackendVisionReceipt: ...
 
     async def close(self) -> None: ...
 
@@ -67,6 +84,7 @@ class SessionRuntime:
         event: SessionEventRequest,
         settings: IntegrationSettings,
         sender: CoachingSender,
+        vision_sender: VisionAnalysisSender,
         audio_adapter_factory: SessionAudioAdapterFactory,
         *,
         now: Callable[[], datetime],
@@ -88,30 +106,44 @@ class SessionRuntime:
         self.features = event.features
         self._settings = settings
         self._sender = sender
+        self._vision_sender = vision_sender
         self._audio_adapter: SessionAudioAdapter | None = None
         self._now = now
         self._commands: asyncio.Queue[CoachingCommand] = asyncio.Queue(
             maxsize=100
         )
+        self._vision_events: asyncio.Queue[
+            tuple[VisionBehaviorEvent, str]
+        ] = asyncio.Queue(maxsize=200)
         self._lock = asyncio.Lock()
         self._tick_task: asyncio.Task[None] | None = None
         self._delivery_task: asyncio.Task[None] | None = None
+        self._vision_delivery_task: asyncio.Task[None] | None = None
         self.aggregator = SessionAggregator(
             event.session_id,
             on_analysis=self._on_analysis,
             on_coaching=self._on_coaching,
             participant_user_ids=list(self.participants),
         )
-        if (
+        stt_enabled = (
             event.features is None
             or event.features.stt_enabled
         ) and any(
             participant.stt_enabled
             for participant in self.participants.values()
-        ):
+        )
+        vision_enabled = (
+            event.features is None
+            or event.features.vision_enabled
+        ) and any(
+            participant.vision_enabled
+            for participant in self.participants.values()
+        )
+        if stt_enabled or vision_enabled:
             self._audio_adapter = audio_adapter_factory.create(
                 event,
                 self.push_stt_event,
+                self.push_vision_batch,
                 self.elapsed_ms,
             )
 
@@ -124,19 +156,40 @@ class SessionRuntime:
             self._delivery_loop(),
             name=f"aggregator-delivery-{self.session_id}",
         )
+        self._vision_delivery_task = asyncio.create_task(
+            self._vision_delivery_loop(),
+            name=f"vision-delivery-{self.session_id}",
+        )
         if self._audio_adapter is not None:
             self._audio_adapter.start()
 
     def _on_analysis(self, event: AnalysisEvent) -> None:
-        logger.debug(
-            "analysis event session=%s type=%s",
-            event.session_id,
-            event.event_type,
-        )
+        if isinstance(event, SilenceDetected):
+            logger.info(
+                "silence detected session=%s elapsedMs=%d durationSec=%.1f",
+                event.session_id,
+                event.session_elapsed_ms,
+                event.payload.silence_sec,
+            )
+        else:
+            logger.debug(
+                "analysis event session=%s type=%s",
+                event.session_id,
+                event.event_type,
+            )
 
     def _on_coaching(self, command: CoachingCommand) -> None:
         if self.features is not None and not self.features.coaching_enabled:
             return
+        logger.info(
+            "coaching requested session=%s target=%s type=%s "
+            "messageKey=%s reason=%s",
+            command.session_id,
+            command.target_user_id,
+            command.coaching_type,
+            command.message_key,
+            command.reason_code,
+        )
         try:
             self._commands.put_nowait(command)
         except asyncio.QueueFull:
@@ -174,10 +227,39 @@ class SessionRuntime:
         batch: VisionEventBatch | Mapping[str, object],
     ) -> VisionBatchIngestionResult:
         async with self._lock:
-            return self.aggregator.push_vision_batch(batch)
+            parsed = (
+                batch
+                if isinstance(batch, VisionEventBatch)
+                else VisionEventBatch.model_validate(batch)
+            )
+            result = self.aggregator.push_vision_batch(parsed)
+            accepted = set(result.accepted_event_ids)
+            for event in parsed.behavior_events:
+                if (
+                    event.event_id not in accepted
+                    or event.event_type
+                    not in IMPORTANT_VISION_BEHAVIOR_TYPES
+                ):
+                    continue
+                participant = self.participants.get(event.user_id)
+                if participant is None or not participant.vision_enabled:
+                    continue
+                try:
+                    self._vision_events.put_nowait(
+                        (event, participant.participant_identity)
+                    )
+                except asyncio.QueueFull:
+                    logger.error(
+                        "vision delivery queue full; dropped eventId=%s",
+                        event.event_id,
+                    )
+            return result
 
     async def wait_until_delivered(self) -> None:
-        await self._commands.join()
+        await asyncio.gather(
+            self._commands.join(),
+            self._vision_events.join(),
+        )
 
     async def stop(self) -> None:
         if self._audio_adapter is not None:
@@ -188,7 +270,10 @@ class SessionRuntime:
             await asyncio.gather(self._tick_task, return_exceptions=True)
         try:
             await asyncio.wait_for(
-                self._commands.join(),
+                asyncio.gather(
+                    self._commands.join(),
+                    self._vision_events.join(),
+                ),
                 timeout=self._settings.shutdown_flush_timeout_seconds,
             )
         except TimeoutError:
@@ -201,6 +286,12 @@ class SessionRuntime:
             self._delivery_task.cancel()
             await asyncio.gather(
                 self._delivery_task,
+                return_exceptions=True,
+            )
+        if self._vision_delivery_task is not None:
+            self._vision_delivery_task.cancel()
+            await asyncio.gather(
+                self._vision_delivery_task,
                 return_exceptions=True,
             )
 
@@ -240,6 +331,35 @@ class SessionRuntime:
             finally:
                 self._commands.task_done()
 
+    async def _vision_delivery_loop(self) -> None:
+        while True:
+            event, participant_identity = await self._vision_events.get()
+            try:
+                receipt = await self._vision_sender.send(
+                    event,
+                    participant_identity,
+                )
+                logger.info(
+                    "vision receipt eventId=%s type=%s status=%s",
+                    receipt.event_id,
+                    event.event_type,
+                    receipt.status,
+                )
+            except BackendVisionDeliveryError:
+                logger.exception(
+                    "vision delivery failed eventId=%s type=%s",
+                    event.event_id,
+                    event.event_type,
+                )
+            except Exception:
+                logger.exception(
+                    "unexpected vision worker error eventId=%s type=%s",
+                    event.event_id,
+                    event.event_type,
+                )
+            finally:
+                self._vision_events.task_done()
+
 
 class SessionManager:
     """Validate lifecycle events and keep the active runtime registry."""
@@ -249,11 +369,13 @@ class SessionManager:
         settings: IntegrationSettings,
         *,
         sender: CoachingSender | None = None,
+        vision_sender: VisionAnalysisSender | None = None,
         audio_adapter_factory: SessionAudioAdapterFactory | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.settings = settings
         self._sender = sender or BackendCoachingClient(settings)
+        self._vision_sender = vision_sender or BackendVisionClient(settings)
         self._audio_adapter_factory = (
             audio_adapter_factory or LiveKitSttAdapterFactory(settings)
         )
@@ -360,6 +482,7 @@ class SessionManager:
             event,
             self.settings,
             self._sender,
+            self._vision_sender,
             self._audio_adapter_factory,
             now=self._now,
         )
@@ -401,4 +524,5 @@ class SessionManager:
             return_exceptions=True,
         )
         await self._sender.close()
+        await self._vision_sender.close()
         await self._audio_adapter_factory.close()

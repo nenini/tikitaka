@@ -18,7 +18,9 @@ from aggregator.audio_adapter import (
     ElapsedMs,
     SessionAudioAdapter,
     SttEventSink,
+    VisionBatchSink,
 )
+from aggregator.livekit_vision import LiveKitVisionAdapter
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.settings import IntegrationSettings
 
@@ -62,6 +64,7 @@ class LiveKitSttAdapterFactory:
         self,
         event: SessionEventRequest,
         sink: SttEventSink,
+        vision_sink: VisionBatchSink,
         elapsed_ms: ElapsedMs,
     ) -> SessionAudioAdapter:
         if self._engine is None:
@@ -71,6 +74,7 @@ class LiveKitSttAdapterFactory:
             engine=self._engine,
             settings=self._settings,
             sink=sink,
+            vision_sink=vision_sink,
             elapsed_ms=elapsed_ms,
         )
 
@@ -88,6 +92,7 @@ class LiveKitSttAdapter:
         engine: SttEngine,
         settings: IntegrationSettings,
         sink: SttEventSink,
+        vision_sink: VisionBatchSink,
         elapsed_ms: ElapsedMs,
     ) -> None:
         if event.live_kit is None:
@@ -97,6 +102,10 @@ class LiveKitSttAdapter:
         self._sink = sink
         self._elapsed_ms = elapsed_ms
         self._room = rtc.Room()
+        self._vision_adapter = LiveKitVisionAdapter(
+            event=event,
+            sink=vision_sink,
+        )
         self._runner = SessionSttRunner(
             engine,
             session_id=event.session_id,
@@ -113,11 +122,13 @@ class LiveKitSttAdapter:
             participant.participant_identity: participant
             for participant in event.participants or []
             if participant.stt_enabled
+            and (event.features is None or event.features.stt_enabled)
         }
         self._track_tasks: dict[str, asyncio.Task[None]] = {}
         self._main_task: asyncio.Task[None] | None = None
         self._stopping = asyncio.Event()
         self._connected = asyncio.Event()
+        self._vision_adapter.register(self._room)
         self._register_room_handlers()
 
     def start(self) -> None:
@@ -146,6 +157,7 @@ class LiveKitSttAdapter:
         final_events = await asyncio.to_thread(self._runner.close)
         await self._forward(final_events)
         await self._forward(self._runner.poll_transcripts())
+        await self._vision_adapter.close()
 
     def _register_room_handlers(self) -> None:
         @self._room.on("track_subscribed")
@@ -208,10 +220,12 @@ class LiveKitSttAdapter:
                             participant,
                         )
             logger.info(
-                "LiveKit STT connected session=%s room=%s participants=%d",
+                "LiveKit session connected session=%s room=%s "
+                "sttParticipants=%d visionEnabled=%s",
                 self._event.session_id,
                 self._connection.room_name,
                 len(self._participants),
+                self._vision_adapter.enabled,
             )
             poll_task = asyncio.create_task(
                 self._poll_transcripts(),
@@ -273,6 +287,13 @@ class LiveKitSttAdapter:
                 f"{session_participant.user_id}"
             ),
         )
+        logger.info(
+            "audio track subscribed session=%s user=%s identity=%s track=%s",
+            self._event.session_id,
+            session_participant.user_id,
+            participant.identity,
+            publication.sid,
+        )
 
     async def _consume_audio(
         self,
@@ -322,6 +343,13 @@ class LiveKitSttAdapter:
 
     async def _forward(self, events: Sequence[SttEvent]) -> None:
         for event in events:
+            logger.info(
+                "STT event session=%s user=%s type=%s elapsedMs=%d",
+                event.session_id,
+                event.user_id,
+                event.event_type,
+                event.session_elapsed_ms,
+            )
             accepted = await self._sink(event)
             if not accepted:
                 logger.warning(

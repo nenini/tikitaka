@@ -12,8 +12,10 @@ from typing import Protocol
 from stt.events import SttEvent
 
 from aggregator.session_contracts import SessionEventRequest
+from aggregator.vision_events import VisionEventBatch
 
 SttEventSink = Callable[[SttEvent], Awaitable[bool]]
+VisionBatchSink = Callable[[VisionEventBatch], Awaitable[object]]
 ElapsedMs = Callable[[], int]
 
 
@@ -30,6 +32,7 @@ class SessionAudioAdapterFactory(Protocol):
         self,
         event: SessionEventRequest,
         sink: SttEventSink,
+        vision_sink: VisionBatchSink,
         elapsed_ms: ElapsedMs,
     ) -> SessionAudioAdapter: ...
 

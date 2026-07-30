@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from stt.events import SttEvent, TranscriptFinalizedEvent, TranscriptPayload
 
@@ -13,6 +15,15 @@ from aggregator.coaching import CoachingCommand
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.session_manager import SessionManager
 from aggregator.settings import IntegrationSettings
+from aggregator.vision_backend import BackendVisionReceipt
+from aggregator.vision_events import (
+    VisionBehaviorEvent,
+    VisionEventBatch,
+)
+
+_VISION_FIXTURE_DIR = (
+    Path(__file__).parents[2] / "vision-analysis" / "tests" / "fixtures"
+)
 
 
 class FakeSender:
@@ -38,8 +49,10 @@ class FakeAudioAdapter:
     def __init__(
         self,
         sink: Callable[[SttEvent], Awaitable[bool]],
+        vision_sink: Callable[[VisionEventBatch], Awaitable[object]],
     ) -> None:
         self.sink = sink
+        self.vision_sink = vision_sink
         self.started = False
         self.stopped = False
 
@@ -63,12 +76,33 @@ class FakeAudioAdapterFactory:
         self,
         _event: SessionEventRequest,
         sink: Callable[[SttEvent], Awaitable[bool]],
+        vision_sink: Callable[[VisionEventBatch], Awaitable[object]],
         _elapsed_ms: Callable[[], int],
     ) -> FakeAudioAdapter:
         assert self.warmed
-        adapter = FakeAudioAdapter(sink)
+        adapter = FakeAudioAdapter(sink, vision_sink)
         self.adapters.append(adapter)
         return adapter
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class FakeVisionSender:
+    def __init__(self) -> None:
+        self.events: list[tuple[VisionBehaviorEvent, str]] = []
+        self.closed = False
+
+    async def send(
+        self,
+        event: VisionBehaviorEvent,
+        participant_identity: str,
+    ) -> BackendVisionReceipt:
+        self.events.append((event, participant_identity))
+        return BackendVisionReceipt(
+            event_id=str(event.event_id),
+            status="STORED",
+        )
 
     async def close(self) -> None:
         self.closed = True
@@ -269,5 +303,48 @@ def test_livekit_adapter_routes_transcript_into_runtime() -> None:
             == "실제 어댑터 경로입니다."
         )
         await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_livekit_adapter_routes_important_vision_event_to_backend() -> None:
+    async def scenario() -> None:
+        sender = FakeSender()
+        vision_sender = FakeVisionSender()
+        audio_factory = FakeAudioAdapterFactory()
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                tick_interval_seconds=3600,
+            ),
+            sender=sender,
+            vision_sender=vision_sender,
+            audio_adapter_factory=audio_factory,
+        )
+        await manager.startup()
+        await manager.handle(_started())
+
+        with (
+            _VISION_FIXTURE_DIR / "vision-behavior-event.valid.json"
+        ).open(encoding="utf-8") as fixture_file:
+            raw = json.load(fixture_file)
+        raw["sessionId"] = "15"
+        raw["userId"] = "1"
+        batch = VisionEventBatch.model_validate(
+            {
+                "behaviorEvents": [raw],
+                "metricSnapshots": [],
+            }
+        )
+        await audio_factory.adapters[0].vision_sink(batch)
+        await manager.runtime("15").wait_until_delivered()
+
+        assert len(vision_sender.events) == 1
+        stored_event, identity = vision_sender.events[0]
+        assert stored_event.event_type == "GAZE_AWAY_STARTED"
+        assert identity == "user-1"
+        await manager.close()
+        assert vision_sender.closed
 
     asyncio.run(scenario())

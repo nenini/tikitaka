@@ -46,6 +46,7 @@ class FakeAudioAdapterFactory:
         self,
         _event: SessionEventRequest,
         _sink: Callable[[SttEvent], Awaitable[bool]],
+        _vision_sink: object,
         _elapsed_ms: Callable[[], int],
     ) -> SessionAudioAdapter:
         return FakeAudioAdapter()
