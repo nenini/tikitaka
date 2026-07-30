@@ -14,13 +14,14 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // 개발 중 백엔드 REST/WS 프록시 (BE 주소 확정되면 target 조정)
+      // 개발 중 백엔드 REST/WS 프록시.
+      // 로컬 `npm run dev` 는 localhost:8080, docker compose 는 VITE_PROXY_TARGET=http://backend:8080 로 주입한다.
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8080',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:8080',
         changeOrigin: true,
         ws: true,
       },

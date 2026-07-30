@@ -19,16 +19,17 @@
 
 ## 🔗 관련 이슈
 <!--
-관련 이슈 번호를 작성해 주세요.
+Jira 이슈 키와 GitLab 이슈 번호를 함께 남겨 주세요. (CONVENTIONS.md)
 
-- MR 병합 시 이슈를 자동으로 종료하려면: Closes #12
-- 이슈를 종료하지 않고 연결만 하려면: Related to #12
+- Jira 연동:            Jira: S15P11A307-000
+- MR 병합 시 자동 종료:  Closes #12
+- 연결만 하려면:         Related to #12
 
-둘 중 하나만 남기고 사용하지 않는 문장은 삭제해 주세요.
+Closes / Related to 중 하나만 남기고 나머지는 삭제해 주세요.
 -->
 
+- Jira: S15P11A307-000
 - Closes #이슈번호
-- Related to #이슈번호
 
 ## 📌 개요
 <!-- MR 내용을 간단히 요약해 주세요. -->

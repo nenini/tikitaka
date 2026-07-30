@@ -9,7 +9,8 @@ import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
-import { MyPage, ConsentManagePage } from '@/features/account/MyPage'
+import { MyPage } from '@/features/account/MyPage'
+import { ConsentManagePage } from '@/features/account/ConsentManagePage'
 import {
   AccountEditPage,
   FaceRecapturePage,
