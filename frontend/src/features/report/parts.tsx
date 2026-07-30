@@ -72,7 +72,6 @@ export function TemperatureCard({ temp, className }: { temp: TemperatureDelta; c
               style={{ left: `${scalePct(lo)}%`, width: `${scalePct(hi) - scalePct(lo)}%` }}
             />
           )}
-          <span className="bt-temp-card__thumb" style={{ left: `${scalePct(temp.after)}%` }} />
         </div>
         <div className="bt-temp-card__ticks bt-numeric">
           <span>0°</span>
