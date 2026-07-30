@@ -27,7 +27,7 @@ def test_silence_makes_coaching() -> None:
     assert command.coaching_type == "SILENCE_RECOVERY"
     assert command.message_key == "SILENCE_RECOVERY_01"
     assert command.event_type == "COACHING_REQUESTED"
-    assert command.expires_at_session_elapsed_ms == 12000 + 5000
+    assert command.expires_at_session_elapsed_ms == 12_000 + 15_000
     assert command.version == 2
     assert command.target_user_id is None
 

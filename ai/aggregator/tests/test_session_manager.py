@@ -215,7 +215,7 @@ def test_ten_second_silence_delivers_one_coaching_per_user() -> None:
         assert all(
             command.expires_at_session_elapsed_ms
             - command.triggered_at_session_elapsed_ms
-            == 5000
+            == 15_000
             for command in silence
         )
         await manager.close()
