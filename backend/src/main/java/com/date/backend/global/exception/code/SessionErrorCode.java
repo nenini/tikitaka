@@ -54,6 +54,11 @@ public enum SessionErrorCode implements ErrorCode {
 			"LIVEKIT_WEBHOOK_NOT_CONFIGURED",
 			"LiveKit Webhook 인증 설정이 필요합니다."
 	),
+	SESSION_LIVEKIT_ROOM_NOT_CONFIGURED(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"SESSION_LIVEKIT_ROOM_NOT_CONFIGURED",
+			"세션의 LiveKit Room 정보가 준비되지 않았습니다."
+	),
 	SESSION_CONNECTION_CONFLICT(
 			HttpStatus.CONFLICT,
 			"SESSION_CONNECTION_CONFLICT",

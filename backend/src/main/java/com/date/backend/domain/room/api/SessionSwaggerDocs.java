@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 
 @Tag(name = "Session", description = "화상 세션 생명주기 API")
@@ -168,6 +169,6 @@ public interface SessionSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "화상 세션 ID", example = "15")
 			@Positive Long sessionId,
-			SessionTerminateRequest request
+			@Valid SessionTerminateRequest request
 	);
 }

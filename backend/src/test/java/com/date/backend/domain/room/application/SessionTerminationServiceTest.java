@@ -3,7 +3,7 @@ package com.date.backend.domain.room.application;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
-import com.date.backend.domain.room.integration.LiveKitRoomManager;
+import com.date.backend.domain.room.event.LiveKitRoomDeletionRequestedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -21,7 +21,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,7 +32,6 @@ class SessionTerminationServiceTest {
 
 	private WaitingRoomRepository sessionRepository;
 	private RoomParticipantRepository participantRepository;
-	private LiveKitRoomManager liveKitRoomManager;
 	private ApplicationEventPublisher eventPublisher;
 	private WaitingRoom session;
 	private SessionTerminationService service;
@@ -42,7 +40,6 @@ class SessionTerminationServiceTest {
 	void setUp() {
 		sessionRepository = mock(WaitingRoomRepository.class);
 		participantRepository = mock(RoomParticipantRepository.class);
-		liveKitRoomManager = mock(LiveKitRoomManager.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
 		session = mock(WaitingRoom.class);
 		when(sessionRepository.findWithMatchPairByIdForUpdate(15L))
@@ -55,7 +52,6 @@ class SessionTerminationServiceTest {
 		service = new SessionTerminationService(
 				sessionRepository,
 				participantRepository,
-				liveKitRoomManager,
 				eventPublisher,
 				Clock.fixed(
 						Instant.parse("2026-07-29T13:30:00Z"),
@@ -75,8 +71,9 @@ class SessionTerminationServiceTest {
 				SessionTerminationReason.TIME_EXPIRED,
 				null
 		);
-		verify(liveKitRoomManager).deleteRoom("date-room-30");
-		verify(eventPublisher).publishEvent(any(Object.class));
+		verify(eventPublisher).publishEvent(
+				new LiveKitRoomDeletionRequestedEvent(15L, "date-room-30")
+		);
 	}
 
 	@Test
@@ -94,7 +91,9 @@ class SessionTerminationServiceTest {
 				SessionTerminationReason.RECONNECT_TIMEOUT,
 				null
 		);
-		verify(liveKitRoomManager).deleteRoom("date-room-30");
+		verify(eventPublisher).publishEvent(
+				new LiveKitRoomDeletionRequestedEvent(15L, "date-room-30")
+		);
 	}
 
 	@Test
@@ -108,7 +107,6 @@ class SessionTerminationServiceTest {
 
 		assertThat(service.completeByTimer(15L, ENDED_AT)).isFalse();
 
-		verify(liveKitRoomManager, never()).deleteRoom(any());
 		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 
@@ -150,6 +148,34 @@ class SessionTerminationServiceTest {
 	}
 
 	@Test
+	void terminationTimestampUsesDatabaseSecondPrecision() {
+		Clock subSecondClock = Clock.fixed(
+				Instant.parse("2026-07-29T13:30:00.987654321Z"),
+				ZoneId.of("Asia/Seoul")
+		);
+		service = new SessionTerminationService(
+				sessionRepository,
+				participantRepository,
+				eventPublisher,
+				subSecondClock
+		);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.CANCELLED);
+
+		var response = service.terminate(
+				101L,
+				15L,
+				SessionTerminationReason.USER_REQUEST
+		);
+
+		assertThat(response.endedAt().getNano()).isZero();
+		verify(session).terminate(
+				LocalDateTime.of(2026, 7, 29, 22, 30),
+				SessionTerminationReason.USER_REQUEST,
+				101L
+		);
+	}
+
+	@Test
 	void repeatedParticipantTerminationReturnsOriginalResult() {
 		when(session.isEnded()).thenReturn(true);
 		when(session.getStatus()).thenReturn(RoomSessionStatus.CANCELLED);
@@ -169,7 +195,6 @@ class SessionTerminationServiceTest {
 				.isEqualTo(SessionTerminationReason.USER_REQUEST);
 		assertThat(response.endedByUserId()).isEqualTo(102L);
 		assertThat(response.endedAt()).isEqualTo(ENDED_AT.minusMinutes(1));
-		verify(liveKitRoomManager, never()).deleteRoom(any());
 		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 
@@ -188,7 +213,7 @@ class SessionTerminationServiceTest {
 				)
 		);
 
-		verify(liveKitRoomManager, never()).deleteRoom(any());
+		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 
 	@Test
@@ -206,16 +231,4 @@ class SessionTerminationServiceTest {
 		);
 	}
 
-	@Test
-	void liveKitDeletionFailureStopsTerminationEventPublication() {
-		when(session.getStatus()).thenReturn(RoomSessionStatus.COMPLETED);
-		doThrow(new IllegalStateException("LiveKit unavailable"))
-				.when(liveKitRoomManager)
-				.deleteRoom("date-room-30");
-
-		assertThatThrownBy(() -> service.completeByTimer(15L, ENDED_AT))
-				.isInstanceOf(IllegalStateException.class);
-
-		verify(eventPublisher, never()).publishEvent(any(Object.class));
-	}
 }

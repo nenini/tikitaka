@@ -4,7 +4,7 @@ import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.dto.response.SessionEndedResponse;
 import com.date.backend.domain.room.event.SessionEndedEvent;
-import com.date.backend.domain.room.integration.LiveKitRoomManager;
+import com.date.backend.domain.room.event.LiveKitRoomDeletionRequestedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -20,20 +20,17 @@ import java.time.LocalDateTime;
 public class SessionTerminationService {
 	private final WaitingRoomRepository sessionRepository;
 	private final RoomParticipantRepository participantRepository;
-	private final LiveKitRoomManager liveKitRoomManager;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public SessionTerminationService(
 			WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
-			LiveKitRoomManager liveKitRoomManager,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
-		this.liveKitRoomManager = liveKitRoomManager;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
@@ -105,6 +102,7 @@ public class SessionTerminationService {
 			Long endedByUserId,
 			LocalDateTime endedAt
 	) {
+		LocalDateTime persistedEndedAt = endedAt.withNano(0);
 		WaitingRoom session = sessionRepository
 				.findWithMatchPairByIdForUpdate(sessionId)
 				.orElseThrow(() -> new BusinessException(
@@ -120,22 +118,27 @@ public class SessionTerminationService {
 		}
 
 		if (reason == SessionTerminationReason.TIME_EXPIRED) {
-			session.complete(endedAt, reason, endedByUserId);
+			session.complete(persistedEndedAt, reason, endedByUserId);
 		} else if (reason == SessionTerminationReason.NORMAL_COMPLETION) {
-			session.complete(endedAt, reason, endedByUserId);
+			session.complete(persistedEndedAt, reason, endedByUserId);
 		} else {
-			session.terminate(endedAt, reason, endedByUserId);
+			session.terminate(persistedEndedAt, reason, endedByUserId);
 		}
-		liveKitRoomManager.deleteRoom(session.getLivekitRoomName());
 		SessionEndedResponse response = new SessionEndedResponse(
 				SessionEndedResponse.SESSION_ENDED,
 				session.getId(),
 				session.getStatus(),
 				reason,
 				endedByUserId,
-				endedAt
+				persistedEndedAt
 		);
 		eventPublisher.publishEvent(new SessionEndedEvent(response));
+		eventPublisher.publishEvent(
+				new LiveKitRoomDeletionRequestedEvent(
+						session.getId(),
+						session.getLivekitRoomName()
+				)
+		);
 		return new EndResult(true, response);
 	}
 

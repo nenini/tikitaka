@@ -10,8 +10,10 @@ import com.date.backend.domain.room.dto.response.SessionDetailResponse;
 import com.date.backend.domain.room.dto.response.SessionEndedResponse;
 import com.date.backend.domain.user.domain.UserRole;
 import com.date.backend.global.security.AuthUser;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,6 +23,34 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SessionControllerTest {
+
+	@Test
+	void controllerMethodConstraintsMatchSwaggerInterface() throws Exception {
+		SessionController controller = new SessionController(
+				mock(SessionQueryService.class),
+				mock(SessionLifecycleService.class),
+				mock(SessionTerminationService.class)
+		);
+		AuthUser authUser =
+				new AuthUser(101L, "session@example.com", UserRole.USER);
+		Method joinMethod = SessionController.class.getMethod(
+				"join",
+				AuthUser.class,
+				Long.class
+		);
+
+		try (var factory = Validation.buildDefaultValidatorFactory()) {
+			var violations = factory.getValidator()
+					.forExecutables()
+					.validateParameters(
+							controller,
+							joinMethod,
+							new Object[]{authUser, 15L}
+					);
+
+			assertThat(violations).isEmpty();
+		}
+	}
 
 	@Test
 	void delegatesAuthenticatedParticipantAndSessionId() {

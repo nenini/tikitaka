@@ -10,7 +10,6 @@ import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
-import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -98,7 +97,7 @@ public class SessionController implements SessionSwaggerDocs {
 	public ApiResponse<SessionEndedResponse> terminate(
 			@AuthenticationPrincipal AuthUser authUser,
 			@PathVariable Long sessionId,
-			@Valid @RequestBody SessionTerminateRequest request
+			@RequestBody SessionTerminateRequest request
 	) {
 		return ApiResponse.success(
 				terminationService.terminate(
