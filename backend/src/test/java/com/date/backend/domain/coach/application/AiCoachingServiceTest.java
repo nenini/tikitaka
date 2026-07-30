@@ -131,7 +131,7 @@ class AiCoachingServiceTest {
 	) {
 		return new AiCoachingRequest(
 				"COACHING_REQUESTED",
-				2,
+				1,
 				eventId,
 				OffsetDateTime.parse("2026-07-30T01:00:04Z"),
 				"aggregator",

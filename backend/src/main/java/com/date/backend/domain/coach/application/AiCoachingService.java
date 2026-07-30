@@ -25,7 +25,7 @@ import java.time.ZoneId;
 @Service
 public class AiCoachingService {
 	private static final String REQUEST_EVENT_TYPE = "COACHING_REQUESTED";
-	private static final int CONTRACT_VERSION = 2;
+	private static final int CONTRACT_VERSION = 1;
 
 	private final WaitingRoomRepository sessionRepository;
 	private final RoomParticipantRepository participantRepository;
