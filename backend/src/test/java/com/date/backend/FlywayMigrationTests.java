@@ -80,6 +80,10 @@ class FlywayMigrationTests {
 				"SESSIONS",
 				"TIMER_EXPIRED_NOTIFIED_AT"
 		);
+		Integer sessionEndedByUserColumnCount = columnCount(
+				"SESSIONS",
+				"ENDEDBYUSERID"
+		);
 		Integer liveKitWebhookEventTableCount =
 				tableCount("LIVEKIT_WEBHOOK_EVENTS");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
@@ -182,7 +186,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(26);
+		assertThat(migrationCount).isEqualTo(27);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -211,6 +215,7 @@ class FlywayMigrationTests {
 		assertThat(participantNetworkQualityColumnCount).isEqualTo(1);
 		assertThat(sessionEndingSoonColumnCount).isEqualTo(1);
 		assertThat(sessionTimerExpiredColumnCount).isEqualTo(1);
+		assertThat(sessionEndedByUserColumnCount).isEqualTo(1);
 		assertThat(liveKitWebhookEventTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);

@@ -1,6 +1,8 @@
 package com.date.backend.domain.room.api;
 
+import com.date.backend.domain.room.dto.request.SessionTerminateRequest;
 import com.date.backend.domain.room.dto.response.SessionDetailResponse;
+import com.date.backend.domain.room.dto.response.SessionEndedResponse;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
 import com.date.backend.global.api.ApiResponse;
@@ -96,5 +98,76 @@ public interface SessionSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "화상 세션 ID", example = "15")
 			@Positive Long sessionId
+	);
+
+	@Operation(
+			summary = "세션 정상 종료",
+			description = """
+					진행 중인 화상 세션을 정상 완료 처리합니다.
+					종료 시각과 종료 요청 사용자를 저장하고 LiveKit Room을 종료합니다.
+					이미 종료된 세션에 대한 반복 요청은 기존 종료 결과를 반환합니다.
+					"""
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "정상 종료 성공 또는 기존 종료 결과 반환"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "403",
+					description = "세션 참여자가 아님"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "404",
+					description = "세션을 찾을 수 없음"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "409",
+					description = "진행 중인 세션이 아님"
+			)
+	})
+	ApiResponse<SessionEndedResponse> complete(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "화상 세션 ID", example = "15")
+			@Positive Long sessionId
+	);
+
+	@Operation(
+			summary = "세션 조기 종료",
+			description = """
+					진행 중인 화상 세션을 조기 종료합니다.
+					종료 사유는 USER_REQUEST, SAFETY_CONCERN,
+					TECHNICAL_ISSUE, OTHER 중 하나를 전달합니다.
+					종료 시각·종료 요청 사용자·사유를 저장하고 LiveKit Room을 종료합니다.
+					이미 종료된 세션에 대한 반복 요청은 기존 종료 결과를 반환합니다.
+					"""
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "조기 종료 성공 또는 기존 종료 결과 반환"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "400",
+					description = "잘못된 종료 사유"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "403",
+					description = "세션 참여자가 아님"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "404",
+					description = "세션을 찾을 수 없음"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "409",
+					description = "진행 중인 세션이 아님"
+			)
+	})
+	ApiResponse<SessionEndedResponse> terminate(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "화상 세션 ID", example = "15")
+			@Positive Long sessionId,
+			SessionTerminateRequest request
 	);
 }

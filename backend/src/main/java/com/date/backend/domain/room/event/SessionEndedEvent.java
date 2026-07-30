@@ -13,6 +13,7 @@ public record SessionEndedEvent(
 			Long sessionId,
 			RoomSessionStatus status,
 			SessionTerminationReason reason,
+			Long endedByUserId,
 			LocalDateTime endedAt
 	) {
 		return new SessionEndedEvent(
@@ -21,6 +22,7 @@ public record SessionEndedEvent(
 						sessionId,
 						status,
 						reason,
+						endedByUserId,
 						endedAt
 				)
 		);

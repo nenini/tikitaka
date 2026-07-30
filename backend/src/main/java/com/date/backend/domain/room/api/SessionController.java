@@ -2,17 +2,22 @@ package com.date.backend.domain.room.api;
 
 import com.date.backend.domain.room.application.SessionQueryService;
 import com.date.backend.domain.room.application.SessionLifecycleService;
+import com.date.backend.domain.room.application.SessionTerminationService;
+import com.date.backend.domain.room.dto.request.SessionTerminateRequest;
+import com.date.backend.domain.room.dto.response.SessionEndedResponse;
 import com.date.backend.domain.room.dto.response.SessionDetailResponse;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
+import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,13 +26,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController implements SessionSwaggerDocs {
 	private final SessionQueryService sessionQueryService;
 	private final SessionLifecycleService lifecycleService;
+	private final SessionTerminationService terminationService;
 
 	public SessionController(
 			SessionQueryService sessionQueryService,
-			SessionLifecycleService lifecycleService
+			SessionLifecycleService lifecycleService,
+			SessionTerminationService terminationService
 	) {
 		this.sessionQueryService = sessionQueryService;
 		this.lifecycleService = lifecycleService;
+		this.terminationService = terminationService;
 	}
 
 	@GetMapping("/{sessionId}")
@@ -71,6 +79,33 @@ public class SessionController implements SessionSwaggerDocs {
 	) {
 		return ApiResponse.success(
 				lifecycleService.getStatus(authUser.userId(), sessionId)
+		);
+	}
+
+	@PostMapping("/{sessionId}/complete")
+	@Override
+	public ApiResponse<SessionEndedResponse> complete(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long sessionId
+	) {
+		return ApiResponse.success(
+				terminationService.complete(authUser.userId(), sessionId)
+		);
+	}
+
+	@PostMapping("/{sessionId}/terminate")
+	@Override
+	public ApiResponse<SessionEndedResponse> terminate(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long sessionId,
+			@Valid @RequestBody SessionTerminateRequest request
+	) {
+		return ApiResponse.success(
+				terminationService.terminate(
+						authUser.userId(),
+						sessionId,
+						request.reason().toDomain()
+				)
 		);
 	}
 }

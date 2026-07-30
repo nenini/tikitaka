@@ -23,6 +23,7 @@ class SessionEndedEventListenerTest {
 				15L,
 				RoomSessionStatus.CANCELLED,
 				SessionTerminationReason.RECONNECT_TIMEOUT,
+				null,
 				LocalDateTime.of(2026, 7, 29, 22, 3)
 		);
 

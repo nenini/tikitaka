@@ -56,6 +56,9 @@ public class WaitingRoom {
 	@Column(name = "terminationReason", length = 500)
 	private String terminationReason;
 
+	@Column(name = "endedByUserId")
+	private Long endedByUserId;
+
 	@Column(name = "livekitRoomName", unique = true, length = 255)
 	private String livekitRoomName;
 
@@ -136,6 +139,10 @@ public class WaitingRoom {
 
 	public String getTerminationReason() {
 		return terminationReason;
+	}
+
+	public Long getEndedByUserId() {
+		return endedByUserId;
 	}
 
 	public String getLivekitRoomName() {
@@ -234,30 +241,35 @@ public class WaitingRoom {
 
 	public void complete(
 			LocalDateTime endedAt,
-			SessionTerminationReason reason
+			SessionTerminationReason reason,
+			Long endedByUserId
 	) {
 		end(
 				RoomSessionStatus.COMPLETED,
 				endedAt,
-				reason
+				reason,
+				endedByUserId
 		);
 	}
 
 	public void terminate(
 			LocalDateTime endedAt,
-			SessionTerminationReason reason
+			SessionTerminationReason reason,
+			Long endedByUserId
 	) {
 		end(
 				RoomSessionStatus.CANCELLED,
 				endedAt,
-				reason
+				reason,
+				endedByUserId
 		);
 	}
 
 	private void end(
 			RoomSessionStatus endStatus,
 			LocalDateTime endedAt,
-			SessionTerminationReason reason
+			SessionTerminationReason reason,
+			Long endedByUserId
 	) {
 		if (!isInProgress()) {
 			throw new IllegalStateException(
@@ -267,5 +279,6 @@ public class WaitingRoom {
 		this.status = Objects.requireNonNull(endStatus);
 		this.actualEndAt = Objects.requireNonNull(endedAt);
 		this.terminationReason = Objects.requireNonNull(reason).name();
+		this.endedByUserId = endedByUserId;
 	}
 }

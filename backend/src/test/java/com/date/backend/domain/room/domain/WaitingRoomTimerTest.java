@@ -72,7 +72,8 @@ class WaitingRoomTimerTest {
 
 		session.complete(
 				endedAt,
-				SessionTerminationReason.TIME_EXPIRED
+				SessionTerminationReason.TIME_EXPIRED,
+				null
 		);
 
 		assertThat(session.getStatus())
@@ -87,7 +88,8 @@ class WaitingRoomTimerTest {
 
 		session.terminate(
 				endedAt,
-				SessionTerminationReason.RECONNECT_TIMEOUT
+				SessionTerminationReason.RECONNECT_TIMEOUT,
+				null
 		);
 
 		assertThat(session.getStatus())
