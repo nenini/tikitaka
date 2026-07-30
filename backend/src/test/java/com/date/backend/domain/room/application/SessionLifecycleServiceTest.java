@@ -121,22 +121,33 @@ class SessionLifecycleServiceTest {
 
 	@Test
 	void participantJoinsWithinAllowedTimeAndReceivesLiveKitToken() {
-		when(session.getStatus()).thenReturn(RoomSessionStatus.CREATED);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 		when(participantA.recordJoin(NOW)).thenReturn(true);
 		when(participantA.getJoinedAt()).thenReturn(NOW);
 
 		var response = service.join(USER_A_ID, SESSION_ID);
 
-		verify(session).markWaiting();
 		assertThat(response.alreadyJoined()).isFalse();
 		assertThat(response.liveKitConfigured()).isTrue();
 		assertThat(response.liveKitAccessToken()).isEqualTo("token");
 	}
 
 	@Test
+	void joinBeforeBothParticipantsAreReadyIsRejectedWithoutIssuingToken() {
+		when(session.getStatus()).thenReturn(RoomSessionStatus.WAITING);
+
+		assertThatThrownBy(() -> service.join(USER_A_ID, SESSION_ID))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(
+								SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
+						)
+				);
+	}
+
+	@Test
 	void joinOutsideAllowedTimeIsRejected() {
 		when(session.getScheduledStartAt()).thenReturn(NOW.plusHours(1));
-		when(session.getStatus()).thenReturn(RoomSessionStatus.CREATED);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 
 		assertThatThrownBy(() -> service.join(USER_A_ID, SESSION_ID))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -148,7 +159,7 @@ class SessionLifecycleServiceTest {
 
 	@Test
 	void duplicateJoinKeepsOriginalJoinAndReturnsIdempotentResult() {
-		when(session.getStatus()).thenReturn(RoomSessionStatus.WAITING);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 		when(participantA.isJoined()).thenReturn(true);
 		when(participantA.recordJoin(NOW)).thenReturn(false);
 		when(participantA.getJoinedAt()).thenReturn(NOW.minusMinutes(1));

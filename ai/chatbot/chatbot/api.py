@@ -64,7 +64,11 @@ class ChatStreamRequest(_CamelModel):
 
 
 def get_llm() -> ChatLLM:
-    return OllamaAdapter()
+    # 컨테이너에선 호스트 Ollama를 가리켜야 함(OLLAMA_HOST). 모델도 env로 교체 가능
+    # (GPU 여유에 따라 7.8B ↔ 2.4B 전환 등). 미설정 시 로컬 기본값.
+    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+    model = os.environ.get("OLLAMA_MODEL", "exaone3.5:7.8b")
+    return OllamaAdapter(model=model, host=host)
 
 
 LLMDep = Annotated[ChatLLM, Depends(get_llm)]

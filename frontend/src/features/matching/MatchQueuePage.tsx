@@ -44,6 +44,7 @@ export function MatchQueuePage() {
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-5 py-6">
+      <h1>페이지 수정중</h1>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 대기 상태 */}
         <Card className="flex flex-1 flex-col items-center gap-5 py-10 text-center">

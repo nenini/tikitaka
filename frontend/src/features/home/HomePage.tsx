@@ -23,9 +23,9 @@ export function HomePage() {
       {/* div + onClick 이 아니라 실제 링크 — 키보드/스크린리더로도 도달·활성화된다 */}
       <div className="grid gap-4 sm:grid-cols-2">
         <CardLink as={Link} to="/matching">
-          <CardHeader title="새 연습 시작 (매칭)" action={<Badge tone="info">F2</Badge>} />
+          <CardHeader title="매칭 트랙 선택" action={<Badge tone="info">F2</Badge>} />
           <p className="bt-body-sm bt-muted">
-            트랙 선택 → 대기 큐 → 매칭 카드로 이어지는 실사용자 매칭 플로우입니다.
+            실사용자, AI 채팅, AI 화상채팅 중 선택
           </p>
         </CardLink>
 

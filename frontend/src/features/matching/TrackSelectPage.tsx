@@ -30,9 +30,9 @@ export function TrackSelectPage() {
   return (
     <main className="mx-auto w-full max-w-[1040px] px-5 py-6">
       <header className="mb-5">
-        <h1 className="bt-h1">(페이지 수정중) 어떤 상대와 연습할까요?</h1>
+        <h1 className="bt-h1">(임시페이지) 어떤 상대와 연습할까요?</h1>
         <p className="bt-body bt-muted mt-1">
-          동시에 진행할 수 있는 매칭은 <b>1개</b>입니다. AI 화상·챗봇은 대기 큐를 유지한 채 이용할 수 있어요.
+          동시에 진행할 수 있는 <b>실사용자 매칭은 1개</b>입니다. AI 화상·챗봇은 대기 큐를 유지한 채 이용할 수 있어요.
         </p>
       </header>
 
@@ -59,17 +59,16 @@ export function TrackSelectPage() {
           }
         />
 
-        {/* AI 화상 — P1 정식 */}
+        {/* AI 화상 */}
         <TrackCard
           emoji="🤖"
-          badge={<Badge tone="warning">P1 · AI 화상</Badge>}
           title="AI 화상 연습"
           subtitle="음성(TTS) 상대 · 내 얼굴만 표시"
           meta={[
             { label: '⏱ 10~15분' },
             { label: '즉시 시작', tone: 'ok' },
             { label: '대화 코칭', tone: 'ok' },
-            { label: '카메라 시 표정 코칭' },
+            { label: '표정 코칭' },
             { label: '상호 평가 없음', tone: 'no' },
             { label: '연락처 없음', tone: 'no' },
           ]}
