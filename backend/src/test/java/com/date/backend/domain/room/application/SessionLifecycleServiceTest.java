@@ -6,6 +6,7 @@ import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.dto.request.SessionAnalysisSettingsRequest;
 import com.date.backend.domain.room.event.AiSessionStartedEvent;
 import com.date.backend.domain.room.integration.LiveKitAiWorkerTokenIssuer;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
@@ -171,6 +172,41 @@ class SessionLifecycleServiceTest {
 								SessionErrorCode.SESSION_NOT_PARTICIPANT
 						)
 				);
+	}
+
+	@Test
+	void participantUpdatesAnalysisSettingsBeforeSessionStarts() {
+		when(session.isInProgress()).thenReturn(false);
+		when(session.isEnded()).thenReturn(false);
+		when(participantA.isVoiceAnalysisEnabled()).thenReturn(true);
+		when(participantA.isExpressionAnalysisEnabled()).thenReturn(true);
+
+		var response = service.updateAnalysisSettings(
+				USER_A_ID,
+				SESSION_ID,
+				new SessionAnalysisSettingsRequest(true, true)
+		);
+
+		verify(participantA).updateAnalysisSettings(true, true);
+		assertThat(response.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(response.userId()).isEqualTo(USER_A_ID);
+		assertThat(response.voiceAnalysisEnabled()).isTrue();
+		assertThat(response.expressionAnalysisEnabled()).isTrue();
+	}
+
+	@Test
+	void analysisSettingsCannotChangeAfterSessionStarts() {
+		when(session.isInProgress()).thenReturn(true);
+
+		assertThatThrownBy(() -> service.updateAnalysisSettings(
+				USER_A_ID,
+				SESSION_ID,
+				new SessionAnalysisSettingsRequest(true, true)
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(
+						SessionErrorCode.SESSION_STATE_CONFLICT
+				)
+		);
 	}
 
 	@Test

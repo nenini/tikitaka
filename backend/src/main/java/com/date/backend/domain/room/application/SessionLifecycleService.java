@@ -6,6 +6,8 @@ import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.dto.request.SessionAnalysisSettingsRequest;
+import com.date.backend.domain.room.dto.response.SessionAnalysisSettingsResponse;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionParticipantStateResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
@@ -136,6 +138,25 @@ public class SessionLifecycleService {
 				participants
 		));
 		return createStatus(session, participants, now);
+	}
+
+	@Transactional
+	public SessionAnalysisSettingsResponse updateAnalysisSettings(
+			Long userId,
+			Long sessionId,
+			SessionAnalysisSettingsRequest request
+	) {
+		WaitingRoom session = findSessionForUpdate(sessionId);
+		if (session.isInProgress() || session.isEnded()) {
+			throw new BusinessException(SessionErrorCode.SESSION_STATE_CONFLICT);
+		}
+		RoomParticipant participant =
+				findParticipantForUpdate(userId, sessionId);
+		participant.updateAnalysisSettings(
+				request.voiceAnalysisEnabled(),
+				request.expressionAnalysisEnabled()
+		);
+		return SessionAnalysisSettingsResponse.from(sessionId, participant);
 	}
 
 	public SessionStatusResponse getStatus(Long userId, Long sessionId) {

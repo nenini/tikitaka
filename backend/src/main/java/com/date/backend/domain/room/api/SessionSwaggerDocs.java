@@ -1,5 +1,7 @@
 package com.date.backend.domain.room.api;
 
+import com.date.backend.domain.room.dto.request.SessionAnalysisSettingsRequest;
+import com.date.backend.domain.room.dto.response.SessionAnalysisSettingsResponse;
 import com.date.backend.domain.room.dto.response.SessionDetailResponse;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
@@ -83,6 +85,45 @@ public interface SessionSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "화상 세션 ID", example = "15")
 			@Positive Long sessionId
+	);
+
+	@Operation(
+			summary = "세션 분석 설정 수정",
+			description = """
+					로그인한 세션 참가자의 음성 및 표정 분석 사용 여부를 설정합니다.
+					설정값은 세션 시작 시 AI 서버에 전달되며 세션 시작 이후에는 수정할 수 없습니다.
+					"""
+	)
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "200",
+					description = "분석 설정 수정 성공",
+					content = @Content(schema = @Schema(
+							implementation = SessionAnalysisSettingsResponse.class
+					))
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "400",
+					description = "입력값 검증 실패"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "401",
+					description = "인증 실패"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "403",
+					description = "세션 참가자가 아님"
+			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(
+					responseCode = "409",
+					description = "이미 시작되었거나 종료된 세션"
+			)
+	})
+	ApiResponse<SessionAnalysisSettingsResponse> updateAnalysisSettings(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "대상 세션 ID", example = "15")
+			@Positive Long sessionId,
+			SessionAnalysisSettingsRequest request
 	);
 
 	@Operation(
