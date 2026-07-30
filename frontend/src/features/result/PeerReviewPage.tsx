@@ -9,7 +9,8 @@ import {
   getSubmittedReview,
   submitPeerReview,
 } from './api'
-import { FreeTextField, MetricRow, OverflowMenu, ReportBlockDialog } from './parts'
+// OverflowMenu 는 아래 '이 세션 관리' 블록을 다시 켤 때 함께 import 한다(현재 주석 처리됨).
+import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
 import type {
   PeerReviewForm,

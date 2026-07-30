@@ -1,30 +1,86 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Icon } from '@/components'
 import type { IconName } from '@/components'
-import { createRealMatchRequest } from './api'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { getMySurveyOrNull } from '@/shared/api/me'
+import { createMatchRequest, getCurrentMatchRequest, onboardingBlockReason } from './api'
+import { QueueSetupModal } from './QueueSetupModal'
+import type { MatchRequestInput } from './types'
 
 /**
  * W-08b 매칭 트랙 선택 (MATCH-01, FE-B).
  * 트랙 3분기: 실사용자 화상(대기 큐) · AI 화상 · AI 챗봇.
  * 규칙: 동시 진행 매칭 1개 · AI화상/챗봇을 이용해도 대기 큐는 유지(‘큐 이탈’로만 해제).
  * 음성 미동의 사용자는 AI 화상 카드를 비활성 + 챗봇 유도.
+ *
+ * 백엔드 연동
+ *  - `POST /api/v1/match-requests` 는 연령 범위 + 가능 시간대를 **필수**로 받는다 →
+ *    등록 전에 `QueueSetupModal` 로 입력을 받는다(초기값은 온보딩 설문에서 가져온다).
+ *  - 이미 대기 중이면(`GET /match-requests/me/current`) 큐 화면으로 바로 보낸다.
+ *  - 온보딩(프로필·설문·얼굴상) 미완료는 서버가 409 로 막는다 → 사유를 그대로 안내한다.
  */
 export function TrackSelectPage() {
   const navigate = useNavigate()
-  const [registering, setRegistering] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [initialInput, setInitialInput] = useState<Partial<MatchRequestInput> | undefined>()
+  const [blockReason, setBlockReason] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // TODO(AUTH 연동): user_consents VOICE 동의 여부. 통합 필수 동의로 충족되면 true.
   const voiceConsented = true
 
-  async function enterQueue() {
-    if (registering) return
-    setRegistering(true)
+  // 이미 대기 중인 요청이 있으면 트랙 선택 화면에 머무를 이유가 없다.
+  useEffect(() => {
+    let alive = true
+    getCurrentMatchRequest()
+      .then((current) => {
+        if (alive && current && current.status === 'WAITING') {
+          navigate(`/matching/queue/${current.matchRequestId}`, { replace: true })
+        }
+      })
+      .catch(() => {
+        /* 조회 실패는 무시 — 등록 시점에 서버가 다시 판정한다 */
+      })
+    return () => {
+      alive = false
+    }
+  }, [navigate])
+
+  /** 설문에서 연령 범위를 끌어와 모달 초기값으로 쓴다. */
+  async function openSetup() {
+    if (checking) return
+    setChecking(true)
+    setBlockReason(null)
+    setSubmitError(null)
     try {
-      const req = await createRealMatchRequest()
-      navigate(`/matching/queue/${req.matchRequestId}`)
+      const survey = await getMySurveyOrNull()
+      setInitialInput(
+        survey
+          ? { preferredAgeMin: survey.minPreferredAge, preferredAgeMax: survey.maxPreferredAge }
+          : undefined,
+      )
+      setSetupOpen(true)
     } finally {
-      setRegistering(false)
+      setChecking(false)
+    }
+  }
+
+  async function submitQueue(input: MatchRequestInput) {
+    try {
+      const queued = await createMatchRequest(input)
+      setSetupOpen(false)
+      navigate(`/matching/queue/${queued.matchRequestId}`)
+    } catch (error) {
+      // 온보딩 미완료는 모달을 닫고 화면 상단에서 안내한다 — 모달 안에서 해결할 수 없는 문제다.
+      const onboarding = onboardingBlockReason(error)
+      if (onboarding) {
+        setSetupOpen(false)
+        setBlockReason(onboarding)
+        return
+      }
+      throw new Error(errorMessageOf(error, '대기 큐에 등록하지 못했어요. 잠시 후 다시 시도해 주세요.'))
     }
   }
 
@@ -54,7 +110,7 @@ export function TrackSelectPage() {
           ]}
           note="노쇼·직전 취소 시 패널티가 있어요."
           cta={
-            <Button variant="primary" block loading={registering} onClick={enterQueue}>
+            <Button variant="primary" block loading={checking} onClick={openSetup}>
               대기 큐 등록
             </Button>
           }
@@ -111,6 +167,21 @@ export function TrackSelectPage() {
           AI 화상은 음성 분석 동의가 필요해요. 마이페이지에서 동의하면 바로 이용할 수 있어요.
         </Callout>
       )}
+
+      {/* 온보딩 미완료 안내 — 서버가 알려준 사유를 그대로 쓴다 */}
+      {blockReason && (
+        <Callout tone="warning" className="mt-4">
+          {blockReason}
+        </Callout>
+      )}
+
+      <QueueSetupModal
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        onSubmit={submitQueue}
+        initial={initialInput}
+        error={submitError}
+      />
     </main>
   )
 }

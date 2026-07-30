@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, Field, Segmented, Select, Spinner } from '@/components'
+import { Badge, Button, Callout, Card, Field, Segmented, Select, Spinner } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
 import { createChatSession, getPersonaOptions, requestPersonaRecommendation, saveRegionCity } from './api'
 import {
   PERSONALITY_DESC,
@@ -39,6 +40,7 @@ export function PersonaSetupPage() {
   const [stage, setStage] = useState<ConversationStage>('BEFORE_DATE')
   const [personality, setPersonality] = useState<PersonaPersonality>('MIDDLE')
   const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -59,10 +61,14 @@ export function PersonaSetupPage() {
   async function handleStart() {
     if (starting || !regionValid) return
     setStarting(true)
+    setError(null)
     try {
       if (needsRegion) await saveRegionCity(regionCity)
+      // ⚠️ 서버는 `purpose` 만 받는다 — 연습 단계·성향은 브라우저에 보관된다(api.ts 참고).
       const session = await createChatSession({ stage, personality })
       navigate(`/chatbot/${session.chatSessionId}`, { replace: true })
+    } catch (startError) {
+      setError(errorMessageOf(startError, '대화를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'))
     } finally {
       setStarting(false)
     }
@@ -126,6 +132,8 @@ export function PersonaSetupPage() {
         {/* <Callout tone="info">
           12시간 동안 답장이 없으면 챗봇이 <b>1회만</b> 먼저 말을 걸어요(야간 00–09시는 아침까지 보류).
         </Callout> */}
+
+        {error && <Callout tone="danger">{error}</Callout>}
 
         <Button size="lg" block loading={starting} disabled={!regionValid} onClick={handleStart}>
           대화 시작
