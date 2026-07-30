@@ -7,6 +7,7 @@ import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.event.AiSessionStartedEvent;
+import com.date.backend.domain.room.integration.LiveKitAiWorkerTokenIssuer;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +42,7 @@ class SessionLifecycleServiceTest {
 	private WaitingRoomRepository sessionRepository;
 	private RoomParticipantRepository participantRepository;
 	private LiveKitParticipantTokenIssuer tokenIssuer;
+	private LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer;
 	private SessionMissionProvisioningService missionProvisioningService;
 	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
@@ -52,6 +55,7 @@ class SessionLifecycleServiceTest {
 		sessionRepository = mock(WaitingRoomRepository.class);
 		participantRepository = mock(RoomParticipantRepository.class);
 		tokenIssuer = mock(LiveKitParticipantTokenIssuer.class);
+		aiWorkerTokenIssuer = mock(LiveKitAiWorkerTokenIssuer.class);
 		missionProvisioningService =
 				mock(SessionMissionProvisioningService.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
@@ -63,6 +67,7 @@ class SessionLifecycleServiceTest {
 						Duration.ofMinutes(10)
 				),
 				tokenIssuer,
+				aiWorkerTokenIssuer,
 				missionProvisioningService,
 				eventPublisher,
 				Clock.fixed(
@@ -102,6 +107,14 @@ class SessionLifecycleServiceTest {
 						true,
 						"https://livekit.example",
 						"token"
+				));
+		when(aiWorkerTokenIssuer.issue(SESSION_ID, "date-room-30"))
+				.thenReturn(new LiveKitAiWorkerTokenIssuer.IssuedAiWorkerToken(
+						true,
+						"wss://livekit.example",
+						"date-room-30",
+						"ai-session-15",
+						"ai-worker-token"
 				));
 	}
 
@@ -179,6 +192,10 @@ class SessionLifecycleServiceTest {
 		);
 		verify(eventPublisher).publishEvent(
 				any(AiSessionStartedEvent.class)
+		);
+		verify(aiWorkerTokenIssuer).issue(
+				eq(SESSION_ID),
+				eq("date-room-30")
 		);
 	}
 

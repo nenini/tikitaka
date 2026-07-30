@@ -9,7 +9,9 @@ import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.dto.response.SessionJoinResponse;
 import com.date.backend.domain.room.dto.response.SessionParticipantStateResponse;
 import com.date.backend.domain.room.dto.response.SessionStatusResponse;
+import com.date.backend.domain.room.event.AiSessionLiveKitConnection;
 import com.date.backend.domain.room.event.AiSessionStartedEvent;
+import com.date.backend.domain.room.integration.LiveKitAiWorkerTokenIssuer;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -31,6 +33,7 @@ public class SessionLifecycleService {
 	private final RoomParticipantRepository participantRepository;
 	private final RoomEntryProperties entryProperties;
 	private final LiveKitParticipantTokenIssuer tokenIssuer;
+	private final LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer;
 	private final SessionMissionProvisioningService missionProvisioningService;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
@@ -40,6 +43,7 @@ public class SessionLifecycleService {
 			RoomParticipantRepository participantRepository,
 			RoomEntryProperties entryProperties,
 			LiveKitParticipantTokenIssuer tokenIssuer,
+			LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer,
 			SessionMissionProvisioningService missionProvisioningService,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
@@ -48,6 +52,7 @@ public class SessionLifecycleService {
 		this.participantRepository = participantRepository;
 		this.entryProperties = entryProperties;
 		this.tokenIssuer = tokenIssuer;
+		this.aiWorkerTokenIssuer = aiWorkerTokenIssuer;
 		this.missionProvisioningService = missionProvisioningService;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
@@ -120,9 +125,14 @@ public class SessionLifecycleService {
 		}
 		session.start(now);
 		missionProvisioningService.provision(session, participants, now);
+		var aiWorkerToken = aiWorkerTokenIssuer.issue(
+				session.getId(),
+				session.getLivekitRoomName()
+		);
 		eventPublisher.publishEvent(AiSessionStartedEvent.of(
 				session.getId(),
 				now.atZone(clock.getZone()).toInstant(),
+				AiSessionLiveKitConnection.from(aiWorkerToken),
 				participants
 		));
 		return createStatus(session, participants, now);

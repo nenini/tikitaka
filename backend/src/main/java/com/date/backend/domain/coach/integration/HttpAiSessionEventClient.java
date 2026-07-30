@@ -44,6 +44,7 @@ public class HttpAiSessionEventClient implements AiSessionEventClient {
 				event.sessionId(),
 				event.actualStartAt(),
 				null,
+				event.liveKit(),
 				event.participants(),
 				event.features(),
 				null
@@ -59,6 +60,7 @@ public class HttpAiSessionEventClient implements AiSessionEventClient {
 				event.sessionId(),
 				null,
 				event.endedAt(),
+				null,
 				null,
 				null,
 				event.reason()

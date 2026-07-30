@@ -156,7 +156,7 @@ livekit:
   api-key: ${LIVEKIT_API_KEY:}
   api-secret: ${LIVEKIT_API_SECRET:}
   empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
-  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:2}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:3}
 
 notification:
   waiting-recommendation:

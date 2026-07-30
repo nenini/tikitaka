@@ -89,6 +89,7 @@ class AiSessionLifecycleEventListenerTest {
 		return AiSessionStartedEvent.of(
 				10L,
 				Instant.parse("2026-07-30T01:00:00Z"),
+				null,
 				List.of(participant)
 		);
 	}

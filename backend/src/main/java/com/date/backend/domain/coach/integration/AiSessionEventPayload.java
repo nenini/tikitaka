@@ -1,6 +1,7 @@
 package com.date.backend.domain.coach.integration;
 
 import com.date.backend.domain.room.event.AiSessionEndedEvent;
+import com.date.backend.domain.room.event.AiSessionLiveKitConnection;
 import com.date.backend.domain.room.event.AiSessionParticipantContext;
 import com.date.backend.domain.room.event.AiSessionStartedEvent;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -16,6 +17,7 @@ public record AiSessionEventPayload(
 		String sessionId,
 		Instant actualStartAt,
 		Instant endedAt,
+		AiSessionLiveKitConnection liveKit,
 		List<AiSessionParticipantContext> participants,
 		AiSessionStartedEvent.AiSessionFeatures features,
 		AiSessionEndedEvent.AiSessionEndReason reason
