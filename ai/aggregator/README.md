@@ -26,7 +26,8 @@ aggregator/
 - **Any 미사용**: 이벤트는 payload별 타입 분리(discriminated union)로 정적 타입 보장.
 - **Observer 감지기**: `on_utterance`(내용) / `on_tick`(시간) 훅만 구현 → 하나씩 켜고 끄고 테스트.
 - **전송-불가지론**: `emit` 콜백만 주입 → 지금은 콘솔, 나중에 BE(#112) WS.
-- **stt 참조**: stt는 build-system이 없어 `pythonpath`(../stt)로 import (stt 자체 관례와 동일).
+- **stt 참조**: 통합 Python 3.11 환경이 로컬 `stt-pipeline`을
+  의존성으로 설치한다. 서버 실행 시 별도 `PYTHONPATH`가 필요 없다.
 
 ## 개발 (로직·테스트, 오디오/GPU 불필요)
 ```bash
@@ -38,7 +39,12 @@ uv run pytest -q    # Mock TranscriptEvent 주입
 
 ## Backend 세션 연동
 
-Backend가 세션 시작·종료를 알려주면 세션별 `SessionAggregator`를 만들고,
+Backend가 세션 시작·종료와 LiveKit 구독 정보를 알려주면 AI가 구독 전용
+참가자(`ai-session-{sessionId}`)로 방에 입장한다. `user-{userId}`별 오디오
+트랙은 서로 섞지 않고 자체 VAD/STT를 거쳐 해당 세션의 `SessionAggregator`에
+전달한다.
+
+세션별 `SessionAggregator`가
 생성된 내부 `CoachingCommand v2`를 Backend `COACHING_REQUESTED v1`로 변환해
 전송한다. MVP 침묵 정책은 **10초 후 두 참가자에게 각각
 `SILENCE_RECOVERY` 코칭**이며 15/30/45초 단계형 침묵 API는 사용하지 않는다.
@@ -58,6 +64,20 @@ GET  /health
 POST /api/v1/sessions/events
 ```
 
+세션 시작 요청에는 아래 필드가 필수다. `accessToken`은 방 구독 전용이며
+로그에 출력하지 않는다.
+
+```json
+{
+  "liveKit": {
+    "url": "wss://...",
+    "roomName": "session-room-name",
+    "accessToken": "...",
+    "participantIdentity": "ai-session-15"
+  }
+}
+```
+
 Backend 전송 API:
 
 ```text
@@ -72,6 +92,10 @@ BACKEND_EVENT_MAX_ATTEMPTS=3
 BACKEND_EVENT_RETRY_DELAY_SECONDS=1
 AGGREGATOR_TICK_INTERVAL_SECONDS=0.5
 AGGREGATOR_SHUTDOWN_FLUSH_TIMEOUT_SECONDS=3
+STT_MODEL_SIZE=large-v3
+STT_DEVICE=cuda
+STT_COMPUTE_TYPE=float16
+STT_LANGUAGE=ko
 ```
 
 ## 라이브 데모 (마이크 + GPU + stt 런타임 의존 필요)
@@ -90,5 +114,7 @@ uv run python -m aggregator.live_demo --lang ko --device cpu
 ```
 
 ## 현재 범위 / 다음
-- **구현됨**: 내용 기반(질문·군말·침묵) + 라이브 데모 + 단위 테스트.
-- **다음(게이트)**: 끼어들기·볼륨(2화자 오디오 + VAD onset/offset 노출 결정) / 지표·BE 발행(BE 계약) / 비전 결합(비전 패키지 머지) / 사후 리포트(GPU LLM). 상세는 `통제실_구현_plan.md` §7.
+- **구현됨**: Backend lifecycle + LiveKit 2화자 오디오 구독 + 자체 VAD/STT
+  라우팅 + 침묵 코칭 Backend 전달.
+- **다음(게이트)**: 실제 Backend 토큰으로 2브라우저 종단간 시험 / Vision
+  DataChannel 수신 / 음성·비전 분석 저장 이벤트 / 사후 리포트.

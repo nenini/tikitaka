@@ -39,6 +39,14 @@ class IntegrationSettings:
     backend_retry_delay_seconds: float = 1.0
     tick_interval_seconds: float = 0.5
     shutdown_flush_timeout_seconds: float = 3.0
+    stt_model_size: str = "large-v3"
+    stt_device: str = "cuda"
+    stt_compute_type: str = "float16"
+    stt_language: str = "ko"
+    stt_vad_threshold: float = 0.5
+    stt_end_silence_ms: int = 700
+    stt_min_confidence: float = 0.5
+    stt_max_pending: int = 8
 
     @classmethod
     def from_env(cls) -> IntegrationSettings:
@@ -66,6 +74,27 @@ class IntegrationSettings:
                 "AGGREGATOR_SHUTDOWN_FLUSH_TIMEOUT_SECONDS",
                 3.0,
             ),
+            stt_model_size=os.getenv(
+                "STT_MODEL_SIZE",
+                "large-v3",
+            ).strip(),
+            stt_device=os.getenv("STT_DEVICE", "cuda").strip(),
+            stt_compute_type=os.getenv(
+                "STT_COMPUTE_TYPE",
+                "float16",
+            ).strip(),
+            stt_language=os.getenv("STT_LANGUAGE", "ko").strip(),
+            stt_vad_threshold=float(
+                os.getenv("STT_VAD_THRESHOLD", "0.5")
+            ),
+            stt_end_silence_ms=_positive_int(
+                "STT_END_SILENCE_MS",
+                700,
+            ),
+            stt_min_confidence=float(
+                os.getenv("STT_MIN_CONFIDENCE", "0.5")
+            ),
+            stt_max_pending=_positive_int("STT_MAX_PENDING", 8),
         )
 
     @property

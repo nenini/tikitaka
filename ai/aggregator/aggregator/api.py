@@ -17,6 +17,7 @@ from aggregator.session_manager import (
     SessionEventContractError,
     SessionManager,
 )
+from aggregator.audio_adapter import SessionAudioAdapterFactory
 from aggregator.settings import IntegrationSettings
 
 
@@ -24,12 +25,18 @@ def create_app(
     settings: IntegrationSettings | None = None,
     *,
     sender: CoachingSender | None = None,
+    audio_adapter_factory: SessionAudioAdapterFactory | None = None,
 ) -> FastAPI:
     resolved_settings = settings or IntegrationSettings.from_env()
-    manager = SessionManager(resolved_settings, sender=sender)
+    manager = SessionManager(
+        resolved_settings,
+        sender=sender,
+        audio_adapter_factory=audio_adapter_factory,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        await manager.startup()
         yield
         await manager.close()
 

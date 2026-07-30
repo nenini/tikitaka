@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
+from copy import deepcopy
+from collections.abc import Awaitable, Callable
 
+from fastapi.testclient import TestClient
+from stt.events import SttEvent
+
+from aggregator.audio_adapter import SessionAudioAdapter
 from aggregator.api import create_app
 from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
+from aggregator.session_contracts import SessionEventRequest
 from aggregator.settings import IntegrationSettings
 
 
@@ -24,7 +30,31 @@ class FakeSender:
         return None
 
 
-_STARTED = {
+class FakeAudioAdapter:
+    def start(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        return None
+
+
+class FakeAudioAdapterFactory:
+    async def warmup(self) -> None:
+        return None
+
+    def create(
+        self,
+        _event: SessionEventRequest,
+        _sink: Callable[[SttEvent], Awaitable[bool]],
+        _elapsed_ms: Callable[[], int],
+    ) -> SessionAudioAdapter:
+        return FakeAudioAdapter()
+
+    async def close(self) -> None:
+        return None
+
+
+_STARTED: dict[str, object] = {
     "eventId": "session-15-ai-session-started",
     "eventType": "AI_SESSION_STARTED",
     "version": 1,
@@ -49,6 +79,12 @@ _STARTED = {
         "visionEnabled": True,
         "coachingEnabled": True,
     },
+    "liveKit": {
+        "url": "wss://livekit.example.test",
+        "roomName": "session-15",
+        "accessToken": "secret-room-token",
+        "participantIdentity": "ai-session-15",
+    },
 }
 
 
@@ -60,6 +96,7 @@ def _client() -> TestClient:
             tick_interval_seconds=3600,
         ),
         sender=FakeSender(),
+        audio_adapter_factory=FakeAudioAdapterFactory(),
     )
     return TestClient(app)
 
@@ -119,3 +156,40 @@ def test_rejects_unsupported_session_contract_version() -> None:
 
         assert response.status_code == 400
         assert "unsupported session event version" in response.json()["detail"]
+
+
+def test_rejects_missing_livekit_connection() -> None:
+    with _client() as client:
+        invalid = {
+            key: value
+            for key, value in _STARTED.items()
+            if key != "liveKit"
+        }
+        invalid["eventId"] = "missing-livekit"
+        response = client.post(
+            "/api/v1/sessions/events",
+            headers={"X-Internal-Token": "shared-token"},
+            json=invalid,
+        )
+
+        assert response.status_code == 400
+        assert "requires liveKit" in response.json()["detail"]
+
+
+def test_rejects_participant_identity_that_breaks_backend_mapping() -> None:
+    with _client() as client:
+        invalid = deepcopy(_STARTED)
+        invalid["eventId"] = "bad-participant-identity"
+        participants = invalid["participants"]
+        assert isinstance(participants, list)
+        first = participants[0]
+        assert isinstance(first, dict)
+        first["participantIdentity"] = "someone-else"
+        response = client.post(
+            "/api/v1/sessions/events",
+            headers={"X-Internal-Token": "shared-token"},
+            json=invalid,
+        )
+
+        assert response.status_code == 400
+        assert "participantIdentity must be user-1" in response.json()["detail"]

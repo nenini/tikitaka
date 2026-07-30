@@ -15,6 +15,10 @@ from aggregator.aggregator import (
     SessionAggregator,
     VisionBatchIngestionResult,
 )
+from aggregator.audio_adapter import (
+    SessionAudioAdapter,
+    SessionAudioAdapterFactory,
+)
 from aggregator.backend_client import (
     BackendCoachingClient,
     BackendDeliveryError,
@@ -22,6 +26,7 @@ from aggregator.backend_client import (
 from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
 from aggregator.events import AnalysisEvent
+from aggregator.livekit_stt import LiveKitSttAdapterFactory
 from aggregator.session_contracts import (
     SessionEventRequest,
     SessionEventResponse,
@@ -62,6 +67,7 @@ class SessionRuntime:
         event: SessionEventRequest,
         settings: IntegrationSettings,
         sender: CoachingSender,
+        audio_adapter_factory: SessionAudioAdapterFactory,
         *,
         now: Callable[[], datetime],
     ) -> None:
@@ -82,6 +88,7 @@ class SessionRuntime:
         self.features = event.features
         self._settings = settings
         self._sender = sender
+        self._audio_adapter: SessionAudioAdapter | None = None
         self._now = now
         self._commands: asyncio.Queue[CoachingCommand] = asyncio.Queue(
             maxsize=100
@@ -95,6 +102,18 @@ class SessionRuntime:
             on_coaching=self._on_coaching,
             participant_user_ids=list(self.participants),
         )
+        if (
+            event.features is None
+            or event.features.stt_enabled
+        ) and any(
+            participant.stt_enabled
+            for participant in self.participants.values()
+        ):
+            self._audio_adapter = audio_adapter_factory.create(
+                event,
+                self.push_stt_event,
+                self.elapsed_ms,
+            )
 
     def start(self) -> None:
         self._tick_task = asyncio.create_task(
@@ -105,6 +124,8 @@ class SessionRuntime:
             self._delivery_loop(),
             name=f"aggregator-delivery-{self.session_id}",
         )
+        if self._audio_adapter is not None:
+            self._audio_adapter.start()
 
     def _on_analysis(self, event: AnalysisEvent) -> None:
         logger.debug(
@@ -159,6 +180,8 @@ class SessionRuntime:
         await self._commands.join()
 
     async def stop(self) -> None:
+        if self._audio_adapter is not None:
+            await self._audio_adapter.stop()
         self.aggregator.state.session_active = False
         if self._tick_task is not None:
             self._tick_task.cancel()
@@ -226,15 +249,20 @@ class SessionManager:
         settings: IntegrationSettings,
         *,
         sender: CoachingSender | None = None,
+        audio_adapter_factory: SessionAudioAdapterFactory | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.settings = settings
         self._sender = sender or BackendCoachingClient(settings)
+        self._audio_adapter_factory = (
+            audio_adapter_factory or LiveKitSttAdapterFactory(settings)
+        )
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._sessions: dict[str, SessionRuntime] = {}
         self._processed_event_ids: set[str] = set()
         self._processed_event_order: deque[str] = deque()
         self._lifecycle_lock = asyncio.Lock()
+        self._started = False
 
     @property
     def active_session_count(self) -> int:
@@ -268,6 +296,12 @@ class SessionManager:
                 status=status,
             )
 
+    async def startup(self) -> None:
+        if self._started:
+            return
+        await self._audio_adapter_factory.warmup()
+        self._started = True
+
     async def _start(
         self,
         event: SessionEventRequest,
@@ -280,12 +314,53 @@ class SessionManager:
             raise SessionEventContractError(
                 "AI_SESSION_STARTED requires actualStartAt"
             )
+        if event.live_kit is None:
+            raise SessionEventContractError(
+                "AI_SESSION_STARTED requires liveKit"
+            )
+        if not event.live_kit.url.startswith(("ws://", "wss://")):
+            raise SessionEventContractError(
+                "liveKit.url must use ws:// or wss://"
+            )
+        expected_ai_identity = f"ai-session-{event.session_id}"
+        if (
+            event.live_kit.participant_identity
+            != expected_ai_identity
+        ):
+            raise SessionEventContractError(
+                "liveKit.participantIdentity must be "
+                f"{expected_ai_identity}"
+            )
+        user_ids = [participant.user_id for participant in event.participants]
+        participant_identities = [
+            participant.participant_identity
+            for participant in event.participants
+        ]
+        if len(user_ids) != len(set(user_ids)):
+            raise SessionEventContractError(
+                "participants must have unique userId values"
+            )
+        if len(participant_identities) != len(set(participant_identities)):
+            raise SessionEventContractError(
+                "participants must have unique participantIdentity values"
+            )
+        for participant in event.participants:
+            expected_user_identity = f"user-{participant.user_id}"
+            if participant.participant_identity != expected_user_identity:
+                raise SessionEventContractError(
+                    "participantIdentity must be "
+                    f"{expected_user_identity} for userId "
+                    f"{participant.user_id}"
+                )
+        if not self._started:
+            raise RuntimeError("SessionManager.startup() must run first")
         if event.session_id in self._sessions:
             return "DUPLICATE"
         runtime = SessionRuntime(
             event,
             self.settings,
             self._sender,
+            self._audio_adapter_factory,
             now=self._now,
         )
         self._sessions[event.session_id] = runtime
@@ -326,3 +401,4 @@ class SessionManager:
             return_exceptions=True,
         )
         await self._sender.close()
+        await self._audio_adapter_factory.close()

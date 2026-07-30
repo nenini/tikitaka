@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pydantic.alias_generators import to_camel
 
 
@@ -26,6 +26,13 @@ class SessionFeatures(_CamelModel):
     coaching_enabled: bool
 
 
+class LiveKitConnection(_CamelModel):
+    url: str = Field(min_length=1)
+    room_name: str = Field(min_length=1)
+    access_token: SecretStr = Field(min_length=1, repr=False)
+    participant_identity: str = Field(min_length=1)
+
+
 class SessionEventRequest(_CamelModel):
     event_id: str = Field(min_length=1)
     event_type: str = Field(min_length=1)
@@ -35,6 +42,7 @@ class SessionEventRequest(_CamelModel):
     ended_at: datetime | None = None
     participants: list[SessionParticipant] | None = None
     features: SessionFeatures | None = None
+    live_kit: LiveKitConnection | None = None
     reason: str | None = None
 
 
