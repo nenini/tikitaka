@@ -6,7 +6,9 @@ import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.SessionConnectionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.dto.request.SessionAnalysisSettingsRequest;
 import com.date.backend.domain.room.event.AiSessionStartedEvent;
+import com.date.backend.domain.room.integration.LiveKitAiWorkerTokenIssuer;
 import com.date.backend.domain.room.integration.LiveKitParticipantTokenIssuer;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -27,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +43,7 @@ class SessionLifecycleServiceTest {
 	private WaitingRoomRepository sessionRepository;
 	private RoomParticipantRepository participantRepository;
 	private LiveKitParticipantTokenIssuer tokenIssuer;
+	private LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer;
 	private SessionMissionProvisioningService missionProvisioningService;
 	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
@@ -52,6 +56,7 @@ class SessionLifecycleServiceTest {
 		sessionRepository = mock(WaitingRoomRepository.class);
 		participantRepository = mock(RoomParticipantRepository.class);
 		tokenIssuer = mock(LiveKitParticipantTokenIssuer.class);
+		aiWorkerTokenIssuer = mock(LiveKitAiWorkerTokenIssuer.class);
 		missionProvisioningService =
 				mock(SessionMissionProvisioningService.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
@@ -63,6 +68,7 @@ class SessionLifecycleServiceTest {
 						Duration.ofMinutes(10)
 				),
 				tokenIssuer,
+				aiWorkerTokenIssuer,
 				missionProvisioningService,
 				eventPublisher,
 				Clock.fixed(
@@ -103,26 +109,45 @@ class SessionLifecycleServiceTest {
 						"https://livekit.example",
 						"token"
 				));
+		when(aiWorkerTokenIssuer.issue(SESSION_ID, "date-room-30"))
+				.thenReturn(new LiveKitAiWorkerTokenIssuer.IssuedAiWorkerToken(
+						true,
+						"wss://livekit.example",
+						"date-room-30",
+						"ai-session-15",
+						"ai-worker-token"
+				));
 	}
 
 	@Test
 	void participantJoinsWithinAllowedTimeAndReceivesLiveKitToken() {
-		when(session.getStatus()).thenReturn(RoomSessionStatus.CREATED);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 		when(participantA.recordJoin(NOW)).thenReturn(true);
 		when(participantA.getJoinedAt()).thenReturn(NOW);
 
 		var response = service.join(USER_A_ID, SESSION_ID);
 
-		verify(session).markWaiting();
 		assertThat(response.alreadyJoined()).isFalse();
 		assertThat(response.liveKitConfigured()).isTrue();
 		assertThat(response.liveKitAccessToken()).isEqualTo("token");
 	}
 
 	@Test
+	void joinBeforeBothParticipantsAreReadyIsRejectedWithoutIssuingToken() {
+		when(session.getStatus()).thenReturn(RoomSessionStatus.WAITING);
+
+		assertThatThrownBy(() -> service.join(USER_A_ID, SESSION_ID))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(
+								SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
+						)
+				);
+	}
+
+	@Test
 	void joinOutsideAllowedTimeIsRejected() {
 		when(session.getScheduledStartAt()).thenReturn(NOW.plusHours(1));
-		when(session.getStatus()).thenReturn(RoomSessionStatus.CREATED);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 
 		assertThatThrownBy(() -> service.join(USER_A_ID, SESSION_ID))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -134,7 +159,7 @@ class SessionLifecycleServiceTest {
 
 	@Test
 	void duplicateJoinKeepsOriginalJoinAndReturnsIdempotentResult() {
-		when(session.getStatus()).thenReturn(RoomSessionStatus.WAITING);
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 		when(participantA.isJoined()).thenReturn(true);
 		when(participantA.recordJoin(NOW)).thenReturn(false);
 		when(participantA.getJoinedAt()).thenReturn(NOW.minusMinutes(1));
@@ -161,6 +186,41 @@ class SessionLifecycleServiceTest {
 	}
 
 	@Test
+	void participantUpdatesAnalysisSettingsBeforeSessionStarts() {
+		when(session.isInProgress()).thenReturn(false);
+		when(session.isEnded()).thenReturn(false);
+		when(participantA.isVoiceAnalysisEnabled()).thenReturn(true);
+		when(participantA.isExpressionAnalysisEnabled()).thenReturn(true);
+
+		var response = service.updateAnalysisSettings(
+				USER_A_ID,
+				SESSION_ID,
+				new SessionAnalysisSettingsRequest(true, true)
+		);
+
+		verify(participantA).updateAnalysisSettings(true, true);
+		assertThat(response.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(response.userId()).isEqualTo(USER_A_ID);
+		assertThat(response.voiceAnalysisEnabled()).isTrue();
+		assertThat(response.expressionAnalysisEnabled()).isTrue();
+	}
+
+	@Test
+	void analysisSettingsCannotChangeAfterSessionStarts() {
+		when(session.isInProgress()).thenReturn(true);
+
+		assertThatThrownBy(() -> service.updateAnalysisSettings(
+				USER_A_ID,
+				SESSION_ID,
+				new SessionAnalysisSettingsRequest(true, true)
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(
+						SessionErrorCode.SESSION_STATE_CONFLICT
+				)
+		);
+	}
+
+	@Test
 	void startsOnlyWhenBothParticipantsJoinedAndReady() {
 		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
 		when(session.isInProgress()).thenReturn(false);
@@ -179,6 +239,10 @@ class SessionLifecycleServiceTest {
 		);
 		verify(eventPublisher).publishEvent(
 				any(AiSessionStartedEvent.class)
+		);
+		verify(aiWorkerTokenIssuer).issue(
+				eq(SESSION_ID),
+				eq("date-room-30")
 		);
 	}
 

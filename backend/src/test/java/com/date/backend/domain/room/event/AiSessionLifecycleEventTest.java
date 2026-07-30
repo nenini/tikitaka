@@ -32,6 +32,12 @@ class AiSessionLifecycleEventTest {
 		AiSessionStartedEvent event = AiSessionStartedEvent.of(
 				15L,
 				startedAt,
+				new AiSessionLiveKitConnection(
+						"wss://livekit.example",
+						"date-room-15",
+						"ai-worker-token",
+						"ai-session-15"
+				),
 				List.of(participantA, participantB)
 		);
 
@@ -39,6 +45,9 @@ class AiSessionLifecycleEventTest {
 		assertThat(event.version()).isEqualTo(1);
 		assertThat(event.sessionId()).isEqualTo("15");
 		assertThat(event.actualStartAt()).isEqualTo(startedAt);
+		assertThat(event.liveKit().roomName()).isEqualTo("date-room-15");
+		assertThat(event.liveKit().participantIdentity())
+				.isEqualTo("ai-session-15");
 		assertThat(event.participants()).containsExactly(
 				new AiSessionParticipantContext(
 						"101",

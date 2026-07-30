@@ -1,0 +1,42 @@
+# AI 서비스 오케스트레이션 — ai/ 루트에서 전체를 관리한다.
+#   docker compose up --build            # 전체 빌드·실행
+#   docker compose up --build chatbot    # 특정 서비스만
+#   docker compose down                  # 정지·제거
+#
+# 각 서비스의 Dockerfile은 해당 폴더에 있고(빌드 컨텍스트 = 그 폴더),
+# 이 파일이 묶어서 실행한다. 서비스끼리 포트·컨테이너 이름이 겹치지 않게 분리한다.
+# LLM/모델 추론은 컨테이너 밖 호스트(Ollama 등)에 붙는다.
+services:
+  chatbot:
+    build:
+      context: ./chatbot
+    image: ssafy-ai-chatbot:latest
+    container_name: ai-chatbot
+    ports:
+      - "8000:8000"                                 # 챗봇 스트리밍 API
+    environment:
+      OLLAMA_HOST: "http://host.docker.internal:11434"
+      # OLLAMA_MODEL: "exaone3.5:2.4b"              # GPU 여유 부족 시 경량 모델
+      # AI_CHAT_INTERNAL_TOKEN: "change-me"         # 설정하면 X-Internal-Token 검사 활성화
+    extra_hosts:
+      - "host.docker.internal:host-gateway"         # Linux 호환(Docker Desktop은 자동)
+    restart: unless-stopped
+
+  # 얼굴상 분석(FastAPI). CPU 실행. 포트 8001로 chatbot(8000)과 분리.
+  # ⚠️ 모델 아티팩트·참조 데이터가 gitignore라, 아래 볼륨에 팀원(AI2)의 파일이 있어야 동작한다.
+  #    - ./face-analysis/artifacts/  : face_detection_yunet_2023mar.onnx, face_landmarker.task, facenet 가중치
+  #    - ./face-analysis/data/       : processing_report.csv(레포 있음) + 참조 이미지(gitignore)
+  #    없으면 startup(모델 로드)에서 부팅 실패한다.
+  face-analysis:
+    build:
+      context: ./face-analysis
+    image: ssafy-ai-face:latest
+    container_name: ai-face
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./face-analysis/artifacts:/app/artifacts:ro
+      - ./face-analysis/data:/app/data:ro
+    restart: unless-stopped
+
+  # vision-analysis는 브라우저용 TS 라이브러리라 도커 대상이 아님(FE 번들에 포함).

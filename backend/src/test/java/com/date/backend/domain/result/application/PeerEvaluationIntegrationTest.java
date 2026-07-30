@@ -148,7 +148,8 @@ class PeerEvaluationIntegrationTest {
 			managed.start(SESSION_TIME);
 			managed.complete(
 					SESSION_TIME.plusMinutes(30),
-					SessionTerminationReason.TIME_EXPIRED
+					SessionTerminationReason.TIME_EXPIRED,
+					null
 			);
 		});
 		return new SessionFixture(

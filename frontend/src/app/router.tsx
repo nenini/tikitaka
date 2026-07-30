@@ -2,11 +2,19 @@ import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute'
 import { HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { SignupPage } from '@/features/auth/SignupPage'
+import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
+import { ConsentPage } from '@/features/auth/ConsentPage'
+import { ProfilePage } from '@/features/auth/ProfilePage'
+import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+import { OAuthCallbackPage } from '@/features/auth/OAuthCallbackPage'
 import { SessionPage } from '@/features/session/SessionPage'
 import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
 import { TrackSelectPage } from '@/features/matching/TrackSelectPage'
 import { MatchQueuePage } from '@/features/matching/MatchQueuePage'
 import { MatchCardPage } from '@/features/matching/MatchCardPage'
+import { ChatPage } from '@/features/chatbot/ChatPage'
+import { PersonaSetupPage } from '@/features/chatbot/PersonaSetupPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
 
@@ -16,6 +24,14 @@ import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
  */
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/signup', element: <SignupPage /> },
+  { path: '/signup/verify', element: <VerifyKycPage /> },
+  { path: '/signup/consent', element: <ConsentPage /> },
+  { path: '/signup/profile', element: <ProfilePage /> },
+  { path: '/signup/survey', element: <SurveyPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  // OAuth 콜백 수신(공개) — 백엔드가 302로 토큰을 URL 프래그먼트에 실어 되돌려보낸다
+  { path: '/oauth/callback', element: <OAuthCallbackPage /> },
   // 공용 컴포넌트 갤러리 (개발/디자인 QA 전용, 인증 불필요)
   { path: '/gallery', element: <ComponentGallery /> },
   {
@@ -29,7 +45,11 @@ export const router = createBrowserRouter([
       // 대기방(기기 점검) → 세션. 대기방을 거쳐 WebRTC 세션으로 진입한다.
       { path: '/session/:sessionId/room', element: <WaitingRoomPage /> },
       { path: '/session/:sessionId', element: <SessionPage /> },
-      // TODO(FE-B 다음 배치): /ai-video/setup(W-21), /chatbot/persona(W-10) · /report/:id, /dashboard, /contact ...
+      // AI 챗봇 F5: 페르소나 설정 W-10 → 대화 W-10b. `/chatbot` 은 진행 중 세션으로 해석된다.
+      { path: '/chatbot/persona', element: <PersonaSetupPage /> },
+      { path: '/chatbot', element: <ChatPage /> },
+      { path: '/chatbot/:chatSessionId', element: <ChatPage /> },
+      // TODO(FE-B 다음 배치): /ai-video/setup(W-21) · /report/:id, /dashboard, /contact ...
 
       //-----------
       // 개발용, 추후 삭제

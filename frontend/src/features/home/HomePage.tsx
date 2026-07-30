@@ -3,7 +3,7 @@ import { Badge, Button, CardHeader, CardLink } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
 
 export function HomePage() {
-  const { user, logout } = useAuthStore()
+  const { user, signOut } = useAuthStore()
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -14,7 +14,7 @@ export function HomePage() {
             {user ? `${user.nickname} 님, 반가워요.` : '로그인된 사용자'}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={logout}>
+        <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           로그아웃
         </Button>
       </div>
@@ -23,9 +23,9 @@ export function HomePage() {
       {/* div + onClick 이 아니라 실제 링크 — 키보드/스크린리더로도 도달·활성화된다 */}
       <div className="grid gap-4 sm:grid-cols-2">
         <CardLink as={Link} to="/matching">
-          <CardHeader title="새 연습 시작 (매칭)" action={<Badge tone="info">F2</Badge>} />
+          <CardHeader title="매칭 트랙 선택" action={<Badge tone="info">F2</Badge>} />
           <p className="bt-body-sm bt-muted">
-            트랙 선택 → 대기 큐 → 매칭 카드로 이어지는 실사용자 매칭 플로우입니다.
+            실사용자, AI 채팅, AI 화상채팅 중 선택
           </p>
         </CardLink>
 

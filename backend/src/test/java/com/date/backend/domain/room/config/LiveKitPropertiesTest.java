@@ -27,8 +27,24 @@ class LiveKitPropertiesTest {
 
 		assertThat(cloud.url()).isEqualTo("https://date-project.livekit.cloud");
 		assertThat(local.url()).isEqualTo("http://localhost:7880");
+		assertThat(cloud.clientUrl())
+				.isEqualTo("wss://date-project.livekit.cloud");
+		assertThat(local.clientUrl()).isEqualTo("ws://localhost:7880");
 		assertThat(cloud.configured()).isTrue();
 		assertThatCode(() -> new LiveKitServerRoomManager(cloud))
 				.doesNotThrowAnyException();
+	}
+
+	@Test
+	void defaultsMaximumParticipantsToThreeForAiWorker() {
+		LiveKitProperties properties = new LiveKitProperties(
+				"",
+				"",
+				"",
+				0,
+				0
+		);
+
+		assertThat(properties.maxParticipants()).isEqualTo(3);
 	}
 }

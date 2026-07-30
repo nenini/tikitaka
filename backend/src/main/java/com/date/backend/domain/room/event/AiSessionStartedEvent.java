@@ -10,6 +10,7 @@ public record AiSessionStartedEvent(
 		int version,
 		String sessionId,
 		Instant actualStartAt,
+		AiSessionLiveKitConnection liveKit,
 		List<AiSessionParticipantContext> participants,
 		AiSessionFeatures features
 ) {
@@ -19,6 +20,7 @@ public record AiSessionStartedEvent(
 	public static AiSessionStartedEvent of(
 			Long sessionId,
 			Instant actualStartAt,
+			AiSessionLiveKitConnection liveKit,
 			List<RoomParticipant> participants
 	) {
 		List<AiSessionParticipantContext> participantContexts =
@@ -35,6 +37,7 @@ public record AiSessionStartedEvent(
 				VERSION,
 				String.valueOf(sessionId),
 				actualStartAt,
+				liveKit,
 				List.copyOf(participantContexts),
 				new AiSessionFeatures(
 						participantContexts.stream()

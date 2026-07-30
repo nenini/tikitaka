@@ -103,7 +103,7 @@ class AiSessionAssistIntegrationTest {
 
 		var coachingRequest = new AiCoachingRequest(
 				"COACHING_REQUESTED",
-				2,
+				1,
 				"coach-" + suffix,
 				occurredAt,
 				"ai-session-worker",

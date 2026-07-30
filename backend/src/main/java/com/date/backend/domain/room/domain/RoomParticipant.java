@@ -255,6 +255,14 @@ public class RoomParticipant {
 		return voiceAnalysisEnabled;
 	}
 
+	public void updateAnalysisSettings(
+			boolean voiceAnalysisEnabled,
+			boolean expressionAnalysisEnabled
+	) {
+		this.voiceAnalysisEnabled = voiceAnalysisEnabled;
+		this.expressionAnalysisEnabled = expressionAnalysisEnabled;
+	}
+
 	public boolean recordConnected(
 			String participantIdentity,
 			String participantSid,

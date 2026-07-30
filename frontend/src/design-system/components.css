@@ -774,6 +774,88 @@ textarea.bt-input { min-height: 96px; resize: vertical; line-height: var(--bt-lh
 @keyframes bt-pulse { 50% { opacity: 0.35; } }
 
 /* --------------------------------------------------------------------------
+   Chat bubble — AI 챗봇 대화(W-10b)
+   방향은 **정렬 + 꼬리쪽 라운드**로 만든다. 색만으로 발신자를 구분하지 않는다(§8) —
+   스크린리더에는 발신자 접두가 텍스트로 함께 나간다(ChatBubble 래퍼가 처리).
+   -------------------------------------------------------------------------- */
+.bt-bubble-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bt-space-1);
+  max-width: 100%;
+}
+.bt-bubble-row--them { align-items: flex-start; }
+.bt-bubble-row--me { align-items: flex-end; }
+
+.bt-bubble {
+  max-width: min(78%, 46ch); /* 긴 문단도 한 줄이 46자를 넘지 않게 — 가독 폭 */
+  padding: var(--bt-space-3) var(--bt-space-4);
+  border-radius: var(--bt-radius-lg);
+  font-size: var(--bt-text-sm);
+  line-height: var(--bt-lh-sm);
+  white-space: pre-wrap;   /* 사용자가 넣은 줄바꿈 보존 */
+  overflow-wrap: anywhere; /* 긴 URL 이 말풍선을 넘지 않게 */
+}
+.bt-bubble--them {
+  background: var(--bt-color-surface-sunken);
+  border: 1px solid var(--bt-color-border);
+  color: var(--bt-color-text);
+  border-end-start-radius: var(--bt-radius-xs);
+}
+.bt-bubble--me {
+  background: var(--bt-color-action); /* 흰 글자 4.59:1 ✓ (brand 가 아니라 action) */
+  color: var(--bt-color-action-on);
+  border-end-end-radius: var(--bt-radius-xs);
+}
+.bt-bubble__meta {
+  font-size: var(--bt-text-micro);
+  line-height: var(--bt-lh-micro);
+  color: var(--bt-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.bt-bubble__actions { display: flex; align-items: center; gap: var(--bt-space-2); }
+
+/* 선톡·날짜처럼 흐름 사이에 끼는 가운데 정렬 구분 */
+.bt-chat-divider {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--bt-space-2);
+  padding: var(--bt-space-1) 0;
+  font-size: var(--bt-text-caption);
+  line-height: var(--bt-lh-caption);
+  color: var(--bt-color-text-secondary);
+}
+
+/* 답장 생성 중 — 상대 말풍선 자리에 그대로 들어간다 */
+.bt-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--bt-space-3) var(--bt-space-4);
+  border: 1px solid var(--bt-color-border);
+  border-radius: var(--bt-radius-lg);
+  border-end-start-radius: var(--bt-radius-xs);
+  background: var(--bt-color-surface-sunken);
+}
+.bt-typing__dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--bt-color-text-tertiary);
+  animation: bt-typing 1.2s var(--bt-ease-standard) infinite;
+}
+.bt-typing__dot:nth-child(2) { animation-delay: 0.15s; }
+.bt-typing__dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bt-typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+/* 토큰이 duration 만 1ms 로 바꾸므로 무한 애니메이션은 여기서 직접 멈춘다(§8) */
+@media (prefers-reduced-motion: reduce) {
+  .bt-typing__dot { animation: none; opacity: 0.55; }
+}
+
+/* --------------------------------------------------------------------------
    List row — 연습 기록(§17.1)
    -------------------------------------------------------------------------- */
 .bt-row {

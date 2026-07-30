@@ -39,6 +39,10 @@ public record AiSessionEndedEvent(
 				SessionTerminationReason reason
 		) {
 			return switch (reason) {
+				case NORMAL_COMPLETION -> NORMAL;
+				case USER_REQUEST -> PARTICIPANT_LEFT;
+				case SAFETY_CONCERN, OTHER -> ROOM_CLOSED;
+				case TECHNICAL_ISSUE -> ERROR;
 				case TIME_EXPIRED -> TIMEOUT;
 				case RECONNECT_TIMEOUT -> PARTICIPANT_LEFT;
 			};

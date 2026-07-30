@@ -15,11 +15,21 @@ public record LiveKitProperties(
 		apiKey = apiKey == null ? "" : apiKey.trim();
 		apiSecret = apiSecret == null ? "" : apiSecret.trim();
 		emptyTimeoutSeconds = emptyTimeoutSeconds <= 0 ? 600 : emptyTimeoutSeconds;
-		maxParticipants = maxParticipants <= 0 ? 2 : maxParticipants;
+		maxParticipants = maxParticipants <= 0 ? 3 : maxParticipants;
 	}
 
 	public boolean configured() {
 		return !url.isBlank() && !apiKey.isBlank() && !apiSecret.isBlank();
+	}
+
+	public String clientUrl() {
+		if (url.regionMatches(true, 0, "https://", 0, 8)) {
+			return "wss://" + url.substring(8);
+		}
+		if (url.regionMatches(true, 0, "http://", 0, 7)) {
+			return "ws://" + url.substring(7);
+		}
+		return url;
 	}
 
 	private static String normalizeServerApiUrl(String value) {

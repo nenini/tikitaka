@@ -99,6 +99,14 @@ ai:
   session:
     internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
     coaching-min-interval: ${AI_COACHING_MIN_INTERVAL:10s}
+  session-event:
+    base-url: ${AI_SESSION_BASE_URL:}
+    event-path: ${AI_SESSION_EVENT_PATH:/api/v1/sessions/events}
+    connect-timeout: ${AI_SESSION_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_SESSION_REQUEST_TIMEOUT:5s}
+    internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
+    max-attempts: ${AI_SESSION_EVENT_MAX_ATTEMPTS:3}
+    retry-delay: ${AI_SESSION_EVENT_RETRY_DELAY:1s}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
@@ -148,7 +156,7 @@ livekit:
   api-key: ${LIVEKIT_API_KEY:}
   api-secret: ${LIVEKIT_API_SECRET:}
   empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
-  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:2}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:3}
 
 notification:
   waiting-recommendation:

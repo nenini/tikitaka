@@ -10,6 +10,7 @@ import {
   Callout,
   Card,
   CardHeader,
+  ChatBubble,
   Chip,
   Cluster,
   CoachToast,
@@ -39,6 +40,7 @@ import {
   TagChip,
   ThemeToggle,
   TopicButton,
+  TypingIndicator,
   iconNames,
 } from '@/components'
 
@@ -266,6 +268,37 @@ export function ComponentGallery() {
             />
           </Card>
         </div>
+      </Section>
+
+      <Section title="Chat bubble · Typing (AI 챗봇 W-10b)">
+        <Card style={{ maxWidth: 520 }}>
+          <Stack gap={8}>
+            <div className="bt-chat-divider">오늘</div>
+            <ChatBubble side="them" senderLabel="지우" meta="14:02">
+              안녕하세요! 오늘 하루 어떠셨어요?
+            </ChatBubble>
+            <ChatBubble
+              side="me"
+              senderLabel="나"
+              meta="14:03"
+              actions={
+                <Button variant="ghost" size="sm">
+                  피드백 보기
+                </Button>
+              }
+            >
+              안녕하세요 :) 오늘은 좀 바빴는데 이제 좀 여유가 생겼어요
+            </ChatBubble>
+            <div className="bt-chat-divider">
+              <Badge tone="warning">선톡</Badge>
+              <span>12시간 무응답 · 1회 한정</span>
+            </div>
+            <ChatBubble side="them" senderLabel="지우" meta="14:20">
+              점심 뭐 드셨어요? 😊
+            </ChatBubble>
+            <TypingIndicator name="지우" />
+          </Stack>
+        </Card>
       </Section>
 
       <Section title="세션 UI (항상 다크)">

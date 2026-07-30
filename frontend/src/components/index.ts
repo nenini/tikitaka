@@ -131,6 +131,10 @@ export type {
   DarkScopeProps,
 } from './layout'
 
+/* ── Chat ── */
+export { ChatBubble, TypingIndicator } from './chat'
+export type { ChatBubbleProps, ChatBubbleSide, TypingIndicatorProps } from './chat'
+
 /* ── Session ── */
 export { CoachToast, TopicButton, QuestionCard, SessionTimer, CallControls, ConnectionIndicator } from './session'
 export type {

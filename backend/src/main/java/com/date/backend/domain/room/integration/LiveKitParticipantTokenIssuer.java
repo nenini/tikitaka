@@ -1,6 +1,8 @@
 package com.date.backend.domain.room.integration;
 
 import com.date.backend.domain.room.config.LiveKitProperties;
+import com.date.backend.global.exception.BusinessException;
+import com.date.backend.global.exception.code.SessionErrorCode;
 import io.livekit.server.AccessToken;
 import io.livekit.server.CanPublish;
 import io.livekit.server.CanSubscribe;
@@ -21,6 +23,11 @@ public class LiveKitParticipantTokenIssuer {
 	public IssuedLiveKitToken issue(Long userId, String roomName) {
 		if (!properties.configured()) {
 			return new IssuedLiveKitToken(false, null, null);
+		}
+		if (roomName == null || roomName.isBlank()) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_LIVEKIT_ROOM_NOT_CONFIGURED
+			);
 		}
 		AccessToken token = new AccessToken(
 				properties.apiKey(),

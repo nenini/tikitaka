@@ -1,0 +1,146 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Badge, Button, Card, Field, Segmented, Spinner } from '@/components'
+import { createChatSession, getPersonaOptions, requestPersonaRecommendation, saveRegionCity } from './api'
+import {
+  PERSONALITY_DESC,
+  PERSONALITY_LABEL,
+  REGION_CITIES,
+  STAGE_DESC,
+  STAGE_LABEL,
+} from './types'
+import type { ConversationStage, PersonaPersonality } from './types'
+
+const STAGE_OPTIONS = (Object.keys(STAGE_LABEL) as ConversationStage[]).map((value) => ({
+  value,
+  label: STAGE_LABEL[value],
+}))
+
+const PERSONALITY_OPTIONS = (Object.keys(PERSONALITY_LABEL) as PersonaPersonality[]).map((value) => ({
+  value,
+  label: PERSONALITY_LABEL[value],
+}))
+
+/**
+ * W-10 챗봇 페르소나 설정 (AI-DATE-01/02 · FE-B).
+ *
+ * 수집 항목
+ *  - 지역(시·도만) · 최초 1회, 이미 있으면 건너뛴다
+ *  - 연습 단계: 소개팅 전 / 소개팅 후
+ *  - 성향: 적극적 / 중간 / 내향적
+ * 
+ */
+export function PersonaSetupPage() {
+  const navigate = useNavigate()
+
+  const [loading, setLoading] = useState(true)
+  const [needsRegion, setNeedsRegion] = useState(false)
+  const [regionCity, setRegionCity] = useState('')
+  const [stage, setStage] = useState<ConversationStage>('BEFORE_DATE')
+  const [personality, setPersonality] = useState<PersonaPersonality>('MIDDLE')
+  const [starting, setStarting] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([getPersonaOptions(), requestPersonaRecommendation()]).then(([options, rec]) => {
+      if (!alive) return
+      setNeedsRegion(!options.regionCity)
+      setStage(rec.stage)
+      setPersonality(rec.personality)
+      setLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const regionValid = !needsRegion || regionCity !== ''
+
+  async function handleStart() {
+    if (starting || !regionValid) return
+    setStarting(true)
+    try {
+      if (needsRegion) await saveRegionCity(regionCity)
+      const session = await createChatSession({ stage, personality })
+      navigate(`/chatbot/${session.chatSessionId}`, { replace: true })
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="mx-auto flex w-full max-w-[720px] justify-center px-5 py-24">
+        <Spinner label="상대 설정을 불러오는 중" />
+      </main>
+    )
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
+      <header className="mb-5">
+        <h1 className="bt-h1">어떤 상대와 연습할까요?</h1>
+        <p className="bt-body bt-muted mt-1">
+          AI 채팅은 <b>텍스트</b>로 진행됩니다. 소개팅 전후 대화 감각을 익혀요. </p>
+      </header>
+
+      <div className="flex flex-col gap-4">
+        {needsRegion && (
+          <Card className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <b className="bt-h3">지역 입력</b>
+              <Badge tone="info">최초 1회</Badge>
+            </div>
+            <Field label="시 · 도" required>
+              {({ id }) => (
+                <select
+                  id={id}
+                  className="bt-input"
+                  value={regionCity}
+                  onChange={(e) => setRegionCity(e.currentTarget.value)}
+                >
+                  <option value="" disabled>
+                    선택해 주세요
+                  </option>
+                  {REGION_CITIES.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <p className="bt-caption bt-muted">
+              챗봇을 처음 쓸 때만 받아요. 대화 중 약속 장소 선정에 활용돼요.
+            </p>
+          </Card>
+        )}
+
+        <Card className="flex flex-col gap-3">
+          <b className="bt-h3">연습 단계</b>
+          <Segmented aria-label="연습 단계" options={STAGE_OPTIONS} value={stage} onChange={setStage} />
+          <p className="bt-caption bt-muted">{STAGE_DESC[stage]}</p>
+        </Card>
+
+        <Card className="flex flex-col gap-3">
+          <b className="bt-h3">성향</b>
+          <Segmented
+            aria-label="성향"
+            options={PERSONALITY_OPTIONS}
+            value={personality}
+            onChange={setPersonality}
+          />
+          <p className="bt-caption bt-muted">{PERSONALITY_DESC[personality]}</p>
+        </Card>
+
+        {/* <Callout tone="info">
+          12시간 동안 답장이 없으면 챗봇이 <b>1회만</b> 먼저 말을 걸어요(야간 00–09시는 아침까지 보류).
+        </Callout> */}
+
+        <Button size="lg" block loading={starting} disabled={!regionValid} onClick={handleStart}>
+          대화 시작
+        </Button>
+      </div>
+    </main>
+  )
+}
