@@ -12,6 +12,8 @@ public record PeerEvaluationResultResponse(
 		int reactionScore,
 		int balanceScore,
 		int mannerScore,
+		String goodBehaviorText,
+		String improvementText,
 		LocalDateTime submittedAt
 ) {
 	public static PeerEvaluationResultResponse from(PeerEvaluation evaluation) {
@@ -23,6 +25,8 @@ public record PeerEvaluationResultResponse(
 				evaluation.getReactionScore(),
 				evaluation.getBalanceScore(),
 				evaluation.getMannerScore(),
+				evaluation.getGoodBehaviorText(),
+				evaluation.getImprovementText(),
 				evaluation.getSubmittedAt()
 		);
 	}

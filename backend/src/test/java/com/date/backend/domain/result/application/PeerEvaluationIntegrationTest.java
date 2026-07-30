@@ -87,9 +87,13 @@ class PeerEvaluationIntegrationTest {
 		assertThat(evaluationService.getStatus(
 				fixture.firstUserId(), fixture.sessionId()
 		).allSubmitted()).isTrue();
-		assertThat(evaluationService.getResult(
+		var receivedResult = evaluationService.getResult(
 				fixture.firstUserId(), fixture.sessionId()
-		).comfortScore()).isEqualTo(4);
+		);
+		assertThat(receivedResult.comfortScore()).isEqualTo(4);
+		assertThat(receivedResult.goodBehaviorText()).isEqualTo("좋았어요.");
+		assertThat(receivedResult.improvementText())
+				.isEqualTo("조금 더 질문해 주세요.");
 		assertThat(applicationEvents.stream(PeerEvaluationsCompletedEvent.class))
 				.hasSize(1);
 
