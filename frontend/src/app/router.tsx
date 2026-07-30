@@ -21,6 +21,12 @@ import {
 } from '@/features/account/AccountEditPage'
 import { SessionPage } from '@/features/session/SessionPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
+import { AdminProtectedRoute } from './AdminProtectedRoute'
+import { AdminShell } from '@/features/admin/AdminShell'
+import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
+import { ReportsAdminPage } from '@/features/admin/ReportsAdminPage'
+import { PolicyAdminPage } from '@/features/admin/PolicyAdminPage'
+import { AdminPlaceholder } from '@/features/admin/AdminPlaceholder'
 
 /**
  * 앱 라우팅.
@@ -63,6 +69,24 @@ export const router = createBrowserRouter([
       },
       // ── 몰입형(다크 고정) — 셸 밖 ──
       { path: '/session/:sessionId', element: <SessionPage /> },
+    ],
+  },
+  // ── 관리자(ADMIN 롤 전용) — 별도 가드 + 관리자 셸(좌측 사이드바) ──
+  {
+    element: <AdminProtectedRoute />,
+    children: [
+      {
+        element: <AdminShell />,
+        children: [
+          { path: '/admin', element: <AdminDashboardPage /> },
+          { path: '/admin/reports', element: <ReportsAdminPage /> },
+          { path: '/admin/policy', element: <PolicyAdminPage /> },
+          // 사이드바에 있으나 이번 차수 목업 없는 화면 — 스텁
+          { path: '/admin/members', element: <AdminPlaceholder title="회원 관리" /> },
+          { path: '/admin/presets', element: <AdminPlaceholder title="사전 데이터" /> },
+          { path: '/admin/analytics', element: <AdminPlaceholder title="리포트" /> },
+        ],
+      },
     ],
   },
 ])
