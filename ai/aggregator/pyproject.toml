@@ -5,8 +5,12 @@ description = "통제실 — 실시간 코칭 집계 엔진 (STT 신호 → 분�
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.116",
+    "httpx>=0.28",
     "pydantic>=2.13.4",
     "numpy>=2.1",
+    "python-dotenv>=1.1",
+    "uvicorn[standard]>=0.35",
 ]
 
 # aggregator는 stt와 같은 방식(pythonpath)으로 stt 패키지를 참조한다.

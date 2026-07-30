@@ -36,6 +36,44 @@ uv run mypy         # strict + pydantic 플러그인, Any 금지
 uv run pytest -q    # Mock TranscriptEvent 주입
 ```
 
+## Backend 세션 연동
+
+Backend가 세션 시작·종료를 알려주면 세션별 `SessionAggregator`를 만들고,
+생성된 내부 `CoachingCommand v2`를 Backend `COACHING_REQUESTED v1`로 변환해
+전송한다. MVP 침묵 정책은 **10초 후 두 참가자에게 각각
+`SILENCE_RECOVERY` 코칭**이며 15/30/45초 단계형 침묵 API는 사용하지 않는다.
+
+`.env.example`을 `.env`로 복사해 실제 공유 토큰과 Backend 주소를 넣는다.
+`.env`는 Git에서 제외된다.
+
+```bash
+cp .env.example .env
+uv run python -m aggregator
+```
+
+수신 API:
+
+```text
+GET  /health
+POST /api/v1/sessions/events
+```
+
+Backend 전송 API:
+
+```text
+POST /internal/ai/coaching-events
+```
+
+선택 환경변수:
+
+```text
+BACKEND_REQUEST_TIMEOUT_SECONDS=5
+BACKEND_EVENT_MAX_ATTEMPTS=3
+BACKEND_EVENT_RETRY_DELAY_SECONDS=1
+AGGREGATOR_TICK_INTERVAL_SECONDS=0.5
+AGGREGATOR_SHUTDOWN_FLUSH_TIMEOUT_SECONDS=3
+```
+
 ## 라이브 데모 (마이크 + GPU + stt 런타임 의존 필요)
 `live_demo`는 stt의 런타임 의존(faster-whisper 등)이 필요하다. stt 실행 환경에서 stt를
 `PYTHONPATH`에 두고 실행한다.
