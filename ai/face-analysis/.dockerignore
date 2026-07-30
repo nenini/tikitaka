@@ -1,0 +1,19 @@
+# 빌드 컨텍스트 제외 (이미지 경량화 + 큰/비공개 데이터 차단)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+scripts/
+reports/
+# 모델·참조 데이터는 런타임 볼륨 마운트 (이미지에 안 넣음)
+artifacts/
+models/
+data/사진데이터/
+data/processed/
+data/crawl/
+*.onnx
+*.task
+*.h5
