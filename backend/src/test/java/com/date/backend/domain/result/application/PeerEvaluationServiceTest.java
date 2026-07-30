@@ -16,7 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -51,7 +53,8 @@ class PeerEvaluationServiceTest {
 				participantRepository,
 				evaluationRepository,
 				eventPublisher,
-				clock
+				clock,
+				Duration.ofHours(48)
 		);
 	}
 
@@ -109,6 +112,52 @@ class PeerEvaluationServiceTest {
 		assertThat(status.mySubmitted()).isTrue();
 		assertThat(status.partnerSubmitted()).isFalse();
 		assertThat(status.allSubmitted()).isFalse();
+		assertThat(status.deadlineAt())
+				.isEqualTo(LocalDateTime.of(2026, 7, 31, 12, 0));
+		assertThat(status.remainingSeconds()).isEqualTo(86_400);
+		assertThat(status.submissionOpen()).isFalse();
+		assertThat(status.resultAvailable()).isFalse();
+		assertThat(status.resultPermanentlyLocked()).isFalse();
+	}
+
+	@Test
+	void rejectsSubmissionAfterFortyEightHourDeadline() {
+		WaitingRoom session = givenCompletedSession();
+		when(session.getActualEndAt())
+				.thenReturn(LocalDateTime.of(2026, 7, 28, 11, 59));
+		when(sessionRepository.findWithMatchPairByIdForUpdate(1L))
+				.thenReturn(Optional.of(session));
+		when(evaluationRepository.existsBySessionIdAndEvaluatorUserId(1L, 10L))
+				.thenReturn(false);
+
+		assertThatThrownBy(() -> service.submit(10L, 1L, request()))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ResultErrorCode.EVALUATION_DEADLINE_EXPIRED)
+				);
+	}
+
+	@Test
+	void permanentlyLocksResultWhenUserMissesDeadline() {
+		WaitingRoom session = givenCompletedSession();
+		when(session.getActualEndAt())
+				.thenReturn(LocalDateTime.of(2026, 7, 28, 12, 0));
+		when(evaluationRepository.existsBySessionIdAndEvaluatorUserId(1L, 10L))
+				.thenReturn(false);
+		when(evaluationRepository.existsBySessionIdAndEvaluatorUserId(1L, 20L))
+				.thenReturn(true);
+
+		var status = service.getStatus(10L, 1L);
+
+		assertThat(status.submissionOpen()).isFalse();
+		assertThat(status.resultAvailable()).isFalse();
+		assertThat(status.resultPermanentlyLocked()).isTrue();
+		assertThat(status.remainingSeconds()).isZero();
+		assertThatThrownBy(() -> service.getResult(10L, 1L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ResultErrorCode.EVALUATION_RESULT_LOCKED)
+				);
 	}
 
 	@Test
@@ -130,6 +179,8 @@ class PeerEvaluationServiceTest {
 		RoomParticipant first = mock(RoomParticipant.class);
 		RoomParticipant second = mock(RoomParticipant.class);
 		when(session.getStatus()).thenReturn(RoomSessionStatus.COMPLETED);
+		when(session.getActualEndAt())
+				.thenReturn(LocalDateTime.of(2026, 7, 29, 12, 0));
 		when(first.getUserId()).thenReturn(10L);
 		when(second.getUserId()).thenReturn(20L);
 		when(sessionRepository.findWithMatchPairById(1L))

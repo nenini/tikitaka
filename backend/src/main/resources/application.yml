@@ -131,6 +131,9 @@ match:
     fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
     initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
 
+result:
+  evaluation-submission-window: ${RESULT_EVALUATION_SUBMISSION_WINDOW:48h}
+
 room:
   entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
   entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}

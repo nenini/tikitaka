@@ -22,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -35,19 +37,28 @@ public class PeerEvaluationService {
 	private final PeerEvaluationRepository evaluationRepository;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
+	private final Duration submissionWindow;
 
 	public PeerEvaluationService(
 			WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
 			PeerEvaluationRepository evaluationRepository,
 			ApplicationEventPublisher eventPublisher,
-			Clock clock
+			Clock clock,
+			@Value("${result.evaluation-submission-window:48h}")
+			Duration submissionWindow
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.evaluationRepository = evaluationRepository;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
+		if (submissionWindow.isZero() || submissionWindow.isNegative()) {
+			throw new IllegalArgumentException(
+					"평가 제출 가능 시간은 0보다 커야 합니다."
+			);
+		}
+		this.submissionWindow = submissionWindow;
 	}
 
 	@Transactional(readOnly = true)
@@ -75,11 +86,20 @@ public class PeerEvaluationService {
 				evaluationRepository.existsBySessionIdAndEvaluatorUserId(
 						sessionId, context.partnerUserId()
 				);
+		LocalDateTime now = LocalDateTime.now(clock);
+		LocalDateTime deadlineAt = evaluationDeadline(context.session());
+		boolean deadlineExpired = !now.isBefore(deadlineAt);
+		boolean submissionOpen = !mySubmitted && !deadlineExpired;
 		return new EvaluationStatusResponse(
 				sessionId,
 				mySubmitted,
 				partnerSubmitted,
-				mySubmitted && partnerSubmitted
+				mySubmitted && partnerSubmitted,
+				deadlineAt,
+				remainingSeconds(now, deadlineAt),
+				submissionOpen,
+				mySubmitted && partnerSubmitted,
+				!mySubmitted && deadlineExpired
 		);
 	}
 
@@ -97,6 +117,11 @@ public class PeerEvaluationService {
 			throw new BusinessException(ResultErrorCode.EVALUATION_ALREADY_SUBMITTED);
 		}
 		LocalDateTime now = LocalDateTime.now(clock);
+		if (!now.isBefore(evaluationDeadline(context.session()))) {
+			throw new BusinessException(
+					ResultErrorCode.EVALUATION_DEADLINE_EXPIRED
+			);
+		}
 		PeerEvaluation evaluation = new PeerEvaluation(
 				sessionId,
 				userId,
@@ -140,6 +165,11 @@ public class PeerEvaluationService {
 	@Transactional(readOnly = true)
 	public PeerEvaluationResultResponse getResult(Long userId, Long sessionId) {
 		completedSessionParticipants(userId, sessionId);
+		if (!evaluationRepository.existsBySessionIdAndEvaluatorUserId(
+				sessionId, userId
+		)) {
+			throw new BusinessException(ResultErrorCode.EVALUATION_RESULT_LOCKED);
+		}
 		if (evaluationRepository.countBySessionId(sessionId) < 2) {
 			throw new BusinessException(ResultErrorCode.EVALUATION_NOT_COMPLETED);
 		}
@@ -213,5 +243,25 @@ public class PeerEvaluationService {
 	}
 
 	private record SessionParticipants(WaitingRoom session, Long partnerUserId) {
+	}
+
+	private LocalDateTime evaluationDeadline(WaitingRoom session) {
+		LocalDateTime endedAt = session.getActualEndAt();
+		if (endedAt == null) {
+			throw new BusinessException(
+					ResultErrorCode.EVALUATION_SESSION_NOT_COMPLETED
+			);
+		}
+		return endedAt.plus(submissionWindow);
+	}
+
+	private long remainingSeconds(
+			LocalDateTime now,
+			LocalDateTime deadlineAt
+	) {
+		if (!now.isBefore(deadlineAt)) {
+			return 0;
+		}
+		return Duration.between(now, deadlineAt).getSeconds();
 	}
 }

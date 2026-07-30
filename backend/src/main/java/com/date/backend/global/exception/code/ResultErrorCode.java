@@ -19,6 +19,16 @@ public enum ResultErrorCode implements ErrorCode {
 			"EVALUATION_ALREADY_SUBMITTED",
 			"이미 상대 평가를 제출했습니다."
 	),
+	EVALUATION_DEADLINE_EXPIRED(
+			HttpStatus.CONFLICT,
+			"EVALUATION_DEADLINE_EXPIRED",
+			"상대 평가 제출 기한이 지났습니다."
+	),
+	EVALUATION_RESULT_LOCKED(
+			HttpStatus.FORBIDDEN,
+			"EVALUATION_RESULT_LOCKED",
+			"본인의 평가를 제출해야 상대 평가를 확인할 수 있습니다."
+	),
 	EVALUATION_NOT_FOUND(
 			HttpStatus.NOT_FOUND,
 			"EVALUATION_NOT_FOUND",
