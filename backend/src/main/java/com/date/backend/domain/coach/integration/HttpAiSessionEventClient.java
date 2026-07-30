@@ -25,6 +25,7 @@ public class HttpAiSessionEventClient implements AiSessionEventClient {
 		this.properties = properties;
 		this.objectMapper = objectMapper;
 		this.httpClient = HttpClient.newBuilder()
+				.version(HttpClient.Version.HTTP_1_1)
 				.connectTimeout(properties.connectTimeout())
 				.build();
 		this.eventUri = URI.create(properties.eventUrl());

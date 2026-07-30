@@ -3,7 +3,9 @@ package com.date.backend.domain.silence.api;
 import com.date.backend.domain.silence.application.QuestionCardService;
 import com.date.backend.domain.silence.dto.QuestionCardListResponse;
 import com.date.backend.global.api.ApiResponse;
+import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Validated
 @RequestMapping("/api/v1/sessions")
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public class QuestionCardController {
 	private final QuestionCardService questionCardService;
 
