@@ -3,19 +3,21 @@ name = "aggregator"
 version = "0.1.0"
 description = "통제실 — 실시간 코칭 집계 엔진 (STT 신호 → 분석 이벤트)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.116",
     "httpx>=0.28",
+    "livekit>=1.0",
     "pydantic>=2.13.4",
     "numpy>=2.1",
     "python-dotenv>=1.1",
+    "stt-pipeline",
     "uvicorn[standard]>=0.35",
 ]
 
-# aggregator는 stt와 같은 방식(pythonpath)으로 stt 패키지를 참조한다.
-# stt는 build-system이 없어 editable 설치 대상이 아니므로, 의존성으로 넣지 않고
-# pythonpath(../stt)로 import 한다. live_demo 런타임은 stt의 풀 의존(faster-whisper 등)이 필요.
+[tool.uv.sources]
+stt-pipeline = { path = "../stt" }
+
 [tool.uv]
 package = false
 
@@ -40,7 +42,13 @@ files = ["aggregator", "tests"]
 
 # 서드파티(스텁 없음) — 런타임 전용, 타입체크에서 무시
 [[tool.mypy.overrides]]
-module = ["sounddevice", "faster_whisper", "faster_whisper.*"]
+module = [
+    "sounddevice",
+    "faster_whisper",
+    "faster_whisper.*",
+    "livekit",
+    "livekit.*",
+]
 ignore_missing_imports = true
 
 # stt는 타입 힌트가 있으나 py.typed가 없어 소스 타입을 따라가되(에러는 silent로 억제),
