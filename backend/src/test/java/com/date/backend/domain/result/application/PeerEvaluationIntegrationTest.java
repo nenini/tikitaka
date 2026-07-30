@@ -69,7 +69,9 @@ class PeerEvaluationIntegrationTest {
 
 	@Test
 	void bothParticipantsSubmitOnceAndCanReadReceivedResult() {
-		SessionFixture fixture = createCompletedSession();
+		SessionFixture fixture = createEndedSession(
+				SessionTerminationReason.TIME_EXPIRED
+		);
 
 		var firstSubmission = evaluationService.submit(
 				fixture.firstUserId(), fixture.sessionId(), request(5)
@@ -105,7 +107,55 @@ class PeerEvaluationIntegrationTest {
 		);
 	}
 
-	private SessionFixture createCompletedSession() {
+	@Test
+	void normalCompletionAllowsEvaluation() {
+		SessionFixture fixture = createEndedSession(
+				SessionTerminationReason.NORMAL_COMPLETION
+		);
+
+		assertThat(evaluationService.getItems(
+				fixture.firstUserId(), fixture.sessionId()
+		).items()).hasSize(6);
+	}
+
+	@Test
+	void cancelledSessionRejectsEvaluation() {
+		SessionFixture fixture = createEndedSession(
+				SessionTerminationReason.USER_REQUEST
+		);
+
+		assertThatThrownBy(() -> evaluationService.getItems(
+				fixture.firstUserId(), fixture.sessionId()
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode())
+						.isEqualTo(ResultErrorCode.EVALUATION_SESSION_NOT_COMPLETED)
+		);
+	}
+
+	@Test
+	void optionalTextCanBeOmittedAndIsReturnedAsNull() {
+		SessionFixture fixture = createEndedSession(
+				SessionTerminationReason.TIME_EXPIRED
+		);
+		evaluationService.submit(
+				fixture.firstUserId(), fixture.sessionId(), request(5)
+		);
+		evaluationService.submit(
+				fixture.secondUserId(),
+				fixture.sessionId(),
+				new PeerEvaluationSubmitRequest(
+						4, 4, 4, 4, 4, 4, null, " "
+				)
+		);
+
+		var received = evaluationService.getResult(
+				fixture.firstUserId(), fixture.sessionId()
+		);
+		assertThat(received.goodBehaviorText()).isNull();
+		assertThat(received.improvementText()).isNull();
+	}
+
+	private SessionFixture createEndedSession(SessionTerminationReason reason) {
 		String suffix = UUID.randomUUID().toString().replace("-", "");
 		User firstUser = saveUser(suffix, "a", "1");
 		User secondUser = saveUser(suffix, "b", "2");
@@ -146,11 +196,22 @@ class PeerEvaluationIntegrationTest {
 			managed.markWaiting();
 			managed.markReady();
 			managed.start(SESSION_TIME);
-			managed.complete(
-					SESSION_TIME.plusMinutes(30),
-					SessionTerminationReason.TIME_EXPIRED,
-					null
-			);
+			if (reason == SessionTerminationReason.NORMAL_COMPLETION
+					|| reason == SessionTerminationReason.TIME_EXPIRED) {
+				managed.complete(
+						SESSION_TIME.plusMinutes(30),
+						reason,
+						reason == SessionTerminationReason.NORMAL_COMPLETION
+								? firstUser.getId()
+								: null
+				);
+			} else {
+				managed.terminate(
+						SESSION_TIME.plusMinutes(10),
+						reason,
+						firstUser.getId()
+				);
+			}
 		});
 		return new SessionFixture(
 				session.getId(),

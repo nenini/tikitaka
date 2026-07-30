@@ -29,7 +29,8 @@ public interface PeerEvaluationSwaggerDocs {
 
 	@Operation(
 			summary = "양측 평가 제출 상태 조회",
-			description = "본인과 상대방의 평가 제출 여부를 조회합니다."
+			description = "본인과 상대방의 평가 제출 여부를 조회합니다. "
+					+ "현재 평가 결과는 양측이 모두 제출한 뒤 공개됩니다."
 	)
 	ApiResponse<EvaluationStatusResponse> getStatus(
 			@Parameter(hidden = true) AuthUser authUser,
@@ -39,7 +40,10 @@ public interface PeerEvaluationSwaggerDocs {
 
 	@Operation(
 			summary = "상대 평가 제출",
-			description = "정상 종료된 세션의 상대방을 한 번만 평가할 수 있습니다."
+			description = "정상 완료 또는 시간 만료로 종료된 세션의 상대방을 한 번만 평가할 수 있습니다. "
+					+ "별점 6개는 모두 필수이며 1~5점이고, 서술형 2개는 선택이며 각각 최대 1,000자입니다. "
+					+ "응답의 reportRequested는 실제 리포트 생성 완료가 아니라 "
+					+ "양측 평가 완료 이벤트 발행 여부를 의미합니다."
 	)
 	ApiResponse<PeerEvaluationSubmitResponse> submit(
 			@Parameter(hidden = true) AuthUser authUser,
@@ -50,7 +54,8 @@ public interface PeerEvaluationSwaggerDocs {
 
 	@Operation(
 			summary = "내가 받은 평가 결과 조회",
-			description = "양측 제출 완료 후 상대방이 나에게 부여한 점수를 조회합니다."
+			description = "양측 제출 완료 후 상대방이 나에게 부여한 별점과 "
+					+ "선택 서술형 피드백을 조회합니다."
 	)
 	ApiResponse<PeerEvaluationResultResponse> getResult(
 			@Parameter(hidden = true) AuthUser authUser,

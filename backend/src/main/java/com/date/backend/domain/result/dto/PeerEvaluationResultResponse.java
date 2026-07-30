@@ -1,6 +1,7 @@
 package com.date.backend.domain.result.dto;
 
 import com.date.backend.domain.result.domain.PeerEvaluation;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
@@ -12,7 +13,9 @@ public record PeerEvaluationResultResponse(
 		int reactionScore,
 		int balanceScore,
 		int mannerScore,
+		@Schema(description = "상대방이 작성한 잘했던 행동(선택)", nullable = true)
 		String goodBehaviorText,
+		@Schema(description = "상대방이 작성한 개선하면 좋을 행동(선택)", nullable = true)
 		String improvementText,
 		LocalDateTime submittedAt
 ) {
