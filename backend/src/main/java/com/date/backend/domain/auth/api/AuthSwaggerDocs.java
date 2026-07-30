@@ -42,21 +42,17 @@ public interface AuthSwaggerDocs {
 
 	@Operation(
 			summary = "소셜 로그인 콜백",
-			description = "OAuth 제공자의 인가 코드를 검증해 토큰을 발급한 뒤, 프론트엔드 콜백 라우트로 302 리다이렉트합니다."
-					+ " 토큰은 URL 해시 프래그먼트로 전달됩니다(SPA 가 수신·저장)."
+			description = "OAuth 제공자의 인가 코드를 검증하고 서비스 Access Token과 Refresh Token을 발급합니다."
 	)
 	@ApiResponses({
-			@io.swagger.v3.oas.annotations.responses.ApiResponse(
-					responseCode = "302",
-					description = "소셜 로그인 성공 — 프론트엔드 콜백으로 리다이렉트"
-			),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "소셜 로그인 성공"),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(
 					responseCode = "400",
 					description = "유효하지 않은 state 또는 요청값"
 			),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "OAuth 인증 실패")
 	})
-	ResponseEntity<Void> oauthCallback(
+	ResponseEntity<ApiResponse<AuthTokenResponse>> oauthCallback(
 			@Parameter(description = "OAuth 제공자", example = "google") String provider,
 			@Parameter(description = "OAuth 인가 코드") String code,
 			@Parameter(description = "CSRF 방지용 상태값") String state,
