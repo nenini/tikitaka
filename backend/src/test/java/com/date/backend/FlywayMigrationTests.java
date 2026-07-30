@@ -47,6 +47,11 @@ class FlywayMigrationTests {
 		Integer aiResponseStateColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIRESPONSESTATE");
 		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
 		Integer liveKitRoomNameColumnCount = columnCount("SESSIONS", "LIVEKITROOMNAME");
+		Integer liveKitRoomNameBackfillMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '31'",
+				Integer.class
+		);
 		Integer roomDeviceCheckTableCount = tableCount("ROOM_DEVICE_CHECKS");
 		Integer participantIdentityColumnCount = columnCount(
 				"SESSION_PARTICIPANTS",
@@ -79,6 +84,10 @@ class FlywayMigrationTests {
 		Integer sessionTimerExpiredColumnCount = columnCount(
 				"SESSIONS",
 				"TIMER_EXPIRED_NOTIFIED_AT"
+		);
+		Integer sessionEndedByUserColumnCount = columnCount(
+				"SESSIONS",
+				"ENDEDBYUSERID"
 		);
 		Integer liveKitWebhookEventTableCount =
 				tableCount("LIVEKIT_WEBHOOK_EVENTS");
@@ -182,7 +191,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(26);
+		assertThat(migrationCount).isEqualTo(28);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -202,6 +211,7 @@ class FlywayMigrationTests {
 		assertThat(aiResponseStateColumnCount).isEqualTo(1);
 		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
 		assertThat(liveKitRoomNameColumnCount).isEqualTo(1);
+		assertThat(liveKitRoomNameBackfillMigrationCount).isEqualTo(1);
 		assertThat(roomDeviceCheckTableCount).isEqualTo(1);
 		assertThat(participantIdentityColumnCount).isEqualTo(1);
 		assertThat(participantConnectionStatusColumnCount).isEqualTo(1);
@@ -211,6 +221,7 @@ class FlywayMigrationTests {
 		assertThat(participantNetworkQualityColumnCount).isEqualTo(1);
 		assertThat(sessionEndingSoonColumnCount).isEqualTo(1);
 		assertThat(sessionTimerExpiredColumnCount).isEqualTo(1);
+		assertThat(sessionEndedByUserColumnCount).isEqualTo(1);
 		assertThat(liveKitWebhookEventTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);

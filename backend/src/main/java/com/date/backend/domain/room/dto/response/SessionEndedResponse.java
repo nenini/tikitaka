@@ -10,6 +10,7 @@ public record SessionEndedResponse(
 		Long sessionId,
 		RoomSessionStatus status,
 		SessionTerminationReason reason,
+		Long endedByUserId,
 		LocalDateTime endedAt
 ) {
 	public static final String SESSION_ENDED = "SESSION_ENDED";
