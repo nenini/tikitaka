@@ -6,6 +6,7 @@ import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.AuthErrorCode;
 import com.date.backend.global.exception.code.RoomErrorCode;
+import com.date.backend.global.exception.code.SessionErrorCode;
 import com.date.backend.global.exception.code.UserErrorCode;
 import com.date.backend.global.security.AuthUser;
 import com.date.backend.global.security.JwtTokenProvider;
@@ -27,6 +28,31 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 	private static final String BEARER_PREFIX = "Bearer ";
 	private static final Pattern PARTICIPANT_TOPIC = Pattern.compile(
 			"^/topic/rooms/(\\d+)/participants$"
+	);
+	private static final Pattern SESSION_PARTICIPANT_TOPIC = Pattern.compile(
+			"^/topic/sessions/(\\d+)/participants$"
+	);
+	private static final Pattern SESSION_TIMER_TOPIC = Pattern.compile(
+			"^/topic/sessions/(\\d+)/timer$"
+	);
+	private static final Pattern SESSION_LIFECYCLE_TOPIC = Pattern.compile(
+			"^/topic/sessions/(\\d+)/lifecycle$"
+	);
+	private static final Pattern SESSION_COACHING_QUEUE = Pattern.compile(
+			"^/user/queue/sessions/(\\d+)/coaching$"
+	);
+	private static final Pattern SESSION_SILENCE_TOPIC = Pattern.compile(
+			"^/topic/sessions/(\\d+)/silence$"
+	);
+	private static final Pattern SESSION_QUESTION_QUEUE = Pattern.compile(
+			"^/user/queue/sessions/(\\d+)/questions$"
+	);
+	private static final Pattern SESSION_SAFETY_QUEUE = Pattern.compile(
+			"^/user/queue/sessions/(\\d+)/safety$"
+	);
+	private static final Pattern SESSION_COMMAND = Pattern.compile(
+			"^/app/sessions/(\\d+)/(heartbeat|connection-state|"
+					+ "media-state|network-quality)$"
 	);
 
 	private final JwtTokenProvider jwtTokenProvider;
@@ -51,6 +77,9 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 			authorizeSubscription(accessor);
+		}
+		if (StompCommand.SEND.equals(accessor.getCommand())) {
+			authorizeSend(accessor);
 		}
 		return message;
 	}
@@ -81,18 +110,119 @@ public class RoomStompAuthInterceptor implements ChannelInterceptor {
 		if (destination == null) {
 			return;
 		}
-		Matcher matcher = PARTICIPANT_TOPIC.matcher(destination);
+		Matcher roomMatcher = PARTICIPANT_TOPIC.matcher(destination);
+		if (roomMatcher.matches()) {
+			assertRoomParticipant(
+					Long.parseLong(roomMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher sessionMatcher = SESSION_PARTICIPANT_TOPIC.matcher(destination);
+		if (sessionMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(sessionMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher timerMatcher = SESSION_TIMER_TOPIC.matcher(destination);
+		if (timerMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(timerMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher lifecycleMatcher =
+				SESSION_LIFECYCLE_TOPIC.matcher(destination);
+		if (lifecycleMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(lifecycleMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher coachingMatcher = SESSION_COACHING_QUEUE.matcher(destination);
+		if (coachingMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(coachingMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher silenceMatcher = SESSION_SILENCE_TOPIC.matcher(destination);
+		if (silenceMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(silenceMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher questionMatcher = SESSION_QUESTION_QUEUE.matcher(destination);
+		if (questionMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(questionMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		Matcher safetyMatcher = SESSION_SAFETY_QUEUE.matcher(destination);
+		if (safetyMatcher.matches()) {
+			assertSessionParticipant(
+					Long.parseLong(safetyMatcher.group(1)),
+					authUser(accessor).userId()
+			);
+			return;
+		}
+
+		throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
+	}
+
+	private void authorizeSend(StompHeaderAccessor accessor) {
+		String destination = accessor.getDestination();
+		if (destination == null) {
+			return;
+		}
+		Matcher matcher = SESSION_COMMAND.matcher(destination);
 		if (!matcher.matches()) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_NOT_PARTICIPANT
+			);
+		}
+		assertSessionParticipant(
+				Long.parseLong(matcher.group(1)),
+				authUser(accessor).userId()
+		);
+	}
+
+	private AuthUser authUser(StompHeaderAccessor accessor) {
+		if (accessor.getUser()
+				instanceof UsernamePasswordAuthenticationToken authentication
+				&& authentication.getPrincipal() instanceof AuthUser authUser) {
+			return authUser;
+		}
+		throw new BusinessException(AuthErrorCode.UNAUTHORIZED);
+	}
+
+	private void assertRoomParticipant(Long roomId, Long userId) {
+		if (!participantRepository.existsByRoom_IdAndUserId(roomId, userId)) {
 			throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
 		}
-		if (accessor.getUser() == null
-				|| !(accessor.getUser() instanceof UsernamePasswordAuthenticationToken authentication)
-				|| !(authentication.getPrincipal() instanceof AuthUser authUser)) {
-			throw new BusinessException(AuthErrorCode.UNAUTHORIZED);
-		}
-		Long roomId = Long.parseLong(matcher.group(1));
-		if (!participantRepository.existsByRoom_IdAndUserId(roomId, authUser.userId())) {
-			throw new BusinessException(RoomErrorCode.ROOM_NOT_PARTICIPANT);
+	}
+
+	private void assertSessionParticipant(Long sessionId, Long userId) {
+		if (!participantRepository.existsByRoom_IdAndUserId(sessionId, userId)) {
+			throw new BusinessException(
+					SessionErrorCode.SESSION_NOT_PARTICIPANT
+			);
 		}
 	}
 }

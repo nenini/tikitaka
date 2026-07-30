@@ -1,0 +1,10 @@
+package com.date.backend.domain.coach.domain;
+
+public enum CoachingType {
+	SILENCE_RECOVERY,
+	RESPONSE_PROMPT,
+	REACTION_PROMPT,
+	ATTENTION_RECOVERY,
+	VISION_SETUP_GUIDANCE,
+	EXPRESSION_GUIDANCE
+}

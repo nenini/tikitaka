@@ -47,7 +47,50 @@ class FlywayMigrationTests {
 		Integer aiResponseStateColumnCount = columnCount("CHATBOT_CONVERSATIONS", "AIRESPONSESTATE");
 		Integer pendingUserMessageColumnCount = columnCount("CHATBOT_CONVERSATIONS", "PENDINGUSERMESSAGEID");
 		Integer liveKitRoomNameColumnCount = columnCount("SESSIONS", "LIVEKITROOMNAME");
+		Integer liveKitRoomNameBackfillMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '31'",
+				Integer.class
+		);
 		Integer roomDeviceCheckTableCount = tableCount("ROOM_DEVICE_CHECKS");
+		Integer participantIdentityColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"PARTICIPANT_IDENTITY"
+		);
+		Integer participantConnectionStatusColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"CONNECTION_STATUS"
+		);
+		Integer participantHeartbeatColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"LAST_HEARTBEAT_AT"
+		);
+		Integer participantReconnectDeadlineColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"RECONNECT_DEADLINE_AT"
+		);
+		Integer participantCameraEnabledColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"CAMERA_ENABLED"
+		);
+		Integer participantNetworkQualityColumnCount = columnCount(
+				"SESSION_PARTICIPANTS",
+				"NETWORK_QUALITY"
+		);
+		Integer sessionEndingSoonColumnCount = columnCount(
+				"SESSIONS",
+				"ENDING_SOON_NOTIFIED_AT"
+		);
+		Integer sessionTimerExpiredColumnCount = columnCount(
+				"SESSIONS",
+				"TIMER_EXPIRED_NOTIFIED_AT"
+		);
+		Integer sessionEndedByUserColumnCount = columnCount(
+				"SESSIONS",
+				"ENDEDBYUSERID"
+		);
+		Integer liveKitWebhookEventTableCount =
+				tableCount("LIVEKIT_WEBHOOK_EVENTS");
 		Integer activeMatchRequestTableCount = tableCount("ACTIVE_MATCH_REQUESTS");
 		Integer matchRequestSlotTableCount = tableCount("MATCH_REQUEST_SLOTS");
 		Integer matchRequestTraitSnapshotTableCount =
@@ -88,6 +131,70 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '20'",
 				Integer.class
 		);
+		Integer sessionRealtimeMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '22'",
+				Integer.class
+		);
+		Integer sessionRecoveryMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '24'",
+				Integer.class
+		);
+		Integer sessionMediaMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '26'",
+				Integer.class
+		);
+		Integer sessionTimerMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '28'",
+				Integer.class
+		);
+		Integer sessionMissionMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '30'",
+				Integer.class
+		);
+		Integer aiAnalysisMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '32'",
+				Integer.class
+		);
+		Integer aiCoachingMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '34'",
+				Integer.class
+		);
+		Integer silenceQuestionMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '36'",
+				Integer.class
+		);
+		Integer safetyMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '38'",
+				Integer.class
+		);
+		Integer missionCatalogTableCount = tableCount("MISSION_CATALOG");
+		Integer sessionMissionTableCount = tableCount("SESSION_MISSIONS");
+		Integer aiAnalysisEventTableCount =
+				tableCount("AI_SESSION_ANALYSIS_EVENTS");
+		Integer aiCoachingEventTableCount =
+				tableCount("AI_COACHING_EVENTS");
+		Integer questionCardTableCount = tableCount("QUESTION_CARDS");
+		Integer silenceEventTableCount = tableCount("SILENCE_EVENTS");
+		Integer questionRecommendationTableCount =
+				tableCount("QUESTION_RECOMMENDATION_EVENTS");
+		Integer questionRecommendationItemTableCount =
+				tableCount("QUESTION_RECOMMENDATION_ITEMS");
+		Integer safeQuestionCardCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM `question_cards` "
+						+ "WHERE `active` = TRUE AND `sensitive` = FALSE",
+				Integer.class
+		);
+		Integer safetyEventTableCount = tableCount("SAFETY_EVENTS");
+		Integer missionCatalogRowCount = rowCount("mission_catalog");
 		Integer matchingPolicyTableCount = tableCount("MATCHING_POLICIES");
 		Integer proposedScheduledAtColumnCount = columnCount(
 				"MATCH_PAIRS",
@@ -128,7 +235,7 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(21);
+		assertThat(migrationCount).isEqualTo(33);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
@@ -148,7 +255,18 @@ class FlywayMigrationTests {
 		assertThat(aiResponseStateColumnCount).isEqualTo(1);
 		assertThat(pendingUserMessageColumnCount).isEqualTo(1);
 		assertThat(liveKitRoomNameColumnCount).isEqualTo(1);
+		assertThat(liveKitRoomNameBackfillMigrationCount).isEqualTo(1);
 		assertThat(roomDeviceCheckTableCount).isEqualTo(1);
+		assertThat(participantIdentityColumnCount).isEqualTo(1);
+		assertThat(participantConnectionStatusColumnCount).isEqualTo(1);
+		assertThat(participantHeartbeatColumnCount).isEqualTo(1);
+		assertThat(participantReconnectDeadlineColumnCount).isEqualTo(1);
+		assertThat(participantCameraEnabledColumnCount).isEqualTo(1);
+		assertThat(participantNetworkQualityColumnCount).isEqualTo(1);
+		assertThat(sessionEndingSoonColumnCount).isEqualTo(1);
+		assertThat(sessionTimerExpiredColumnCount).isEqualTo(1);
+		assertThat(sessionEndedByUserColumnCount).isEqualTo(1);
+		assertThat(liveKitWebhookEventTableCount).isEqualTo(1);
 		assertThat(activeMatchRequestTableCount).isEqualTo(1);
 		assertThat(matchRequestSlotTableCount).isEqualTo(1);
 		assertThat(matchRequestTraitSnapshotTableCount).isEqualTo(1);
@@ -162,6 +280,26 @@ class FlywayMigrationTests {
 		assertThat(notificationQueryMigrationCount).isEqualTo(1);
 		assertThat(waitingRecommendationMigrationCount).isEqualTo(1);
 		assertThat(adminMatchingPolicyMigrationCount).isEqualTo(1);
+		assertThat(sessionRealtimeMigrationCount).isEqualTo(1);
+		assertThat(sessionRecoveryMigrationCount).isEqualTo(1);
+		assertThat(sessionMediaMigrationCount).isEqualTo(1);
+		assertThat(sessionTimerMigrationCount).isEqualTo(1);
+		assertThat(sessionMissionMigrationCount).isEqualTo(1);
+		assertThat(aiAnalysisMigrationCount).isEqualTo(1);
+		assertThat(aiCoachingMigrationCount).isEqualTo(1);
+		assertThat(silenceQuestionMigrationCount).isEqualTo(1);
+		assertThat(safetyMigrationCount).isEqualTo(1);
+		assertThat(missionCatalogTableCount).isEqualTo(1);
+		assertThat(sessionMissionTableCount).isEqualTo(1);
+		assertThat(aiAnalysisEventTableCount).isEqualTo(1);
+		assertThat(aiCoachingEventTableCount).isEqualTo(1);
+		assertThat(questionCardTableCount).isEqualTo(1);
+		assertThat(silenceEventTableCount).isEqualTo(1);
+		assertThat(questionRecommendationTableCount).isEqualTo(1);
+		assertThat(questionRecommendationItemTableCount).isEqualTo(1);
+		assertThat(safeQuestionCardCount).isEqualTo(14);
+		assertThat(safetyEventTableCount).isEqualTo(1);
+		assertThat(missionCatalogRowCount).isEqualTo(4);
 		assertThat(matchingPolicyTableCount).isEqualTo(1);
 		assertThat(proposedScheduledAtColumnCount).isEqualTo(1);
 		assertThat(rejectedAtColumnCount).isEqualTo(1);

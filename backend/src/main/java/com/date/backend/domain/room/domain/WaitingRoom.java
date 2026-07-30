@@ -56,8 +56,20 @@ public class WaitingRoom {
 	@Column(name = "terminationReason", length = 500)
 	private String terminationReason;
 
+	@Column(name = "endedByUserId")
+	private Long endedByUserId;
+
 	@Column(name = "livekitRoomName", unique = true, length = 255)
 	private String livekitRoomName;
+
+	@Column(name = "ending_soon_notified_at")
+	private LocalDateTime endingSoonNotifiedAt;
+
+	@Column(name = "ending_imminent_notified_at")
+	private LocalDateTime endingImminentNotifiedAt;
+
+	@Column(name = "timer_expired_notified_at")
+	private LocalDateTime timerExpiredNotifiedAt;
 
 	@Column(name = "createdAt", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
@@ -125,8 +137,75 @@ public class WaitingRoom {
 		return extensionDurationSec;
 	}
 
+	public String getTerminationReason() {
+		return terminationReason;
+	}
+
+	public Long getEndedByUserId() {
+		return endedByUserId;
+	}
+
 	public String getLivekitRoomName() {
 		return livekitRoomName;
+	}
+
+	public LocalDateTime expectedEndAt() {
+		if (!isInProgress() || actualStartAt == null) {
+			throw new IllegalStateException(
+					"진행 중인 세션에만 종료 예정 시각이 존재합니다."
+			);
+		}
+		return actualStartAt.plusSeconds(
+				(long) plannedDurationSec + extensionDurationSec
+		);
+	}
+
+	public LocalDateTime getEndingSoonNotifiedAt() {
+		return endingSoonNotifiedAt;
+	}
+
+	public LocalDateTime getEndingImminentNotifiedAt() {
+		return endingImminentNotifiedAt;
+	}
+
+	public LocalDateTime getTimerExpiredNotifiedAt() {
+		return timerExpiredNotifiedAt;
+	}
+
+	public boolean claimEndingSoonNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || endingSoonNotifiedAt != null) {
+			return false;
+		}
+		endingSoonNotifiedAt = notifiedAt;
+		return true;
+	}
+
+	public boolean claimEndingImminentNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || endingImminentNotifiedAt != null) {
+			return false;
+		}
+		if (endingSoonNotifiedAt == null) {
+			endingSoonNotifiedAt = notifiedAt;
+		}
+		endingImminentNotifiedAt = notifiedAt;
+		return true;
+	}
+
+	public boolean claimTimerExpiredNotification(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (!isInProgress() || timerExpiredNotifiedAt != null) {
+			return false;
+		}
+		if (endingSoonNotifiedAt == null) {
+			endingSoonNotifiedAt = notifiedAt;
+		}
+		if (endingImminentNotifiedAt == null) {
+			endingImminentNotifiedAt = notifiedAt;
+		}
+		timerExpiredNotifiedAt = notifiedAt;
+		return true;
 	}
 
 	public void markWaiting() {
@@ -147,11 +226,59 @@ public class WaitingRoom {
 		return status == RoomSessionStatus.IN_PROGRESS;
 	}
 
+	public boolean isEnded() {
+		return status == RoomSessionStatus.COMPLETED
+				|| status == RoomSessionStatus.CANCELLED;
+	}
+
 	public void start(LocalDateTime startedAt) {
 		if (status != RoomSessionStatus.READY) {
 			throw new IllegalStateException("준비 완료된 세션만 시작할 수 있습니다.");
 		}
 		status = RoomSessionStatus.IN_PROGRESS;
 		actualStartAt = Objects.requireNonNull(startedAt);
+	}
+
+	public void complete(
+			LocalDateTime endedAt,
+			SessionTerminationReason reason,
+			Long endedByUserId
+	) {
+		end(
+				RoomSessionStatus.COMPLETED,
+				endedAt,
+				reason,
+				endedByUserId
+		);
+	}
+
+	public void terminate(
+			LocalDateTime endedAt,
+			SessionTerminationReason reason,
+			Long endedByUserId
+	) {
+		end(
+				RoomSessionStatus.CANCELLED,
+				endedAt,
+				reason,
+				endedByUserId
+		);
+	}
+
+	private void end(
+			RoomSessionStatus endStatus,
+			LocalDateTime endedAt,
+			SessionTerminationReason reason,
+			Long endedByUserId
+	) {
+		if (!isInProgress()) {
+			throw new IllegalStateException(
+					"진행 중인 세션만 종료할 수 있습니다."
+			);
+		}
+		this.status = Objects.requireNonNull(endStatus);
+		this.actualEndAt = Objects.requireNonNull(endedAt);
+		this.terminationReason = Objects.requireNonNull(reason).name();
+		this.endedByUserId = endedByUserId;
 	}
 }

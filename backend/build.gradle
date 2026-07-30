@@ -30,6 +30,7 @@ dependencies {
 	implementation 'org.flywaydb:flyway-mysql'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 	implementation 'io.livekit:livekit-server:0.13.0'
+	implementation 'com.auth0:java-jwt:4.5.1'
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'com.mysql:mysql-connector-j'
