@@ -4,7 +4,7 @@ import {
 } from "./VisionConfig.js";
 
 export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
-  schemaVersion: 2,
+  schemaVersion: 3,
   model: {
     wasmBasePath: "/mediapipe/wasm",
     modelAssetPath: "/models/face_landmarker.task",
@@ -16,6 +16,16 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     minTrackingConfidence: 0.5,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
+    preferredDelegate: "GPU",
+  },
+  handModel: {
+    enabled: true,
+    modelAssetPath: "/models/hand_landmarker.task",
+    modelVersion: "mediapipe-hand-landmarker",
+    numHands: 2,
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
     preferredDelegate: "GPU",
   },
   frame: {

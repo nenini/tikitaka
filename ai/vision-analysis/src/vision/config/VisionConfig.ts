@@ -67,7 +67,7 @@ const higherIsWorseAngleGateSchema = z
 
 export const visionConfigSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     model: z
       .object({
         wasmBasePath: z.string().min(1),
@@ -80,6 +80,19 @@ export const visionConfigSchema = z
         minTrackingConfidence: unitScoreSchema,
         outputFaceBlendshapes: z.literal(true),
         outputFacialTransformationMatrixes: z.literal(true),
+        preferredDelegate: z.enum(["GPU", "CPU"]),
+      })
+      .strict(),
+    handModel: z
+      .object({
+        /** Hand analysis can be disabled without changing the face pipeline. */
+        enabled: z.boolean(),
+        modelAssetPath: z.string().min(1),
+        modelVersion: z.string().min(1).max(128),
+        numHands: z.number().int().min(1).max(2),
+        minHandDetectionConfidence: unitScoreSchema,
+        minHandPresenceConfidence: unitScoreSchema,
+        minTrackingConfidence: unitScoreSchema,
         preferredDelegate: z.enum(["GPU", "CPU"]),
       })
       .strict(),

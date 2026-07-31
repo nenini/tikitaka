@@ -4,7 +4,7 @@ import type { VisionConfig } from "../config/VisionConfig.js";
 
 export interface InitializeVisionWorkerRequest {
   readonly type: "INITIALIZE";
-  readonly config: Pick<VisionConfig, "model" | "frame">;
+  readonly config: Pick<VisionConfig, "model" | "handModel" | "frame">;
 }
 
 export interface ProcessVisionFrameRequest {
@@ -23,7 +23,9 @@ export type VisionWorkerRequest =
 
 export interface VisionWorkerReadyResponse {
   readonly type: "READY";
+  /** Face delegate kept under the old key for caller compatibility. */
   readonly delegate: "GPU" | "CPU";
+  readonly handDelegate: "GPU" | "CPU" | null;
 }
 
 export interface VisionWorkerFrameResultResponse {
@@ -70,4 +72,3 @@ export function isVisionWorkerResponse(
     type === "DISPOSED"
   );
 }
-

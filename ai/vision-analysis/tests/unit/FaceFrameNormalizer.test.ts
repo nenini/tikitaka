@@ -113,6 +113,48 @@ describe("FaceFrameNormalizer", () => {
     expect(frame.faceDetected).toBe(false);
     expect(frame.primaryFace).toBeNull();
   });
+
+  it("adds browser-local hand observations without changing face detection", () => {
+    const normalizer = new FaceFrameNormalizer();
+    const frame = normalizer.normalize({
+      frameId: 1,
+      sessionElapsedMs: 200,
+      clientMonotonicMs: 200,
+      capturedAt: "2026-07-20T00:00:00.000Z",
+      sourceWidth: 1280,
+      sourceHeight: 720,
+      brightnessScore: 0.8,
+      blurScore: 0.9,
+      rawLaplacianVariance: 250,
+      totalDurationMs: 37,
+      targetFps: 5,
+      actualFps: 5,
+      performanceProfile: "HIGH",
+      landmarkerResult: createResult([createFace()]),
+      handLandmarkerResult: {
+        inferenceDurationMs: 12,
+        hands: [
+          {
+            landmarks: Array.from({ length: 21 }, (_, index) => ({
+              x: 0.1 + (index % 5) * 0.1,
+              y: 0.2 + Math.floor(index / 5) * 0.1,
+              z: 0,
+            })),
+            handedness: "LEFT",
+            handednessConfidence: 0.9,
+          },
+        ],
+      },
+    });
+
+    expect(frame.faceDetected).toBe(true);
+    expect(frame.handDetected).toBe(true);
+    expect(frame.handCount).toBe(1);
+    expect(frame.hands[0]?.landmarks).toHaveLength(21);
+    expect(frame.processing.faceLandmarkerDurationMs).toBe(20);
+    expect(frame.processing.handLandmarkerDurationMs).toBe(12);
+    expect(frame.processing.landmarkerDurationMs).toBe(32);
+  });
 });
 
 describe("face box helpers", () => {

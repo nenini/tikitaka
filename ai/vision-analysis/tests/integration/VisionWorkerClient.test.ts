@@ -93,8 +93,14 @@ describe("VisionWorkerClient", () => {
 
     const initialization = client.initialize(defaultVisionConfig);
     expect(worker.messages[0]?.message.type).toBe("INITIALIZE");
-    worker.emit({ type: "READY", delegate: "CPU" });
+    worker.emit({
+      type: "READY",
+      delegate: "CPU",
+      handDelegate: "CPU",
+    });
     await initialization;
+    expect(client.getDelegate()).toBe("CPU");
+    expect(client.getHandDelegate()).toBe("CPU");
 
     const sampledFrame = createSampledFrame();
     const processing = client.consume(sampledFrame);
@@ -119,7 +125,11 @@ describe("VisionWorkerClient", () => {
     const worker = new FakeWorker();
     const client = new VisionWorkerClient(worker, () => undefined);
     const initialization = client.initialize(defaultVisionConfig);
-    worker.emit({ type: "READY", delegate: "CPU" });
+    worker.emit({
+      type: "READY",
+      delegate: "CPU",
+      handDelegate: "GPU",
+    });
     await initialization;
 
     const first = client.processFrame(createSampledFrame());

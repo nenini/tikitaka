@@ -8,16 +8,24 @@ describe("visionConfigSchema", () => {
     expect(visionConfigSchema.parse(defaultVisionConfig)).toEqual(
       defaultVisionConfig,
     );
-    expect(defaultVisionConfig.schemaVersion).toBe(2);
+    expect(defaultVisionConfig.schemaVersion).toBe(3);
   });
 
   it("rejects the previous configuration schema version", () => {
     expect(() =>
       visionConfigSchema.parse({
         ...defaultVisionConfig,
-        schemaVersion: 1,
+        schemaVersion: 2,
       }),
     ).toThrow();
+  });
+
+  it("enables two-hand tracking with a separate model by default", () => {
+    expect(defaultVisionConfig.handModel.enabled).toBe(true);
+    expect(defaultVisionConfig.handModel.numHands).toBe(2);
+    expect(defaultVisionConfig.handModel.modelAssetPath).toBe(
+      "/models/hand_landmarker.task",
+    );
   });
 
   it("requires FaceQualityDetector in every performance profile", () => {

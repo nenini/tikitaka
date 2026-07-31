@@ -4,6 +4,8 @@ import type {
   LandmarkerFaceResult,
   LandmarkerFrameResult,
 } from "./LandmarkerFrameResult.js";
+import { normalizeHands } from "./HandFrameNormalizer.js";
+import type { HandLandmarkerFrameResult } from "./HandLandmarkerFrameResult.js";
 import type {
   NormalizedFaceBox,
   NormalizedFaceFrame,
@@ -57,6 +59,8 @@ export interface FaceFrameNormalizationInput {
   readonly actualFps: number;
   readonly performanceProfile: PerformanceProfile;
   readonly landmarkerResult: LandmarkerFrameResult;
+  /** Undefined only when hand analysis is explicitly disabled. */
+  readonly handLandmarkerResult?: HandLandmarkerFrameResult;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -411,6 +415,12 @@ export class FaceFrameNormalizer {
     faceCount: number,
     primaryFace: NormalizedFaceFrame["primaryFace"],
   ): NormalizedFaceFrame {
+    const hands =
+      input.handLandmarkerResult === undefined
+        ? []
+        : normalizeHands(input.handLandmarkerResult);
+    const handLandmarkerDurationMs =
+      input.handLandmarkerResult?.inferenceDurationMs ?? 0;
     return {
       schemaVersion: 1,
       frameId: input.frameId,
@@ -425,6 +435,9 @@ export class FaceFrameNormalizer {
       faceDetected: faceCount > 0,
       faceCount,
       primaryFace,
+      handDetected: hands.length > 0,
+      handCount: hands.length,
+      hands,
       imageQuality: {
         brightnessScore: input.brightnessScore,
         backlightScore: input.backlightScore ?? 1,
@@ -432,7 +445,12 @@ export class FaceFrameNormalizer {
         rawLaplacianVariance: input.rawLaplacianVariance,
       },
       processing: {
-        landmarkerDurationMs: input.landmarkerResult.inferenceDurationMs,
+        landmarkerDurationMs:
+          input.landmarkerResult.inferenceDurationMs +
+          handLandmarkerDurationMs,
+        faceLandmarkerDurationMs:
+          input.landmarkerResult.inferenceDurationMs,
+        handLandmarkerDurationMs,
         totalDurationMs: input.totalDurationMs,
         targetFps: input.targetFps,
         actualFps: input.actualFps,

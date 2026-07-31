@@ -1,3 +1,5 @@
+import type { NormalizedHand } from "./NormalizedHand.js";
+
 export const PERFORMANCE_PROFILES = ["HIGH", "MEDIUM", "LOW"] as const;
 export type PerformanceProfile = (typeof PERFORMANCE_PROFILES)[number];
 
@@ -61,6 +63,10 @@ export interface NormalizedFaceFrame {
   readonly faceDetected: boolean;
   readonly faceCount: number;
   readonly primaryFace: NormalizedPrimaryFace | null;
+  /** Browser-local hand observations; public Vision events never include them. */
+  readonly handDetected: boolean;
+  readonly handCount: number;
+  readonly hands: readonly NormalizedHand[];
   readonly imageQuality: {
     /** 0 is very dark and 1 is sufficiently bright. */
     readonly brightnessScore: number;
@@ -72,7 +78,10 @@ export interface NormalizedFaceFrame {
     readonly rawLaplacianVariance: number;
   };
   readonly processing: {
+    /** Combined Face + Hand Landmarker time used by the performance governor. */
     readonly landmarkerDurationMs: number;
+    readonly faceLandmarkerDurationMs: number;
+    readonly handLandmarkerDurationMs: number;
     readonly totalDurationMs: number;
     readonly targetFps: number;
     readonly actualFps: number;

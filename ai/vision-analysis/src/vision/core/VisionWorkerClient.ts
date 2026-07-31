@@ -38,6 +38,7 @@ export class VisionWorkerClient implements FrameSampleConsumer {
   private disposal: PendingOperation<void> | null = null;
   private initializationTimer: ReturnType<typeof setTimeout> | null = null;
   private delegate: "GPU" | "CPU" | null = null;
+  private handDelegate: "GPU" | "CPU" | null = null;
 
   constructor(
     private readonly worker: WorkerPort,
@@ -49,7 +50,7 @@ export class VisionWorkerClient implements FrameSampleConsumer {
   }
 
   initialize(
-    config: Pick<VisionConfig, "model" | "frame" | "worker">,
+    config: Pick<VisionConfig, "model" | "handModel" | "frame" | "worker">,
   ): Promise<void> {
     if (this.disposed) {
       return Promise.reject(new Error("VisionWorkerClient is disposed"));
@@ -76,7 +77,11 @@ export class VisionWorkerClient implements FrameSampleConsumer {
         this.worker.postMessage(
           {
             type: "INITIALIZE",
-            config: { model: config.model, frame: config.frame },
+            config: {
+              model: config.model,
+              handModel: config.handModel,
+              frame: config.frame,
+            },
           },
           [],
         );
@@ -149,6 +154,11 @@ export class VisionWorkerClient implements FrameSampleConsumer {
     return this.delegate;
   }
 
+  /** The hand task may independently fall back from GPU to CPU. */
+  getHandDelegate(): "GPU" | "CPU" | null {
+    return this.handDelegate;
+  }
+
   private readonly handleMessage = (event: MessageEvent<unknown>): void => {
     if (!isVisionWorkerResponse(event.data)) {
       this.failAll(new Error("Vision Worker returned an invalid message"));
@@ -160,6 +170,7 @@ export class VisionWorkerClient implements FrameSampleConsumer {
         this.clearInitializationTimer();
         this.initialized = true;
         this.delegate = event.data.delegate;
+        this.handDelegate = event.data.handDelegate;
         this.initialization?.resolve();
         this.initialization = null;
         break;
@@ -178,6 +189,7 @@ export class VisionWorkerClient implements FrameSampleConsumer {
         this.disposed = true;
         this.initialized = false;
         this.delegate = null;
+        this.handDelegate = null;
         this.disposal?.resolve();
         this.disposal = null;
         this.detachAndTerminate();
@@ -209,6 +221,7 @@ export class VisionWorkerClient implements FrameSampleConsumer {
     this.disposal = null;
     this.initialized = false;
     this.delegate = null;
+    this.handDelegate = null;
   }
 
   private clearInitializationTimer(): void {
