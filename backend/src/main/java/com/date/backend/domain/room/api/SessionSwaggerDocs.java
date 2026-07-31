@@ -57,7 +57,7 @@ public interface SessionSwaggerDocs {
 	})
 	ApiResponse<SessionDetailResponse> getDetail(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 
@@ -72,7 +72,7 @@ public interface SessionSwaggerDocs {
 	)
 	ApiResponse<SessionJoinResponse> join(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 
@@ -86,7 +86,7 @@ public interface SessionSwaggerDocs {
 	)
 	ApiResponse<SessionStatusResponse> start(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 
@@ -124,7 +124,7 @@ public interface SessionSwaggerDocs {
 	})
 	ApiResponse<SessionAnalysisSettingsResponse> updateAnalysisSettings(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대상 세션 ID", example = "15")
+			@Parameter(description = "대상 세션 ID", example = "1")
 			Long sessionId,
 			@Valid SessionAnalysisSettingsRequest request
 	);
@@ -138,7 +138,7 @@ public interface SessionSwaggerDocs {
 	)
 	ApiResponse<SessionStatusResponse> getStatus(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 
@@ -170,7 +170,7 @@ public interface SessionSwaggerDocs {
 	})
 	ApiResponse<SessionEndedResponse> complete(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 
@@ -208,7 +208,7 @@ public interface SessionSwaggerDocs {
 	})
 	ApiResponse<SessionEndedResponse> terminate(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId,
 			@Valid SessionTerminateRequest request
 	);
