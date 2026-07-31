@@ -9,7 +9,7 @@ public record RoomDeviceCheckResponse(
 		@Schema(description = "기기 점검 결과 ID", example = "31")
 		Long deviceCheckId,
 
-		@Schema(description = "대기방 ID", example = "15")
+		@Schema(description = "대기방 ID", example = "1")
 		Long roomId,
 
 		@Schema(description = "점검 사용자 ID", example = "1")

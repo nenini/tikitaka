@@ -92,7 +92,7 @@ public interface WaitingRoomSwaggerDocs {
 	})
 	ApiResponse<RoomDeviceCheckResponse> saveDeviceCheck(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대기방 ID", example = "15")
+			@Parameter(description = "대기방 ID", example = "1")
 			@Positive Long roomId,
 			@Valid
 			@io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -135,7 +135,7 @@ public interface WaitingRoomSwaggerDocs {
 	})
 	ApiResponse<RoomDeviceCheckResponse> getLatestDeviceCheck(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대기방 ID", example = "15")
+			@Parameter(description = "대기방 ID", example = "1")
 			@Positive Long roomId
 	);
 
@@ -149,7 +149,7 @@ public interface WaitingRoomSwaggerDocs {
 	)
 	ApiResponse<RoomParticipantsStatusResponse> markReady(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대기방 ID", example = "15")
+			@Parameter(description = "대기방 ID", example = "1")
 			@Positive Long roomId
 	);
 
@@ -162,7 +162,7 @@ public interface WaitingRoomSwaggerDocs {
 	)
 	ApiResponse<RoomParticipantsStatusResponse> cancelReady(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대기방 ID", example = "15")
+			@Parameter(description = "대기방 ID", example = "1")
 			@Positive Long roomId
 	);
 
@@ -176,7 +176,7 @@ public interface WaitingRoomSwaggerDocs {
 	)
 	ApiResponse<RoomParticipantsStatusResponse> getParticipantStatuses(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "대기방 ID", example = "15")
+			@Parameter(description = "대기방 ID", example = "1")
 			@Positive Long roomId
 	);
 }
