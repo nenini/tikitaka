@@ -342,7 +342,12 @@ GOOGLE_OAUTH_CLIENT_ID=
 GOOGLE_OAUTH_CLIENT_SECRET=
 NAVER_OAUTH_CLIENT_ID=
 NAVER_OAUTH_CLIENT_SECRET=
+FRONTEND_BASE_URL=http://localhost:5173
 ```
+
+OAuth 성공 후 백엔드는 `OAUTH_SUCCESS_REDIRECT`로 이동시키며 URL fragment에
+서비스 Access Token과 Refresh Token을 전달합니다. 프론트엔드는 해당 경로를
+라우터에 등록하고 fragment의 토큰을 저장한 뒤 로그인 완료 화면으로 이동해야 합니다.
 
 - Google 동의 항목: `openid`, `email`, `profile`
 - Naver 제공 정보: 회원 고유 ID, 이메일, 이름
