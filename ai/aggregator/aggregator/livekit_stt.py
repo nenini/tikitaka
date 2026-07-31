@@ -1,0 +1,359 @@
+"""LiveKit remote audio tracks -> own VAD/STT -> SessionRuntime events."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, cast
+
+import numpy as np
+from livekit import rtc
+
+from stt.events import SttEvent
+from stt.pipeline import SAMPLE_RATE, SttEngine
+from stt.session import SessionSttRunner, make_vad_options
+
+from aggregator.audio_adapter import (
+    ElapsedMs,
+    SessionAudioAdapter,
+    SttEventSink,
+    VisionBatchSink,
+)
+from aggregator.livekit_vision import LiveKitVisionAdapter
+from aggregator.session_contracts import SessionEventRequest
+from aggregator.settings import IntegrationSettings
+
+if TYPE_CHECKING:
+    from livekit.rtc import AudioTrack, RemoteParticipant, RemoteTrackPublication
+
+logger = logging.getLogger(__name__)
+
+
+class LiveKitSttAdapterFactory:
+    """Load one Whisper engine and share it across all active sessions."""
+
+    def __init__(self, settings: IntegrationSettings) -> None:
+        self._settings = settings
+        self._engine: SttEngine | None = None
+        self._engine_lock = asyncio.Lock()
+
+    async def warmup(self) -> None:
+        if self._engine is not None:
+            return
+        async with self._engine_lock:
+            if self._engine is None:
+                logger.info(
+                    "warming STT engine model=%s device=%s",
+                    self._settings.stt_model_size,
+                    self._settings.stt_device,
+                )
+                self._engine = await asyncio.to_thread(
+                    SttEngine,
+                    model_size=self._settings.stt_model_size,
+                    device=self._settings.stt_device,
+                    compute_type=self._settings.stt_compute_type,
+                    language=self._settings.stt_language,
+                )
+                logger.info(
+                    "STT engine ready device=%s",
+                    self._engine.device,
+                )
+
+    def create(
+        self,
+        event: SessionEventRequest,
+        sink: SttEventSink,
+        vision_sink: VisionBatchSink,
+        elapsed_ms: ElapsedMs,
+    ) -> SessionAudioAdapter:
+        if self._engine is None:
+            raise RuntimeError("STT engine must be warmed before session start")
+        return LiveKitSttAdapter(
+            event=event,
+            engine=self._engine,
+            settings=self._settings,
+            sink=sink,
+            vision_sink=vision_sink,
+            elapsed_ms=elapsed_ms,
+        )
+
+    async def close(self) -> None:
+        self._engine = None
+
+
+class LiveKitSttAdapter:
+    """Join one LiveKit room and keep each participant's audio isolated."""
+
+    def __init__(
+        self,
+        *,
+        event: SessionEventRequest,
+        engine: SttEngine,
+        settings: IntegrationSettings,
+        sink: SttEventSink,
+        vision_sink: VisionBatchSink,
+        elapsed_ms: ElapsedMs,
+    ) -> None:
+        if event.live_kit is None:
+            raise ValueError("liveKit connection is required")
+        self._event = event
+        self._connection = event.live_kit
+        self._sink = sink
+        self._elapsed_ms = elapsed_ms
+        self._room = rtc.Room()
+        self._vision_adapter = LiveKitVisionAdapter(
+            event=event,
+            sink=vision_sink,
+        )
+        self._runner = SessionSttRunner(
+            engine,
+            session_id=event.session_id,
+            vad_opts=make_vad_options(
+                threshold=settings.stt_vad_threshold,
+                end_silence_ms=settings.stt_end_silence_ms,
+            ),
+            end_silence_ms=settings.stt_end_silence_ms,
+            min_confidence=settings.stt_min_confidence,
+            max_pending=settings.stt_max_pending,
+            session_epoch_ms=elapsed_ms(),
+        )
+        self._participants = {
+            participant.participant_identity: participant
+            for participant in event.participants or []
+            if participant.stt_enabled
+            and (event.features is None or event.features.stt_enabled)
+        }
+        self._track_tasks: dict[str, asyncio.Task[None]] = {}
+        self._main_task: asyncio.Task[None] | None = None
+        self._stopping = asyncio.Event()
+        self._connected = asyncio.Event()
+        self._vision_adapter.register(self._room)
+        self._register_room_handlers()
+
+    def start(self) -> None:
+        self._main_task = asyncio.create_task(
+            self._run(),
+            name=f"livekit-stt-{self._event.session_id}",
+        )
+
+    async def stop(self) -> None:
+        self._stopping.set()
+        for task in self._track_tasks.values():
+            task.cancel()
+        if self._track_tasks:
+            await asyncio.gather(
+                *self._track_tasks.values(),
+                return_exceptions=True,
+            )
+        self._track_tasks.clear()
+
+        if self._connected.is_set():
+            await self._room.disconnect()
+        if self._main_task is not None:
+            self._main_task.cancel()
+            await asyncio.gather(self._main_task, return_exceptions=True)
+
+        final_events = await asyncio.to_thread(self._runner.close)
+        await self._forward(final_events)
+        await self._forward(self._runner.poll_transcripts())
+        await self._vision_adapter.close()
+
+    def _register_room_handlers(self) -> None:
+        @self._room.on("track_subscribed")
+        def on_track_subscribed(
+            track: AudioTrack,
+            publication: RemoteTrackPublication,
+            participant: RemoteParticipant,
+        ) -> None:
+            self._start_audio_track(track, publication, participant)
+
+        @self._room.on("track_unsubscribed")
+        def on_track_unsubscribed(
+            _track: AudioTrack,
+            publication: RemoteTrackPublication,
+            _participant: RemoteParticipant,
+        ) -> None:
+            task = self._track_tasks.pop(publication.sid, None)
+            if task is not None:
+                task.cancel()
+
+        @self._room.on("disconnected")
+        def on_disconnected(reason: object) -> None:
+            if not self._stopping.is_set():
+                logger.warning(
+                    "LiveKit disconnected session=%s reason=%s",
+                    self._event.session_id,
+                    reason,
+                )
+
+    async def _run(self) -> None:
+        try:
+            await self._room.connect(
+                self._connection.url,
+                self._connection.access_token.get_secret_value(),
+                options=rtc.RoomOptions(auto_subscribe=True),
+            )
+            if self._room.name != self._connection.room_name:
+                raise RuntimeError(
+                    "connected LiveKit room does not match lifecycle roomName"
+                )
+            if (
+                self._room.local_participant.identity
+                != self._connection.participant_identity
+            ):
+                raise RuntimeError(
+                    "LiveKit token identity does not match "
+                    "lifecycle participantIdentity"
+                )
+            self._connected.set()
+            for participant in self._room.remote_participants.values():
+                for publication in participant.track_publications.values():
+                    if (
+                        publication.track is not None
+                        and publication.track.kind
+                        == rtc.TrackKind.KIND_AUDIO
+                    ):
+                        self._start_audio_track(
+                            cast("AudioTrack", publication.track),
+                            publication,
+                            participant,
+                        )
+            logger.info(
+                "LiveKit session connected session=%s room=%s "
+                "sttParticipants=%d visionEnabled=%s",
+                self._event.session_id,
+                self._connection.room_name,
+                len(self._participants),
+                self._vision_adapter.enabled,
+            )
+            poll_task = asyncio.create_task(
+                self._poll_transcripts(),
+                name=f"stt-poll-{self._event.session_id}",
+            )
+            await self._stopping.wait()
+            poll_task.cancel()
+            await asyncio.gather(poll_task, return_exceptions=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "LiveKit STT worker failed session=%s room=%s",
+                self._event.session_id,
+                self._connection.room_name,
+            )
+            if (
+                self._room.connection_state
+                != rtc.ConnectionState.CONN_DISCONNECTED
+            ):
+                await self._room.disconnect()
+
+    def _start_audio_track(
+        self,
+        track: AudioTrack,
+        publication: RemoteTrackPublication,
+        participant: RemoteParticipant,
+    ) -> None:
+        if publication.sid in self._track_tasks:
+            return
+        session_participant = self._participants.get(participant.identity)
+        if session_participant is None:
+            logger.warning(
+                "ignored unexpected/non-STT participant session=%s identity=%s",
+                self._event.session_id,
+                participant.identity,
+            )
+            return
+        if track.kind != rtc.TrackKind.KIND_AUDIO:
+            return
+        if publication.source != rtc.TrackSource.SOURCE_MICROPHONE:
+            logger.debug(
+                "ignored non-microphone audio session=%s identity=%s source=%s",
+                self._event.session_id,
+                participant.identity,
+                publication.source,
+            )
+            return
+        self._track_tasks[publication.sid] = asyncio.create_task(
+            self._consume_audio(
+                track,
+                publication.sid,
+                session_participant.user_id,
+                participant.identity,
+                self._elapsed_ms(),
+            ),
+            name=(
+                f"livekit-audio-{self._event.session_id}-"
+                f"{session_participant.user_id}"
+            ),
+        )
+        logger.info(
+            "audio track subscribed session=%s user=%s identity=%s track=%s",
+            self._event.session_id,
+            session_participant.user_id,
+            participant.identity,
+            publication.sid,
+        )
+
+    async def _consume_audio(
+        self,
+        track: AudioTrack,
+        track_sid: str,
+        user_id: str,
+        participant_identity: str,
+        stream_epoch_ms: int,
+    ) -> None:
+        stream = rtc.AudioStream(
+            track,
+            sample_rate=SAMPLE_RATE,
+            num_channels=1,
+            frame_size_ms=20,
+            capacity=100,
+        )
+        try:
+            async for frame_event in stream:
+                pcm = np.frombuffer(
+                    frame_event.frame.data,
+                    dtype=np.int16,
+                ).astype(np.float32)
+                pcm /= 32768.0
+                events = self._runner.feed(
+                    user_id=user_id,
+                    participant_identity=participant_identity,
+                    audio=pcm,
+                    stream_epoch_ms=stream_epoch_ms,
+                )
+                await self._forward(events)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "LiveKit audio consumer failed session=%s user=%s track=%s",
+                self._event.session_id,
+                user_id,
+                track_sid,
+            )
+        finally:
+            await stream.aclose()
+
+    async def _poll_transcripts(self) -> None:
+        while not self._stopping.is_set():
+            await self._forward(self._runner.poll_transcripts())
+            await asyncio.sleep(0.05)
+
+    async def _forward(self, events: Sequence[SttEvent]) -> None:
+        for event in events:
+            logger.info(
+                "STT event session=%s user=%s type=%s elapsedMs=%d",
+                event.session_id,
+                event.user_id,
+                event.event_type,
+                event.session_elapsed_ms,
+            )
+            accepted = await self._sink(event)
+            if not accepted:
+                logger.warning(
+                    "aggregator rejected STT event session=%s eventId=%s",
+                    self._event.session_id,
+                    event.event_id,
+                )

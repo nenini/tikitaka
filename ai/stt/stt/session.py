@@ -30,8 +30,12 @@ from stt.events import (
     TranscriptFinalizedEvent,
     TranscriptPayload,
 )
-from stt.pipeline import SAMPLE_RATE, SttEngine
-from stt.transcription import TranscriptionJob, TranscriptionWorker
+from stt.pipeline import SAMPLE_RATE
+from stt.transcription import (
+    Transcriber,
+    TranscriptionJob,
+    TranscriptionWorker,
+)
 
 MAX_BUFFER_SECONDS = 25.0
 
@@ -57,7 +61,7 @@ class SpeakerStream:
 
     def __init__(
         self,
-        engine: SttEngine,
+        engine: Transcriber,
         *,
         session_id: str,
         user_id: str,
@@ -256,7 +260,7 @@ class SessionSttRunner:
 
     def __init__(
         self,
-        engine: SttEngine,
+        engine: Transcriber,
         *,
         session_id: str,
         vad_opts: VadOptions,

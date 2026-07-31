@@ -7,7 +7,7 @@
 
 ## 환경
 
-- Python 3.12 (uv 가상환경) · faster-whisper · sounddevice · pydantic
+- Python 3.11 (통합 AI 서버 표준) · faster-whisper · sounddevice · pydantic
 - GPU: CUDA + cuDNN 9 (pip 휠 `nvidia-cudnn-cu12`/`nvidia-cublas-cu12`, Windows DLL 경로 자동 설정)
 
 ```bash

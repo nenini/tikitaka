@@ -96,7 +96,7 @@ def test_attention_coaches_listener_when_partner_is_speaking() -> None:
     assert command.coaching_type == "ATTENTION_RECOVERY"
     assert command.target_user_id == "user-a"
     assert command.message_key == "ATTENTION_RECOVERY_01"
-    assert command.expires_at_session_elapsed_ms == 191_000
+    assert command.expires_at_session_elapsed_ms == 201_000
 
 
 def test_attention_stays_off_until_stt_fills_speaking_state() -> None:
