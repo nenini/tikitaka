@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertDialog, Button, CallControls, Callout, DarkScope, Icon, IconButton } from '@/components'
 import type { QuestionOption } from '@/components'
+import { useAuthStore } from '@/stores/auth.store'
 import { useCoachingStore } from '@/stores/coaching.store'
 import { useSessionStore } from '@/stores/session.store'
 import { errorMessageOf } from '@/shared/api/envelope'
@@ -9,6 +10,7 @@ import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
 import { createApiTokenProvider } from './livekit/tokenProvider'
 import { useLiveKitRoom } from './livekit/useLiveKitRoom'
+import { isVisionEnabled, snapshotAnalysisSettings, useVisionAnalysis } from './vision'
 import { CoachRail } from './components/CoachRail'
 import { SessionStage } from './components/SessionStage'
 import { SilenceHint } from './components/SilenceHint'
@@ -157,6 +159,45 @@ export function SessionPage() {
       alive = false
     }
   }, [validSession, sessionId, status?.status])
+
+  /* ── 표정·시선 분석 (COACH-01) ──
+     동의 플래그는 대기방 입장 때 찍은 스냅샷이 SSOT 다(§8 — 세션 화면에는 노출하지 않는다).
+     대기방을 거치지 않았거나 스냅샷이 사라졌으면 **시작 전에만** 한 번 더 찍어 본다
+     (PATCH 는 IN_PROGRESS 부터 409 다). 끝내 모르면 false — 분석하지 않는다. */
+  const currentUser = useAuthStore((s) => s.user)
+  const [visionEnabled, setVisionEnabled] = useState(() =>
+    validSession ? isVisionEnabled(sessionId) : false,
+  )
+  const sessionPhase = status?.status
+  useEffect(() => {
+    if (!validSession || visionEnabled) return
+    if (sessionPhase !== undefined && sessionPhase !== 'READY') return
+    let alive = true
+    void snapshotAnalysisSettings(sessionId).then((snapshot) => {
+      if (alive && snapshot) setVisionEnabled(snapshot.expressionAnalysisEnabled)
+    })
+    return () => {
+      alive = false
+    }
+  }, [validSession, sessionId, visionEnabled, sessionPhase])
+
+  const vision = useVisionAnalysis({
+    visionEnabled,
+    room: session.room,
+    localVideo: session.localVideo,
+    sessionId,
+    userId: currentUser?.id ?? null,
+    participantIdentity: session.localParticipantIdentity,
+    sessionStartedAt: status?.actualStartAt ?? detail?.actualStartAt ?? null,
+  })
+
+  // 분석은 fail-soft 다 — 사용자에게는 알리지 않지만(§10 코칭만 노출), 조용히 죽으면
+  // 리포트에 표정 지표가 통째로 빠진 뒤에야 알게 된다. 콘솔에는 반드시 남긴다.
+  useEffect(() => {
+    if (vision.state === 'UNAVAILABLE') {
+      console.warn('[vision] 표정·시선 분석을 사용할 수 없습니다:', vision.error)
+    }
+  }, [vision.state, vision.error])
 
   /* ── 코칭 ── 한 번에 하나만 띄운다(원칙 2). 스토어의 마지막 메시지만 꺼내 쓴다. */
   const messages = useCoachingStore((s) => s.messages)

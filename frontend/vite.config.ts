@@ -4,15 +4,33 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
+/**
+ * AI 파트가 만든 브라우저 로컬 분석 패키지(`ai/vision-analysis`).
+ *
+ * **소스가 아니라 빌드 산출물(dist)** 을 물린다. 소스를 직접 번들하면 이 프로젝트의
+ * tsconfig(`erasableSyntaxOnly`·`noUnusedLocals`·비-strict)가 AI 패키지 소스에 그대로
+ * 적용되어 `tsc -b` 가 남의 코드에서 터진다 — 패키지는 자기 tsconfig 로 빌드하고
+ * FE 는 .d.ts 만 읽는 게 맞다.
+ *
+ *   빌드: `npm run vision:build` (ai/vision-analysis 에서 `npm install` 이 선행돼야 한다)
+ */
+const visionPackage = fileURLToPath(new URL('../ai/vision-analysis', import.meta.url))
+const visionDist = `${visionPackage}/dist`
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@vision': visionDist,
     },
   },
   server: {
     port: 5173,
+    fs: {
+      // 프로젝트 루트 밖(ai/vision-analysis)을 읽어야 dev 서버가 파일을 서빙한다.
+      allow: [fileURLToPath(new URL('.', import.meta.url)), visionPackage],
+    },
     /**
      * 시연용 터널 허용 (MVP 데모).
      *

@@ -13,6 +13,11 @@ import type { TokenProvider } from './tokenProvider'
 
 export interface LiveKitSession {
     state: BtConnectionState
+    /**
+     * 연결이 끝난 Room. DataChannel 로 무언가를 보내야 하는 쪽(예: Vision v4 배치)이
+     * 쓴다. 연결 전·정리 후에는 null 이라 "룸이 살아있을 때만" 발행하게 강제된다.
+     */
+    room: Room | null
     localVideo: LocalVideoTrack | null  /** 내 카메라 트랙 */
     remoteVideo: RemoteVideoTrack | null
     remoteAudio: RemoteAudioTrack | null
@@ -22,6 +27,11 @@ export interface LiveKitSession {
      * (`SessionHeartbeatRequest.participantSid` 등). 연결 전에는 null.
      */
     localParticipantSid: string | null
+    /**
+     * 내 LiveKit participant identity. 서버가 `user-{userId}` 로 발급한다
+     * (`RoomParticipant.identityOf`). SID 와 달리 토큰에 박혀 있어 재연결해도 같다.
+     */
+    localParticipantIdentity: string | null
     /** 상대가 룸에 들어와 있는가. 카메라·마이크를 모두 끈 상대도 감지된다 */
     partnerConnected: boolean
     muted: boolean
@@ -61,6 +71,10 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
     const [error, setError] = useState<Error | null>(null)
     const [mediaDenied, setMediaDenied] = useState(false)
     const [localParticipantSid, setLocalParticipantSid] = useState<string | null>(null)
+    const [localParticipantIdentity, setLocalParticipantIdentity] = useState<string | null>(null)
+    // 연결이 끝난 뒤에만 노출한다 — 연결 전 Room 을 밖으로 넘기면 소비자가
+    // 아직 존재하지 않는 localParticipant 로 publishData 를 시도하게 된다.
+    const [connectedRoom, setConnectedRoom] = useState<Room | null>(null)
     const [partnerConnected, setPartnerConnected] = useState(false)
     // 값이 바뀌면 effect 가 다시 돌아 입장을 재시도한다.
     const [retryNonce, setRetryNonce] = useState(0)
@@ -206,6 +220,8 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
 
                 // SID 는 연결 후에야 정해진다. 서버 STOMP 명령이 이 값을 요구한다.
                 setLocalParticipantSid(room.localParticipant.sid || null)
+                setLocalParticipantIdentity(room.localParticipant.identity || null)
+                setConnectedRoom(room)
                 setPartnerConnected(room.remoteParticipants.size > 0)
 
                 // 게이트를 통과했어도 이 사이에 권한이 바뀌었을 수 있다. 실패하면 입장을 취소한다.
@@ -233,6 +249,8 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
             cancelled = true
             roomRef.current = null
             setLocalParticipantSid(null)
+            setLocalParticipantIdentity(null)
+            setConnectedRoom(null)
             setPartnerConnected(false)
             permissionWatchers.forEach((s) => (s.onchange = null))
             room.removeAllListeners()
@@ -281,10 +299,12 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
 
     return {
         state,
+        room: connectedRoom,
         localVideo,
         remoteVideo,
         remoteAudio,
         localParticipantSid,
+        localParticipantIdentity,
         partnerConnected,
         muted,
         cameraDisabled,

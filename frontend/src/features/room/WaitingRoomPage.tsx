@@ -16,6 +16,7 @@ import { useSessionStore } from '@/stores/session.store'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { useStomp, useStompSubscription } from '@/shared/realtime/useStomp'
 import { joinSession } from '@/features/session/api'
+import { snapshotAnalysisSettings } from '@/features/session/vision'
 import { roomParticipantsTopic } from '@/features/session/types'
 import { useDeviceCheck } from './useDeviceCheck'
 import {
@@ -207,6 +208,10 @@ export function WaitingRoomPage() {
     setJoining(true)
     setActionError(null)
     try {
+      // 표정·음성 분석 플래그를 입장 직전에 1회 스냅샷한다(기능명세서 v4 §8).
+      // 세션이 IN_PROGRESS 가 되면 PATCH 가 409 라, 여기가 마지막 기회다.
+      // 실패해도 입장은 막지 않는다 — 그 경우 표정 분석만 꺼진 채로 진행된다.
+      await snapshotAnalysisSettings(roomId)
       await joinSession(roomId)
       setPhase('connecting')
       navigate(`/session/${roomId}`)

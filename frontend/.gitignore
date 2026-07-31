@@ -28,3 +28,7 @@ dist-ssr
 !.env.example
 
 .gstack/
+
+# Vision 분석 로컬 자산 — `npm run vision:assets` 가 채운다(모델은 직접 내려받는다)
+public/mediapipe/
+public/models/
