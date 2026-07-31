@@ -36,6 +36,13 @@ class WaitingRoomTimerTest {
 		ReflectionTestUtils.setField(session, "extensionDurationSec", 300);
 
 		assertThat(session.expectedEndAt())
+				.isEqualTo(STARTED_AT.plusMinutes(40));
+	}
+
+	@Test
+	void sessionUsesThirtyFiveMinutePlannedDurationByDefault() {
+		assertThat(session.getPlannedDurationSec()).isEqualTo(35 * 60);
+		assertThat(session.expectedEndAt())
 				.isEqualTo(STARTED_AT.plusMinutes(35));
 	}
 

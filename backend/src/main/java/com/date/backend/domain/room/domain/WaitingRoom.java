@@ -21,6 +21,7 @@ import java.util.Objects;
 @Entity
 @Table(name = "sessions")
 public class WaitingRoom {
+	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 35 * 60;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -88,7 +89,7 @@ public class WaitingRoom {
 		this.sessionType = "REAL_DATE";
 		this.status = RoomSessionStatus.CREATED;
 		this.scheduledStartAt = matchPair.getScheduledAt();
-		this.plannedDurationSec = 1800;
+		this.plannedDurationSec = DEFAULT_PLANNED_DURATION_SECONDS;
 		this.extensionDurationSec = 0;
 		this.livekitRoomName = "date-room-" + matchPair.getId();
 	}
