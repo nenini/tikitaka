@@ -21,7 +21,6 @@ import { SessionReportPage } from '@/features/report/SessionReportPage'
 import { GrowthDashboardPage } from '@/features/growth/GrowthDashboardPage'
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
-import { DemoEntryPage } from '@/features/demo/DemoEntryPage'
 
 /**
  * 앱 라우팅. 기능이 확정되면 각 feature 폴더에 페이지를 추가한다.
@@ -64,9 +63,7 @@ export const router = createBrowserRouter([
 
       //-----------
       // 개발용, 추후 삭제
-      { path: '/livekit-demo', element: <LiveKitDemoPage /> },
-      // MVP 시연용 바로가기 — 매칭 UI 를 건너뛰고 대기방까지 자동 주행한다(시연 후 삭제)
-      { path: '/demo', element: <DemoEntryPage /> }
+      { path: '/livekit-demo', element: <LiveKitDemoPage /> }
     ],
   },
 ])
