@@ -43,6 +43,14 @@ export function HomePage() {
           </p>
         </CardLink>
 
+        <CardLink as={Link} to="/chatbot">
+          <CardHeader title="챗봇" />
+          <p className="bt-body-sm bt-muted">
+            ai 페르소나와 소개팅 전/후 상황을 연습해볼 수 있습니다.
+          </p>
+        </CardLink>
+
+
         <CardLink as={Link} to="/session/demo/report">
           <CardHeader title="세션 리포트" />
           <p className="bt-body-sm bt-muted">
@@ -56,6 +64,8 @@ export function HomePage() {
             사랑의 온도 추이, 강약점, 뱃지
           </p>
         </CardLink>
+
+
       </div>
     </main>
   )
