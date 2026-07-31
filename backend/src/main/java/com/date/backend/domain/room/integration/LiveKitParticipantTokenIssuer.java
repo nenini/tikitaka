@@ -5,6 +5,7 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.SessionErrorCode;
 import io.livekit.server.AccessToken;
 import io.livekit.server.CanPublish;
+import io.livekit.server.CanPublishData;
 import io.livekit.server.CanSubscribe;
 import io.livekit.server.RoomJoin;
 import io.livekit.server.RoomName;
@@ -40,7 +41,8 @@ public class LiveKitParticipantTokenIssuer {
 				new RoomJoin(true),
 				new RoomName(roomName),
 				new CanPublish(true),
-				new CanSubscribe(true)
+				new CanSubscribe(true),
+				new CanPublishData(true)
 		);
 		return new IssuedLiveKitToken(true, properties.url(), token.toJwt());
 	}

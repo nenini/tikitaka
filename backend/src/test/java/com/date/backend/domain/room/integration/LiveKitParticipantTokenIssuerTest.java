@@ -1,9 +1,12 @@
 package com.date.backend.domain.room.integration;
 
+import com.auth0.jwt.JWT;
 import com.date.backend.domain.room.config.LiveKitProperties;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.SessionErrorCode;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +29,16 @@ class LiveKitParticipantTokenIssuerTest {
 		assertThat(token.configured()).isTrue();
 		assertThat(token.url()).isEqualTo("https://demo.livekit.cloud");
 		assertThat(token.accessToken()).isNotBlank();
+
+		var decoded = JWT.decode(token.accessToken());
+		Map<String, Object> video = decoded.getClaim("video").asMap();
+		assertThat(decoded.getSubject()).isEqualTo("user-2");
+		assertThat(video)
+				.containsEntry("roomJoin", true)
+				.containsEntry("room", "date-room-1")
+				.containsEntry("canPublish", true)
+				.containsEntry("canSubscribe", true)
+				.containsEntry("canPublishData", true);
 	}
 
 	@Test
