@@ -27,6 +27,7 @@
 | 수신자 | `destinationIdentities: ["ai-session-{sessionId}"]` |
 | 페이로드 | UTF-8 JSON, `{ "behaviorEvents": [...], "metricSnapshots": [...] }` |
 | 패킷 상한 | 12KB. 넘으면 같은 모양으로 쪼개 여러 패킷을 보낸다 |
+| 전송 조건 | `ai-session-{sessionId}` 가 **룸에 입장한 뒤에만** 보낸다 |
 
 ### participantIdentity 를 페이로드에 넣지 않는 이유
 
@@ -51,11 +52,30 @@ Aggregator 의 `VisionEventBatch`(pydantic)는 `extra="forbid"` 이고 필드가
 
 ### 순서·중복
 
-- `seq` 는 (userId, clientInstanceId) 기준 단조 증가다. 배치는 행동/메트릭 두 배열로
-  나뉘어 순서가 깨지므로 수신 측이 `ordered_events()` 로 복원한다.
+- `seq` 는 (userId, clientInstanceId) 기준 단조 증가다. 한 패킷 안에서는 행동/메트릭 두
+  배열로 나뉘어 순서가 깨지므로 수신 측이 `ordered_events()` 로 복원한다.
+- **패킷 사이의 순서는 브라우저가 보장한다.** 12KB 분할 시 behavior/metric 전체를 seq 로
+  정렬한 뒤 연속 구간으로만 자르므로 항상 `packet[i].maxSeq < packet[i+1].minSeq` 다.
+  (예전에는 behavior 를 먼저 채우고 metric 을 나중에 채워 `[11,13]` → `[10,12]` 처럼
+  뒤집힌 패킷이 나올 수 있었다.)
 - `eventId` 가 멱등 키다. 재전송으로 같은 `eventId` 가 두 번 올 수 있다.
 - 전송이 실패하면 배치는 브라우저 버퍼에 남아 다음 interval 에 재시도된다
   (최대 100건 / 30초, 초과분은 메트릭부터 버린다).
+
+### AI 워커 입장 전 이벤트
+
+DataChannel 은 수신자가 없어도 publish 가 성공으로 끝난다. 그래서 워커가 룸에 없으면
+`AI_WORKER_NOT_CONNECTED` 로 **던져서** publisher 버퍼에 남긴다.
+
+⚠️ 버퍼 수명은 `transport.maxBufferedAgeMs` = **30초**다. 워커가 세션 시작보다 30초 넘게
+늦게 입장하면 그 이전 구간은 폐기된다. baseline 수집이 세션 앞부분에서 이뤄지므로,
+워커는 `AI_SESSION_STARTED` 직후 입장하는 것이 좋다.
+
+### 룸 참가자 구성
+
+룸에는 사람 2명 + AI 워커 1명이 들어온다. 참가자 수를 세는 곳에서는 AI 워커를 빼야 한다
+(`livekit/identity.ts` 의 `isAiWorkerIdentity`). 안 그러면 상대가 아직 없는데도
+"상대 입장"으로 판단해 빈 영상에 대고 "상대가 카메라를 껐어요" 를 띄운다.
 
 ## 동의 (`visionEnabled`)
 
@@ -69,10 +89,19 @@ Aggregator 의 `VisionEventBatch`(pydantic)는 `extra="forbid"` 이고 필드가
 
 ## 로컬 자산
 
+둘 다 `npm run vision:assets` 가 준비한다. **`postinstall` 에서 자동 실행**되므로 새 PC·CI·
+배포 서버 모두 `npm install` 한 번이면 갖춰진다.
+
 | 파일 | 출처 |
 | --- | --- |
-| `public/mediapipe/wasm/**` | `npm run vision:assets` (node_modules 에서 복사, postinstall 자동) |
-| `public/models/face_landmarker.task` | 직접 내려받아 둔다 (아래) |
+| `public/mediapipe/wasm/**` | `node_modules/@mediapipe/tasks-vision/wasm` 에서 복사 |
+| `public/models/face_landmarker.task` | 없으면 Google MediaPipe 호스팅에서 다운로드 (3.7MB) |
+
+- 임시 파일로 받은 뒤 rename 하므로 중단돼도 잘린 파일이 남지 않는다. 이미 잘려 있으면
+  크기를 보고 다시 받는다.
+- 네트워크가 막혀도 **install 을 실패시키지 않는다.** 경고만 남고 분석이 꺼진 채로 뜬다.
+- 오프라인 CI 에서 다운로드를 끄려면 `BT_SKIP_VISION_MODEL=1`.
+- 수동으로 받으려면:
 
 ```bash
 curl -L -o public/models/face_landmarker.task https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
@@ -80,6 +109,24 @@ curl -L -o public/models/face_landmarker.task https://storage.googleapis.com/med
 
 모델이 없으면 Worker 초기화가 실패하고 상태가 `UNAVAILABLE` 이 된다. 통화는 그대로
 진행되고 콘솔에 경고만 남는다 — 분석은 fail-soft 다.
+
+> ⚠️ WASM 은 `public/` 에 두지만 dev 서버에서는 거기서 서빙하면 **안 된다**.
+> MediaPipe 는 런타임에 `import("/mediapipe/wasm/vision_wasm_module_internal.js")` 를
+> 실행하는데, vite dev 는 `public/` 파일이 모듈로 import 되면 500 으로 거절한다.
+> 그래서 `vite.config.ts` 의 `bt:mediapipe-wasm-dev` 플러그인이 transform 미들웨어보다
+> 먼저 이 경로를 가로채 원본 바이트를 돌려준다. 프로덕션 빌드는 정적 서빙이라 무관하다 —
+> **`vite build` 만 확인하면 절대 안 잡히는 버그**이므로 플러그인을 지우지 말 것.
+
+## 콘솔로 확인하기
+
+```js
+localStorage.setItem('bt.vision.debug', '1')   // 상세 로그 (새로고침 불필요)
+```
+
+- 행동 감지(`SMILE_STARTED`·`GAZE_AWAY_STARTED`·`NOD_EVENT` …)는 dev 에서 항상 찍힌다.
+- 상세 모드에서는 5초마다 품질·baseline·프로파일·누적 카운트 한 줄이 추가로 찍힌다.
+- `[vision] 전송 실패 …` 가 계속 늘면 룸 연결 또는 신원 불일치다(전송은 되지만 받는 쪽이
+  없는 경우는 실패로 잡히지 않는다 — DataChannel 은 수신자 유무를 알려주지 않는다).
 
 ## AI 패키지 빌드
 

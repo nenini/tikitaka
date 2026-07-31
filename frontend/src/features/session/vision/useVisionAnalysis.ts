@@ -21,6 +21,7 @@ import {
   aiWorkerIdentityOf,
   participantIdentityOf,
 } from './LiveKitVisionTransport'
+import { VisionDebugLogger } from './visionDebug'
 
 export type VisionAnalysisState =
   /** 아직 조건이 안 갖춰졌다(동의 없음·세션 미시작·룸 미연결) */
@@ -178,6 +179,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
 
     let disposed = false
     setStatus({ state: 'STARTING', error: null })
+    const debug = new VisionDebugLogger(sessionId, userId)
 
     const clock = new SystemClock()
     const timeline = new SessionTimeline(
@@ -237,7 +239,10 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
     const onFrameResult = (frame: NormalizedFaceFrame): void => {
       if (disposed || runtime === null || runtime.getState() !== 'ACTIVE') return
       // 전송 실패는 publisher 가 버퍼에 담아 재시도한다 — 여기서 통화를 흔들면 안 된다.
-      void runtime.process(frame, runtimeStatusOf()).catch(() => undefined)
+      void runtime
+        .process(frame, runtimeStatusOf())
+        .then((result) => debug.frame(result))
+        .catch(() => undefined)
     }
 
     // Worker 가 치명적으로 죽으면 샘플링부터 멈춰야 한다. 클라이언트가 샘플러보다 먼저
@@ -273,6 +278,12 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
       .then(() => {
         if (disposed) return
         activeSampler.start()
+        debug.start({
+          delegate: client.getDelegate(),
+          topic: 'vision.v4',
+          수신자: aiWorkerIdentityOf(String(sessionId)),
+          sessionElapsedMs기준점: anchorMs,
+        })
         setStatus({ state: 'RUNNING', error: null })
       })
       .catch((error: unknown) => {
@@ -289,6 +300,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
       activeSampler.stop()
       // 동의 철회면 버퍼를 버리고(flush 안 함), 세션 종료면 마지막 배치까지 내보낸다.
       const reason = visionEnabledRef.current ? 'SESSION_ENDED' : 'CONSENT_WITHDRAWN'
+      debug.end(reason)
       void activeRuntime
         .end(reason, {
           sessionElapsedMs: timeline.now().sessionElapsedMs,

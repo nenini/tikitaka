@@ -1,8 +1,15 @@
 import { ConnectionState, type Room } from 'livekit-client'
 import type {
+  VisionBehaviorEvent,
+  VisionMetricSnapshot,
+} from '@vision/vision/events/VisionEvent.js'
+import type {
   VisionEventBatch,
   VisionEventTransport,
 } from '@vision/vision/events/VisionEventPublisher.js'
+import { aiWorkerIdentityOf, participantIdentityOf } from '../livekit/identity'
+
+export { aiWorkerIdentityOf, participantIdentityOf }
 
 /** AI 파트와 합의한 DataChannel topic. 이 topic 의 페이로드는 Vision v4 배치 뿐이다. */
 export const VISION_V4_TOPIC = 'vision.v4'
@@ -15,16 +22,6 @@ export const VISION_V4_TOPIC = 'vision.v4'
  * 전송이 한 번 실패해 버퍼가 쌓인 뒤의 flush 에서는 반드시 걸린다.
  */
 const MAX_PACKET_BYTES = 12_000
-
-/** 백엔드 `LiveKitAiWorkerTokenIssuer.IDENTITY_PREFIX` 와 같은 규칙. */
-export function aiWorkerIdentityOf(sessionId: string): string {
-  return `ai-session-${sessionId}`
-}
-
-/** 백엔드 `RoomParticipant.identityOf` 와 같은 규칙. */
-export function participantIdentityOf(userId: string): string {
-  return `user-${userId}`
-}
 
 export interface LiveKitVisionTransportOptions {
   readonly room: Room
@@ -42,6 +39,7 @@ export interface LiveKitVisionTransportOptions {
 
 export type VisionTransportRejectionReason =
   | 'ROOM_DISCONNECTED'
+  | 'AI_WORKER_NOT_CONNECTED'
   | 'IDENTITY_MISMATCH'
   | 'SESSION_MISMATCH'
   | 'USER_MISMATCH'
@@ -113,6 +111,16 @@ export class LiveKitVisionTransport implements VisionEventTransport {
         `participantIdentity 불일치: 기대 ${participantIdentity}, 실제 ${room.localParticipant.identity}`,
       )
     }
+    if (!this.isAiWorkerPresent()) {
+      // DataChannel 은 수신자가 없어도 성공으로 끝난다 — 그대로 두면 워커가 들어오기 전
+      // 이벤트가 조용히 사라진다. 던져서 publisher 버퍼에 남기고 다음 interval 에 재시도한다.
+      // (버퍼 수명은 transport.maxBufferedAgeMs = 30초다. 워커가 그보다 늦게 들어오면
+      //  그 이전 구간은 폐기된다 — 세션 시작과 함께 워커가 입장해야 하는 이유다.)
+      throw new VisionTransportRejection(
+        'AI_WORKER_NOT_CONNECTED',
+        `AI Worker(${this.options.aiParticipantIdentity})가 아직 룸에 없습니다.`,
+      )
+    }
 
     for (const event of [...batch.behaviorEvents, ...batch.metricSnapshots]) {
       if (event.sessionId !== sessionId) {
@@ -128,6 +136,16 @@ export class LiveKitVisionTransport implements VisionEventTransport {
         )
       }
     }
+  }
+
+  /** remoteParticipants 는 identity 로 키가 잡히지만, 키 누락에 대비해 값도 훑는다. */
+  private isAiWorkerPresent(): boolean {
+    const { room, aiParticipantIdentity } = this.options
+    if (room.remoteParticipants.has(aiParticipantIdentity)) return true
+    for (const participant of room.remoteParticipants.values()) {
+      if (participant.identity === aiParticipantIdentity) return true
+    }
+    return false
   }
 
   /**
@@ -147,53 +165,52 @@ export class LiveKitVisionTransport implements VisionEventTransport {
   }
 
   /**
-   * 패킷 상한을 넘지 않게 배치를 나눈다.
+   * 패킷 상한을 넘지 않게 배치를 나눈다. **패킷 간 seq 범위는 반드시 증가한다.**
    *
-   * seq 순서는 수신 측이 `ordered_events()` 로 복원하므로, 여기서는 크기만 본다.
+   * 배치는 behavior/metric 두 배열로 나뉘어 있어 전역 seq 순서를 잃는다. 그 상태로
+   * 배열별로 쪼개면 `packet1 = [11,13]`, `packet2 = [10,12]` 처럼 뒤집힌 패킷이 나오고,
+   * 수신 측이 패킷 단위로 순서를 신뢰하면 오래된 이벤트를 stale 로 버리게 된다.
+   * 그래서 전체를 seq 로 정렬한 뒤 **연속 구간**으로만 자른다 —
+   * 결과는 항상 `packet[i].maxSeq < packet[i+1].minSeq` 를 만족한다.
+   *
    * 이벤트 하나가 혼자서 상한을 넘으면 쪼갤 방법이 없으므로 단독 패킷으로 보낸다
    * (SFU 가 거절하면 publisher 버퍼에 남았다가 age 초과로 폐기된다).
    */
   private split(batch: VisionEventBatch): VisionEventBatch[] {
     if (this.byteLengthOf(batch) <= this.maxPacketBytes) return [batch]
 
+    const ordered: readonly (VisionBehaviorEvent | VisionMetricSnapshot)[] = [
+      ...batch.behaviorEvents,
+      ...batch.metricSnapshots,
+    ].sort((left, right) => left.seq - right.seq)
+
     const packets: VisionEventBatch[] = []
-    let behaviorEvents: VisionEventBatch['behaviorEvents'][number][] = []
-    let metricSnapshots: VisionEventBatch['metricSnapshots'][number][] = []
+    let current: (VisionBehaviorEvent | VisionMetricSnapshot)[] = []
 
-    const flush = () => {
-      if (behaviorEvents.length === 0 && metricSnapshots.length === 0) return
-      packets.push({ behaviorEvents, metricSnapshots })
-      behaviorEvents = []
-      metricSnapshots = []
-    }
-
-    // 행동 이벤트를 먼저 채운다 — 용량 압박에서 살아남아야 하는 쪽이다
-    // (BufferedVisionEventPublisher 도 같은 우선순위로 메트릭부터 버린다).
-    for (const event of batch.behaviorEvents) {
-      const next = [...behaviorEvents, event]
-      if (
-        behaviorEvents.length > 0 &&
-        this.byteLengthOf({ behaviorEvents: next, metricSnapshots }) > this.maxPacketBytes
-      ) {
-        flush()
-        behaviorEvents = [event]
+    for (const event of ordered) {
+      const next = [...current, event]
+      if (current.length > 0 && this.byteLengthOf(toBatch(next)) > this.maxPacketBytes) {
+        packets.push(toBatch(current))
+        current = [event]
         continue
       }
-      behaviorEvents = next
+      current = next
     }
-    for (const snapshot of batch.metricSnapshots) {
-      const next = [...metricSnapshots, snapshot]
-      if (
-        (behaviorEvents.length > 0 || metricSnapshots.length > 0) &&
-        this.byteLengthOf({ behaviorEvents, metricSnapshots: next }) > this.maxPacketBytes
-      ) {
-        flush()
-        metricSnapshots = [snapshot]
-        continue
-      }
-      metricSnapshots = next
-    }
-    flush()
+    if (current.length > 0) packets.push(toBatch(current))
     return packets
+  }
+}
+
+/** seq 로 정렬된 이벤트 묶음을 다시 계약 모양(behavior/metric 분리)으로 되돌린다. */
+function toBatch(
+  events: readonly (VisionBehaviorEvent | VisionMetricSnapshot)[],
+): VisionEventBatch {
+  return {
+    behaviorEvents: events.filter(
+      (event): event is VisionBehaviorEvent => event.kind === 'behavior',
+    ),
+    metricSnapshots: events.filter(
+      (event): event is VisionMetricSnapshot => event.kind === 'metric',
+    ),
   }
 }

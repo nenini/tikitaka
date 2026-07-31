@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite'
+import { createReadStream, existsSync, statSync } from 'node:fs'
+import { basename, extname, join } from 'node:path'
+import { defineConfig, type Plugin } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -17,8 +19,59 @@ import tailwindcss from '@tailwindcss/vite'
 const visionPackage = fileURLToPath(new URL('../ai/vision-analysis', import.meta.url))
 const visionDist = `${visionPackage}/dist`
 
+const MEDIAPIPE_WASM_ROUTE = '/mediapipe/wasm/'
+const mediapipeWasmDir = fileURLToPath(new URL('./public/mediapipe/wasm', import.meta.url))
+
+const WASM_CONTENT_TYPES: Record<string, string> = {
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.wasm': 'application/wasm',
+  '.data': 'application/octet-stream',
+}
+
+/**
+ * MediaPipe WASM 런타임을 dev 서버에서 **변환 없이** 내보낸다.
+ *
+ * MediaPipe 의 FilesetResolver 는 런타임에
+ * `import("/mediapipe/wasm/vision_wasm_module_internal.js")` 를 실행한다.
+ * 그런데 vite dev 는 `public/` 안의 파일이 모듈로 import 되면 500 으로 거절한다
+ * ("should not be imported from source code"). 그래서 dev 에서는 얼굴 분석이 항상
+ * INITIALIZATION_FAILED 로 죽는다 — `vite build` 결과물은 정적 서빙이라 멀쩡해서
+ * 빌드만 확인하면 절대 안 잡히는 종류의 버그다.
+ *
+ * vite 의 transform 미들웨어보다 **먼저** 이 경로를 가로채 원본 바이트를 그대로 돌려준다.
+ * (`configureServer` 본문에서 등록하면 내부 미들웨어보다 앞에 선다.)
+ * 프로덕션 빌드는 `public/` 이 dist 로 그대로 복사되므로 이 플러그인이 관여하지 않는다.
+ */
+function mediapipeWasmDevServer(): Plugin {
+  return {
+    name: 'bt:mediapipe-wasm-dev',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? ''
+        if (!url.startsWith(MEDIAPIPE_WASM_ROUTE)) return next()
+
+        // 쿼리(`?import` 등)를 떼고, 경로 탈출을 막기 위해 파일명만 쓴다.
+        const requested = basename(url.slice(MEDIAPIPE_WASM_ROUTE.length).split('?')[0] ?? '')
+        const filePath = join(mediapipeWasmDir, requested)
+        if (requested === '' || !existsSync(filePath) || !statSync(filePath).isFile()) {
+          return next()
+        }
+
+        res.setHeader(
+          'Content-Type',
+          WASM_CONTENT_TYPES[extname(requested)] ?? 'application/octet-stream',
+        )
+        res.setHeader('Cache-Control', 'no-cache')
+        createReadStream(filePath).pipe(res)
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), mediapipeWasmDevServer()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -9,6 +9,7 @@ import {
 import type { LocalVideoTrack, RemoteAudioTrack, RemoteVideoTrack } from 'livekit-client'
 import type { ConnectionState as BtConnectionState } from '@/components'
 import { toBtState } from './connectionState'
+import { isAiWorkerIdentity } from './identity'
 import type { TokenProvider } from './tokenProvider'
 
 export interface LiveKitSession {
@@ -51,6 +52,21 @@ export interface LiveKitSession {
     mediaDenied: boolean
     /** 권한을 다시 확인하고 입장을 재시도한다 */
     retry: () => void
+}
+
+/**
+ * 룸에 들어와 있는 **사람** 상대의 수.
+ *
+ * 룸에는 AI 분석 워커(`ai-session-{id}`)도 원격 참가자로 들어온다. 그냥
+ * `remoteParticipants.size` 를 쓰면 상대가 아직 안 왔는데도 "상대 입장"으로 보이고,
+ * 세션 화면이 빈 영상에 대고 "상대가 카메라를 껐어요" 를 띄운다.
+ */
+function humanPartnerCount(room: Room): number {
+  let count = 0
+  room.remoteParticipants.forEach((participant) => {
+    if (!isAiWorkerIdentity(participant.identity)) count += 1
+  })
+  return count
 }
 
 /** 권한 거부·장치 없음을 구분한다. 사용자에게 다른 안내를 해야 한다. */
@@ -126,15 +142,17 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
             })
             .on(RoomEvent.TrackSubscribed, onTrackSubscribed)
             .on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
-            .on(RoomEvent.ParticipantConnected, () => {
+            .on(RoomEvent.ParticipantConnected, (participant) => {
                 // 상대 입장. 카메라·마이크를 모두 끄고 들어와도 여기서 잡힌다
                 // (트랙 유무로 판정하면 그 경우를 놓친다).
-                if (!cancelled) setPartnerConnected(true)
+                // AI 분석 워커도 같은 이벤트로 들어오므로 사람만 센다.
+                if (cancelled || isAiWorkerIdentity(participant.identity)) return
+                setPartnerConnected(true)
             })
-            .on(RoomEvent.ParticipantDisconnected, () => {
+            .on(RoomEvent.ParticipantDisconnected, (participant) => {
                 // 상대 이탈 — 연결 끊김(내 네트워크 문제)과 구분해서 트랙만 비운다
-                if (cancelled) return
-                setPartnerConnected(room.remoteParticipants.size > 0)
+                if (cancelled || isAiWorkerIdentity(participant.identity)) return
+                setPartnerConnected(humanPartnerCount(room) > 0)
                 setRemoteVideo(null)
                 setRemoteAudio(null)
             })
@@ -222,7 +240,7 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
                 setLocalParticipantSid(room.localParticipant.sid || null)
                 setLocalParticipantIdentity(room.localParticipant.identity || null)
                 setConnectedRoom(room)
-                setPartnerConnected(room.remoteParticipants.size > 0)
+                setPartnerConnected(humanPartnerCount(room) > 0)
 
                 // 게이트를 통과했어도 이 사이에 권한이 바뀌었을 수 있다. 실패하면 입장을 취소한다.
                 try {
