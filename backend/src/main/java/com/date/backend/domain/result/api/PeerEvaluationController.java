@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 
 @RestController
 @Validated
@@ -54,7 +55,7 @@ public class PeerEvaluationController implements PeerEvaluationSwaggerDocs {
 	@Override
 	public ApiResponse<PeerEvaluationSubmitResponse> submit(
 			@AuthenticationPrincipal AuthUser authUser,
-			@PathVariable Long sessionId,
+			@Positive @PathVariable Long sessionId,
 			@Valid @RequestBody PeerEvaluationSubmitRequest request
 	) {
 		return ApiResponse.success(

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 
 @Tag(name = "Result", description = "세션 종료 후 상대 평가 API")
@@ -50,7 +51,7 @@ public interface PeerEvaluationSwaggerDocs {
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "화상 세션 ID", example = "15")
 			@Positive Long sessionId,
-			PeerEvaluationSubmitRequest request
+			@Valid PeerEvaluationSubmitRequest request
 	);
 
 	@Operation(
