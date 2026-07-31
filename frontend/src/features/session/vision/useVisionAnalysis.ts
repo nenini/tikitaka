@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LocalVideoTrack, Room } from 'livekit-client'
+import { RoomEvent } from 'livekit-client'
+import type { LocalVideoTrack, RemoteParticipant, Room } from 'livekit-client'
 import { SystemClock } from '@vision/common/Clock.js'
 import { createClientInstanceId } from '@vision/common/ClientInstanceId.js'
 import { MonotonicSequenceGenerator } from '@vision/common/SequenceGenerator.js'
@@ -26,6 +27,8 @@ import { VisionDebugLogger } from './visionDebug'
 export type VisionAnalysisState =
   /** 아직 조건이 안 갖춰졌다(동의 없음·세션 미시작·룸 미연결) */
   | 'IDLE'
+  /** 다른 조건은 다 갖춰졌고 AI 워커가 룸에 들어오기를 기다리는 중 */
+  | 'WAITING_FOR_AI_WORKER'
   /** Worker 초기화 중 */
   | 'STARTING'
   /** 프레임을 분석하고 배치를 내보내는 중 */
@@ -69,6 +72,7 @@ const IDLE: VisionAnalysisStatus = { state: 'IDLE', error: null }
  * 지켜야 하는 것
  *  - 원본 프레임은 브라우저 밖으로 나가지 않는다. 나가는 건 스칼라 지표뿐이다.
  *  - `visionEnabled=false` 면 분석·전송을 **둘 다** 멈춘다. 진행 중이었다면 버퍼도 버린다.
+ *  - **AI 워커가 룸에 들어온 뒤에** 분석을 시작한다. 그전 이벤트는 받는 쪽이 없다.
  *  - 분석이 실패해도 통화는 계속된다. 여기서 던지는 예외가 SessionPage 로 올라가면 안 된다.
  *
  * 알려진 한계: 카메라를 끄면 프레임 자체가 끊겨 `CAMERA_DISABLED` 행동 이벤트가 나가지
@@ -101,12 +105,20 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
 
   const anchorMs = useSessionElapsedAnchor(sessionStartedAt)
 
-  const ready =
+  // AI 워커가 들어오기 전에는 분석 자체를 시작하지 않는다. DataChannel 은 수신자가 없어도
+  // publish 가 성공으로 끝나기 때문에, 워커보다 먼저 시작하면 초반 이벤트가 조용히 사라진다.
+  // (transport 의 AI_WORKER_NOT_CONNECTED 가드는 버퍼에 남겨 재시도하지만 30초까지만이다.)
+  // 워커가 아예 안 오면 MediaPipe 를 세션 내내 헛돌리게 되므로 CPU 도 아낀다.
+  const aiWorkerIdentity = aiWorkerIdentityOf(String(sessionId))
+  const aiWorkerJoined = useAiWorkerPresence(room, aiWorkerIdentity)
+
+  const preconditionsMet =
     visionEnabled &&
     room !== null &&
     userId !== null &&
     participantIdentity !== null &&
     anchorMs !== null
+  const ready = preconditionsMet && aiWorkerJoined
 
   /* ── 분석 전용 video 엘리먼트 ──
      DOM 에 붙어 있어야 브라우저가 프레임을 넘겨준다(display:none 이면 rVFC 가 멈춘다).
@@ -161,7 +173,12 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
   /* ── 파이프라인 · 전송 ── */
   useEffect(() => {
     if (!ready || room === null || userId === null || participantIdentity === null) {
-      setStatus(IDLE)
+      // 워커만 없는 상태는 IDLE 과 구분한다 — 시연 중 "왜 안 뜨지"를 콘솔에서 바로 가른다.
+      setStatus(
+        preconditionsMet
+          ? { state: 'WAITING_FOR_AI_WORKER', error: null }
+          : IDLE,
+      )
       return
     }
     const element = videoRef.current
@@ -208,7 +225,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
         sessionId: String(sessionId),
         userId,
         participantIdentity,
-        aiParticipantIdentity: aiWorkerIdentityOf(String(sessionId)),
+        aiParticipantIdentity: aiWorkerIdentity,
       }),
       defaultVisionConfig,
       clock,
@@ -281,7 +298,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
         debug.start({
           delegate: client.getDelegate(),
           topic: 'vision.v4',
-          수신자: aiWorkerIdentityOf(String(sessionId)),
+          수신자: aiWorkerIdentity,
           sessionElapsedMs기준점: anchorMs,
         })
         setStatus({ state: 'RUNNING', error: null })
@@ -310,9 +327,55 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
         .finally(() => worker.terminate())
       setStatus(IDLE)
     }
-  }, [ready, room, userId, participantIdentity, sessionId, anchorMs])
+  }, [ready, preconditionsMet, room, userId, participantIdentity, sessionId, aiWorkerIdentity, anchorMs])
 
   return status
+}
+
+/**
+ * AI 분석 워커가 이 룸에 들어왔는가.
+ *
+ * **한 번 들어오면 계속 true 다(latch).** 워커가 잠깐 끊겼다고 파이프라인을 통째로
+ * 내렸다 올리면 baseline 과 진행 중인 행동 에피소드가 전부 리셋된다. 일시적인 이탈은
+ * transport 의 `AI_WORKER_NOT_CONNECTED` 가드가 버퍼로 흡수한다.
+ *
+ * 룸이 바뀌면(재연결·다음 세션) 다시 기다린다.
+ */
+function useAiWorkerPresence(room: Room | null, aiWorkerIdentity: string): boolean {
+  const [joined, setJoined] = useState(false)
+
+  useEffect(() => {
+    if (room === null) {
+      setJoined(false)
+      return
+    }
+
+    const present = (): boolean => {
+      // 키는 identity 지만, 키 누락에 대비해 값도 훑는다.
+      if (room.remoteParticipants.has(aiWorkerIdentity)) return true
+      for (const participant of room.remoteParticipants.values()) {
+        if (participant.identity === aiWorkerIdentity) return true
+      }
+      return false
+    }
+
+    // 우리가 늦게 붙었으면 워커는 이미 들어와 있다 — 이벤트를 기다리면 영영 못 만난다.
+    if (present()) {
+      setJoined(true)
+      return
+    }
+
+    setJoined(false)
+    const onConnected = (participant: RemoteParticipant): void => {
+      if (participant.identity === aiWorkerIdentity) setJoined(true)
+    }
+    room.on(RoomEvent.ParticipantConnected, onConnected)
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, onConnected)
+    }
+  }, [room, aiWorkerIdentity])
+
+  return joined
 }
 
 /**

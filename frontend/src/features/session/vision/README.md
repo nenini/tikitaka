@@ -64,12 +64,21 @@ Aggregator 의 `VisionEventBatch`(pydantic)는 `extra="forbid"` 이고 필드가
 
 ### AI 워커 입장 전 이벤트
 
-DataChannel 은 수신자가 없어도 publish 가 성공으로 끝난다. 그래서 워커가 룸에 없으면
-`AI_WORKER_NOT_CONNECTED` 로 **던져서** publisher 버퍼에 남긴다.
+DataChannel 은 수신자가 없어도 publish 가 성공으로 끝난다. 그래서 두 겹으로 막는다.
 
-⚠️ 버퍼 수명은 `transport.maxBufferedAgeMs` = **30초**다. 워커가 세션 시작보다 30초 넘게
-늦게 입장하면 그 이전 구간은 폐기된다. baseline 수집이 세션 앞부분에서 이뤄지므로,
-워커는 `AI_SESSION_STARTED` 직후 입장하는 것이 좋다.
+**1. 분석 시작 자체를 막는다.** `useVisionAnalysis` 는 `ai-session-{sessionId}` 가 룸에
+들어오기 전에는 파이프라인을 만들지 않는다(상태 `WAITING_FOR_AI_WORKER`). 분석용 video
+엘리먼트도, MediaPipe Worker 도 생성되지 않는다 — 받는 쪽이 없는데 CPU 를 태울 이유가 없다.
+
+- 붙는 순간 이미 워커가 있으면(새로고침 등) `ParticipantConnected` 를 기다리지 않고 바로 시작한다.
+- 한 번 들어오면 **latch** 된다. 워커가 잠깐 끊겼다고 파이프라인을 내렸다 올리면 baseline 과
+  진행 중인 행동 에피소드가 리셋되기 때문이다. 그 구간은 아래 2번이 흡수한다.
+
+**2. 전송 직전에 한 번 더 확인한다.** 워커가 중간에 빠지면 `AI_WORKER_NOT_CONNECTED` 로
+던져서 publisher 버퍼에 남기고 다음 interval 에 재시도한다.
+
+⚠️ 버퍼 수명은 `transport.maxBufferedAgeMs` = **30초**다. 워커가 30초 넘게 안 돌아오면
+그 구간은 폐기된다.
 
 ### 룸 참가자 구성
 
