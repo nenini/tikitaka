@@ -36,8 +36,12 @@ const ICONS = {
   // ── actions / arrows ───────────────────────────────────
   'chevron-right':   { paint: 'stroke', body: <path d="M9 6l6 6-6 6" /> },
   'chevron-left':    { paint: 'stroke', body: <path d="M15 6l-6 6 6 6" /> },
+  'chevron-down':    { paint: 'stroke', body: <path d="M6 9l6 6 6-6" /> },
   'chevrons-right':  { paint: 'stroke', body: <path d="M13 17l5-5-5-5M6 17l5-5-5-5" /> }, // 버튼 trailing 어포던스
+  'arrow-up':        { paint: 'stroke', body: <path d="M12 19V5M5 12l7-7 7 7" /> },   // 온도 상승
+  'arrow-down':      { paint: 'stroke', body: <path d="M12 5v14M19 12l-7 7-7-7" /> }, // 온도 하락
   plus:              { paint: 'stroke', body: <path d="M12 5v14M5 12h14" /> },
+  more:              { paint: 'stroke', body: <path d="M12 5h.01M12 12h.01M12 19h.01" strokeWidth={2.6} /> }, // 오버플로 메뉴
   close:             { paint: 'stroke', body: <path d="M18 6L6 18M6 6l12 12" /> },
   check:             { paint: 'stroke', body: <path d="M20 6L9 17l-5-5" /> },
   search:            { paint: 'stroke', body: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></> },
@@ -55,6 +59,11 @@ const ICONS = {
   report:            { paint: 'stroke', body: <path d="M4 21V4M4 4h13l-2 4 2 4H4" /> }, // 신고 깃발
   lock:              { paint: 'stroke', body: <><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></> },
   eye:               { paint: 'stroke', body: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></> },
+  target:            { paint: 'stroke', body: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12h.01" /></> }, // 세션 목표
+  bulb:              { paint: 'stroke', body: <><path d="M15.1 14.2a5.5 5.5 0 10-6.2 0c.7.5 1.1 1.3 1.1 2.1h4c0-.8.4-1.6 1.1-2.1z" /><path d="M9.5 19.5h5M10.5 22h3" /></> }, // 대체 제안
+  wrench:            { paint: 'stroke', body: <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.8-3.8a6 6 0 01-8 8l-6.9 6.9a2.1 2.1 0 01-3-3l6.9-6.9a6 6 0 018-8l-3.8 3.8z" /> }, // 생성 실패·복구
+  medal:             { paint: 'stroke', body: <><circle cx="12" cy="15" r="6" /><path d="M8.6 10.4L5.5 3h4.9L12 6.3 13.6 3h4.9l-3.1 7.4" /></> }, // 뱃지 기본
+  bot:               { paint: 'stroke', body: <><rect x="4" y="8" width="16" height="12" rx="3.5" /><path d="M12 8V4.5M9.5 13.5h.01M14.5 13.5h.01M9.5 16.8c1.6.9 3.4.9 5 0" /></> }, // AI 상대
 
   // ── session / call controls ────────────────────────────
   mic:         { paint: 'stroke', body: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0014 0M12 18v4" /></> },
@@ -64,6 +73,8 @@ const ICONS = {
   chat:        { paint: 'stroke', body: <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" /> },
   'phone-end': { paint: 'fill',   body: <path d="M12 9c-1.6 0-3.2.3-4.6.8v3.1c0 .4-.2.8-.6 1-.9.4-1.7 1-2.4 1.7-.2.2-.4.3-.7.3s-.5-.1-.7-.3l-2-2c-.2-.2-.3-.4-.3-.7s.1-.5.3-.7C3.9 9.8 7.8 8.2 12 8.2s8.1 1.6 11 4c.2.2.3.4.3.7s-.1.5-.3.7l-2 2c-.2.2-.4.3-.7.3s-.5-.1-.7-.3c-.7-.7-1.5-1.3-2.4-1.7-.4-.2-.6-.6-.6-1V9.8C15.2 9.3 13.6 9 12 9z" /> },
   clock:       { paint: 'stroke', body: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> },
+  speaker:     { paint: 'stroke', body: <><path d="M11 5L6 9H3v6h3l5 4z" /><path d="M15.4 8.6a4.8 4.8 0 010 6.8M18.4 5.6a9 9 0 010 12.8" /></> },
+  'speaker-off': { paint: 'stroke', body: <><path d="M11 5L6 9H3v6h3l5 4z" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></> },
   'camera-flip': { paint: 'stroke', body: <><path d="M15 10l6-4v12l-6-4M3 6h12v12H3z" /><path d="M6 14a3 3 0 015.2-2M12 10a3 3 0 01-5.2 2" /><path d="M11 11.5L11.4 8M6.6 12.5L6.2 16" /></> },
   signal:      { paint: 'stroke', body: <path d="M4 20v-4M9 20v-8M14 20V8M19 20V4" /> },
 

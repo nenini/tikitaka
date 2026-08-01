@@ -19,9 +19,9 @@ const EXTENSION_OFFER_AT_SEC = 60
 // TODO(FE-SESSION-10): 추천 주제·질문은 GET /api/sessions/{id}/questions 로 교체.
 //   LLM 호출 없이 사전 정의 풀에서 즉시 내려오는 값이라 프론트는 그대로 렌더만 한다.
 const MOCK_TOPICS: readonly SilenceTopic[] = [
-  { id: 'cafe', label: '☕ 카페 이야기' },
-  { id: 'movie', label: '🎬 최근 본 영화' },
-  { id: 'travel', label: '✈️ 여행' },
+  { id: 'cafe', label: '카페 이야기' },
+  { id: 'movie', label: '최근 본 영화' },
+  { id: 'travel', label: '여행' },
 ]
 const MOCK_QUESTIONS = [
   { id: 'q1', text: '최근에 재밌게 본 영화나 드라마 있으세요?' },
@@ -152,9 +152,14 @@ export function SessionPage() {
           </aside>
         </div>
 
-        {/* 하단: 통화 컨트롤 */}
-        <footer className="flex flex-col items-center gap-2">
-          {session.error && <Callout tone="danger">{session.error.message}</Callout>}
+        {/* 하단: 통화 컨트롤. 오류 배너는 흐름에 끼우지 않고 위로 띄운다 —
+            흐름에 넣으면 오류가 뜰 때마다 컨트롤이 밀려 누르려던 버튼이 자리를 옮긴다. */}
+        <footer className="relative flex flex-col items-center gap-2">
+          {session.error && (
+            <Callout tone="danger" className="bt-session-error" role="alert">
+              {session.error.message}
+            </Callout>
+          )}
 
           {session.needsAudioUnlock && (
             <Button variant="tonal" size="sm" onClick={session.unlockAudio}>

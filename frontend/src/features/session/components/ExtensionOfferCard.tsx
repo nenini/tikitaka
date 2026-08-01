@@ -18,6 +18,10 @@ export interface ExtensionOfferCardProps {
  * 🔒 규칙: **상대의 거절 여부를 표시하지 않는다.** 그래서 "상대가 거절했어요" 같은 상태가
  * 이 컴포넌트에 존재하지 않는다. 내가 수락했는데 연장이 안 되면 그냥 세션이 끝날 뿐이고,
  * 사용자는 상대가 거절했는지 시간이 다 됐는지 구분할 수 없다. 이게 의도된 동작이다.
+ *
+ * 등장 강조: 답할 시간이 1분뿐이라 조용히 나타나면 놓친다. 카드가 한 번 미끄러져 들어오고
+ * 테두리가 두 번만 깜빡인 뒤 멈춘다 — 계속 깜빡이면 대화보다 UI를 보게 된다.
+ * `aria-live="assertive"` 는 남용하면 안 되지만, 시한부 요청이라 여기서는 맞는 선택이다.
  */
 export function ExtensionOfferCard({
   choice,
@@ -26,7 +30,12 @@ export function ExtensionOfferCard({
   minutes = 5,
 }: ExtensionOfferCardProps) {
   return (
-    <Card variant="inset">
+    <Card
+      variant="inset"
+      className="bt-extension-offer"
+      role="status"
+      aria-live={choice === 'pending' ? 'assertive' : 'polite'}
+    >
       <div className="bt-caption mb-1 flex items-center gap-1">
         <Icon name="clock" size={13} />곧 세션이 끝나요
       </div>

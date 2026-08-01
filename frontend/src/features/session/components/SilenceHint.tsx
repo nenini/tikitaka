@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { Badge, Cluster, Icon, QuestionCard } from '@/components'
+import { Badge, Cluster, Icon, QuestionCard, TagChip } from '@/components'
 import type { QuestionCardState, QuestionOption } from '@/components'
 import type { SilenceStage } from '../useSilenceStage'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
@@ -52,15 +52,19 @@ export function SilenceHint({
   if (stage === 'none') return null
 
   if (stage === 'topic') {
+    // 15~20초 단계는 **읽을 거리**지 누를 거리가 아니다.
+    // 버튼 모양(테두리+호버+커서)으로 그리면 눌러도 아무 일이 없어 어포던스가 거짓말을 한다
+    // — 정적 태그로 그려 "참고 문구"임을 형태로 못박는다.
     return (
-      <div className="flex items-start gap-2">
-        <Cluster gap={8}>
-          {topics.map((topic) => (
-            <span key={topic.id} className="bt-topic-btn" style={{ cursor: 'default' }}>
-              {topic.label}
-            </span>
-          ))}
-        </Cluster>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1.5">
+          <span className="bt-caption bt-muted">이런 주제는 어때요?</span>
+          <Cluster gap={6}>
+            {topics.map((topic) => (
+              <TagChip key={topic.id}>{topic.label}</TagChip>
+            ))}
+          </Cluster>
+        </div>
         <HintCloseButton onClick={onDismiss} />
       </div>
     )
@@ -90,11 +94,13 @@ export function SilenceHint({
           disabled
           onSelect={() => { }}
           onRetry={onRetryQuestions}
-          className="[&_button:disa bled]:cursor-default!"
+          className="[&_button:disabled]:cursor-default!"
         />
 
-        {/* <button onClick={onDismiss} aria-label="힌트 닫기" style={{ position: 'absolute', top: 8, right: 14 }}>X</button> */}
-        {/* <HintCloseButton onClick={onDismiss} aria-label="힌트 닫기" style={{ position: 'absolute', top: 8, right: 14 }} /> */}
+        <HintCloseButton
+          onClick={onDismiss}
+          style={{ position: 'absolute', top: 6, right: 8 }}
+        />
       </div>
     </div>
   )

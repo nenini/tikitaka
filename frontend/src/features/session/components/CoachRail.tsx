@@ -58,6 +58,18 @@ export function CoachRail({
         코치 · 나에게만 보여요
       </div>
 
+      {/* 연장 제안은 남은 1분 안에 답해야 하는 유일한 요청이라 레일 **맨 위에 고정**한다.
+          아래에 두면 레일이 스크롤될 때 화면 밖으로 밀려 응답 기회 자체가 사라진다. */}
+      {extensionVisible && (
+        <div className="bt-rail-sticky">
+          <ExtensionOfferCard
+            choice={extensionChoice}
+            onAccept={onAcceptExtension}
+            onDecline={onDeclineExtension}
+          />
+        </div>
+      )}
+
       {silenceHint}
 
       {message && (
@@ -72,14 +84,6 @@ export function CoachRail({
       )}
 
       <GoalProgressCard goalLabel={goalLabel} speakingRatio={speakingRatio} />
-
-      {extensionVisible && (
-        <ExtensionOfferCard
-          choice={extensionChoice}
-          onAccept={onAcceptExtension}
-          onDecline={onDeclineExtension}
-        />
-      )}
     </div>
   )
 }

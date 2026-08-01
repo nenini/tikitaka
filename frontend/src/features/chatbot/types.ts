@@ -93,6 +93,73 @@ export interface SuggestedSentence {
   reason?: string | null
 }
 
+/* ── 종합 피드백(W-10b 종료 후) ─────────────────────────── */
+
+/**
+ * 종합 피드백 생성 상태.
+ * `POST .../report` 로 생성을 걸고 `GET .../report` 로 결과를 가져온다 — 생성에 시간이 걸려
+ * 화면은 준비 중 상태를 먼저 그린다.
+ */
+export type ChatReportStatus = 'PENDING' | 'GENERATING' | 'COMPLETED' | 'FAILED'
+
+/**
+ * 대화에서 반복된 패턴 하나. 세션 리포트(W-16)의 강점/보완 키워드와 같은 성격이지만
+ * 여기서는 **텍스트 대화**에서만 나온다.
+ */
+export interface ChatPattern {
+  label: string
+  /** 대화에서 몇 번 나타났는지 — 근거 없는 단정 대신 횟수를 남긴다(§7.4) */
+  count: number
+}
+
+/**
+ * 되짚어볼 순간 하나. "이 메시지에서 이렇게 해볼 수 있었어요" 형식으로,
+ * 메시지별 피드백(FeedbackModal)과 같은 규칙을 따른다 — 점수 없음, 대안 제시.
+ */
+export interface ChatHighlight {
+  messageId: string
+  /** 내가 보낸 원문 */
+  userText: string
+  /** 왜 짚었는지 (한 줄) */
+  comment: string
+  /** 이렇게 말해볼 수도 있어요 */
+  suggestion?: string | null
+}
+
+/**
+ * GET /ai-chat-sessions/{id}/report — 대화 전체에 대한 종합 피드백.
+ *
+ * ⚠️ 필드명은 응답 스키마 미확정 상태의 잠정안이다(api.ts 와 같은 방침).
+ * 🔒 규칙: 챗봇 결과는 **사랑의 온도에 반영하지 않는다** — 온도·등수 필드를 두지 않는다.
+ */
+export interface ChatReport {
+  chatSessionId: string
+  reportStatus: ChatReportStatus
+  /** 대화 시작~종료 */
+  startedAt: string
+  completedAt?: string | null
+  /** 내가 보낸 메시지 수 */
+  userMessageCount: number
+  /** 주고받은 전체 메시지 수 */
+  totalMessageCount: number
+  /** 대화가 이어진 시간(분) */
+  durationMin: number
+  stage: ConversationStage
+  personality: PersonaPersonality
+  practiceGoal?: string | null
+  /** 한 줄 총평 */
+  summaryText?: string | null
+  /** 잘한 점 */
+  strengths: string[]
+  /** 다음에 해볼 것 */
+  improvements: string[]
+  patterns: ChatPattern[]
+  highlights: ChatHighlight[]
+  /** 다음 연습 제안 */
+  nextSuggestions: string[]
+  generatedAt?: string | null
+}
+
 /**
  * 챗봇 최초 이용 시 수집하는 지역 목록(§7.1). **시·도만** 받는다 —
  * 구·군은 미수집(와이어플로우 W-10 사용자 지시). 상대에게는 공개하지 않는다.

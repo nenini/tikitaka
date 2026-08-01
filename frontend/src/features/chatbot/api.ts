@@ -6,6 +6,7 @@ import type {
   AiPersonaOptions,
   ChatMessage,
   ChatMessagePage,
+  ChatReport,
   CreateChatSessionInput,
   MessageFeedback,
   PersonaRecommendation,
@@ -118,12 +119,27 @@ export async function completeChatSession(chatSessionId: string): Promise<AiChat
   }
 }
 
-/** 종합 피드백 생성 요청(비동기 생성 → 준비되면 리포트 화면 W-16 에서 조회). */
+/*   GET   /api/v1/ai-chat-sessions/{id}/report                          종합 피드백 조회 */
+
+/** 종합 피드백 생성 요청(비동기 생성 → 준비되면 종합 피드백 화면에서 조회). */
 export async function createChatReport(chatSessionId: string): Promise<void> {
   try {
     await apiClient.post(`${BASE}/${chatSessionId}/report`)
   } catch {
     /* 데모: 생성 요청만 흘린다 */
+  }
+}
+
+/**
+ * 종합 피드백 조회. 생성이 끝나지 않았으면 `reportStatus` 가 PENDING/GENERATING 으로 온다 —
+ * 화면은 그동안 준비 중 상태를 그리고 주기적으로 다시 묻는다.
+ */
+export async function getChatReport(chatSessionId: string): Promise<ChatReport> {
+  try {
+    const { data } = await apiClient.get<ChatReport>(`${BASE}/${chatSessionId}/report`)
+    return data
+  } catch {
+    return demoChatReport(chatSessionId)
   }
 }
 
@@ -416,6 +432,57 @@ function demoMessages(): ChatMessage[] {
       isProactive: true,
     },
   ]
+}
+
+/** 종합 피드백 데모. 화법 규칙(§7.4)을 지킨 문구로만 채운다 — 점수·등수 없음. */
+function demoChatReport(chatSessionId: string): ChatReport {
+  const session = demoSessionStore.get(chatSessionId)
+  return {
+    chatSessionId,
+    reportStatus: 'COMPLETED',
+    startedAt: minutesAgo(42),
+    completedAt: new Date().toISOString(),
+    userMessageCount: 14,
+    totalMessageCount: 29,
+    durationMin: 42,
+    stage: session?.stage ?? 'BEFORE_DATE',
+    personality: session?.persona.personality ?? 'MIDDLE',
+    practiceGoal: session?.practiceGoal ?? '약속 일시·장소를 자연스럽게 정해보기',
+    summaryText: '상대의 말을 받아 되묻는 흐름이 자리를 잡았어요. 약속을 제안하는 대목만 한 번 더 연습하면 좋겠어요.',
+    strengths: [
+      '상대가 꺼낸 소재를 이어받아 질문한 적이 6번 있었어요.',
+      '답장 길이가 상대와 비슷하게 유지됐어요.',
+      '모르는 주제에서도 대화를 끊지 않고 되물었어요.',
+    ],
+    improvements: [
+      '한 문장으로 끝난 답이 4번 있었어요. 이유나 상황을 한 줄만 덧붙여 보세요.',
+      '약속을 제안할 때 날짜를 열어두면 상대가 정하기 어려워요. 후보를 두 개만 주는 편이 편해요.',
+    ],
+    patterns: [
+      { label: '되묻기', count: 6 },
+      { label: '짧은 단답', count: 4 },
+      { label: '공감 표현', count: 3 },
+    ],
+    highlights: [
+      {
+        messageId: 'm4',
+        userText: '네 좋아해요! 조용한 데 찾아다니는 편이에요',
+        comment: '취향을 밝힌 건 좋았는데 대화가 여기서 한 번 멈췄어요.',
+        suggestion: '네 좋아해요! 조용한 데 찾아다니는 편인데, 혹시 자주 가는 곳 있으세요?',
+      },
+      {
+        messageId: 'm6',
+        userText: '언제든 괜찮아요',
+        comment: '배려로 한 말이지만 상대가 다시 정해야 해서 부담이 넘어가요.',
+        suggestion: '이번 주말은 어떠세요? 토요일 오후나 일요일 낮이면 저는 다 좋아요.',
+      },
+    ],
+    nextSuggestions: [
+      '다음 대화에서는 단답 뒤에 한 줄 덧붙이기를 목표로 잡아보세요.',
+      '‘소개팅 후’ 단계로 한 번 더 연습해 보면 애프터 대화가 편해져요.',
+    ],
+    generatedAt: new Date().toISOString(),
+  }
 }
 
 const DEMO_REPLIES = [
