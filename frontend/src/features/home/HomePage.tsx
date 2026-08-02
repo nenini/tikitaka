@@ -207,13 +207,16 @@ export function HomePage() {
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-2">
+              {/* TODO(HOME): AI 화상(W-21) 화면 생기면 /ai-video/setup 으로 연결 */}
               <CardButton onClick={() => console.log('TODO(HOME): AI 화상 15분 시작')}>
                 <span className="mb-1 block text-[20px]" aria-hidden="true">
                   🤖
                 </span>
                 <span className="text-[13px] font-semibold">AI 화상 15분</span>
               </CardButton>
-              <CardButton onClick={() => console.log('TODO(HOME): AI 챗봇 시작')}>
+              {/* 챗봇 F5 진입점 — 페르소나 설정(W-10)부터 시작한다.
+                  매칭 트랙 선택·대기 큐 화면과 같은 경로를 쓴다. */}
+              <CardButton onClick={() => navigate('/chatbot/persona')}>
                 <span className="mb-1 block text-[20px]" aria-hidden="true">
                   💬
                 </span>
