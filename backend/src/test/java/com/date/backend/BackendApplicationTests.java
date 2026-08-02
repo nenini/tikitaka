@@ -108,6 +108,10 @@ class BackendApplicationTests {
 				.contains("\"title\":\"DATE Backend API\"")
 				.contains("\"summary\":\"로그인\"")
 				.contains("\"summary\":\"내 정보 조회\"")
+				.contains("\"summary\":\"얼굴상 분석 요청 생성\"")
+				.contains("\"summary\":\"얼굴상 분석 성공 결과 제출\"")
+				.contains("\"summary\":\"얼굴상 분석 실패 결과 제출\"")
+				.contains("\"summary\":\"내 최신 얼굴상 분석 결과 조회\"")
 				.contains("\"BearerAuth\"");
 	}
 
@@ -160,6 +164,37 @@ class BackendApplicationTests {
 		assertThat(response.body())
 				.contains("\"success\":false")
 				.contains("\"code\":\"UNAUTHORIZED\"");
+	}
+
+	@Test
+	void faceAnalysisRequestWithoutTokenReturnsUnauthorized() throws Exception {
+		HttpResponse<String> response = post("/api/v1/face-analyses", "{}");
+
+		assertThat(response.statusCode()).isEqualTo(401);
+		assertThat(response.body())
+				.contains("\"success\":false")
+				.contains("\"code\":\"UNAUTHORIZED\"");
+	}
+
+	@Test
+	void authenticatedUserCanCreateFaceAnalysisRequest() throws Exception {
+		String email = "face-" + UUID.randomUUID() + "@example.com";
+		HttpResponse<String> signupResponse = signup(email, "password123!");
+		String accessToken = objectMapper.readTree(signupResponse.body())
+				.path("data")
+				.path("accessToken")
+				.asText();
+
+		HttpResponse<String> response = post(
+				"/api/v1/face-analyses",
+				"{}",
+				accessToken
+		);
+
+		assertThat(response.statusCode()).isEqualTo(201);
+		JsonNode data = objectMapper.readTree(response.body()).path("data");
+		assertThat(data.path("analysisRequestId").asLong()).isPositive();
+		assertThat(data.path("status").asText()).isEqualTo("PENDING");
 	}
 
 	@Test
@@ -320,6 +355,17 @@ class BackendApplicationTests {
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(URI.create("http://localhost:" + port + path))
 				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(body))
+				.build();
+
+		return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+	}
+
+	private HttpResponse<String> post(String path, String body, String accessToken) throws Exception {
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create("http://localhost:" + port + path))
+				.header("Content-Type", "application/json")
+				.header("Authorization", "Bearer " + accessToken)
 				.POST(HttpRequest.BodyPublishers.ofString(body))
 				.build();
 

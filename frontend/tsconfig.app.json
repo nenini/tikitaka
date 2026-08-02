@@ -11,7 +11,9 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      /* AI 파트 브라우저 분석 패키지 빌드 산출물 (vite.config.ts 의 alias 와 같이 움직인다) */
+      "@vision/*": ["../ai/vision-analysis/dist/*"]
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

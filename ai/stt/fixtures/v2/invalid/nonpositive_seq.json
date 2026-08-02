@@ -1,0 +1,21 @@
+{
+  "sessionId": "session-123",
+  "userId": "123456789012345678",
+  "participantIdentity": "participant-123",
+  "clientInstanceId": "ac8682da-b2f0-4fbb-86ba-9d7b3d88798c",
+  "seq": 0,
+  "utteranceId": "6cd66154-e669-40c1-95f0-4d17554dc1a0",
+  "sessionElapsedMs": 1350,
+  "confidence": 0.91,
+  "version": 2,
+  "eventId": "a313bb4d-e24e-4cb5-af22-25c20b23a302",
+  "occurredAt": "2026-07-28T10:30:01.350000+00:00",
+  "eventType": "SPEECH_STARTED",
+  "kind": "speech",
+  "source": "VAD",
+  "modelVersion": "faster-whisper-vad",
+  "ruleVersion": "stt-vad-rule-v1",
+  "payload": {
+    "observedStartElapsedMs": 1200
+  }
+}

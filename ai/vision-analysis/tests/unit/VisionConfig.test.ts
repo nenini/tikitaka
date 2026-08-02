@@ -8,6 +8,16 @@ describe("visionConfigSchema", () => {
     expect(visionConfigSchema.parse(defaultVisionConfig)).toEqual(
       defaultVisionConfig,
     );
+    expect(defaultVisionConfig.schemaVersion).toBe(2);
+  });
+
+  it("rejects the previous configuration schema version", () => {
+    expect(() =>
+      visionConfigSchema.parse({
+        ...defaultVisionConfig,
+        schemaVersion: 1,
+      }),
+    ).toThrow();
   });
 
   it("requires FaceQualityDetector in every performance profile", () => {
@@ -32,5 +42,9 @@ describe("visionConfigSchema", () => {
   it("keeps nod disabled by default until empirical tuning is complete", () => {
     expect(defaultVisionConfig.nod.enabledByDefault).toBe(false);
   });
-});
 
+  it("uses a dedicated 0.15 baseline cutoff for smile-prompt suppression", () => {
+    expect(defaultVisionConfig.smile.baselinePromptSuppressionScore).toBe(0.15);
+    expect(defaultVisionConfig.smile.subtleAbsoluteScore).toBe(0.2);
+  });
+});

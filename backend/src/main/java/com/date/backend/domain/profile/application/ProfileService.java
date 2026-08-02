@@ -8,6 +8,7 @@ import com.date.backend.domain.profile.dto.response.ProfileResponse;
 import com.date.backend.domain.profile.dto.request.ProfileUpdateRequest;
 import com.date.backend.domain.profile.dto.response.PublicProfileResponse;
 import com.date.backend.domain.profile.repository.ProfileRepository;
+import com.date.backend.domain.user.domain.KoreanAgeCalculator;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
 
 @Service
@@ -90,7 +90,10 @@ public class ProfileService {
 				.filter(User::isActive)
 				.orElseThrow(() -> new BusinessException(ProfileErrorCode.PROFILE_NOT_FOUND));
 
-		int age = Period.between(user.getBirthDate(), LocalDate.now(SERVICE_ZONE_ID)).getYears();
+		int age = KoreanAgeCalculator.calculate(
+				user.getBirthDate(),
+				LocalDate.now(SERVICE_ZONE_ID)
+		);
 		return PublicProfileResponse.from(profile, age);
 	}
 

@@ -17,7 +17,7 @@ import wave
 import numpy as np
 
 from stt.pipeline import SAMPLE_RATE, SttEngine
-from stt.session import SessionSttRunner, make_vad_options
+from stt.session import SessionSttRunner, StreamEvent, make_vad_options
 
 
 def load_wav_16k_mono(path: str) -> np.ndarray:
@@ -40,11 +40,19 @@ def load_wav_16k_mono(path: str) -> np.ndarray:
     return data
 
 
-def _run_stream(runner: SessionSttRunner, speaker_id: str, audio: np.ndarray, chunk_s: float = 0.5):
-    events = []
+def _run_stream(
+    runner: SessionSttRunner, user_id: str, audio: np.ndarray, chunk_s: float = 0.5
+) -> list[StreamEvent]:
+    events: list[StreamEvent] = []
     step = int(SAMPLE_RATE * chunk_s)
     for i in range(0, len(audio), step):
-        events.extend(runner.feed(speaker_id, audio[i : i + step]))
+        events.extend(
+            runner.feed(
+                user_id=user_id,
+                participant_identity=f"dev-{user_id}",
+                audio=audio[i : i + step],
+            )
+        )
     return events
 
 
@@ -73,13 +81,15 @@ def main() -> None:
     audio_b = load_wav_16k_mono(args.audio_b)
     print(f"[stt] A={len(audio_a) / SAMPLE_RATE:.1f}s, B={len(audio_b) / SAMPLE_RATE:.1f}s. 전사 중...\n")
 
-    events = _run_stream(runner, "user-A", audio_a) + _run_stream(runner, "user-B", audio_b)
-    events.sort(key=lambda e: e.payload.segment_start_ms)  # 공통 시간축 정렬
+    speech = _run_stream(runner, "user-A", audio_a) + _run_stream(runner, "user-B", audio_b)
+    runner.close()  # 진행 중 발화 flush + 대기 전사 완료까지
+    transcripts = runner.poll_transcripts()
+    transcripts.sort(key=lambda e: e.payload.segment_start_ms)  # 공통 시간축 정렬
 
-    for e in events:
-        p = e.payload
-        print(f"[{p.segment_start_ms / 1000:6.1f}s] ({e.speaker_id} conf={e.confidence}) {p.text}")
-    print(f"\n[stt] 총 {len(events)}개 이벤트 (A/B interleaved).")
+    for t in transcripts:
+        p = t.payload
+        print(f"[{p.segment_start_ms / 1000:6.1f}s] ({t.user_id} conf={t.confidence}) {p.text}")
+    print(f"\n[stt] 전사 {len(transcripts)}개 / SPEECH {len(speech)}개 (A/B interleaved).")
 
 
 if __name__ == "__main__":

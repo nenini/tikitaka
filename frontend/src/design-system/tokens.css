@@ -200,6 +200,12 @@
   --bt-color-warning:        var(--bt-pollen-700);
   --bt-color-warning-bg:     var(--bt-pollen-100);
   --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* `*-bg` **위에** 얹는 글자색.
+     `--bt-color-success`(4.50:1)는 **흰 배경 기준** 값이라, 같은 계열 틴트 위에 올리면
+     4.0:1 로 떨어져 AA 를 놓친다. 틴트 배경을 쓰는 칩·배지는 이쪽을 쓴다. */
+  --bt-color-success-on-bg: var(--bt-leaf-800);
+  --bt-color-warning-on-bg: var(--bt-pollen-800);
   --bt-color-danger:         var(--bt-rose-700);
   --bt-color-danger-bg:      var(--bt-rose-100);
   --bt-color-danger-fill:    var(--bt-rose-600);
@@ -210,6 +216,16 @@
   /* 호감(하트)은 danger와 같은 색상 계열을 쓴다. 색만으로 구분하지 말고
      반드시 아이콘+라벨을 동반할 것. DESIGN_SYSTEM.md §3.3 참고. */
   --bt-color-like: var(--bt-rose-500);
+
+  /* 면 틴트 — 같은 흰 카드를 여러 장 늘어놓지 않기 위한 "의미별로 물든 면".
+     의미색 램프의 가장 옅은 단계라 채도가 낮고(원칙 6), 본문색을 그대로 얹어도 AA 를 지킨다.
+     `*-bg`(칩·배지 틴트)와는 다른 역할이다 — 저쪽은 글자를 감싸는 알약, 이쪽은 섹션 하나를 담는 면. */
+  --bt-color-panel-success:      var(--bt-leaf-50);
+  --bt-color-panel-success-line: var(--bt-leaf-200);
+  --bt-color-panel-warning:      var(--bt-pollen-50);
+  --bt-color-panel-warning-line: var(--bt-pollen-200);
+  --bt-color-panel-brand:        var(--bt-blue-50);
+  --bt-color-panel-brand-line:   var(--bt-blue-200);
 
   --bt-color-focus: var(--bt-blue-600);
   --bt-color-scrim: rgba(23, 24, 31, 0.44);
@@ -255,6 +271,11 @@
   --bt-color-warning:        var(--bt-pollen-200);
   --bt-color-warning-bg:     rgba(240, 169, 60, 0.16);
   --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* 다크에서는 틴트가 반투명이라 배경이 어두운 쪽으로 남는다 —
+     밝은 톤이 그대로 대비를 얻으므로 본색과 같은 값을 쓴다(라이트에서만 갈린다). */
+  --bt-color-success-on-bg: var(--bt-leaf-400);
+  --bt-color-warning-on-bg: var(--bt-pollen-200);
   --bt-color-danger:         var(--bt-rose-400);
   --bt-color-danger-bg:      rgba(228, 64, 79, 0.18);
   --bt-color-danger-fill:    var(--bt-rose-500);
@@ -263,6 +284,15 @@
   --bt-color-info-bg:        rgba(91, 139, 239, 0.16);
 
   --bt-color-like: var(--bt-rose-400);
+
+  /* 다크에서는 램프의 50 단계가 오히려 밝은 면이 된다. 어두운 표면 위에 의미색을
+     아주 낮은 알파로 얹어 "물든 면"의 인상만 남긴다. */
+  --bt-color-panel-success:      rgba(87, 201, 126, 0.10);
+  --bt-color-panel-success-line: rgba(87, 201, 126, 0.22);
+  --bt-color-panel-warning:      rgba(240, 169, 60, 0.10);
+  --bt-color-panel-warning-line: rgba(240, 169, 60, 0.22);
+  --bt-color-panel-brand:        rgba(91, 139, 239, 0.12);
+  --bt-color-panel-brand-line:   rgba(91, 139, 239, 0.24);
 
   --bt-color-focus: var(--bt-blue-300);
   --bt-color-scrim: rgba(0, 0, 0, 0.64);

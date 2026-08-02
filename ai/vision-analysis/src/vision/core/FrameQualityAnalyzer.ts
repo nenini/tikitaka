@@ -8,6 +8,8 @@ export interface FrameQualityAnalyzerOptions {
 
 export interface FrameImageQuality {
   readonly brightnessScore: number;
+  readonly backgroundBrightnessScore: number;
+  readonly backlightScore: number;
   readonly blurScore: number;
   readonly rawLaplacianVariance: number;
 }
@@ -44,6 +46,8 @@ export class FrameQualityAnalyzer {
     if (width <= 0 || height <= 0) {
       return {
         brightnessScore: 0,
+        backgroundBrightnessScore: 0,
+        backlightScore: 0,
         blurScore: 0,
         rawLaplacianVariance: 0,
       };
@@ -70,6 +74,42 @@ export class FrameQualityAnalyzer {
       0,
       1,
     );
+    let backgroundSum = 0;
+    let backgroundCount = 0;
+    if (faceBox !== null) {
+      for (let y = 0; y < imageData.height; y += 1) {
+        for (let x = 0; x < imageData.width; x += 1) {
+          if (
+            x >= bounds.left &&
+            x < bounds.right &&
+            y >= bounds.top &&
+            y < bounds.bottom
+          ) {
+            continue;
+          }
+          const index = (y * imageData.width + x) * 4;
+          backgroundSum +=
+            0.2126 * (imageData.data[index] ?? 0) +
+            0.7152 * (imageData.data[index + 1] ?? 0) +
+            0.0722 * (imageData.data[index + 2] ?? 0);
+          backgroundCount += 1;
+        }
+      }
+    }
+    const backgroundBrightnessScore =
+      backgroundCount === 0
+        ? brightnessScore
+        : clamp(backgroundSum / backgroundCount / 255, 0, 1);
+    // Only a brighter background than face ROI is treated as backlight evidence.
+    const backlightScore =
+      faceBox === null
+        ? 1
+        : clamp(
+            1 -
+              Math.max(0, backgroundBrightnessScore - brightnessScore) / 0.45,
+            0,
+            1,
+          );
     const rawLaplacianVariance = this.laplacianVariance(
       luminance,
       width,
@@ -82,7 +122,13 @@ export class FrameQualityAnalyzer {
       1,
     );
 
-    return { brightnessScore, blurScore, rawLaplacianVariance };
+    return {
+      brightnessScore,
+      backgroundBrightnessScore,
+      backlightScore,
+      blurScore,
+      rawLaplacianVariance,
+    };
   }
 
   private toPixelBounds(
@@ -150,4 +196,3 @@ export class FrameQualityAnalyzer {
     return squaredSum / count - mean * mean;
   }
 }
-

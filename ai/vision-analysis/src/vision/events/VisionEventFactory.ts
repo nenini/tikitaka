@@ -30,10 +30,6 @@ const EVENT_SOURCE_BY_TYPE = {
   SMILE_STARTED: "SMILE_EXPRESSION_DETECTOR",
   SMILE_ENDED: "SMILE_EXPRESSION_DETECTOR",
   NOD_EVENT: "NOD_DETECTOR",
-  LOW_EXPRESSION_ACTIVITY_STARTED: "EXPRESSION_ACTIVITY_DETECTOR",
-  LOW_EXPRESSION_ACTIVITY_ENDED: "EXPRESSION_ACTIVITY_DETECTOR",
-  STIFF_EXPRESSION_STARTED: "EXPRESSION_ACTIVITY_DETECTOR",
-  STIFF_EXPRESSION_ENDED: "EXPRESSION_ACTIVITY_DETECTOR",
 } as const satisfies Readonly<
   Record<VisionBehaviorEventType, VisionEventSource>
 >;
@@ -53,13 +49,25 @@ export interface CreateBehaviorEventOptions<
   TEventType extends VisionBehaviorEventType,
 > {
   readonly confidence: number;
+  readonly confidenceDetails: EventConfidenceDetails;
   readonly episodeId: string | null;
   readonly payload: VisionBehaviorPayloadMap[TEventType];
 }
 
 export interface CreateMetricSnapshotOptions {
   readonly confidence: number;
+  readonly confidenceDetails: EventConfidenceDetails;
   readonly payload: VisionMetricSnapshotPayload;
+}
+
+export interface EventConfidenceDetails {
+  readonly measurementConfidence?: number;
+  readonly signalClarity?: number;
+  readonly personalizationConfidence?: number;
+  readonly evidenceStrength?: number;
+  readonly baselineMode: VisionEventEnvelope<string>["baselineMode"];
+  readonly coachingEligible: boolean;
+  readonly baselineEpoch: number;
 }
 
 export class VisionEventFactory {
@@ -109,7 +117,11 @@ export class VisionEventFactory {
     options: CreateBehaviorEventOptions<TEventType>,
   ): VisionBehaviorEventFor<TEventType> {
     return {
-      ...this.createEnvelope(eventType, options.confidence),
+      ...this.createEnvelope(
+        eventType,
+        options.confidence,
+        options.confidenceDetails,
+      ),
       kind: "behavior",
       source: EVENT_SOURCE_BY_TYPE[eventType],
       episodeId: options.episodeId,
@@ -121,7 +133,11 @@ export class VisionEventFactory {
     options: CreateMetricSnapshotOptions,
   ): VisionMetricSnapshot {
     return {
-      ...this.createEnvelope("VISION_METRIC_SNAPSHOT", options.confidence),
+      ...this.createEnvelope(
+        "VISION_METRIC_SNAPSHOT",
+        options.confidence,
+        options.confidenceDetails,
+      ),
       kind: "metric",
       source: "VISION_PIPELINE",
       payload: options.payload,
@@ -131,14 +147,17 @@ export class VisionEventFactory {
   private createEnvelope<TEventType extends string>(
     eventType: TEventType,
     confidence: number,
+    details: EventConfidenceDetails,
   ): Omit<VisionEventEnvelope<TEventType>, "source"> {
+    // Eligibility fields deliberately have no defaults. Every producer must
+    // state its baseline semantics instead of silently appearing personalized.
     // Frame-scoped time wins over wall-time sampling to keep a multi-event frame exact.
     const timePoint = this.scopedTimePoint ?? this.timeline.now();
 
     return {
       eventId: this.uuidFactory(),
       eventType,
-      version: 1,
+      version: 4,
       sessionId: this.identity.sessionId,
       userId: this.identity.userId,
       clientInstanceId: this.identity.clientInstanceId,
@@ -147,6 +166,15 @@ export class VisionEventFactory {
       clientMonotonicMs: timePoint.clientMonotonicMs,
       occurredAt: toIsoTimestamp(this.clock.wallClockNowMs()),
       confidence,
+      measurementConfidence:
+        details.measurementConfidence ?? confidence,
+      signalClarity: details.signalClarity ?? confidence,
+      personalizationConfidence:
+        details.personalizationConfidence ?? 1,
+      evidenceStrength: details.evidenceStrength ?? confidence,
+      baselineMode: details.baselineMode,
+      coachingEligible: details.coachingEligible,
+      baselineEpoch: details.baselineEpoch,
       modelVersion: this.versions.modelVersion,
       ruleVersion: this.versions.ruleVersion,
     };

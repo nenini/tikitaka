@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -52,7 +53,9 @@ public class GlobalExceptionHandler {
 				errors,
 				request.getRequestURI()
 		);
-		return ResponseEntity.status(errorCode.status()).body(body);
+		return ResponseEntity.status(errorCode.status())
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(body);
 	}
 
 	@ExceptionHandler({
@@ -119,7 +122,9 @@ public class GlobalExceptionHandler {
 				responseMessage,
 				request.getRequestURI()
 		);
-		return ResponseEntity.status(errorCode.status()).body(body);
+		return ResponseEntity.status(errorCode.status())
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(body);
 	}
 
 	private ApiErrorResponse.FieldError toFieldError(FieldError error) {
