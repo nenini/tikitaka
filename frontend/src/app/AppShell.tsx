@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Avatar, BottomNav, IconButton } from '@/components'
 import type { IconName } from '@/components'
+import { NotificationPanel } from '@/features/notifications/NotificationPanel'
+import { useNotifications } from '@/features/notifications/useNotifications'
 
 /* -------------------------------------------------------------------------- */
 /*  AppShell — 앱 전체가 공유하는 셸(chrome).                                   */
@@ -18,6 +21,8 @@ const NAV: readonly { to: string; label: string; icon: IconName; end?: boolean }
 ]
 
 export function AppShell() {
+  const [notiOpen, setNotiOpen] = useState(false)
+  const noti = useNotifications()
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       {/* ── 데스크탑 상단 네비 (모바일 숨김) ───────────────────────── */}
@@ -46,7 +51,34 @@ export function AppShell() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <IconButton icon="bell" aria-label="알림" />
+            {/* 알림 벨 — 드롭다운 토글 + 안읽음 카운트 배지 (바깥클릭 미닫힘: onClose=벨 재클릭·X·Esc) */}
+            <div className="relative">
+              <IconButton
+                icon="bell"
+                aria-label={noti.unread > 0 ? `알림 (안읽음 ${noti.unread}개)` : '알림'}
+                aria-expanded={notiOpen}
+                onClick={() => setNotiOpen((v) => !v)}
+              />
+              {noti.unread > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold text-white"
+                  style={{ background: 'var(--bt-color-danger-fill, #d0455f)' }}
+                >
+                  {noti.unread}
+                </span>
+              )}
+              <NotificationPanel
+                open={notiOpen}
+                onClose={() => setNotiOpen(false)}
+                items={noti.items}
+                unread={noti.unread}
+                markOne={noti.markOne}
+                markAll={noti.markAll}
+                loadMore={noti.loadMore}
+                hasMore={noti.hasMore}
+              />
+            </div>
             <NavLink to="/me" aria-label="내 정보" className="rounded-full">
               <Avatar size="sm" name="유월" />
             </NavLink>
