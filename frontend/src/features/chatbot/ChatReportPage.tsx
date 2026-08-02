@@ -30,14 +30,18 @@ const POLL_MS = 8_000
  *  - 화법 §7.4: 점수 대신 **횟수와 사실**, 추정은 추정으로(Hedge), 끝에는 다음 행동.
  */
 export function ChatReportPage() {
-  const { chatSessionId = 'demo' } = useParams()
+  const { chatSessionId: chatSessionIdParam } = useParams()
   const navigate = useNavigate()
+
+  // 백엔드 sessionId 는 Long 이다.
+  const chatSessionId = Number(chatSessionIdParam)
 
   const [report, setReport] = useState<ChatReport | null>(null)
   const [retrying, setRetrying] = useState(false)
   const aliveRef = useRef(true)
 
   const load = useCallback(async () => {
+    if (!Number.isFinite(chatSessionId) || chatSessionId <= 0) return
     const r = await getChatReport(chatSessionId)
     if (aliveRef.current) setReport(r)
   }, [chatSessionId])

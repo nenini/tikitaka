@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Callout, Card, Field, Icon, Input, Modal, Stack } from '@/components'
-import { getQueueStatus, leaveQueue, relaxConditions } from './api'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button, Callout, Card, Icon, Modal, Stack, TagChip } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { getCurrentMatchRequest, leaveQueue, updateMatchRequest } from './api'
+import { QueueSetupModal } from './QueueSetupModal'
 import { InfoRow } from './parts'
-import { formatMMSS, formatTimeRange, useNow } from './format'
-import type { DelayReason, QueueStatus } from './types'
+import { formatMMSS, useNow } from './format'
+import { summarizeSlots } from './types'
+import type { DelayReason, MatchRequestInput, QueueStatus } from './types'
 
 /**
  * W-09b 매칭 대기 큐 (MATCH-02/03, FE-B).
@@ -16,34 +19,74 @@ import type { DelayReason, QueueStatus } from './types'
  *
  * 규칙: 홈·챗봇을 이용해도 대기 큐는 유지되고 ‘큐 이탈’(DELETE)로만 해제된다.
  * 큐 이탈은 패널티·온도 감점 없음.
+ *
+ * 백엔드 연동
+ *  - 조회는 `GET /api/v1/match-requests/me/current` 단건뿐이다(요청 id 로 조회하는 엔드포인트가 없다).
+ *    라우트의 `:requestId` 는 링크 복구용 힌트로만 남는다.
+ *  - 매칭 성립을 알리는 **STOMP 토픽이 없다**(`RoomStompAuthInterceptor` 화이트리스트에
+ *    match 관련 destination 이 없음) → 폴링으로 성립을 감지한다.
+ *  - 조건 완화는 `PUT .../me/current` 이며 **전체 교체**라 슬롯까지 함께 보낸다.
  */
+
+/** 성립 감지 폴링 주기. 서버 매칭 워커는 1초 주기지만 화면은 이 정도면 충분하다. */
+const POLL_INTERVAL_MS = 5_000
+
 export function MatchQueuePage() {
-  const { requestId = 'demo' } = useParams()
   const navigate = useNavigate()
   const now = useNow()
 
   const [status, setStatus] = useState<QueueStatus | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [relaxOpen, setRelaxOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    getQueueStatus(requestId).then((s) => alive && setStatus(s))
-    // TODO(FE-B WS): STOMP 'match-found' → navigate(pair)
-    return () => {
-      alive = false
+  // 폴링 콜백이 항상 최신 navigate 를 쓰도록 ref 에 담는다(effect 재구독 방지).
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+
+  const load = useCallback(async () => {
+    try {
+      const current = await getCurrentMatchRequest()
+      if (!current) {
+        // 대기 요청이 사라졌다(이탈·만료) → 트랙 선택으로 돌려보낸다.
+        navigateRef.current('/matching', { replace: true })
+        return
+      }
+      setStatus(current)
+      setLoadError(null)
+      if (current.matched) {
+        // 성립 — 매칭 카드로. 카드 화면도 me/current 로 조회하므로 경로 id 는 힌트다.
+        navigateRef.current('/matching/pair/current', { replace: true })
+      }
+    } catch (error) {
+      setLoadError(errorMessageOf(error, '대기 상태를 불러오지 못했어요.'))
     }
-  }, [requestId])
+  }, [])
+
+  useEffect(() => {
+    void load()
+    const timer = setInterval(() => void load(), POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [load])
 
   async function handleLeave() {
     setLeaving(true)
     try {
-      await leaveQueue(requestId)
+      await leaveQueue()
       navigate('/matching')
+    } catch (error) {
+      setLoadError(errorMessageOf(error, '큐에서 나가지 못했어요.'))
+      setLeaveOpen(false)
     } finally {
       setLeaving(false)
     }
+  }
+
+  async function handleRelax(input: MatchRequestInput) {
+    const next = await updateMatchRequest(input)
+    setStatus(next)
+    setRelaxOpen(false)
   }
 
   const elapsedSec = status ? Math.floor((now - new Date(status.requestedAt).getTime()) / 1000) : 0
@@ -56,6 +99,12 @@ export function MatchQueuePage() {
           조건이 맞는 사람이 대기 큐에 들어오면 바로 연결해 드려요.
         </p>
       </header>
+
+      {loadError && (
+        <Callout tone="danger" className="mb-4">
+          {loadError}
+        </Callout>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 대기 상태 */}
@@ -81,20 +130,18 @@ export function MatchQueuePage() {
           )}
 
           <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setRelaxOpen(true)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!status}
+              onClick={() => setRelaxOpen(true)}
+            >
               조건 완화
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setLeaveOpen(true)}>
               큐 이탈
             </Button>
           </div>
-
-          {/* 데모 전용: WS 미연동 상태에서 매칭 성립 전환 확인용 */}
-          {import.meta.env.DEV && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/matching/pair/demo')}>
-              매칭 성립 시뮬레이션 (dev)
-            </Button>
-          )}
         </Card>
 
         {/* 우: 조건 요약 + 기다리는 동안 할 일 */}
@@ -105,14 +152,22 @@ export function MatchQueuePage() {
               <Stack gap={8}>
                 <InfoRow
                   label="연령 범위"
-                  value={`${status.conditions.minPreferredAge} ~ ${status.conditions.maxPreferredAge}세`}
+                  value={`${status.conditions.preferredAgeMin} ~ ${status.conditions.preferredAgeMax}세`}
                 />
-                <InfoRow label="가능 시간대" value={`주 ${status.conditions.availableSlotCount}개 슬롯`} />
-                <InfoRow
-                  label="희망 시작"
-                  value={formatTimeRange(status.conditions.preferredStartAt, status.conditions.preferredEndAt)}
-                />
-                <InfoRow label="제외 조건" value={`차단 ${status.conditions.blockedCount}명 · 최근 매칭`} />
+                <InfoRow label="가능 시간대" value={summarizeSlots(status.conditions.availableSlots)} />
+                {status.conditions.preferredFaceTag && (
+                  <InfoRow label="선호 얼굴상" value={status.conditions.preferredFaceTag.name} />
+                )}
+                {status.conditions.preferredTraits.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="bt-body-sm bt-muted">선호 성격</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {status.conditions.preferredTraits.map((trait) => (
+                        <TagChip key={trait.id}>{trait.name}</TagChip>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Stack>
             ) : (
               <p className="bt-body-sm bt-muted">조건을 불러오는 중…</p>
@@ -139,16 +194,15 @@ export function MatchQueuePage() {
         </aside>
       </div>
 
-      {/* 조건 완화 모달 */}
-      <RelaxModal
+      {/* 조건 완화 — PUT 은 전체 교체라 큐 등록과 같은 입력을 다시 받는다 */}
+      <QueueSetupModal
         open={relaxOpen}
-        current={status}
         onClose={() => setRelaxOpen(false)}
-        onSaved={(next) => {
-          setStatus(next)
-          setRelaxOpen(false)
-        }}
-        requestId={requestId}
+        onSubmit={handleRelax}
+        initial={status?.conditions}
+        title="매칭 조건 완화"
+        description="연령 범위나 시간대를 넓히면 맞는 후보가 늘어나요."
+        submitLabel="조건 적용"
       />
 
       {/* 큐 이탈 확인 */}
@@ -199,86 +253,13 @@ function WaitTip({ icon, children }: { icon: 'home' | 'chat'; children: React.Re
   )
 }
 
+/**
+ * 지연 사유 안내.
+ * ⚠️ 백엔드가 지연 사유를 내려주지 않아(엔드포인트 없음) 지금은 렌더되지 않는다.
+ *    서버가 붙으면 `toQueueStatus` 매핑만 채우면 이 문구들이 살아난다.
+ */
 const DELAY_TEXT: Record<DelayReason, string> = {
   SLOT_NARROW: '가능한 시간대가 좁아 맞는 상대가 적어요. 시간대를 넓히면 만날 확률이 올라가요.',
   AGE_RANGE: '연령 범위가 좁아 후보가 적어요. 범위를 넓히면 매칭될 확률이 올라가요.',
   CANDIDATE_SHORTAGE: '지금은 대기 중인 사람이 적어요. 저녁 시간대에 사람이 가장 많아요.',
-}
-
-/** 조건 완화 — 연령 범위 조정(최소 구현). 시간대 편집은 개인정보 수정으로 이관. */
-function RelaxModal({
-  open,
-  current,
-  requestId,
-  onClose,
-  onSaved,
-}: {
-  open: boolean
-  current: QueueStatus | null
-  requestId: string
-  onClose: () => void
-  onSaved: (next: QueueStatus) => void
-}) {
-  const [min, setMin] = useState('')
-  const [max, setMax] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  // 모달이 열릴 때 현재값으로 초기화
-  useEffect(() => {
-    if (open && current) {
-      setMin(String(current.conditions.minPreferredAge))
-      setMax(String(current.conditions.maxPreferredAge))
-    }
-  }, [open, current])
-
-  async function save() {
-    setSaving(true)
-    try {
-      const next = await relaxConditions(requestId, {
-        minPreferredAge: Number(min),
-        maxPreferredAge: Number(max),
-      })
-      onSaved(next)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const invalid = !min || !max || Number(min) > Number(max)
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="매칭 조건 완화"
-      actions={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            취소
-          </Button>
-          <Button variant="primary" loading={saving} disabled={invalid} onClick={save}>
-            적용
-          </Button>
-        </>
-      }
-    >
-      <p className="bt-body-sm bt-muted mb-3">연령 범위를 넓히면 매칭될 후보가 늘어나요.</p>
-      <div className="flex items-end gap-3">
-        <Field label="최소 연령">
-          {({ id }) => (
-            <Input id={id} type="number" inputMode="numeric" min={19} max={99} value={min} onChange={(e) => setMin(e.currentTarget.value)} />
-          )}
-        </Field>
-        <span className="bt-muted pb-2">~</span>
-        <Field label="최대 연령">
-          {({ id }) => (
-            <Input id={id} type="number" inputMode="numeric" min={19} max={99} value={max} onChange={(e) => setMax(e.currentTarget.value)} />
-          )}
-        </Field>
-      </div>
-      <p className="bt-caption bt-muted mt-3">
-        가능한 시간대는 마이페이지 &gt; 개인정보 수정에서 바꿀 수 있어요.
-      </p>
-    </Modal>
-  )
 }

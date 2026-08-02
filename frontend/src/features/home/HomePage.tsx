@@ -29,24 +29,10 @@ export function HomePage() {
           </p>
         </CardLink>
 
-        <CardLink as={Link} to="/session/demo/room">
-          <CardHeader title="대기방 입장 (기기 점검)" action={<Badge tone="info">P0</Badge>} />
+        <CardLink as={Link} to="/chatbot">
+          <CardHeader title="챗봇" />
           <p className="bt-body-sm bt-muted">
-            카메라·마이크·스피커를 점검하고 세션에 입장합니다. 통과하면 WebRTC 세션(다크 고정)으로 이어져요.
-          </p>
-        </CardLink>
-
-        <CardLink as={Link} to="/session/demo/review">
-          <CardHeader title="상대 평가" />
-          <p className="bt-body-sm bt-muted">
-            정량평가 6개 지표, 글 피드백, 신고/차단
-          </p>
-        </CardLink>
-
-        <CardLink as={Link} to="/session/demo/report">
-          <CardHeader title="세션 리포트" />
-          <p className="bt-body-sm bt-muted">
-            ai 분석 및 상대 평가
+            ai 페르소나와 소개팅 전/후 상황을 연습해볼 수 있습니다.
           </p>
         </CardLink>
 
@@ -57,6 +43,9 @@ export function HomePage() {
           </p>
         </CardLink>
       </div>
+
+      {/* 대기방(W-11)·상호평가(W-14)·세션 리포트(W-16)는 실제 sessionId 가 있어야 열린다.
+          매칭이 확정되면 그 흐름 안에서 자동으로 이어지므로 홈에 바로가기를 두지 않는다. */}
     </main>
   )
 }

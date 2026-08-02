@@ -7,10 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "vision:build": "npm --prefix ../ai/vision-analysis run build",
+    "vision:assets": "node scripts/copy-vision-assets.mjs",
+    "postinstall": "node scripts/copy-vision-assets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
+    "@mediapipe/tasks-vision": "0.10.35",
     "axios": "^1.18.1",
     "livekit-client": "^2.21.0",
     "react": "^19.2.7",

@@ -2,8 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeviceStatus } from './types'
 
 /**
- * 대기방 기기 점검(W-11) — **클라 전용**. getUserMedia 로 카메라·마이크를 잡고,
- * Web Audio 로 마이크 입력 레벨과 스피커 테스트음을 만든다. 서버 저장은 없다.
+ * 대기방 기기 점검(W-11). getUserMedia 로 카메라·마이크를 잡고,
+ * Web Audio 로 마이크 입력 레벨과 스피커 테스트음을 만든다.
+ *
+ * ⚠️ 결과는 **서버에 저장된다**(`POST /api/v1/rooms/{id}/device-check`).
+ *    백엔드는 카메라·마이크·**스피커·네트워크** 4개를 모두 `@NotNull` 로 받고,
+ *    4개 전부 true 여야 `readyAvailable` 을 주며 그래야 준비 완료(ready)가 통과한다
+ *    (`RoomDeviceCheck.isReadyAvailable`, `RoomReadyService`).
+ *    그래서 예전엔 없던 두 항목을 여기서 판정한다 —
+ *      · 스피커: 사용자가 테스트음을 한 번이라도 재생했는가(`speakerTested`)
+ *      · 네트워크: `navigator.onLine` + online/offline 이벤트(`network`)
  *
  * ⚠️ 마이크 레벨은 초당 수십 번 갱신되는 값이라 React state 에 넣지 않는다.
  *    ref 로 <meter> DOM 을 직접 갱신하도록 `meterRef` 를 노출하고, rAF 루프에서만 만진다.
@@ -17,9 +25,15 @@ export interface UseDeviceCheck {
   camera: DeviceStatus
   microphone: DeviceStatus
   speakerPlaying: boolean
+  /** 테스트음을 한 번이라도 재생했는가 → 서버 `speakerPassed` */
+  speakerTested: boolean
+  /** 온라인 여부 → 서버 `networkPassed` */
+  network: DeviceStatus
   errorReason: string | null
-  /** 카메라+마이크 모두 정상 → 입장 가능 */
+  /** 카메라+마이크 정상 → 미리보기·연결 가능 */
   ready: boolean
+  /** 서버가 요구하는 4개 항목 전부 통과 → 준비 완료 가능 */
+  allPassed: boolean
   /** 권한 거부/장치 오류 후 다시 점검 */
   retry: () => void
   /** 스피커 테스트음(짧은 비프) 재생 */
@@ -55,9 +69,25 @@ export function useDeviceCheck(): UseDeviceCheck {
   const [camera, setCamera] = useState<DeviceStatus>('idle')
   const [microphone, setMicrophone] = useState<DeviceStatus>('idle')
   const [speakerPlaying, setSpeakerPlaying] = useState(false)
+  const [speakerTested, setSpeakerTested] = useState(false)
+  const [network, setNetwork] = useState<DeviceStatus>(() =>
+    navigator.onLine ? 'ready' : 'error',
+  )
   const [errorReason, setErrorReason] = useState<string | null>(null)
   /** retry 시 effect 를 다시 돌리기 위한 nonce */
   const [attempt, setAttempt] = useState(0)
+
+  // 네트워크 상태. 브라우저가 알려주는 최소 신호만 쓴다 —
+  // 실제 대역폭 측정은 LiveKit 연결 품질(세션 화면)이 담당한다.
+  useEffect(() => {
+    const sync = () => setNetwork(navigator.onLine ? 'ready' : 'error')
+    window.addEventListener('online', sync)
+    window.addEventListener('offline', sync)
+    return () => {
+      window.removeEventListener('online', sync)
+      window.removeEventListener('offline', sync)
+    }
+  }, [])
 
   /** 마이크 레벨 rAF 루프 — RMS 를 0~100% width 로 변환해 meterRef 를 직접 갱신. */
   const startMeter = useCallback((stream: MediaStream) => {
@@ -174,6 +204,9 @@ export function useDeviceCheck(): UseDeviceCheck {
       osc.start(now)
       osc.stop(now + 0.72)
       setSpeakerPlaying(true)
+      // 재생을 시작한 시점에 "점검함"으로 본다. 실제로 들렸는지는 사용자만 알 수 있고,
+      // 서버는 boolean 하나만 받으므로 재생 사실을 근거로 삼는다.
+      setSpeakerTested(true)
       osc.onended = () => {
         setSpeakerPlaying(false)
         void ctx.close().catch(() => {})
@@ -183,14 +216,19 @@ export function useDeviceCheck(): UseDeviceCheck {
     }
   }, [speakerPlaying])
 
+  const ready = camera === 'ready' && microphone === 'ready'
+
   return {
     videoRef,
     meterRef,
     camera,
     microphone,
     speakerPlaying,
+    speakerTested,
+    network,
     errorReason,
-    ready: camera === 'ready' && microphone === 'ready',
+    ready,
+    allPassed: ready && speakerTested && network === 'ready',
     retry,
     playTestTone,
   }
