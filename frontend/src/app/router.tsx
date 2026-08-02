@@ -4,6 +4,7 @@ import { AppShell } from './AppShell'
 import { ComingSoon } from './ComingSoon'
 import { HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { SplashPage } from '@/features/auth/SplashPage'
 import { SignupPage } from '@/features/auth/SignupPage'
 import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
@@ -35,6 +36,8 @@ import { AdminPlaceholder } from '@/features/admin/AdminPlaceholder'
  * - 세션(WebRTC·다크 고정)처럼 몰입형 화면은 셸 밖에 둔다.
  */
 export const router = createBrowserRouter([
+  // 서비스 첫 진입 화면 — 3초 후(또는 START 클릭 시) 인증 상태에 따라 홈/로그인으로 이동
+  { path: '/splash', element: <SplashPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/signup', element: <SignupPage /> },
   { path: '/signup/verify', element: <VerifyKycPage /> },

@@ -18,7 +18,7 @@ export function AuthPlaceholder({
     <main className="flex min-h-dvh items-center justify-center bg-surface-sunken px-5 py-10">
       <Card className="w-full max-w-[420px] text-center">
         <span aria-hidden="true" className="text-[28px]">
-          🌸
+          💬
         </span>
         <h1 className="bt-h2 mt-2">{title}</h1>
         <p className="bt-body-sm bt-muted mt-2">{note}</p>
