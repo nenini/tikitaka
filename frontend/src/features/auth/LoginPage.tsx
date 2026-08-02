@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,7 +7,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button, Callout, Card, Field, Input, Stack } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
 import { authErrorMessage, login, oauthStart } from './api'
-import heroImg from '@/assets/hero.png'
 
 /* -------------------------------------------------------------------------- */
 /*  W-01 · 랜딩 · 로그인 (AUTH-01)                                              */
@@ -37,12 +37,66 @@ export function LoginPage() {
 
 /* -------------------------------------------------------------------------- */
 /*  레이아웃 A · 분할형 — 데스크탑: 좌 히어로 / 우 폼, 모바일: 세로 스택         */
+/*  진입 연출: 히어로 사진이 화면을 꽉 채웠다가(풀블리드) 좌측 패널 폭으로        */
+/*  자연스럽게 줄어들며 정착 → 우측 로그인 섹션이 뒤이어 드러난다.               */
+/*  최종 상태는 기존 분할 레이아웃과 동일(연출은 진입 순간에만).                  */
 /* -------------------------------------------------------------------------- */
+
+/** 인트로 타이밍(ms) — 풀블리드 유지 → 정착 트랜지션 길이 */
+const INTRO_HOLD = 820
+const SETTLE_MS = 1050
+
+/** 정착 시점에 맞춰 아래→위로 떠오르는 리빌 스타일. */
+function reveal(on: boolean, delay: number): CSSProperties {
+  return {
+    opacity: on ? 1 : 0,
+    transform: on ? 'none' : 'translateY(14px)',
+    transition: `opacity 560ms ${delay}ms ease-out, transform 560ms ${delay}ms cubic-bezier(.22,1,.36,1)`,
+  }
+}
+
 function SplitLayout() {
+  // mounted: 첫 페인트 직후(브랜드 마크 먼저 등장) / settled: 좌측 패널로 정착 완료
+  const [mounted, setMounted] = useState(false)
+  const [settled, setSettled] = useState(false)
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setMounted(true))
+    // 모바일(세로 스택)·모션 최소화 선호 시에는 연출 없이 최종 상태로 시작한다
+    const skip =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      !window.matchMedia('(min-width: 1024px)').matches
+    if (skip) {
+      setSettled(true)
+      return () => cancelAnimationFrame(raf)
+    }
+    const timer = window.setTimeout(() => setSettled(true), INTRO_HOLD)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(timer)
+    }
+  }, [])
+
   return (
-    <main className="flex min-h-dvh flex-col lg:grid lg:grid-cols-[1.05fr_1fr]">
-      <HeroPanel />
-      <section className="flex flex-1 items-center justify-center bg-bg px-5 py-10 sm:px-8">
+    <main
+      className="flex min-h-dvh flex-col lg:grid"
+      style={{
+        // 1fr 0fr(풀블리드) → 1.05fr 1fr(분할). 모바일은 flex-col 이라 이 값이 무시된다.
+        gridTemplateColumns: settled ? '1.05fr 1fr' : '1fr 0fr',
+        transition: `grid-template-columns ${SETTLE_MS}ms cubic-bezier(.65,0,.2,1)`,
+      }}
+    >
+      <HeroPanel mounted={mounted} settled={settled} />
+      {/* 폭이 0 인 동안 폼이 삐져나오지 않도록 overflow-hidden */}
+      <section
+        className="flex flex-1 items-center justify-center overflow-hidden bg-bg px-5 py-10 sm:px-8"
+        style={{
+          opacity: settled ? 1 : 0,
+          transform: settled ? 'none' : 'translateX(28px)',
+          transition:
+            'opacity 620ms 380ms ease-out, transform 620ms 380ms cubic-bezier(.22,1,.36,1)',
+        }}
+      >
         <div className="w-full max-w-[420px]">
           <LoginCard />
         </div>
@@ -51,40 +105,60 @@ function SplitLayout() {
   )
 }
 
-/** 좌측(모바일은 상단) 브랜드 히어로 패널 */
-function HeroPanel() {
+/**
+ * 좌측(모바일은 상단) 브랜드 히어로 패널.
+ * 배경 사진은 cover 라 패널 폭이 줄면 자동으로 다시 크롭된다 — 정착 연출이 자연스럽게 이어진다.
+ */
+function HeroPanel({ mounted, settled }: { mounted: boolean; settled: boolean }) {
   return (
     <section
-      className="relative flex flex-col justify-center overflow-hidden px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16"
+      className="relative flex min-w-0 flex-col justify-center overflow-hidden px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16"
       style={{
+        // 히어로 사진(public/hero-couple.webp · 스플래시와 동일 파일이라 캐시 재사용) · 없을 때 브랜드 그라데이션 폴백
         background:
+          "url('/hero-couple.webp') center / cover no-repeat, " +
           'linear-gradient(158deg, var(--bt-color-action) 0%, var(--bt-color-brand) 52%, var(--bt-blue-400) 100%)',
       }}
     >
-      <img
-        src={heroImg}
-        alt=""
+      {/* 가독용 스크림 — 풀블리드 구간엔 옅게(사진을 보여주고), 정착 후엔 짙게(텍스트 가독) */}
+      <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 hidden w-[380px] opacity-20 blur-[1px] lg:block"
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(158deg, rgba(24,12,20,.62) 0%, rgba(24,12,20,.28) 42%, rgba(24,12,20,.68) 100%)',
+          opacity: settled ? 1 : 0.45,
+          transition: `opacity ${SETTLE_MS}ms ease-out`,
+        }}
       />
       <div className="relative z-10 max-w-[520px]">
-        <BrandMark tone="light" />
+        {/* 서비스명은 풀블리드 구간에서 먼저 등장 */}
+        <div style={reveal(mounted, 120)}>
+          <BrandMark tone="light" />
+        </div>
         <span
           className="bt-caption mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold"
-          style={{ background: 'rgba(255,255,255,.18)', color: '#fff' }}
+          style={{ background: 'rgba(255,255,255,.18)', color: '#fff', ...reveal(settled, 120) }}
         >
           낯선 사람과의 대화, 연습이 됩니다
         </span>
-        <h1 className="mt-4 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] sm:text-[34px] lg:text-[40px]">
+        <h1
+          className="mt-4 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] sm:text-[34px] lg:text-[40px]"
+          style={reveal(settled, 200)}
+        >
           30분 모의 소개팅으로
           <br />
           대화 습관을 바꿔보세요
         </h1>
-        <p className="mt-4 max-w-[440px] text-[15px] leading-[1.65] text-white/85">
-          실제 소개팅 전에 연습하고, AI 코칭과 상대 피드백으로 내 대화의 강점과 개선점을 확인하세요.{' '}
-          <b className="font-semibold text-white">연애 매칭이 아니라 대화 연습 서비스</b>입니다.
+        <p
+          className="mt-4 max-w-[440px] text-[15px] leading-[1.65] text-white/85"
+          style={reveal(settled, 290)}
+        >
+          실제 소개팅 전에 연습하고, AI 코칭과 상대 피드백으로 {' '}
+          <br />
+          <b className="font-semibold text-white">내 대화의 강점과 개선점을 확인</b>하세요.
         </p>
-        <HeroStats className="mt-8" />
+        <HeroStats className="mt-8" style={reveal(settled, 380)} />
       </div>
     </section>
   )
@@ -238,28 +312,39 @@ function SocialButtons() {
 /* -------------------------------------------------------------------------- */
 /*  프리미티브                                                                 */
 /* -------------------------------------------------------------------------- */
+/**
+ * 브랜드 락업 — 로고 마크(하트 말풍선 'tika') + 국문 워드마크.
+ * 마크는 장식이므로 alt=""(aria-hidden), 서비스명은 옆 텍스트가 읽힌다.
+ */
 function BrandMark({ tone }: { tone: 'light' | 'dark' }) {
   return (
     <span
       className="inline-flex items-center gap-2 text-[20px] font-extrabold tracking-[-0.02em]"
       style={{ color: tone === 'light' ? '#fff' : 'var(--bt-color-text)' }}
     >
-      <span aria-hidden="true" className="text-[22px]">
-        🌸
-      </span>
-      BloomTalk
+      <img
+        src="/tika-logo-whitever.webp"
+        alt=""
+        aria-hidden="true"
+        width={41}
+        height={28}
+        className="h-7 w-auto"
+        // 사진 위(light)에서는 흰 로고가 배경에 묻히지 않도록 그림자로 분리한다
+        style={tone === 'light' ? { filter: 'drop-shadow(0 2px 7px rgba(0,0,0,.45))' } : undefined}
+      />
+      티키타카
     </span>
   )
 }
 
-function HeroStats({ className = '' }: { className?: string }) {
+function HeroStats({ className = '', style }: { className?: string; style?: CSSProperties }) {
   const stats = [
     { v: '30분', k: '화상 세션' },
     { v: '실시간', k: 'AI 코칭' },
     { v: '상호', k: '행동 피드백' },
   ]
   return (
-    <dl className={`flex gap-6 ${className}`}>
+    <dl className={`flex gap-6 ${className}`} style={style}>
       {stats.map((s) => (
         <div key={s.k} className="flex flex-col">
           <dt className="bt-numeric text-[20px] font-bold leading-none">{s.v}</dt>

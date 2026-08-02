@@ -82,5 +82,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      # 컨테이너 안에서는 backend 서비스명으로 프록시한다 (호스트 localhost 아님)
+      VITE_PROXY_TARGET: "http://backend:8080"
+      TZ: Asia/Seoul
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+
 volumes:
   mysql-data:

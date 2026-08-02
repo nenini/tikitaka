@@ -9,7 +9,8 @@ import type { ApiEnvelope, AuthTokens } from '@/features/auth/types'
  *   재발급은 단일 비행(single-flight) — 동시에 401 이 여러 개 나도 refresh 는 한 번만 호출한다.
  */
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  // 빈 문자열(.env 에 키만 있고 값 없음)도 미설정으로 보고 '/api' 프록시로 폴백한다(|| 사용)
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 10_000,
   headers: { 'Content-Type': 'application/json' },
 })
