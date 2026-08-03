@@ -68,7 +68,9 @@ export async function getMe(): Promise<MeResponse> {
  *    SPA 가 토큰을 받으려면 백엔드가 FE 라우트로 리다이렉트하도록 조율이 필요하다. AUTH_FLOW.md §5 참고.
  */
 export function oauthStart(provider: OAuthProviderId): void {
-  const base = import.meta.env.VITE_API_BASE_URL ?? '/api'
+  // `??` 가 아니라 `||` — .env 에 빈 값(VITE_API_BASE_URL=)이 들어와도 프록시 경로로 폴백해야 한다.
+  // (`??` 는 빈 문자열을 통과시켜 `/api` 프리픽스가 빠지고, 프록시를 못 타 SPA 라우터로 떨어진다)
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
   window.location.assign(`${base}/v1/auth/oauth2/${provider}`)
 }
 
