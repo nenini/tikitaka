@@ -176,6 +176,12 @@ class FlywayMigrationTests {
 						+ "WHERE \"success\" = TRUE AND \"version\" = '38'",
 				Integer.class
 		);
+		Integer sessionContactDecisionMigrationCount =
+				jdbcTemplate.queryForObject(
+						"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+								+ "WHERE \"success\" = TRUE AND \"version\" = '39'",
+						Integer.class
+				);
 		Integer resultMigrationCount = jdbcTemplate.queryForObject(
 				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
 						+ "WHERE \"success\" = TRUE AND \"version\" = '40'",
@@ -321,6 +327,7 @@ class FlywayMigrationTests {
 		assertThat(aiCoachingMigrationCount).isEqualTo(1);
 		assertThat(silenceQuestionMigrationCount).isEqualTo(1);
 		assertThat(safetyMigrationCount).isEqualTo(1);
+		assertThat(sessionContactDecisionMigrationCount).isEqualTo(1);
 		assertThat(resultMigrationCount).isEqualTo(1);
 		assertThat(missionCatalogTableCount).isEqualTo(1);
 		assertThat(sessionMissionTableCount).isEqualTo(1);

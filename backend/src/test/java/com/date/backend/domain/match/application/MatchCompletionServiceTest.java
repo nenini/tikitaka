@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 class MatchCompletionServiceTest {
 
 	@Test
-	void completesSessionAfterThirtyMinutesAndReleasesActiveRequests() {
+	void completesSessionAfterThirtyFiveMinutesAndReleasesActiveRequests() {
 		MatchPairRepository pairRepository = mock(MatchPairRepository.class);
 		ActiveMatchRequestRepository activeRepository =
 				mock(ActiveMatchRequestRepository.class);
@@ -28,7 +28,7 @@ class MatchCompletionServiceTest {
 		MatchRequest first = mock(MatchRequest.class);
 		MatchRequest second = mock(MatchRequest.class);
 		LocalDateTime scheduledAt = LocalDateTime.of(2026, 7, 29, 10, 0);
-		LocalDateTime completedAt = scheduledAt.plusMinutes(30);
+		LocalDateTime completedAt = scheduledAt.plusMinutes(35);
 
 		when(pair.getId()).thenReturn(1L);
 		when(pair.getStatus()).thenReturn(MatchStatus.CONFIRMED);
@@ -39,7 +39,7 @@ class MatchCompletionServiceTest {
 		when(pair.getUserBId()).thenReturn(20L);
 		when(pairRepository.findAllByStatusAndScheduledAtBefore(
 				MatchStatus.CONFIRMED,
-				completedAt.minusMinutes(30)
+				completedAt.minusMinutes(35)
 		)).thenReturn(List.of(pair));
 		when(pairRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pair));
 

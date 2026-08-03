@@ -32,6 +32,7 @@ class SessionTimerServiceTest {
 			LocalDateTime.of(2026, 7, 29, 22, 0);
 
 	private WaitingRoomRepository sessionRepository;
+	private SessionExtensionAgreementPolicy extensionAgreementPolicy;
 	private ApplicationEventPublisher eventPublisher;
 	private WaitingRoom session;
 	private SessionTimerService service;
@@ -39,15 +40,21 @@ class SessionTimerServiceTest {
 	@BeforeEach
 	void setUp() {
 		sessionRepository = mock(WaitingRoomRepository.class);
+		extensionAgreementPolicy = mock(
+				SessionExtensionAgreementPolicy.class
+		);
 		eventPublisher = mock(ApplicationEventPublisher.class);
 		session = mock(WaitingRoom.class);
 		when(session.getId()).thenReturn(15L);
+		when(extensionAgreementPolicy.isMutuallyAgreed(15L))
+				.thenReturn(true);
 		when(sessionRepository.findActiveTimersForUpdate(
 				any(RoomSessionStatus.class),
 				any(Pageable.class)
 		)).thenReturn(List.of(session));
 		service = new SessionTimerService(
 				sessionRepository,
+				extensionAgreementPolicy,
 				new SessionTimerProperties(
 						true,
 						1_000,
@@ -62,6 +69,19 @@ class SessionTimerServiceTest {
 						ZoneId.of("Asia/Seoul")
 				)
 		);
+	}
+
+	@Test
+	void sessionWithoutMutualAgreementExpiresAtThirtyMinutes() {
+		when(extensionAgreementPolicy.isMutuallyAgreed(15L))
+				.thenReturn(false);
+		when(session.extensionDecisionDeadlineAt()).thenReturn(NOW);
+		when(session.claimTimerExpiredNotification(NOW)).thenReturn(true);
+
+		service.publishTimerEvents();
+
+		assertThat(broadcastTypes())
+				.containsExactly(SessionTimerEventType.SESSION_TIME_EXPIRED);
 	}
 
 	@Test
