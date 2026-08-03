@@ -4,6 +4,7 @@ import { SystemClock } from "../../common/Clock.js";
 import { FaceFrameNormalizer, selectPrimaryFaceBox } from "../core/FaceFrameNormalizer.js";
 import { FaceLandmarkerAdapter } from "../core/FaceLandmarkerAdapter.js";
 import { FrameQualityAnalyzer } from "../core/FrameQualityAnalyzer.js";
+import { HandLandmarkerAdapter } from "../core/HandLandmarkerAdapter.js";
 import type {
   VisionWorkerRequest,
   VisionWorkerResponse,
@@ -13,6 +14,7 @@ const scope = globalThis as unknown as DedicatedWorkerGlobalScope;
 const clock = new SystemClock();
 const normalizer = new FaceFrameNormalizer();
 let adapter: FaceLandmarkerAdapter | null = null;
+let handAdapter: HandLandmarkerAdapter | null = null;
 let analysisCanvas: OffscreenCanvas | null = null;
 let analysisContext: OffscreenCanvasRenderingContext2D | null = null;
 let qualityAnalyzer: FrameQualityAnalyzer | null = null;
@@ -25,6 +27,7 @@ async function initialize(
   request: Extract<VisionWorkerRequest, { readonly type: "INITIALIZE" }>,
 ): Promise<void> {
   adapter?.close();
+  handAdapter?.close();
   normalizer.reset();
 
   try {
@@ -51,9 +54,26 @@ async function initialize(
       },
       clock,
     );
-    respond({ type: "READY", delegate: adapter.delegate });
+    handAdapter = request.config.handModel.enabled
+      ? await HandLandmarkerAdapter.create(
+          {
+            wasmBasePath: request.config.model.wasmBasePath,
+            model: request.config.handModel,
+            gpuCanvas: new OffscreenCanvas(1, 1),
+          },
+          clock,
+        )
+      : null;
+    respond({
+      type: "READY",
+      delegate: adapter.delegate,
+      handDelegate: handAdapter?.delegate ?? null,
+    });
   } catch (error: unknown) {
+    adapter?.close();
     adapter = null;
+    handAdapter?.close();
+    handAdapter = null;
     respond({
       type: "FATAL_ERROR",
       code: "INITIALIZATION_FAILED",
@@ -102,6 +122,12 @@ function processFrame(
       canvas,
       frame.clientMonotonicMs,
     );
+    // Both tasks inspect the same resized canvas. This avoids transferring or
+    // scaling the camera frame a second time.
+    const handLandmarkerResult = handAdapter?.detect(
+      canvas,
+      frame.clientMonotonicMs,
+    );
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const imageQuality = analyzer.analyze(
       imageData,
@@ -123,6 +149,9 @@ function processFrame(
       actualFps: frame.actualFps,
       performanceProfile: frame.performanceProfile,
       landmarkerResult,
+      ...(handLandmarkerResult === undefined
+        ? {}
+        : { handLandmarkerResult }),
     });
 
     respond({ type: "FRAME_RESULT", frame: normalizedFrame });
@@ -144,6 +173,8 @@ function processFrame(
 function dispose(): void {
   adapter?.close();
   adapter = null;
+  handAdapter?.close();
+  handAdapter = null;
   analysisCanvas = null;
   analysisContext = null;
   qualityAnalyzer = null;

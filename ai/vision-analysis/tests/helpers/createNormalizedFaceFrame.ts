@@ -67,6 +67,12 @@ export function createNormalizedFaceFrame(
           geometry: {
             mouthCornerLiftLeft: 0,
             mouthCornerLiftRight: 0,
+            mouthRegion: {
+              left: 0.42,
+              top: 0.58,
+              right: 0.58,
+              bottom: 0.68,
+            },
             noseToChinVerticalRatio: 0.3,
             landmarkDisplacementScore:
               options.landmarkDisplacementScore ?? null,
@@ -86,6 +92,9 @@ export function createNormalizedFaceFrame(
           },
         }
       : null,
+    handDetected: false,
+    handCount: 0,
+    hands: [],
     imageQuality: {
       brightnessScore: options.brightnessScore ?? 0.8,
       backlightScore: options.backlightScore ?? 1,
@@ -94,6 +103,8 @@ export function createNormalizedFaceFrame(
     },
     processing: {
       landmarkerDurationMs: 20,
+      faceLandmarkerDurationMs: 20,
+      handLandmarkerDurationMs: 0,
       totalDurationMs: 25,
       targetFps: 5,
       actualFps: 5,

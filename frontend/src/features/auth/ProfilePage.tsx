@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } from '@/components'
 import { cn } from '@/shared/lib/cn'
+import { createProfile } from '@/features/profile/api'
+import { authErrorMessage } from '@/features/auth/api'
 
 /* -------------------------------------------------------------------------- */
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
@@ -51,6 +53,7 @@ async function checkNicknameAvailable(nickname: string): Promise<boolean> {
 export function ProfilePage() {
   const navigate = useNavigate()
   const [nickStatus, setNickStatus] = useState<NickStatus>('idle')
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const {
     register,
@@ -86,9 +89,19 @@ export function ProfilePage() {
       setError('nickname', { message: '닉네임 중복 확인을 해주세요' })
       return
     }
-    // TODO(PROFILE): PUT /api/me/profile 로 교체
-    console.log('profile payload', data)
-    navigate('/signup/survey')
+    setSubmitError(null)
+    try {
+      // POST /api/v1/users/me/profile — 온보딩 4단계 프로필 생성
+      await createProfile({
+        nickname: data.nickname.trim(),
+        gender: data.gender === 'female' ? 'FEMALE' : 'MALE', // 폼(소문자) → 백엔드 enum(대문자)
+        regionCity: data.regionSido,
+      })
+      navigate('/signup/survey')
+    } catch (e) {
+      // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출
+      setSubmitError(authErrorMessage(e) ?? '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.')
+    }
   }
 
   const nickError =
@@ -222,6 +235,12 @@ export function ProfilePage() {
           <Callout tone="warning" icon="info-circle">
             <b>키·직업·실명·전화·정확한 주소는 수집하지 않아요.</b> 매칭은 <b>시간 · 나이 · 외모 · 성격</b> 4요소로 계산됩니다(직업 제외 · D-08).
           </Callout>
+
+          {submitError && (
+            <Callout tone="warning" icon="info-circle">
+              {submitError}
+            </Callout>
+          )}
 
           <div className="flex gap-2">
             <Button

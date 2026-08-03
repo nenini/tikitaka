@@ -24,7 +24,7 @@ public interface MissionSwaggerDocs {
 	)
 	ApiResponse<SessionMissionsResponse> getMyMissions(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "화상 세션 ID", example = "15")
+			@Parameter(description = "화상 세션 ID", example = "1")
 			@Positive Long sessionId
 	);
 }

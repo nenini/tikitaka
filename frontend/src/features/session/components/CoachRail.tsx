@@ -4,6 +4,8 @@ import type { CoachMessage } from '@/stores/coaching.store'
 import { ExtensionOfferCard } from './ExtensionOfferCard'
 import type { ExtensionChoice } from './ExtensionOfferCard'
 import { GoalProgressCard } from './GoalProgressCard'
+import { MissionProgressCard } from './MissionProgressCard'
+import type { SessionMission } from '../types'
 
 export interface CoachRailProps {
   /**
@@ -18,8 +20,17 @@ export interface CoachRailProps {
    */
   message: CoachMessage | null
   onDismissMessage: () => void
+  /** 안전 경고 카드. 코칭보다 위에 놓는다 — 성격이 다르고 더 급하다 */
+  safetyWarning?: ReactNode
   goalLabel: string
-  speakingRatio: number
+  /**
+   * 내 발화 비율 0~100.
+   * ⚠️ 백엔드에 실시간 발화 비율을 내려주는 경로가 없다(분석 이벤트는 AI→BE 단방향).
+   *    값이 없으면 카드를 그리지 않는다 — 가짜 숫자를 세우지 않기 위해서다.
+   */
+  speakingRatio?: number | null
+  /** 서버가 배정한 세션 미션. 없으면 카드를 그리지 않는다 */
+  missions?: SessionMission[]
   /** 종료 1분 전부터 true */
   extensionVisible: boolean
   extensionChoice: ExtensionChoice
@@ -44,8 +55,10 @@ export function CoachRail({
   silenceHint,
   message,
   onDismissMessage,
+  safetyWarning,
   goalLabel,
   speakingRatio,
+  missions = [],
   extensionVisible,
   extensionChoice,
   onAcceptExtension,
@@ -57,6 +70,21 @@ export function CoachRail({
         <Icon name="lock" size={12} />
         코치 · 나에게만 보여요
       </div>
+
+      {/* 연장 제안은 남은 1분 안에 답해야 하는 유일한 요청이라 레일 **맨 위에 고정**한다.
+          아래에 두면 레일이 스크롤될 때 화면 밖으로 밀려 응답 기회 자체가 사라진다. */}
+      {extensionVisible && (
+        <div className="bt-rail-sticky">
+          <ExtensionOfferCard
+            choice={extensionChoice}
+            onAccept={onAcceptExtension}
+            onDecline={onDeclineExtension}
+          />
+        </div>
+      )}
+
+      {/* 안전 경고는 코칭 제안과 성격이 다르다 — 먼저, 그리고 따로 보여준다 */}
+      {safetyWarning}
 
       {silenceHint}
 
@@ -71,15 +99,12 @@ export function CoachRail({
         />
       )}
 
-      <GoalProgressCard goalLabel={goalLabel} speakingRatio={speakingRatio} />
-
-      {extensionVisible && (
-        <ExtensionOfferCard
-          choice={extensionChoice}
-          onAccept={onAcceptExtension}
-          onDecline={onDeclineExtension}
-        />
+      {/* 발화 비율 지표는 서버 경로가 생길 때만 그린다(가짜 숫자 금지) */}
+      {typeof speakingRatio === 'number' && (
+        <GoalProgressCard goalLabel={goalLabel} speakingRatio={speakingRatio} />
       )}
+
+      <MissionProgressCard missions={missions} />
     </div>
   )
 }

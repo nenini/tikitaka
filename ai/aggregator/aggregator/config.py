@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class MvpCoachingConfig:
     """All tunable MVP thresholds in one place."""
 
-    coaching_ttl_ms: int = 5_000
+    coaching_ttl_ms: int = 15_000
     default_cooldown_ms: int = 60_000
     vision_setup_cooldown_ms: int = 120_000
     vision_setup_startup_grace_ms: int = 3_000

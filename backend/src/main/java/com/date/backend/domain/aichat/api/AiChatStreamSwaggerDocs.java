@@ -67,7 +67,7 @@ public interface AiChatStreamSwaggerDocs {
 	})
 	SseEmitter stream(
 			@Parameter(hidden = true) AuthUser authUser,
-			@Parameter(description = "AI 채팅 세션 ID", example = "15") Long sessionId,
+			@Parameter(description = "AI 채팅 세션 ID", example = "1") Long sessionId,
 			@Valid AiChatStreamRequest request
 	);
 

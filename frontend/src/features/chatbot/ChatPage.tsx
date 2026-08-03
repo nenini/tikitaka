@@ -11,15 +11,17 @@ import {
   TypingIndicator,
 } from '@/components'
 import {
+  cancelAiResponse,
   completeChatSession,
   createChatReport,
-  getChatSession,
+  getChatSessionDetail,
   getCurrentChatSession,
-  getMessages,
-  sendMessage,
+  rememberPersonaName,
+  retryAiReply,
+  sendMessageAndStream,
   setProactiveMessageEnabled,
-  streamAiReply,
 } from './api'
+import { errorMessageOf } from '@/shared/api/envelope'
 import { cn } from '@/shared/lib/cn'
 import { useMediaQuery } from '@/shared/lib/useMediaQuery'
 import { ChatHeader, Composer, DayDivider, FeedbackModal, PersonaPanel, ProactiveDivider } from './parts'
@@ -54,33 +56,46 @@ export function ChatPage() {
   /** 사용자가 위로 올려 과거를 읽는 중이면 자동 스크롤을 하지 않는다 */
   const stickToBottom = useRef(true)
 
-  /* ── 세션 · 메시지 로드 ── */
+  /* ── 세션 · 메시지 로드 ──
+     백엔드 상세 응답이 세션과 메시지를 함께 주므로 호출이 한 번이다. */
   useEffect(() => {
     let alive = true
     setLoading(true)
 
-      ; (async () => {
-        const found = idParam ? await getChatSession(idParam) : await getCurrentChatSession()
-        if (!alive) return
+    void (async () => {
+      try {
+        if (!idParam) {
+          // `/chatbot` 진입 — 진행 중 세션을 찾아 URL 에 id 를 남긴다(새로고침·뒤로가기 대비).
+          const current = await getCurrentChatSession()
+          if (!alive) return
+          if (!current) {
+            setNoSession(true)
+            setLoading(false)
+            return
+          }
+          navigate(`/chatbot/${current.chatSessionId}`, { replace: true })
+          return
+        }
 
-        if (!found) {
+        const chatSessionId = Number(idParam)
+        if (!Number.isFinite(chatSessionId) || chatSessionId <= 0) {
           setNoSession(true)
           setLoading(false)
           return
         }
-        // `/chatbot` 으로 들어왔으면 세션 id 를 URL 에 남긴다(새로고침·뒤로가기 대비).
-        // 이 effect 가 id 와 함께 다시 돌면서 메시지를 불러온다.
-        if (!idParam) {
-          navigate(`/chatbot/${found.chatSessionId}`, { replace: true })
-          return
-        }
 
-        setSession(found)
-        const page = await getMessages(found.chatSessionId)
+        const detail = await getChatSessionDetail(chatSessionId)
         if (!alive) return
-        setMessages(page.items)
+        setSession(detail.session)
+        setMessages(detail.messages)
         setLoading(false)
-      })()
+      } catch (loadError) {
+        if (!alive) return
+        setError(errorMessageOf(loadError, '대화를 불러오지 못했어요.'))
+        setNoSession(true)
+        setLoading(false)
+      }
+    })()
 
     return () => {
       alive = false
@@ -103,7 +118,9 @@ export function ChatPage() {
     el.scrollTop = el.scrollHeight
   }, [messages, streamText, loading])
 
-  /* ── 전송 → 스트리밍 수신 ── */
+  /* ── 전송 → 스트리밍 수신 ──
+     백엔드는 POST 하나로 사용자 메시지 저장 + AI 스트리밍을 함께 처리한다
+     (사용자 메시지 전용 엔드포인트가 없다). */
   async function handleSend() {
     const text = draft.trim()
     if (!session || !text || busy || session.status !== 'ACTIVE') return
@@ -113,26 +130,36 @@ export function ChatPage() {
     setBusy(true)
     stickToBottom.current = true
 
-    // 낙관적 렌더
+    // 낙관적 렌더 — 서버가 준 id 로 나중에 교체한다.
     const optimisticId = `local-${Date.now()}`
+    const sentAt = new Date().toISOString()
     setMessages((prev) => [
       ...prev,
-      { messageId: optimisticId, sender: 'USER', text, createdAt: new Date().toISOString() },
+      { messageId: optimisticId, sender: 'USER', text, createdAt: sentAt },
     ])
 
+    setStreamText('')
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    let acc = ''
     try {
-      const saved = await sendMessage(session.chatSessionId, text)
-      setMessages((prev) => prev.map((m) => (m.messageId === optimisticId ? saved : m)))
-
-      setStreamText('')
-      const controller = new AbortController()
-      abortRef.current = controller
-
-      let acc = ''
-      const reply = await streamAiReply(session.chatSessionId, {
+      const reply = await sendMessageAndStream(session.chatSessionId, text, {
         onDelta: (chunk) => {
           acc += chunk
           setStreamText(acc)
+        },
+        onUserMessageId: (userMessageId) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.messageId === optimisticId ? { ...m, messageId: String(userMessageId) } : m)),
+          )
+        },
+        // 서버는 첫 응답에서 페르소나를 고른다 — 표시명을 그때 알게 된다.
+        onPersona: ({ personaKey, displayName }) => {
+          rememberPersonaName(session.chatSessionId, displayName)
+          setSession((s) =>
+            s ? { ...s, persona: { ...s.persona, personaId: personaKey, name: displayName } } : s,
+          )
         },
         signal: controller.signal,
       })
@@ -142,18 +169,74 @@ export function ChatPage() {
         setMessages((prev) => [
           ...prev,
           {
-            messageId: reply.messageId,
+            messageId: reply.aiMessageId != null ? String(reply.aiMessageId) : `ai-${Date.now()}`,
             sender: 'AI',
             text: replyText,
             createdAt: new Date().toISOString(),
           },
         ])
       }
-      setSession((s) => (s ? { ...s, lastUserMessageAt: saved.createdAt } : s))
-    } catch {
-      setError('메시지를 보내지 못했어요. 잠시 후 다시 시도해 주세요.')
+      setSession((s) => (s ? { ...s, lastUserMessageAt: sentAt, aiResponseState: 'IDLE' } : s))
+    } catch (sendError) {
+      if (controller.signal.aborted) {
+        // 사용자가 취소했다 — 보낸 메시지는 서버에 남아 있으니 지우지 않는다.
+        setSession((s) => (s ? { ...s, aiResponseState: 'CANCELLED' } : s))
+        return
+      }
+      setError(errorMessageOf(sendError, '메시지를 보내지 못했어요. 잠시 후 다시 시도해 주세요.'))
       setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId))
       setDraft(text) // 쓴 글을 잃지 않게 되돌려준다
+    } finally {
+      abortRef.current = null
+      setStreamText(null)
+      setBusy(false)
+    }
+  }
+
+  /** 진행 중인 AI 응답 취소 — 서버 상태도 CANCELLED 로 기록한다. */
+  async function handleCancelReply() {
+    if (!session) return
+    abortRef.current?.abort()
+    await cancelAiResponse(session.chatSessionId).catch(() => {
+      /* 취소할 응답이 없으면 409 — 이미 끝난 것이니 무시 */
+    })
+  }
+
+  /** 실패·취소된 응답 재시도. 사용자 메시지를 다시 보내지 않는다. */
+  async function handleRetryReply() {
+    if (!session?.pendingUserMessageId || busy) return
+    setError(null)
+    setBusy(true)
+    setStreamText('')
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    let acc = ''
+    try {
+      const reply = await retryAiReply(session.chatSessionId, session.pendingUserMessageId, {
+        onDelta: (chunk) => {
+          acc += chunk
+          setStreamText(acc)
+        },
+        signal: controller.signal,
+      })
+      const replyText = reply.text || acc
+      if (replyText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            messageId: reply.aiMessageId != null ? String(reply.aiMessageId) : `ai-${Date.now()}`,
+            sender: 'AI',
+            text: replyText,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      }
+      setSession((s) => (s ? { ...s, aiResponseState: 'IDLE', pendingUserMessageId: null } : s))
+    } catch (retryError) {
+      if (!controller.signal.aborted) {
+        setError(errorMessageOf(retryError, '다시 시도하지 못했어요.'))
+      }
     } finally {
       abortRef.current = null
       setStreamText(null)
@@ -173,13 +256,19 @@ export function ChatPage() {
     if (!session) return
     setEnding(true)
     try {
+      // 응답 생성 중이면 서버가 종료를 막는다(409) → 먼저 취소한다.
       abortRef.current?.abort()
+      if (session.aiResponseState === 'PROCESSING') {
+        await cancelAiResponse(session.chatSessionId).catch(() => {})
+      }
       const next = await completeChatSession(session.chatSessionId)
-      // 종합 피드백은 생성에 시간이 걸린다 — 생성만 걸어두고 조회는 리포트 화면(W-16)에서 한다
+      // 종합 피드백 생성 API 는 아직 백엔드에 없다(no-op).
       await createChatReport(session.chatSessionId)
       setSession(next)
       setEndOpen(false)
       setPersonaOpen(false)
+    } catch (endError) {
+      setError(errorMessageOf(endError, '대화를 종료하지 못했어요.'))
     } finally {
       setEnding(false)
     }
@@ -260,7 +349,7 @@ export function ChatPage() {
             <LoadingBubbles />
           ) : messages.length === 0 ? (
             <p className="bt-body-sm bt-muted m-auto max-w-[28ch] text-center">
-              먼저 가볍게 인사를 건네볼까요? 편하게 쓰셔도 돼요.
+              먼저 가볍게 인사를 건네볼까요?<br /> 편하게 쓰셔도 돼요.
             </p>
           ) : (
             messages.map((message, i) => (
@@ -288,11 +377,42 @@ export function ChatPage() {
           style={compact ? { paddingBottom: 'max(12px, env(safe-area-inset-bottom))' } : undefined}
         >
           {error && <Callout tone="danger">{error}</Callout>}
+
+          {/* 응답이 실패·취소로 멈춰 있으면 사용자 메시지를 다시 보내지 않고 재시도한다 */}
+          {!ended &&
+            session?.pendingUserMessageId != null &&
+            (session.aiResponseState === 'FAILED' || session.aiResponseState === 'CANCELLED') && (
+              <Callout tone="warning">
+                답장이 도착하지 않았어요. 보낸 메시지는 그대로 남아 있어요.
+                <div className="mt-2">
+                  <Button variant="secondary" size="sm" leadingIcon="refresh" onClick={handleRetryReply}>
+                    다시 시도
+                  </Button>
+                </div>
+              </Callout>
+            )}
+
+          {/* 스트리밍 중에는 멈출 수 있어야 한다 — 긴 답변을 기다리게만 두지 않는다 */}
+          {busy && streamText != null && (
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" onClick={handleCancelReply}>
+                답변 멈추기
+              </Button>
+            </div>
+          )}
+
           {ended ? (
             <Callout tone="info">
-              <b>대화를 마쳤어요.</b> 종합 피드백을 만들고 있어요. 준비되면 알림으로 알려드릴게요.
-              <div className="mt-2 flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+              대화를 마쳤어요. 주고받은 대화를 정리해 종합 피드백을 만들고 있어요.
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate(`/chatbot/${session?.chatSessionId}/report`)}
+                >
+                  종합 피드백 보기
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                   홈으로
                 </Button>
               </div>
@@ -335,13 +455,14 @@ export function ChatPage() {
             <Button variant="ghost" onClick={() => setEndOpen(false)}>
               계속하기
             </Button>
-            <Button variant="secondary" loading={ending} onClick={handleEnd}>
+            {/* 되돌릴 수 없는 액션이라 주 버튼으로 세운다 */}
+            <Button variant="primary" loading={ending} onClick={handleEnd}>
               종료하고 피드백 받기
             </Button>
           </>
         }
       >
-        종료하면 이 대화에는 더 이상 메시지를 보낼 수 없어요. 대신 <b>대화 전체에 대한 종합 피드백</b>을
+        종료하면 이 대화에는 더 이상 메시지를 보낼 수 없어요. 대신 대화 전체에 대한 종합 피드백을
         만들어 드려요. 챗봇 연습은 사랑의 온도에 반영되지 않습니다.
       </Modal>
 

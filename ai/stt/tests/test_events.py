@@ -32,7 +32,7 @@ def _started(**over: object) -> SpeechStartedEvent:
         "payload": SpeechStartedPayload(observed_start_elapsed_ms=1200),
     }
     base.update(over)
-    return SpeechStartedEvent(**base)  # type: ignore[arg-type]
+    return SpeechStartedEvent(**base)
 
 
 def _ended(**over: object) -> SpeechEndedEvent:
@@ -44,7 +44,7 @@ def _ended(**over: object) -> SpeechEndedEvent:
         ),
     }
     base.update(over)
-    return SpeechEndedEvent(**base)  # type: ignore[arg-type]
+    return SpeechEndedEvent(**base)
 
 
 def _transcript(**over: object) -> TranscriptFinalizedEvent:
@@ -56,7 +56,7 @@ def _transcript(**over: object) -> TranscriptFinalizedEvent:
         ),
     }
     base.update(over)
-    return TranscriptFinalizedEvent(**base)  # type: ignore[arg-type]
+    return TranscriptFinalizedEvent(**base)
 
 
 # ── 고정값(kind/source/version/modelVersion/ruleVersion) ───────────
@@ -165,7 +165,7 @@ def test_bad_termination_reason() -> None:
     with pytest.raises(ValidationError):
         SpeechEndedPayload(
             observed_start_elapsed_ms=0, observed_end_elapsed_ms=1,
-            speech_duration_ms=1, termination_reason="NOPE",  # type: ignore[arg-type]
+            speech_duration_ms=1, termination_reason="NOPE",
         )
 
 
@@ -182,7 +182,7 @@ def test_transcript_language_not_empty() -> None:
 def test_transcript_isfinal_must_be_true() -> None:
     with pytest.raises(ValidationError):
         TranscriptPayload(
-            text="x", language="ko", is_final=False,  # type: ignore[arg-type]
+            text="x", language="ko", is_final=False,
             segment_start_ms=0, segment_end_ms=1,
         )
 

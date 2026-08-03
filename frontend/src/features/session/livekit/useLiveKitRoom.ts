@@ -9,13 +9,32 @@ import {
 import type { LocalVideoTrack, RemoteAudioTrack, RemoteVideoTrack } from 'livekit-client'
 import type { ConnectionState as BtConnectionState } from '@/components'
 import { toBtState } from './connectionState'
+import { isAiWorkerIdentity } from './identity'
 import type { TokenProvider } from './tokenProvider'
 
 export interface LiveKitSession {
     state: BtConnectionState
+    /**
+     * 연결이 끝난 Room. DataChannel 로 무언가를 보내야 하는 쪽(예: Vision v4 배치)이
+     * 쓴다. 연결 전·정리 후에는 null 이라 "룸이 살아있을 때만" 발행하게 강제된다.
+     */
+    room: Room | null
     localVideo: LocalVideoTrack | null  /** 내 카메라 트랙 */
     remoteVideo: RemoteVideoTrack | null
     remoteAudio: RemoteAudioTrack | null
+    /**
+     * 내 LiveKit participant SID. 서버 STOMP 명령(`/app/sessions/{id}/heartbeat` ·
+     * `media-state` · `network-quality` · `connection-state`)이 **필수로 요구**한다
+     * (`SessionHeartbeatRequest.participantSid` 등). 연결 전에는 null.
+     */
+    localParticipantSid: string | null
+    /**
+     * 내 LiveKit participant identity. 서버가 `user-{userId}` 로 발급한다
+     * (`RoomParticipant.identityOf`). SID 와 달리 토큰에 박혀 있어 재연결해도 같다.
+     */
+    localParticipantIdentity: string | null
+    /** 상대가 룸에 들어와 있는가. 카메라·마이크를 모두 끈 상대도 감지된다 */
+    partnerConnected: boolean
     muted: boolean
     cameraDisabled: boolean
     mutePending: boolean
@@ -35,6 +54,21 @@ export interface LiveKitSession {
     retry: () => void
 }
 
+/**
+ * 룸에 들어와 있는 **사람** 상대의 수.
+ *
+ * 룸에는 AI 분석 워커(`ai-session-{id}`)도 원격 참가자로 들어온다. 그냥
+ * `remoteParticipants.size` 를 쓰면 상대가 아직 안 왔는데도 "상대 입장"으로 보이고,
+ * 세션 화면이 빈 영상에 대고 "상대가 카메라를 껐어요" 를 띄운다.
+ */
+function humanPartnerCount(room: Room): number {
+  let count = 0
+  room.remoteParticipants.forEach((participant) => {
+    if (!isAiWorkerIdentity(participant.identity)) count += 1
+  })
+  return count
+}
+
 /** 권한 거부·장치 없음을 구분한다. 사용자에게 다른 안내를 해야 한다. */
 function isPermissionError(err: unknown): boolean {
     return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError')
@@ -52,6 +86,12 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
     const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false)
     const [error, setError] = useState<Error | null>(null)
     const [mediaDenied, setMediaDenied] = useState(false)
+    const [localParticipantSid, setLocalParticipantSid] = useState<string | null>(null)
+    const [localParticipantIdentity, setLocalParticipantIdentity] = useState<string | null>(null)
+    // 연결이 끝난 뒤에만 노출한다 — 연결 전 Room 을 밖으로 넘기면 소비자가
+    // 아직 존재하지 않는 localParticipant 로 publishData 를 시도하게 된다.
+    const [connectedRoom, setConnectedRoom] = useState<Room | null>(null)
+    const [partnerConnected, setPartnerConnected] = useState(false)
     // 값이 바뀌면 effect 가 다시 돌아 입장을 재시도한다.
     const [retryNonce, setRetryNonce] = useState(0)
 
@@ -102,9 +142,17 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
             })
             .on(RoomEvent.TrackSubscribed, onTrackSubscribed)
             .on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
-            .on(RoomEvent.ParticipantDisconnected, () => {
+            .on(RoomEvent.ParticipantConnected, (participant) => {
+                // 상대 입장. 카메라·마이크를 모두 끄고 들어와도 여기서 잡힌다
+                // (트랙 유무로 판정하면 그 경우를 놓친다).
+                // AI 분석 워커도 같은 이벤트로 들어오므로 사람만 센다.
+                if (cancelled || isAiWorkerIdentity(participant.identity)) return
+                setPartnerConnected(true)
+            })
+            .on(RoomEvent.ParticipantDisconnected, (participant) => {
                 // 상대 이탈 — 연결 끊김(내 네트워크 문제)과 구분해서 트랙만 비운다
-                if (cancelled) return
+                if (cancelled || isAiWorkerIdentity(participant.identity)) return
+                setPartnerConnected(humanPartnerCount(room) > 0)
                 setRemoteVideo(null)
                 setRemoteAudio(null)
             })
@@ -188,6 +236,12 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
                 await room.connect(serverUrl, token)
                 if (cancelled) return
 
+                // SID 는 연결 후에야 정해진다. 서버 STOMP 명령이 이 값을 요구한다.
+                setLocalParticipantSid(room.localParticipant.sid || null)
+                setLocalParticipantIdentity(room.localParticipant.identity || null)
+                setConnectedRoom(room)
+                setPartnerConnected(humanPartnerCount(room) > 0)
+
                 // 게이트를 통과했어도 이 사이에 권한이 바뀌었을 수 있다. 실패하면 입장을 취소한다.
                 try {
                     await room.localParticipant.setMicrophoneEnabled(true)
@@ -212,6 +266,10 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
         return () => {
             cancelled = true
             roomRef.current = null
+            setLocalParticipantSid(null)
+            setLocalParticipantIdentity(null)
+            setConnectedRoom(null)
+            setPartnerConnected(false)
             permissionWatchers.forEach((s) => (s.onchange = null))
             room.removeAllListeners()
             // 로컬 트랙 정지(카메라 표시등 OFF)까지 여기서 완료
@@ -259,9 +317,13 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
 
     return {
         state,
+        room: connectedRoom,
         localVideo,
         remoteVideo,
         remoteAudio,
+        localParticipantSid,
+        localParticipantIdentity,
+        partnerConnected,
         muted,
         cameraDisabled,
         mutePending,

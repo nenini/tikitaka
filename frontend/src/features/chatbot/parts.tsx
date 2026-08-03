@@ -199,7 +199,8 @@ export function Composer({ value, onChange, onSend, busy, disabled }: ComposerPr
 /* ── 메시지별 피드백 · 대체 문장 ───────────────────────── */
 
 export interface FeedbackModalProps {
-  chatSessionId: string
+  /** 백엔드 sessionId (Long) */
+  chatSessionId: number
   /** 열려 있는 대상 메시지(내 메시지). null 이면 닫힘 */
   message: ChatMessage | null
   onClose: () => void

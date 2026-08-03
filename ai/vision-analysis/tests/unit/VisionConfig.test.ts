@@ -8,16 +8,24 @@ describe("visionConfigSchema", () => {
     expect(visionConfigSchema.parse(defaultVisionConfig)).toEqual(
       defaultVisionConfig,
     );
-    expect(defaultVisionConfig.schemaVersion).toBe(2);
+    expect(defaultVisionConfig.schemaVersion).toBe(3);
   });
 
   it("rejects the previous configuration schema version", () => {
     expect(() =>
       visionConfigSchema.parse({
         ...defaultVisionConfig,
-        schemaVersion: 1,
+        schemaVersion: 2,
       }),
     ).toThrow();
+  });
+
+  it("enables two-hand tracking with a separate model by default", () => {
+    expect(defaultVisionConfig.handModel.enabled).toBe(true);
+    expect(defaultVisionConfig.handModel.numHands).toBe(2);
+    expect(defaultVisionConfig.handModel.modelAssetPath).toBe(
+      "/models/hand_landmarker.task",
+    );
   });
 
   it("requires FaceQualityDetector in every performance profile", () => {
@@ -36,6 +44,20 @@ describe("visionConfigSchema", () => {
 
     expect(() => visionConfigSchema.parse(invalidConfig)).toThrow(
       /recovery threshold/,
+    );
+  });
+
+  it("keeps attention recovery above the away threshold", () => {
+    expect(defaultVisionConfig.screenAttention.attentionAwayScore).toBe(75);
+    expect(defaultVisionConfig.screenAttention.attentionRecoveryScore).toBe(80);
+    expect(defaultVisionConfig.screenAttention.awayMinimumDurationMs).toBe(1_000);
+    expect(defaultVisionConfig.screenAttention.prolongedDurationMs).toBe(3_000);
+
+    const invalidConfig = structuredClone(defaultVisionConfig);
+    invalidConfig.screenAttention.attentionRecoveryScore =
+      invalidConfig.screenAttention.attentionAwayScore;
+    expect(() => visionConfigSchema.parse(invalidConfig)).toThrow(
+      /recovery score must exceed/,
     );
   });
 

@@ -7,10 +7,21 @@ import com.date.backend.domain.face.dto.request.FaceAnalysisResultSubmitRequest;
 import com.date.backend.domain.face.dto.request.FaceAnalysisResultTagRequest;
 import com.date.backend.domain.face.dto.response.FaceAnalysisRequestResponse;
 import com.date.backend.domain.face.repository.UserFaceTagRepository;
+import com.date.backend.domain.match.domain.MatchPair;
+import com.date.backend.domain.match.domain.MatchRequest;
+import com.date.backend.domain.match.repository.MatchPairRepository;
+import com.date.backend.domain.match.repository.MatchRequestRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.domain.Gender;
 import com.date.backend.domain.profile.dto.request.ProfileCreateRequest;
 import com.date.backend.domain.profile.repository.ProfileRepository;
+import com.date.backend.domain.room.application.WaitingRoomProvisioningService;
+import com.date.backend.domain.room.domain.RoomParticipant;
+import com.date.backend.domain.room.domain.RoomSessionStatus;
+import com.date.backend.domain.room.domain.SessionTerminationReason;
+import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.repository.RoomParticipantRepository;
+import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.domain.survey.application.SurveyService;
 import com.date.backend.domain.survey.domain.FaceTagCatalog;
 import com.date.backend.domain.survey.domain.PracticeGoalCatalog;
@@ -28,6 +39,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -35,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -98,6 +111,12 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 	private final TraitCatalogRepository traitCatalogRepository;
 	private final PracticeGoalCatalogRepository practiceGoalCatalogRepository;
 	private final SurveyService surveyService;
+	private final MatchRequestRepository matchRequestRepository;
+	private final MatchPairRepository matchPairRepository;
+	private final WaitingRoomRepository waitingRoomRepository;
+	private final RoomParticipantRepository roomParticipantRepository;
+	private final WaitingRoomProvisioningService waitingRoomProvisioningService;
+	private final boolean resultTestSessionEnabled;
 
 	public LocalMatchTestDataInitializer(
 			UserRepository userRepository,
@@ -111,7 +130,14 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 			FaceTagCatalogRepository faceTagCatalogRepository,
 			TraitCatalogRepository traitCatalogRepository,
 			PracticeGoalCatalogRepository practiceGoalCatalogRepository,
-			SurveyService surveyService
+			SurveyService surveyService,
+			MatchRequestRepository matchRequestRepository,
+			MatchPairRepository matchPairRepository,
+			WaitingRoomRepository waitingRoomRepository,
+			RoomParticipantRepository roomParticipantRepository,
+			WaitingRoomProvisioningService waitingRoomProvisioningService,
+			@Value("${app.local-seed.result-test-session-enabled:true}")
+			boolean resultTestSessionEnabled
 	) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
@@ -125,6 +151,12 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 		this.traitCatalogRepository = traitCatalogRepository;
 		this.practiceGoalCatalogRepository = practiceGoalCatalogRepository;
 		this.surveyService = surveyService;
+		this.matchRequestRepository = matchRequestRepository;
+		this.matchPairRepository = matchPairRepository;
+		this.waitingRoomRepository = waitingRoomRepository;
+		this.roomParticipantRepository = roomParticipantRepository;
+		this.waitingRoomProvisioningService = waitingRoomProvisioningService;
+		this.resultTestSessionEnabled = resultTestSessionEnabled;
 	}
 
 	@Override
@@ -133,9 +165,142 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 		for (SeedUser seed : SEED_USERS) {
 			seed(seed);
 		}
+		if (resultTestSessionEnabled) {
+			seedCompletedResultTestSession();
+		}
 		log.info(
 				"Local match test users are ready. emails={}",
 				SEED_USERS.stream().map(SeedUser::email).toList()
+		);
+	}
+
+	private void seedCompletedResultTestSession() {
+		User woman = userRepository.findByEmail(SEED_USERS.get(0).email())
+				.orElseThrow();
+		User man = userRepository.findByEmail(SEED_USERS.get(1).email())
+				.orElseThrow();
+		WaitingRoom existingSession = findCompletedSession(
+				woman.getId(),
+				man.getId()
+		);
+		if (existingSession != null) {
+			logResultTestSession(existingSession, woman, man);
+			return;
+		}
+
+		Map<String, FaceTagCatalog> faceTags = faceTagCatalogRepository
+				.findAllByActiveTrueOrderByDisplayOrderAsc()
+				.stream()
+				.collect(Collectors.toMap(FaceTagCatalog::getCode, Function.identity()));
+		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime matchedAt = now.minusHours(2);
+		LocalDateTime acceptDeadlineAt = now.minusMinutes(90);
+		LocalDateTime confirmedAt = now.minusMinutes(100);
+		LocalDateTime scheduledAt = now.minusMinutes(60);
+		LocalDateTime startedAt = now.minusMinutes(40);
+		LocalDateTime endedAt = now.minusMinutes(10);
+
+		MatchRequest womanRequest = matchRequestRepository.saveAndFlush(
+				new MatchRequest(
+						woman.getId(),
+						(short) 24,
+						(short) 28,
+						require(faceTags, "DINOSAUR"),
+						require(faceTags, "DOG"),
+						matchedAt
+				)
+		);
+		MatchRequest manRequest = matchRequestRepository.saveAndFlush(
+				new MatchRequest(
+						man.getId(),
+						(short) 25,
+						(short) 30,
+						require(faceTags, "DOG"),
+						require(faceTags, "DINOSAUR"),
+						matchedAt
+				)
+		);
+		womanRequest.markMatchFound(matchedAt);
+		manRequest.markMatchFound(matchedAt);
+
+		MatchPair pair = new MatchPair(
+				womanRequest,
+				manRequest,
+				new BigDecimal("50.000"),
+				new BigDecimal("50.000"),
+				acceptDeadlineAt,
+				scheduledAt,
+				matchedAt
+		);
+		pair.confirm(confirmedAt);
+		womanRequest.confirm();
+		manRequest.confirm();
+		pair = matchPairRepository.saveAndFlush(pair);
+
+		waitingRoomProvisioningService.provision(pair);
+		WaitingRoom session = waitingRoomRepository.findByMatchPair_Id(pair.getId())
+				.orElseThrow();
+		List<RoomParticipant> participants =
+				roomParticipantRepository.findAllByRoom_IdOrderByUserIdAsc(
+						session.getId()
+				);
+		participants.forEach(participant -> {
+			participant.recordJoin(startedAt.minusMinutes(1));
+			participant.markReady();
+		});
+		session.markWaiting();
+		session.markReady();
+		session.start(startedAt);
+		session.complete(
+				endedAt,
+				SessionTerminationReason.TIME_EXPIRED,
+				null
+		);
+		pair.complete(endedAt);
+		womanRequest.complete(endedAt);
+		manRequest.complete(endedAt);
+		waitingRoomRepository.saveAndFlush(session);
+
+		logResultTestSession(session, woman, man);
+	}
+
+	private WaitingRoom findCompletedSession(Long firstUserId, Long secondUserId) {
+		return matchPairRepository.findAll().stream()
+				.filter(pair -> isSamePair(pair, firstUserId, secondUserId))
+				.map(pair -> waitingRoomRepository.findByMatchPair_Id(pair.getId())
+						.orElse(null))
+				.filter(session -> session != null
+						&& session.getStatus() == RoomSessionStatus.COMPLETED)
+				.findFirst()
+				.orElse(null);
+	}
+
+	private boolean isSamePair(
+			MatchPair pair,
+			Long firstUserId,
+			Long secondUserId
+	) {
+		return pair.getUserAId().equals(firstUserId)
+				&& pair.getUserBId().equals(secondUserId)
+				|| pair.getUserAId().equals(secondUserId)
+				&& pair.getUserBId().equals(firstUserId);
+	}
+
+	private void logResultTestSession(
+			WaitingRoom session,
+			User woman,
+			User man
+	) {
+		log.info(
+				"Local RESULT test session is ready. sessionId={}, "
+						+ "status={}, users=[{}:{}, {}:{}], password={}",
+				session.getId(),
+				session.getStatus(),
+				woman.getId(),
+				SEED_USERS.get(0).email(),
+				man.getId(),
+				SEED_USERS.get(1).email(),
+				TEST_PASSWORD
 		);
 	}
 

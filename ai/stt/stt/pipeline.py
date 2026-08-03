@@ -46,9 +46,27 @@ _add_cuda_dll_dirs()
 import numpy as np  # noqa: E402
 from faster_whisper import WhisperModel  # noqa: E402
 
+import re  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
 
 SAMPLE_RATE = 16_000
+
+# 한국어 전사에 나올 수 없는 외국 문자(키릴·아랍·일본가나·한자) — 있으면 환각으로 드롭.
+_FOREIGN_SCRIPT = re.compile(r"[Ѐ-ӿ؀-ۿ぀-ヿ一-鿿]")
+
+# whisper가 "이건 음성이 아닌 것 같다"고 보는 확률의 상한. 초과하면 전사를 버린다.
+#
+# 실측 2026-07-30 (테스트 55건 = 발화 45 + 거부 10, float16·int8_float16 양쪽):
+#   진짜 발화 no_speech_prob  최대 0.212
+#   무음/노이즈 출력          최소 0.458
+#   → 임계 0.25~0.45 구간이 전부 동일(CER 불변, 환각 통과 0건). 중앙값 0.35 채택.
+# 기존 0.6은 환각 구간에 걸쳐 있어 float16에서 "시청해주셔서 감사합니다."가 새어나갔다
+# (int8에서는 우연히 막혔다 — 양자화에 따라 결과가 뒤집히던 것을 이 값으로 없앤다).
+#
+# ⚠️ 2026-07-31 라이브 마이크 실사용: 0.35는 오프라인 55건에 과적합 — 실제 마이크는
+# 진짜 발화의 no_speech_prob이 0.35~0.6에도 자주 들어와서 발화가 통째로 드롭됐다
+# (SPEECH_STARTED/ENDED만 뜨고 전사 안 뜸). 환경별 튜닝 필요. 현재 0.5 (실험서 0.6과 동일, 환각 컷만 소폭 강화, #39).
+NO_SPEECH_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
@@ -91,6 +109,7 @@ class SttEngine:
         base_ms: int = 0,
         vad_filter: bool = False,
         min_confidence: float = 0.5,
+        no_speech_threshold: float = NO_SPEECH_THRESHOLD,
     ) -> list[TranscriptPiece]:
         """오디오 청크(float32 mono 16kHz) → 전사 조각 리스트.
 
@@ -103,9 +122,12 @@ class SttEngine:
             beam_size=5,
             vad_filter=vad_filter,  # 무음 구간 스킵 (기본 False: 상위에서 이미 VAD 게이팅)
             vad_parameters=dict(min_silence_duration_ms=500),
-            no_speech_threshold=0.6,
+            no_speech_threshold=no_speech_threshold,
             log_prob_threshold=-1.0,
             condition_on_previous_text=False,  # 청크 간 환각 전파 방지
+            # 반복은 후처리(collapse+반복억제)로 잡는다. 디코딩 강제(no_repeat_ngram/penalty)는
+            # 정확도를 깎아서 제거함. compression_ratio는 기본값(2.4)만 유지 = 반복 세그먼트 드롭.
+            compression_ratio_threshold=2.4,
         )
 
         pieces: list[TranscriptPiece] = []
@@ -113,8 +135,10 @@ class SttEngine:
             text = seg.text.strip()
             if not text:
                 continue
+            if _FOREIGN_SCRIPT.search(text):
+                continue  # 한국어에 없는 외국 문자(키릴/한자 등) = 환각 드롭
             # 무음 확률이 높거나(환각 의심) 신뢰도가 낮으면 버린다
-            if getattr(seg, "no_speech_prob", 0.0) > 0.6:
+            if getattr(seg, "no_speech_prob", 0.0) > no_speech_threshold:
                 continue
             confidence = round(min(max(math.exp(seg.avg_logprob), 0.0), 1.0), 2)
             if confidence < min_confidence:

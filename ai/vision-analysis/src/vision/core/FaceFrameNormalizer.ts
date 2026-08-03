@@ -4,12 +4,15 @@ import type {
   LandmarkerFaceResult,
   LandmarkerFrameResult,
 } from "./LandmarkerFrameResult.js";
+import { normalizeHands } from "./HandFrameNormalizer.js";
+import type { HandLandmarkerFrameResult } from "./HandLandmarkerFrameResult.js";
 import type {
   NormalizedFaceBox,
   NormalizedFaceFrame,
   NormalizedFaceGeometry,
   NormalizedEyeGaze,
   NormalizedEyePosition,
+  NormalizedRegion,
   PerformanceProfile,
 } from "./NormalizedFaceFrame.js";
 
@@ -18,6 +21,12 @@ const UPPER_LIP_CENTER_INDEX = 13;
 const CHIN_INDEX = 152;
 const MOUTH_CORNER_LEFT_INDEX = 61;
 const MOUTH_CORNER_RIGHT_INDEX = 291;
+// Lip contour points used only to derive a browser-local mouth region.
+const MOUTH_REGION_INDICES = [
+  0, 13, 14, 17, 37, 39, 40, 61, 78, 81, 82, 84, 87, 88, 91, 95, 146,
+  178, 181, 185, 191, 267, 269, 270, 291, 308, 311, 312, 314, 317, 318,
+  321, 324, 375, 402, 405, 409, 415,
+] as const;
 const REQUIRED_BLENDSHAPES = [
   "mouthSmileLeft",
   "mouthSmileRight",
@@ -57,6 +66,8 @@ export interface FaceFrameNormalizationInput {
   readonly actualFps: number;
   readonly performanceProfile: PerformanceProfile;
   readonly landmarkerResult: LandmarkerFrameResult;
+  /** Undefined only when hand analysis is explicitly disabled. */
+  readonly handLandmarkerResult?: HandLandmarkerFrameResult;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -221,6 +232,36 @@ export function computeFaceBox(
   };
 }
 
+/**
+ * Builds a padded mouth ROI from lip landmarks. The padding absorbs small
+ * landmark jitter and covers the immediate area a hand would physically hide.
+ */
+export function computeMouthRegion(
+  landmarks: readonly FaceLandmarkPoint[],
+): NormalizedRegion | null {
+  const points = MOUTH_REGION_INDICES.map((index) => landmarks[index]);
+  if (points.some((point) => point === undefined)) return null;
+  const defined = points.filter(
+    (point): point is FaceLandmarkPoint => point !== undefined,
+  );
+  const left = Math.min(...defined.map((point) => point.x));
+  const right = Math.max(...defined.map((point) => point.x));
+  const top = Math.min(...defined.map((point) => point.y));
+  const bottom = Math.max(...defined.map((point) => point.y));
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= Number.EPSILON || height <= Number.EPSILON) return null;
+
+  const horizontalPadding = width * 0.25;
+  const verticalPadding = height * 0.35;
+  return {
+    left: clamp(left - horizontalPadding, 0, 1),
+    top: clamp(top - verticalPadding, 0, 1),
+    right: clamp(right + horizontalPadding, 0, 1),
+    bottom: clamp(bottom + verticalPadding, 0, 1),
+  };
+}
+
 export function selectPrimaryFaceBox(
   result: LandmarkerFrameResult,
 ): NormalizedFaceBox | null {
@@ -319,6 +360,7 @@ export class FaceFrameNormalizer {
         upperLip === undefined || rightCorner === undefined
           ? null
           : (upperLip.y - rightCorner.y) / faceHeight,
+      mouthRegion: computeMouthRegion(landmarks),
       noseToChinVerticalRatio:
         nose === undefined || chin === undefined
           ? null
@@ -411,6 +453,12 @@ export class FaceFrameNormalizer {
     faceCount: number,
     primaryFace: NormalizedFaceFrame["primaryFace"],
   ): NormalizedFaceFrame {
+    const hands =
+      input.handLandmarkerResult === undefined
+        ? []
+        : normalizeHands(input.handLandmarkerResult);
+    const handLandmarkerDurationMs =
+      input.handLandmarkerResult?.inferenceDurationMs ?? 0;
     return {
       schemaVersion: 1,
       frameId: input.frameId,
@@ -425,6 +473,9 @@ export class FaceFrameNormalizer {
       faceDetected: faceCount > 0,
       faceCount,
       primaryFace,
+      handDetected: hands.length > 0,
+      handCount: hands.length,
+      hands,
       imageQuality: {
         brightnessScore: input.brightnessScore,
         backlightScore: input.backlightScore ?? 1,
@@ -432,7 +483,12 @@ export class FaceFrameNormalizer {
         rawLaplacianVariance: input.rawLaplacianVariance,
       },
       processing: {
-        landmarkerDurationMs: input.landmarkerResult.inferenceDurationMs,
+        landmarkerDurationMs:
+          input.landmarkerResult.inferenceDurationMs +
+          handLandmarkerDurationMs,
+        faceLandmarkerDurationMs:
+          input.landmarkerResult.inferenceDurationMs,
+        handLandmarkerDurationMs,
         totalDurationMs: input.totalDurationMs,
         targetFps: input.targetFps,
         actualFps: input.actualFps,
