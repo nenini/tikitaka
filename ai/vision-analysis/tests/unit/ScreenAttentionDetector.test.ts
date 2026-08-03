@@ -140,6 +140,78 @@ describe("ScreenAttentionDetector", () => {
     expect(detector.getState().eyeGazeScore).toBe(0);
   });
 
+  it("removes iris weight when the two eyes disagree", () => {
+    const detector = new ScreenAttentionDetector(
+      { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+      createDetectorEventFactory(),
+    );
+    const context = { quality, baseline, performanceProfile: "HIGH" as const };
+    detector.update(
+      createNormalizedFaceFrame({
+        yaw: 16,
+        eyeGaze: {
+          left: { horizontalRatio: 0.8, verticalRatio: 0.5 },
+          right: { horizontalRatio: 0.2, verticalRatio: 0.5 },
+          horizontalRatio: 0.5,
+          verticalRatio: 0.5,
+          binocularAgreementScore: 0.4,
+        },
+        blendshapes: { eyeBlinkLeft: 0, eyeBlinkRight: 0 },
+      }),
+      context,
+    );
+
+    const state = detector.getState();
+    expect(state.binocularAgreement).toBe(0);
+    expect(state.irisProxyScore).toBe(1);
+    expect(state.effectiveIrisWeight).toBe(0);
+    expect(state.attentionMode).toBe("HEAD_CENTER_ONLY");
+    expect(state.screenAttentionScore).toBeCloseTo(
+      100 *
+        (defaultVisionConfig.screenAttention.headOnlyWeight *
+          (state.headPoseScore ?? 0) +
+          defaultVisionConfig.screenAttention.centerOnlyWeight *
+            (state.faceCenterScore ?? 0)),
+    );
+  });
+
+  it("scales iris weight by reliability and applies one monocular penalty", () => {
+    const binocular = new ScreenAttentionDetector(
+      { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+      createDetectorEventFactory(),
+    );
+    const context = { quality, baseline, performanceProfile: "HIGH" as const };
+    binocular.update(
+      createNormalizedFaceFrame({
+        eyeGaze: {
+          left: { horizontalRatio: 0.65, verticalRatio: 0.5 },
+          right: { horizontalRatio: 0.65, verticalRatio: 0.5 },
+          horizontalRatio: 0.65,
+          verticalRatio: 0.5,
+          binocularAgreementScore: 1,
+        },
+        blendshapes: { eyeBlinkLeft: 0, eyeBlinkRight: 0 },
+      }),
+      context,
+    );
+    expect(binocular.getState().gazeReliability).toBeCloseTo(0.9);
+    expect(binocular.getState().effectiveIrisWeight).toBeCloseTo(
+      defaultVisionConfig.screenAttention.irisWeight * 0.9,
+    );
+
+    const monocular = new ScreenAttentionDetector(
+      { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+      createDetectorEventFactory(),
+    );
+    monocular.update(
+      createNormalizedFaceFrame({
+        blendshapes: { eyeBlinkLeft: 0.9, eyeBlinkRight: 0 },
+      }),
+      context,
+    );
+    expect(monocular.getState().gazeReliability).toBeCloseTo(0.9 * 0.85);
+  });
+
   it("does not treat a blink as gaze departure", () => {
     const detector = new ScreenAttentionDetector(
       { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },

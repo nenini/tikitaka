@@ -66,6 +66,8 @@ export interface ScreenAttentionDetectorState {
   readonly leftEyeReliability: number;
   readonly rightEyeReliability: number;
   readonly gazeReliability: number;
+  /** Reliability-adjusted iris contribution used by the aggregate score. */
+  readonly effectiveIrisWeight: number;
   readonly binocularAgreement: number | null;
   readonly gazeMode: GazeMode;
   readonly headPoseScore: number | null;
@@ -301,7 +303,7 @@ export class ScreenAttentionDetector
     const gazeReliability =
       gazeMode === "BINOCULAR"
         ? Math.min(leftEyeReliability, rightEyeReliability)
-        : Math.max(leftEyeReliability, rightEyeReliability) * 0.85;
+        : Math.max(leftEyeReliability, rightEyeReliability);
     const horizontalDeltas = [
       leftHorizontalDelta,
       rightHorizontalDelta,
@@ -376,9 +378,26 @@ export class ScreenAttentionDetector
               this.config.gazeVerticalRecoveryDelta,
               this.config.gazeVerticalEntryDelta,
             );
+    // Two disagreeing eyes must not cancel each other into a false centered
+    // average. In that case the raw iris diagnostic remains visible, but it
+    // contributes no weight to the aggregate attention score.
+    const binocularReliable =
+      gazeMode !== "BINOCULAR" ||
+      (binocularAgreement ?? 0) >=
+        this.config.minimumBinocularAgreementScore;
+    const irisFusionReliability =
+      irisProxyScore === null || !binocularReliable
+        ? 0
+        : clamp01(gazeReliability);
+    const effectiveIrisWeight =
+      fallback || headPoseScore === null
+        ? 0
+        : this.config.irisWeight * irisFusionReliability;
     const attentionMode: AttentionMode = fallback
       ? "GLOBAL_POSE_ONLY"
-      : gazeMode === "BINOCULAR"
+      : irisFusionReliability <= 0 && headPoseScore !== null
+        ? "HEAD_CENTER_ONLY"
+        : gazeMode === "BINOCULAR"
         ? "BINOCULAR"
         : gazeMode === "MONOCULAR_LEFT" ||
             gazeMode === "MONOCULAR_RIGHT"
@@ -390,7 +409,7 @@ export class ScreenAttentionDetector
       ? headPoseScore === null
         ? null
         : 100 * headPoseScore
-      : irisProxyScore === null
+      : irisProxyScore === null || irisFusionReliability <= 0
         ? headPoseScore === null
           ? null
           : 100 *
@@ -398,10 +417,23 @@ export class ScreenAttentionDetector
               this.config.centerOnlyWeight * faceCenterScore)
         : headPoseScore === null
           ? 100 * irisProxyScore
-          : 100 *
-            (this.config.headWeight * headPoseScore +
-              this.config.faceCenterWeight * faceCenterScore +
-              this.config.irisWeight * irisProxyScore);
+          : (() => {
+              const poseAndCenterWeight =
+                this.config.headWeight + this.config.faceCenterWeight;
+              const remainingWeight = 1 - effectiveIrisWeight;
+              const effectiveHeadWeight =
+                remainingWeight *
+                (this.config.headWeight / poseAndCenterWeight);
+              const effectiveCenterWeight =
+                remainingWeight *
+                (this.config.faceCenterWeight / poseAndCenterWeight);
+              return (
+                100 *
+                (effectiveHeadWeight * headPoseScore +
+                  effectiveCenterWeight * faceCenterScore +
+                  effectiveIrisWeight * irisProxyScore)
+              );
+            })();
 
     const modeCap: Record<AttentionMode, number> = {
       BINOCULAR: 0.95,
@@ -414,7 +446,7 @@ export class ScreenAttentionDetector
       context.quality.confidence,
       face.yaw === null || face.pitch === null ? null : 0.9,
       0.85,
-      irisProxyScore === null ? null : gazeReliability,
+      irisFusionReliability <= 0 ? null : irisFusionReliability,
       fallback
         ? 0
         : Math.max(
@@ -441,6 +473,7 @@ export class ScreenAttentionDetector
     const headDeparture =
       (headPoseScore ?? 1) <= this.config.meaningfulDepartureScore;
     const irisDeparture =
+      irisFusionReliability > 0 &&
       (irisProxyScore ?? 1) <= this.config.meaningfulDepartureScore;
     const headDirectionSign = Math.sign(yaw ?? 0) as -1 | 0 | 1;
     const irisDirectionSign = Math.sign(gazeHorizontal ?? 0) as -1 | 0 | 1;
@@ -489,6 +522,7 @@ export class ScreenAttentionDetector
         leftEyeReliability,
         rightEyeReliability,
         gazeReliability,
+        effectiveIrisWeight,
         binocularAgreement,
         gazeMode,
         headPoseScore,
@@ -722,6 +756,7 @@ export class ScreenAttentionDetector
       leftEyeReliability,
       rightEyeReliability,
       gazeReliability,
+      effectiveIrisWeight,
       binocularAgreement,
       gazeMode,
       headPoseScore,
@@ -877,6 +912,7 @@ export class ScreenAttentionDetector
     leftEyeReliability: number;
     rightEyeReliability: number;
     gazeReliability: number;
+    effectiveIrisWeight: number;
     binocularAgreement: number | null;
     gazeMode: GazeMode;
     headPoseScore: number | null;
@@ -908,6 +944,7 @@ export class ScreenAttentionDetector
       leftEyeReliability: values.leftEyeReliability,
       rightEyeReliability: values.rightEyeReliability,
       gazeReliability: values.gazeReliability,
+      effectiveIrisWeight: values.effectiveIrisWeight,
       binocularAgreement: values.binocularAgreement,
       gazeMode: values.gazeMode,
       headPoseScore: values.headPoseScore,
@@ -953,6 +990,7 @@ export class ScreenAttentionDetector
       leftEyeReliability: 0,
       rightEyeReliability: 0,
       gazeReliability: 0,
+      effectiveIrisWeight: 0,
       binocularAgreement: null,
       gazeMode: "UNAVAILABLE",
       headPoseScore: null,

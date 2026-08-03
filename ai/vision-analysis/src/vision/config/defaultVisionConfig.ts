@@ -4,7 +4,7 @@ import {
 } from "./VisionConfig.js";
 
 export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
-  schemaVersion: 2,
+  schemaVersion: 3,
   model: {
     wasmBasePath: "/mediapipe/wasm",
     modelAssetPath: "/models/face_landmarker.task",
@@ -16,6 +16,16 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     minTrackingConfidence: 0.5,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
+    preferredDelegate: "GPU",
+  },
+  handModel: {
+    enabled: true,
+    modelAssetPath: "/models/hand_landmarker.task",
+    modelVersion: "mediapipe-hand-landmarker",
+    numHands: 2,
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
     preferredDelegate: "GPU",
   },
   frame: {
@@ -188,13 +198,17 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     minimumBinocularAgreementScore: 0.65,
     binocularHorizontalTolerance: 0.12,
     binocularVerticalTolerance: 0.15,
-    headWeight: 0.45,
+    // Screen attention prioritizes where the eyes are looking. Large head
+    // turns remain available separately for posture coaching.
+    headWeight: 0.35,
     faceCenterWeight: 0.15,
-    irisWeight: 0.4,
+    irisWeight: 0.5,
     headOnlyWeight: 0.75,
     centerOnlyWeight: 0.25,
-    attentionAwayScore: 40,
-    attentionRecoveryScore: 65,
+    attentionAwayScore: 75,
+    // Recovery must be higher than entry to avoid repeatedly opening and
+    // closing an episode around the same score.
+    attentionRecoveryScore: 80,
     meaningfulDepartureScore: 0.6,
     minimumEventConfidence: 0.65,
     coachingMinimumConfidence: 0.75,
@@ -211,9 +225,9 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     fallbackPitchDegrees: 30,
     fallbackMinimumDurationMs: 2_000,
     fallbackMinimumMeasurementConfidence: 0.7,
-    awayMinimumDurationMs: 1_500,
+    awayMinimumDurationMs: 1_000,
     recoveryMinimumDurationMs: 500,
-    prolongedDurationMs: 5_000,
+    prolongedDurationMs: 3_000,
     cooldownMs: 2_000,
     emaAlpha: 0.35,
   },
