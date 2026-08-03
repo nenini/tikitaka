@@ -3,6 +3,7 @@ package com.date.backend.domain.match.application;
 import com.date.backend.domain.face.domain.UserFaceTag;
 import com.date.backend.domain.face.repository.UserFaceTagRepository;
 import com.date.backend.domain.match.domain.ActiveMatchRequest;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.match.domain.MatchRequest;
 import com.date.backend.domain.match.domain.MatchRequestSlot;
 import com.date.backend.domain.match.domain.MatchRequestStatus;
@@ -57,6 +58,7 @@ public class MatchRequestService {
 	private final MatchRequestSlotRepository matchRequestSlotRepository;
 	private final MatchRequestTraitSnapshotRepository traitSnapshotRepository;
 	private final MatchJobEnqueueService jobEnqueueService;
+	private final UserRestrictionPolicy restrictionPolicy;
 
 	public MatchRequestService(
 			UserRepository userRepository,
@@ -69,7 +71,8 @@ public class MatchRequestService {
 			ActiveMatchRequestRepository activeMatchRequestRepository,
 			MatchRequestSlotRepository matchRequestSlotRepository,
 			MatchRequestTraitSnapshotRepository traitSnapshotRepository,
-			MatchJobEnqueueService jobEnqueueService
+			MatchJobEnqueueService jobEnqueueService,
+			UserRestrictionPolicy restrictionPolicy
 	) {
 		this.userRepository = userRepository;
 		this.profileRepository = profileRepository;
@@ -82,11 +85,13 @@ public class MatchRequestService {
 		this.matchRequestSlotRepository = matchRequestSlotRepository;
 		this.traitSnapshotRepository = traitSnapshotRepository;
 		this.jobEnqueueService = jobEnqueueService;
+		this.restrictionPolicy = restrictionPolicy;
 	}
 
 	@Transactional
 	public MatchRequestResponse create(Long userId, MatchRequestSaveRequest request) {
 		validateActiveUser(userId);
+		restrictionPolicy.assertNotRestricted(userId);
 		validateRequest(request);
 		if (activeMatchRequestRepository.existsById(userId)) {
 			throw new BusinessException(MatchErrorCode.MATCH_REQUEST_ALREADY_ACTIVE);

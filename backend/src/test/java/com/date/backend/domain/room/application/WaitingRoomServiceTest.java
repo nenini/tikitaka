@@ -2,6 +2,7 @@ package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchStatus;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.room.config.RoomEntryProperties;
@@ -45,12 +46,14 @@ class WaitingRoomServiceTest {
 			Instant.parse("2026-07-28T09:55:00Z"),
 			ZoneId.of("Asia/Seoul")
 	);
+	private final UserRestrictionPolicy restrictionPolicy = mock(UserRestrictionPolicy.class);
 	private final WaitingRoomService service = new WaitingRoomService(
 			roomRepository,
 			participantRepository,
 			profileRepository,
 			new RoomEntryProperties(Duration.ofMinutes(10), Duration.ofMinutes(10)),
-			clock
+			clock,
+			restrictionPolicy
 	);
 
 	private WaitingRoom room;
@@ -131,7 +134,8 @@ class WaitingRoomServiceTest {
 				participantRepository,
 				profileRepository,
 				new RoomEntryProperties(Duration.ofMinutes(10), Duration.ofMinutes(10)),
-				earlyClock
+				earlyClock,
+				restrictionPolicy
 		);
 
 		var response = earlyService.getDetail(USER_A_ID, ROOM_ID);

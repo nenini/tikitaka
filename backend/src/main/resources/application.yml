@@ -112,6 +112,14 @@ ai:
     internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
     max-attempts: ${AI_SESSION_EVENT_MAX_ATTEMPTS:3}
     retry-delay: ${AI_SESSION_EVENT_RETRY_DELAY:1s}
+  transcript:
+    base-url: ${AI_TRANSCRIPT_BASE_URL:${AI_SESSION_BASE_URL:}}
+    path-template: ${AI_TRANSCRIPT_PATH_TEMPLATE:/api/v1/sessions/{sessionId}/transcript}
+    connect-timeout: ${AI_TRANSCRIPT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_TRANSCRIPT_REQUEST_TIMEOUT:15s}
+    internal-token: ${AI_TRANSCRIPT_INTERNAL_TOKEN:${AI_SESSION_INTERNAL_TOKEN:}}
+    max-attempts: ${AI_TRANSCRIPT_MAX_ATTEMPTS:5}
+    retry-delay: ${AI_TRANSCRIPT_RETRY_DELAY:2s}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
@@ -165,6 +173,13 @@ livekit:
   api-secret: ${LIVEKIT_API_SECRET:}
   empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
   max-participants: ${LIVEKIT_MAX_PARTICIPANTS:3}
+
+moderation:
+  no-show:
+    grace-period: ${NO_SHOW_GRACE_PERIOD:5m}
+    first-restriction: ${NO_SHOW_FIRST_RESTRICTION:1d}
+    second-restriction: ${NO_SHOW_SECOND_RESTRICTION:3d}
+    repeated-restriction: ${NO_SHOW_REPEATED_RESTRICTION:7d}
 
 notification:
   waiting-recommendation:

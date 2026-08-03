@@ -155,12 +155,17 @@ public class MatchCandidateService {
 						ACTIVE_MATCH_STATUSES
 				)
 		);
+		Set<Long> restrictedUserIds = constraintRepository.findRestrictedUserIds(
+				userIds,
+				evaluatedAt
+		);
 
 		User sourceUser = usersById.get(source.getUserId());
 		Profile sourceProfile = profilesByUserId.get(source.getUserId());
 		if (sourceUser == null
 				|| sourceProfile == null
-				|| usersWithActiveMatch.contains(source.getUserId())) {
+				|| usersWithActiveMatch.contains(source.getUserId())
+				|| restrictedUserIds.contains(source.getUserId())) {
 			return Optional.empty();
 		}
 
@@ -177,6 +182,7 @@ public class MatchCandidateService {
 				.filter(candidate -> !blockedCandidateIds.contains(candidate.getUserId()))
 				.filter(candidate -> !cooldownCandidateIds.contains(candidate.getUserId()))
 				.filter(candidate -> !usersWithActiveMatch.contains(candidate.getUserId()))
+				.filter(candidate -> !restrictedUserIds.contains(candidate.getUserId()))
 				.map(candidate -> toCandidate(
 						source,
 						sourceUser,

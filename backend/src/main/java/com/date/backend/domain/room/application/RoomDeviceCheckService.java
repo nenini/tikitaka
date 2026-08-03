@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.match.domain.MatchStatus;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.domain.RoomDeviceCheck;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
@@ -24,17 +25,20 @@ public class RoomDeviceCheckService {
 	private final RoomParticipantRepository participantRepository;
 	private final RoomDeviceCheckRepository deviceCheckRepository;
 	private final Clock clock;
+	private final UserRestrictionPolicy restrictionPolicy;
 
 	public RoomDeviceCheckService(
 			WaitingRoomRepository roomRepository,
 			RoomParticipantRepository participantRepository,
 			RoomDeviceCheckRepository deviceCheckRepository,
-			Clock clock
+			Clock clock,
+			UserRestrictionPolicy restrictionPolicy
 	) {
 		this.roomRepository = roomRepository;
 		this.participantRepository = participantRepository;
 		this.deviceCheckRepository = deviceCheckRepository;
 		this.clock = clock;
+		this.restrictionPolicy = restrictionPolicy;
 	}
 
 	@Transactional
@@ -43,6 +47,7 @@ public class RoomDeviceCheckService {
 			Long roomId,
 			RoomDeviceCheckRequest request
 	) {
+		restrictionPolicy.assertNotRestricted(userId);
 		WaitingRoom room = findAccessibleRoom(userId, roomId);
 		validateCheckable(room);
 		RoomDeviceCheck check = deviceCheckRepository.saveAndFlush(new RoomDeviceCheck(
@@ -58,6 +63,7 @@ public class RoomDeviceCheckService {
 	}
 
 	public RoomDeviceCheckResponse getLatest(Long userId, Long roomId) {
+		restrictionPolicy.assertNotRestricted(userId);
 		findAccessibleRoom(userId, roomId);
 		RoomDeviceCheck check = deviceCheckRepository
 				.findFirstByRoom_IdAndUserIdOrderByCheckedAtDescIdDesc(roomId, userId)

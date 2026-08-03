@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
@@ -39,6 +40,7 @@ public class SessionLifecycleService {
 	private final SessionMissionProvisioningService missionProvisioningService;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
+	private final UserRestrictionPolicy restrictionPolicy;
 
 	public SessionLifecycleService(
 			WaitingRoomRepository sessionRepository,
@@ -48,7 +50,8 @@ public class SessionLifecycleService {
 			LiveKitAiWorkerTokenIssuer aiWorkerTokenIssuer,
 			SessionMissionProvisioningService missionProvisioningService,
 			ApplicationEventPublisher eventPublisher,
-			Clock clock
+			Clock clock,
+			UserRestrictionPolicy restrictionPolicy
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
@@ -58,10 +61,12 @@ public class SessionLifecycleService {
 		this.missionProvisioningService = missionProvisioningService;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
+		this.restrictionPolicy = restrictionPolicy;
 	}
 
 	@Transactional
 	public SessionJoinResponse join(Long userId, Long sessionId) {
+		restrictionPolicy.assertNotRestricted(userId);
 		WaitingRoom session = findSessionForUpdate(sessionId);
 		RoomParticipant participant = findParticipantForUpdate(userId, sessionId);
 		LocalDateTime now = LocalDateTime.now(clock);

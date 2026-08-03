@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.config.RoomEntryProperties;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
@@ -47,6 +48,7 @@ class SessionLifecycleServiceTest {
 	private SessionMissionProvisioningService missionProvisioningService;
 	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
+	private UserRestrictionPolicy restrictionPolicy;
 	private WaitingRoom session;
 	private RoomParticipant participantA;
 	private RoomParticipant participantB;
@@ -60,6 +62,7 @@ class SessionLifecycleServiceTest {
 		missionProvisioningService =
 				mock(SessionMissionProvisioningService.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
+		restrictionPolicy = mock(UserRestrictionPolicy.class);
 		service = new SessionLifecycleService(
 				sessionRepository,
 				participantRepository,
@@ -74,7 +77,8 @@ class SessionLifecycleServiceTest {
 				Clock.fixed(
 						Instant.parse("2026-07-30T10:00:00Z"),
 						ZoneId.of("Asia/Seoul")
-				)
+				),
+				restrictionPolicy
 		);
 		session = mock(WaitingRoom.class);
 		participantA = mock(RoomParticipant.class);
