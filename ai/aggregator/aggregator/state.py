@@ -58,6 +58,7 @@ class VisionUserState:
     vision_available: bool = False
     low_smile_observed_ms: float = 0.0
     low_smile_episode: int = 0
+    hand_over_mouth_active: bool = False
 
     def apply_behavior(self, event: VisionBehaviorEvent) -> None:
         self.latest_behavior = event

@@ -2,6 +2,7 @@ import type {
   NormalizedEyeGaze,
   NormalizedFaceFrame,
 } from "../../src/vision/core/NormalizedFaceFrame.js";
+import type { NormalizedHand } from "../../src/vision/core/NormalizedHand.js";
 
 export interface NormalizedFrameOptions {
   readonly timestampMs?: number;
@@ -20,6 +21,7 @@ export interface NormalizedFrameOptions {
   readonly blendshapes?: Readonly<Record<string, number>>;
   readonly landmarkDisplacementScore?: number | null;
   readonly eyeGaze?: NormalizedEyeGaze;
+  readonly hands?: readonly NormalizedHand[];
 }
 
 export function createNormalizedFaceFrame(
@@ -92,9 +94,9 @@ export function createNormalizedFaceFrame(
           },
         }
       : null,
-    handDetected: false,
-    handCount: 0,
-    hands: [],
+    handDetected: (options.hands?.length ?? 0) > 0,
+    handCount: options.hands?.length ?? 0,
+    hands: options.hands ?? [],
     imageQuality: {
       brightnessScore: options.brightnessScore ?? 0.8,
       backlightScore: options.backlightScore ?? 1,

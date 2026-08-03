@@ -13,15 +13,15 @@ class MvpCoachingConfig:
     default_cooldown_ms: int = 60_000
     vision_setup_cooldown_ms: int = 120_000
     vision_setup_startup_grace_ms: int = 3_000
-    max_per_session: int = 20
-    max_per_user: int = 10
+    max_per_session: int = 50
+    max_per_user: int = 25
 
     response_prompt_delay_ms: int = 5_000
     reaction_prompt_delay_ms: int = 15_000
     low_smile_observed_ms: int = 20_000
     low_smile_cooldown_ms: int = 90_000
     low_smile_max_per_user: int = 2
-    low_smile_score_threshold: float = 0.20
+    low_smile_score_threshold: float = 0.15
     low_smile_min_confidence: float = 0.65
     attention_min_confidence: float = 0.75
     face_missing_guidance_ms: int = 5_000

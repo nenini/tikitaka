@@ -21,6 +21,15 @@ class SmileCoachingDetector:
     ) -> None:
         target = state.user(event.user_id)
         vision = target.vision
+        hand_over_mouth = event.payload.metrics.hand_over_mouth
+        if hand_over_mouth.active:
+            vision.low_smile_observed_ms = 0.0
+            if not vision.hand_over_mouth_active:
+                vision.low_smile_episode += 1
+            vision.hand_over_mouth_active = True
+            return
+        vision.hand_over_mouth_active = False
+
         smile = event.payload.metrics.smile
         configuration_score = smile.configuration_score
         active_detectors = event.payload.capabilities.active_detectors

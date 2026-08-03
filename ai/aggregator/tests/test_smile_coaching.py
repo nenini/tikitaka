@@ -20,7 +20,13 @@ _FIXTURE = (
 )
 
 
-def _metric(*, seq: int, ended_ms: int, score: float = 0.1) -> dict[str, object]:
+def _metric(
+    *,
+    seq: int,
+    ended_ms: int,
+    score: float = 0.1,
+    hand_over_mouth: bool = False,
+) -> dict[str, object]:
     with _FIXTURE.open(encoding="utf-8") as fixture_file:
         raw = json.load(fixture_file)
     assert isinstance(raw, dict)
@@ -38,6 +44,11 @@ def _metric(*, seq: int, ended_ms: int, score: float = 0.1) -> dict[str, object]
     }
     metrics = payload["metrics"]
     assert isinstance(metrics, dict)
+    mouth = metrics["handOverMouth"]
+    assert isinstance(mouth, dict)
+    mouth["active"] = hand_over_mouth
+    mouth["overlapRatio"] = 0.6 if hand_over_mouth else 0
+    mouth["confidence"] = 0.9 if hand_over_mouth else None
     smile = metrics["smile"]
     assert isinstance(smile, dict)
     smile["configurationScore"] = score
@@ -108,6 +119,42 @@ def test_detected_smile_resets_accumulated_time() -> None:
     assert (
         aggregator.state.user("user-a").vision.low_smile_observed_ms == 1_000
     )
+
+
+def test_hand_over_mouth_resets_timer_and_starts_new_episode() -> None:
+    aggregator, coaching = _aggregator()
+    aggregator.state.user("user-b").is_speaking = True
+
+    aggregator.push_vision_event(_metric(seq=126, ended_ms=1_000))
+    aggregator.push_vision_event(
+        _metric(seq=127, ended_ms=2_000, hand_over_mouth=True)
+    )
+    aggregator.push_vision_event(
+        _metric(seq=128, ended_ms=3_000, hand_over_mouth=True)
+    )
+
+    vision = aggregator.state.user("user-a").vision
+    assert vision.low_smile_observed_ms == 0
+    assert vision.low_smile_episode == 1
+    assert vision.hand_over_mouth_active is True
+    aggregator.tick(3_000)
+    assert coaching == []
+
+
+def test_default_low_smile_threshold_accepts_subtle_expression() -> None:
+    aggregator, coaching = _aggregator()
+    aggregator.state.user("user-b").is_speaking = True
+
+    aggregator.push_vision_event(
+        _metric(seq=126, ended_ms=1_000, score=0.15)
+    )
+    aggregator.push_vision_event(
+        _metric(seq=127, ended_ms=2_000, score=0.15)
+    )
+    aggregator.tick(2_000)
+
+    assert coaching == []
+    assert aggregator.state.user("user-a").vision.low_smile_observed_ms == 0
 
 
 def test_expression_guidance_obeys_cooldown_and_two_message_limit() -> None:

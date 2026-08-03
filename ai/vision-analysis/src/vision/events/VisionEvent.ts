@@ -196,6 +196,12 @@ export interface VisionMetricSnapshotPayload {
     readonly blurScore: number;
   };
   readonly metrics: {
+    /** Browser-local hand landmarks are reduced to this bounded mouth-occlusion state. */
+    readonly handOverMouth: {
+      readonly active: boolean;
+      readonly overlapRatio: number | null;
+      readonly confidence: number | null;
+    };
     readonly smile: {
       readonly configurationScore: number | null;
       readonly baselineScore: number | null;

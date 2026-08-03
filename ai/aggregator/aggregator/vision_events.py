@@ -425,6 +425,12 @@ class SmileMetric(_ContractModel):
     confidence: UnitScore
 
 
+class HandOverMouthMetric(_ContractModel):
+    active: StrictBool
+    overlap_ratio: UnitScore | None
+    confidence: UnitScore | None
+
+
 class AttentionMetric(_ContractModel):
     score: Annotated[float, Field(ge=0, le=100)] | None
     confidence: UnitScore
@@ -441,6 +447,7 @@ class ActivityMetric(_ContractModel):
 
 
 class VisionMetrics(_ContractModel):
+    hand_over_mouth: HandOverMouthMetric
     smile: SmileMetric
     attention: AttentionMetric
     activity: ActivityMetric
