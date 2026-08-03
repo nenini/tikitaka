@@ -21,6 +21,7 @@ export * from "./detectors/BehaviorStateMachine.js";
 export * from "./detectors/ExpressionActivityDetector.js";
 export * from "./detectors/ExpressionActivityScore.js";
 export * from "./detectors/FaceQualityDetector.js";
+export * from "./detectors/HandOverMouthDetector.js";
 export * from "./detectors/NodDetector.js";
 export * from "./detectors/ScreenAttentionDetector.js";
 export * from "./detectors/SmileExpressionDetector.js";

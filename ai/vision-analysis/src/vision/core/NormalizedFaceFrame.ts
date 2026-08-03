@@ -17,8 +17,21 @@ export interface NormalizedFaceBox {
 export interface NormalizedFaceGeometry {
   readonly mouthCornerLiftLeft: number | null;
   readonly mouthCornerLiftRight: number | null;
+  /**
+   * Browser-local mouth region used by occlusion rules. This derived box is
+   * not included in the public Vision event contract.
+   */
+  readonly mouthRegion: NormalizedRegion | null;
   readonly noseToChinVerticalRatio: number | null;
   readonly landmarkDisplacementScore: number | null;
+}
+
+/** Axis-aligned region in normalized, non-mirrored camera coordinates. */
+export interface NormalizedRegion {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
 }
 
 export interface NormalizedEyePosition {

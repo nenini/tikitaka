@@ -67,6 +67,12 @@ export function createNormalizedFaceFrame(
           geometry: {
             mouthCornerLiftLeft: 0,
             mouthCornerLiftRight: 0,
+            mouthRegion: {
+              left: 0.42,
+              top: 0.58,
+              right: 0.58,
+              bottom: 0.68,
+            },
             noseToChinVerticalRatio: 0.3,
             landmarkDisplacementScore:
               options.landmarkDisplacementScore ?? null,
