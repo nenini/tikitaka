@@ -74,6 +74,9 @@ public class WaitingRoom {
 	@Column(name = "timer_expired_notified_at")
 	private LocalDateTime timerExpiredNotifiedAt;
 
+	@Column(name = "evaluation_completion_notified_at")
+	private LocalDateTime evaluationCompletionNotifiedAt;
+
 	@Column(name = "createdAt", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
@@ -201,6 +204,20 @@ public class WaitingRoom {
 
 	public LocalDateTime getTimerExpiredNotifiedAt() {
 		return timerExpiredNotifiedAt;
+	}
+
+	public LocalDateTime getEvaluationCompletionNotifiedAt() {
+		return evaluationCompletionNotifiedAt;
+	}
+
+	public boolean claimEvaluationCompletion(LocalDateTime notifiedAt) {
+		Objects.requireNonNull(notifiedAt);
+		if (status != RoomSessionStatus.COMPLETED
+				|| evaluationCompletionNotifiedAt != null) {
+			return false;
+		}
+		evaluationCompletionNotifiedAt = notifiedAt;
+		return true;
 	}
 
 	public boolean claimEndingSoonNotification(LocalDateTime notifiedAt) {
