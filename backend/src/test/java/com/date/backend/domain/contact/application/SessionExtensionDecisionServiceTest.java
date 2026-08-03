@@ -6,12 +6,9 @@ import com.date.backend.domain.contact.domain.ContactExchangeRequest;
 import com.date.backend.domain.contact.event.SessionExtensionDecisionChangedEvent;
 import com.date.backend.domain.contact.repository.ContactExchangeRequestRepository;
 import com.date.backend.domain.match.domain.MatchPair;
-import com.date.backend.domain.room.application.SessionTerminationService;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
-import com.date.backend.domain.room.domain.SessionTerminationReason;
 import com.date.backend.domain.room.domain.WaitingRoom;
-import com.date.backend.domain.room.event.LiveKitRoomDeletionRequestedEvent;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -40,7 +37,7 @@ class SessionExtensionDecisionServiceTest {
 	private static final LocalDateTime STARTED_AT =
 			LocalDateTime.of(2026, 7, 31, 20, 0);
 	private static final Clock DECISION_WINDOW_CLOCK = Clock.fixed(
-			Instant.parse("2026-07-31T11:31:00Z"),
+			Instant.parse("2026-07-31T11:26:00Z"),
 			ZoneId.of("Asia/Seoul")
 	);
 
@@ -88,12 +85,8 @@ class SessionExtensionDecisionServiceTest {
 	void firstAgreementCreatesPendingDecisionWithoutEndingSession() {
 		when(decisionRepository.findBySession_Id(15L))
 				.thenReturn(Optional.empty());
-		SessionTerminationService terminationService = mock(
-				SessionTerminationService.class
-		);
 		SessionExtensionDecisionService service = service(
-				DECISION_WINDOW_CLOCK,
-				terminationService
+				DECISION_WINDOW_CLOCK
 		);
 
 		var response = service.decide(1L, 15L, ContactDecision.AGREE);
@@ -103,26 +96,20 @@ class SessionExtensionDecisionServiceTest {
 		assertThat(response.requesterUserId()).isEqualTo(1L);
 		assertThat(response.targetUserId()).isEqualTo(2L);
 		assertThat(response.scheduledEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(35));
+				.isEqualTo(STARTED_AT.plusMinutes(30));
 		verify(decisionRepository).save(any(ContactExchangeRequest.class));
-		verify(terminationService, never())
-				.terminateForContactDecline(any(), any(), any());
 		verify(eventPublisher).publishEvent(
 				any(SessionExtensionDecisionChangedEvent.class)
 		);
 	}
 
 	@Test
-	void secondAgreementKeepsSessionRunningUntilPlannedEnd() {
+	void secondAgreementExtendsSessionToThirtyFiveMinutes() {
 		ContactExchangeRequest stored = pendingAgreement();
 		when(decisionRepository.findBySession_Id(15L))
 				.thenReturn(Optional.of(stored));
-		SessionTerminationService terminationService = mock(
-				SessionTerminationService.class
-		);
 		SessionExtensionDecisionService service = service(
-				DECISION_WINDOW_CLOCK,
-				terminationService
+				DECISION_WINDOW_CLOCK
 		);
 
 		var response = service.decide(2L, 15L, ContactDecision.AGREE);
@@ -131,25 +118,18 @@ class SessionExtensionDecisionServiceTest {
 				.isEqualTo(ContactDecisionStatus.AGREED);
 		assertThat(response.sessionStatus())
 				.isEqualTo(RoomSessionStatus.IN_PROGRESS);
-		verify(terminationService, never())
-				.terminateForContactDecline(any(), any(), any());
+		assertThat(response.scheduledEndAt())
+				.isEqualTo(STARTED_AT.plusMinutes(35));
+		assertThat(session.getExtensionDurationSec()).isEqualTo(5 * 60);
 	}
 
 	@Test
-	void oneDeclineCancelsSessionThroughExistingTerminationFlow() {
+	void oneDeclineKeepsSessionUntilThirtyMinuteTimerExpires() {
 		ContactExchangeRequest stored = pendingAgreement();
 		when(decisionRepository.findBySession_Id(15L))
 				.thenReturn(Optional.of(stored));
-		SessionTerminationService terminationService =
-				new SessionTerminationService(
-						sessionRepository,
-						participantRepository,
-						eventPublisher,
-						DECISION_WINDOW_CLOCK
-				);
 		SessionExtensionDecisionService service = service(
-				DECISION_WINDOW_CLOCK,
-				terminationService
+				DECISION_WINDOW_CLOCK
 		);
 
 		var response = service.decide(2L, 15L, ContactDecision.DECLINE);
@@ -157,29 +137,19 @@ class SessionExtensionDecisionServiceTest {
 		assertThat(response.status())
 				.isEqualTo(ContactDecisionStatus.DECLINED);
 		assertThat(response.sessionStatus())
-				.isEqualTo(RoomSessionStatus.CANCELLED);
-		assertThat(response.actualEndAt())
-				.isEqualTo(LocalDateTime.of(2026, 7, 31, 20, 31));
-		assertThat(session.getTerminationReason())
-				.isEqualTo(SessionTerminationReason.CONTACT_DECLINED.name());
-		verify(eventPublisher).publishEvent(
-				new LiveKitRoomDeletionRequestedEvent(
-						15L,
-						session.getLivekitRoomName()
-				)
-		);
+				.isEqualTo(RoomSessionStatus.IN_PROGRESS);
+		assertThat(response.scheduledEndAt())
+				.isEqualTo(STARTED_AT.plusMinutes(30));
+		assertThat(response.actualEndAt()).isNull();
 	}
 
 	@Test
 	void decisionBeforeLastFiveMinutesIsRejected() {
 		Clock tooEarlyClock = Clock.fixed(
-				Instant.parse("2026-07-31T11:29:59Z"),
+				Instant.parse("2026-07-31T11:24:59Z"),
 				ZoneId.of("Asia/Seoul")
 		);
-		SessionExtensionDecisionService service = service(
-				tooEarlyClock,
-				mock(SessionTerminationService.class)
-		);
+		SessionExtensionDecisionService service = service(tooEarlyClock);
 
 		assertThatThrownBy(() ->
 				service.decide(1L, 15L, ContactDecision.AGREE)
@@ -192,15 +162,11 @@ class SessionExtensionDecisionServiceTest {
 		verify(decisionRepository, never()).save(any());
 	}
 
-	private SessionExtensionDecisionService service(
-			Clock clock,
-			SessionTerminationService terminationService
-	) {
+	private SessionExtensionDecisionService service(Clock clock) {
 		return new SessionExtensionDecisionService(
 				sessionRepository,
 				participantRepository,
 				decisionRepository,
-				terminationService,
 				eventPublisher,
 				clock
 		);

@@ -6,9 +6,9 @@ import com.date.backend.domain.contact.domain.ContactExchangeRequest;
 import com.date.backend.domain.contact.dto.response.SessionExtensionDecisionResponse;
 import com.date.backend.domain.contact.event.SessionExtensionDecisionChangedEvent;
 import com.date.backend.domain.contact.repository.ContactExchangeRequestRepository;
-import com.date.backend.domain.room.application.SessionTerminationService;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.WaitingRoom;
+import com.date.backend.domain.room.application.SessionExtensionAgreementPolicy;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -22,13 +22,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-public class SessionExtensionDecisionService {
+public class SessionExtensionDecisionService
+		implements SessionExtensionAgreementPolicy {
 	private static final long DECISION_WINDOW_MINUTES = 5;
 
 	private final WaitingRoomRepository sessionRepository;
 	private final RoomParticipantRepository participantRepository;
 	private final ContactExchangeRequestRepository decisionRepository;
-	private final SessionTerminationService terminationService;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
@@ -36,14 +36,12 @@ public class SessionExtensionDecisionService {
 			WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
 			ContactExchangeRequestRepository decisionRepository,
-			SessionTerminationService terminationService,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.decisionRepository = decisionRepository;
-		this.terminationService = terminationService;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
@@ -77,8 +75,8 @@ public class SessionExtensionDecisionService {
 			);
 		}
 
-		LocalDateTime scheduledEndAt = session.expectedEndAt();
-		assertDecisionWindow(now, scheduledEndAt);
+		LocalDateTime baseEndAt = session.extensionDecisionDeadlineAt();
+		assertDecisionWindow(now, baseEndAt);
 
 		ContactExchangeRequest stored =
 				decisionRepository.findBySession_Id(sessionId).orElse(null);
@@ -97,18 +95,16 @@ public class SessionExtensionDecisionService {
 			changed = stored.recordDecision(userId, decision, now);
 		}
 
-		if (changed && stored.getStatus() == ContactDecisionStatus.DECLINED) {
-			terminationService.terminateForContactDecline(
-					sessionId,
-					userId,
-					now
-			);
+		if (stored.getStatus() == ContactDecisionStatus.AGREED) {
+			session.grantExtension();
 		}
 
 		SessionExtensionDecisionResponse response = responseOf(
 				stored,
 				session,
-				scheduledEndAt,
+				stored.getStatus() == ContactDecisionStatus.AGREED
+						? session.expectedEndAt()
+						: baseEndAt,
 				now
 		);
 		if (changed) {
@@ -117,6 +113,15 @@ public class SessionExtensionDecisionService {
 			);
 		}
 		return response;
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public boolean isMutuallyAgreed(Long sessionId) {
+		return decisionRepository.existsBySession_IdAndStatus(
+				sessionId,
+				ContactDecisionStatus.AGREED
+		);
 	}
 
 	private void assertDecisionWindow(

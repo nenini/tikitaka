@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 public record SessionExtensionDecisionRequest(
 		@NotNull
 		@Schema(
-				description = "마지막 5분 유지 의사. AGREE면 유지, DECLINE이면 즉시 종료",
+				description = "마지막 5분 진행 의사. 양측 모두 AGREE이면 35분까지 유지하며, DECLINE 또는 미응답이면 30분에 종료",
 				example = "AGREE"
 		)
 		ContactDecision decision

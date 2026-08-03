@@ -22,6 +22,8 @@ import java.util.Objects;
 @Table(name = "sessions")
 public class WaitingRoom {
 	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 35 * 60;
+	public static final int BASE_DURATION_SECONDS = 30 * 60;
+	public static final int EXTENSION_DURATION_SECONDS = 5 * 60;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -156,9 +158,37 @@ public class WaitingRoom {
 					"진행 중인 세션에만 종료 예정 시각이 존재합니다."
 			);
 		}
-		return actualStartAt.plusSeconds(
-				(long) plannedDurationSec + extensionDurationSec
-		);
+		return actualStartAt.plusSeconds(plannedDurationSec);
+	}
+
+	public LocalDateTime extensionDecisionDeadlineAt() {
+		if (!isInProgress() || actualStartAt == null) {
+			throw new IllegalStateException(
+					"진행 중인 세션에만 연장 의사 결정 시각이 존재합니다."
+			);
+		}
+		return actualStartAt.plusSeconds(BASE_DURATION_SECONDS);
+	}
+
+	public boolean grantExtension() {
+		if (!isInProgress()) {
+			throw new IllegalStateException(
+					"진행 중인 세션만 연장할 수 있습니다."
+			);
+		}
+		if (extensionDurationSec == EXTENSION_DURATION_SECONDS) {
+			return false;
+		}
+		if (extensionDurationSec != 0) {
+			throw new IllegalStateException(
+					"허용되지 않은 세션 연장 시간입니다."
+			);
+		}
+		extensionDurationSec = EXTENSION_DURATION_SECONDS;
+		endingSoonNotifiedAt = null;
+		endingImminentNotifiedAt = null;
+		timerExpiredNotifiedAt = null;
+		return true;
 	}
 
 	public LocalDateTime getEndingSoonNotifiedAt() {
