@@ -41,6 +41,7 @@ public class SecurityConfig {
 			"/internal/ai/silence-events",
 			"/internal/ai/question-recommendations",
 			"/internal/ai/safety-events",
+			"/internal/v1/session-analyses",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",
