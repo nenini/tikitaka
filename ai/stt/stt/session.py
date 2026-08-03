@@ -12,6 +12,7 @@ seq는 종류 무관 (sessionId, userId, clientInstanceId)에서 단조 증가(w
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -36,6 +37,30 @@ from stt.transcription import (
     TranscriptionJob,
     TranscriptionWorker,
 )
+
+# ── 환각 억제 (stt 샌드박스에서 이벤트 자체에 적용) ─────────────────
+# 관제실로 나가는 TRANSCRIPT 이벤트를 깨끗하게 만든다.
+_REPEAT_GUARD_MAX_CHARS = 6
+_NORMALIZE = re.compile(r"[^\w가-힣]+")
+
+
+def _normalize_text(text: str) -> str:
+    return _NORMALIZE.sub("", text)
+
+
+def _collapse_repeats(text: str, max_run: int = 2) -> str:
+    """발화 내부 반복 환각 접기: 같은 토큰이 연속 max_run 초과면 잘라낸다("네. 네. 네." → "네. 네.")."""
+    out: list[str] = []
+    run = 1
+    for tok in text.split():
+        if out and tok == out[-1]:
+            run += 1
+            if run > max_run:
+                continue
+        else:
+            run = 1
+        out.append(tok)
+    return " ".join(out)
 
 MAX_BUFFER_SECONDS = 25.0
 
@@ -95,6 +120,7 @@ class SpeakerStream:
         self._withdrawn = False
         self._utterance_id = ""
         self._observed_start_ms = 0
+        self._last_norm_text = ""  # 반복억제용: 직전 발화의 정규화 텍스트
 
     def _elapsed_ms(self, sample_pos: int) -> int:
         return self.stream_epoch_ms + int(sample_pos / SAMPLE_RATE * 1000)
@@ -169,6 +195,12 @@ class SpeakerStream:
         )
         if not pieces:
             return
+        text = _collapse_repeats(" ".join(p.text for p in pieces))  # 발화 내부 반복("네. 네.") 접기
+        norm = _normalize_text(text)
+        # 반복억제: 직전과 동일한 ≤6자 발화 반복이면 이벤트 미발행(관제실로 안 감)
+        if norm == self._last_norm_text and len(norm) <= _REPEAT_GUARD_MAX_CHARS:
+            return
+        self._last_norm_text = norm
         events.append(
             TranscriptFinalizedEvent(
                 **self._ids(),
@@ -176,7 +208,7 @@ class SpeakerStream:
                 session_elapsed_ms=observed_end_ms,  # 동기: 완료 ≈ 발화 종료
                 confidence=min(p.confidence for p in pieces),
                 payload=TranscriptPayload(
-                    text=" ".join(p.text for p in pieces),
+                    text=text,
                     language=pieces[0].language,
                     segment_start_ms=self._observed_start_ms,
                     segment_end_ms=observed_end_ms,
