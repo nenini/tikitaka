@@ -28,6 +28,18 @@ def _positive_int(name: str, default: int) -> int:
     return value
 
 
+def _boolean(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 @dataclass(frozen=True)
 class IntegrationSettings:
     """Small, dependency-free settings object loaded from environment."""
@@ -47,6 +59,16 @@ class IntegrationSettings:
     stt_end_silence_ms: int = 700
     stt_min_confidence: float = 0.5
     stt_max_pending: int = 8
+    transcript_retention_seconds: float = 1_800.0
+    transcript_cleanup_interval_seconds: float = 30.0
+    transcript_debug_log: bool = False
+    transcript_debug_full_on_session_end: bool = False
+    coaching_llm_enabled: bool = False
+    coaching_llm_base_url: str = "http://127.0.0.1:8100"
+    coaching_llm_model: str = "kakaocorp/kanana-2-3b-instruct"
+    coaching_llm_timeout_seconds: float = 2.0
+    coaching_llm_max_context_utterances: int = 10
+    coaching_llm_max_message_characters: int = 100
 
     @classmethod
     def from_env(cls) -> IntegrationSettings:
@@ -95,8 +117,56 @@ class IntegrationSettings:
                 os.getenv("STT_MIN_CONFIDENCE", "0.5")
             ),
             stt_max_pending=_positive_int("STT_MAX_PENDING", 8),
+            transcript_retention_seconds=_positive_float(
+                "TRANSCRIPT_RETENTION_SECONDS",
+                1_800.0,
+            ),
+            transcript_cleanup_interval_seconds=_positive_float(
+                "TRANSCRIPT_CLEANUP_INTERVAL_SECONDS",
+                30.0,
+            ),
+            transcript_debug_log=_boolean(
+                "TRANSCRIPT_DEBUG_LOG",
+                False,
+            ),
+            transcript_debug_full_on_session_end=_boolean(
+                "TRANSCRIPT_DEBUG_FULL_ON_SESSION_END",
+                False,
+            ),
+            coaching_llm_enabled=_boolean(
+                "COACHING_LLM_ENABLED",
+                False,
+            ),
+            coaching_llm_base_url=os.getenv(
+                "COACHING_LLM_BASE_URL",
+                "http://127.0.0.1:8100",
+            ).strip().rstrip("/"),
+            coaching_llm_model=os.getenv(
+                "COACHING_LLM_MODEL",
+                "kakaocorp/kanana-2-3b-instruct",
+            ).strip(),
+            coaching_llm_timeout_seconds=_positive_float(
+                "COACHING_LLM_TIMEOUT_SECONDS",
+                2.0,
+            ),
+            coaching_llm_max_context_utterances=_positive_int(
+                "COACHING_LLM_MAX_CONTEXT_UTTERANCES",
+                10,
+            ),
+            coaching_llm_max_message_characters=_positive_int(
+                "COACHING_LLM_MAX_MESSAGE_CHARACTERS",
+                100,
+            ),
         )
 
     @property
     def backend_configured(self) -> bool:
         return bool(self.backend_base_url and self.internal_token)
+
+    @property
+    def coaching_llm_configured(self) -> bool:
+        return bool(
+            self.coaching_llm_enabled
+            and self.coaching_llm_base_url
+            and self.coaching_llm_model
+        )

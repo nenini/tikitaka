@@ -8,7 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from aggregator.transcripts import TranscriptBuffer, TranscriptSegment
 from aggregator.vision_events import VisionBehaviorEvent, VisionMetricSnapshot
+
+# Existing detectors use this domain name in type annotations. Keep the name
+# while the stored object now carries the full STT v2 identity contract.
+Utterance = TranscriptSegment
 
 _VISION_EPISODE_START_TYPES = {
     "FACE_MISSING_STARTED",
@@ -29,21 +34,9 @@ _VISION_EPISODE_END_TYPES = {
 
 
 @dataclass
-class Utterance:
-    speaker_id: str
-    start_ms: int
-    end_ms: int
-    text: str
-
-    @property
-    def duration_ms(self) -> int:
-        return max(0, self.end_ms - self.start_ms)
-
-
-@dataclass
 class SpeakerState:
     speaker_id: str
-    utterances: list[Utterance] = field(default_factory=list)
+    utterances: list[TranscriptSegment] = field(default_factory=list)
     speaking_ms: int = 0
     question_count: int = 0
     filler_count: int = 0
@@ -105,6 +98,7 @@ class UserRuntimeState:
 @dataclass
 class SessionState:
     session_id: str
+    transcript_buffer: TranscriptBuffer = field(default_factory=TranscriptBuffer)
     speakers: dict[str, SpeakerState] = field(default_factory=dict)
     vision_users: dict[str, VisionUserState] = field(default_factory=dict)
     users: dict[str, UserRuntimeState] = field(default_factory=dict)
@@ -119,9 +113,10 @@ class SessionState:
             self.speakers[speaker_id] = state
         return state
 
-    def add_utterance(self, utterance: Utterance) -> None:
+    def add_utterance(self, utterance: TranscriptSegment) -> None:
         state = self.speaker(utterance.speaker_id)
         state.utterances.append(utterance)
+        self.transcript_buffer.append(utterance)
         state.speaking_ms += utterance.duration_ms
         self.last_activity_ms = max(self.last_activity_ms, utterance.end_ms)
 

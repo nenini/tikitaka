@@ -33,8 +33,9 @@ from aggregator.coaching_detectors import (
 from aggregator.config import MvpCoachingConfig
 from aggregator.detectors import Detector, default_detectors
 from aggregator.events import AnalysisEvent, SilenceDetected
-from aggregator.state import SessionState, Utterance
+from aggregator.state import SessionState
 from aggregator.speech_events import parse_stt_event
+from aggregator.transcripts import TranscriptSegment
 from aggregator.vision_events import (
     VISION_EVENT_ADAPTER,
     VisionBehaviorEventBase,
@@ -190,11 +191,20 @@ class SessionAggregator:
 
     def _apply_transcript(self, event: TranscriptFinalizedEvent) -> None:
         """Store a finalized transcript and run content detectors."""
-        utterance = Utterance(
-            speaker_id=event.user_id,
+        utterance = TranscriptSegment(
+            event_id=event.event_id,
+            utterance_id=event.utterance_id,
+            session_id=event.session_id,
+            user_id=event.user_id,
+            participant_identity=event.participant_identity,
+            client_instance_id=event.client_instance_id,
+            seq=event.seq,
             start_ms=event.payload.segment_start_ms,
             end_ms=event.payload.segment_end_ms,
             text=event.payload.text,
+            confidence=event.confidence,
+            language=event.payload.language,
+            occurred_at=event.occurred_at,
         )
         self.state.add_utterance(utterance)
         self._conversation_detector.on_utterance(self.state, utterance)
@@ -323,6 +333,24 @@ class SessionAggregator:
         candidates.extend(
             self._conversation_detector.on_tick(self.state, now_ms)
         )
+        candidates.extend(
+            self._vision_setup_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
+        self._dispatch_candidates(
+            self._coaching_arbitrator.select(candidates)
+        )
+
+    def tick_vision(self, now_ms: int) -> None:
+        """Advance only coaching rules that depend on Vision observations.
+
+        A browser Vision packet is not an authoritative speech clock. Running
+        the full tick from that packet can make its client-side elapsed time
+        wake STT silence/long-talk rules immediately. The session runtime's
+        own clock remains responsible for ``tick``; Vision transports use
+        this narrower entry point.
+        """
+        candidates: list[CoachingCandidate] = []
         candidates.extend(
             self._vision_setup_detector.on_tick(self.state, now_ms)
         )

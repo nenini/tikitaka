@@ -343,7 +343,12 @@ class LiveKitSttAdapter:
 
     async def _forward(self, events: Sequence[SttEvent]) -> None:
         for event in events:
-            logger.info(
+            log = (
+                logger.info
+                if event.event_type == "TRANSCRIPT_FINALIZED"
+                else logger.debug
+            )
+            log(
                 "STT event session=%s user=%s type=%s elapsedMs=%d",
                 event.session_id,
                 event.user_id,

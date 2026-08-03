@@ -66,7 +66,9 @@ def to_backend_coaching_request(
     """Convert internal v2 without weakening it to Backend's fixed v1 DTO."""
     if command.target_user_id is None:
         raise ValueError("Backend coaching requires targetUserId")
-    message_text = COACHING_MESSAGES.get(command.message_key)
+    message_text = command.message_text or COACHING_MESSAGES.get(
+        command.message_key
+    )
     if message_text is None:
         raise ValueError(
             f"No messageText registered for messageKey={command.message_key!r}"

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 
+import pytest
 from stt.events import SttEvent, TranscriptFinalizedEvent, TranscriptPayload
 
 from aggregator.backend_contracts import BackendCoachingReceipt
@@ -15,6 +17,7 @@ from aggregator.coaching import CoachingCommand
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.session_manager import SessionManager
 from aggregator.settings import IntegrationSettings
+from aggregator.transcripts import TranscriptSegment
 from aggregator.vision_backend import BackendVisionReceipt
 from aggregator.vision_events import (
     VisionBehaviorEvent,
@@ -40,6 +43,23 @@ class FakeSender:
             event_id=command.event_id,
             status="DELIVERED",
         )
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class FakeMessageGenerator:
+    def __init__(self, message: str | None) -> None:
+        self.message = message
+        self.calls: list[tuple[TranscriptSegment, ...]] = []
+        self.closed = False
+
+    async def generate(
+        self,
+        segments: Sequence[TranscriptSegment],
+    ) -> str | None:
+        self.calls.append(tuple(segments))
+        return self.message
 
     async def close(self) -> None:
         self.closed = True
@@ -201,15 +221,20 @@ def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
 def test_ten_second_silence_delivers_one_coaching_per_user() -> None:
     async def scenario() -> None:
         sender = FakeSender()
+        message_generator = FakeMessageGenerator(
+            "최근 관심 있는 활동을 더 물어보세요."
+        )
         audio_factory = FakeAudioAdapterFactory()
         manager = SessionManager(
             IntegrationSettings(
                 internal_token="token",
                 backend_base_url="http://backend:8080",
                 tick_interval_seconds=3600,
+                coaching_llm_enabled=True,
             ),
             sender=sender,
             audio_adapter_factory=audio_factory,
+            message_generator=message_generator,
         )
         await manager.startup()
         await manager.handle(_started())
@@ -247,12 +272,19 @@ def test_ten_second_silence_delivers_one_coaching_per_user() -> None:
         assert {command.target_user_id for command in silence} == {"1", "2"}
         assert all(command.version == 2 for command in silence)
         assert all(
+            command.message_text == "최근 관심 있는 활동을 더 물어보세요."
+            for command in silence
+        )
+        assert len(message_generator.calls) == 1
+        assert message_generator.calls[0][0].text == "반갑습니다."
+        assert all(
             command.expires_at_session_elapsed_ms
             - command.triggered_at_session_elapsed_ms
             == 15_000
             for command in silence
         )
         await manager.close()
+        assert message_generator.closed
 
     asyncio.run(scenario())
 
@@ -305,6 +337,102 @@ def test_livekit_adapter_routes_transcript_into_runtime() -> None:
         await manager.close()
 
     asyncio.run(scenario())
+
+
+def test_transcript_is_retained_after_end_and_expires_from_memory(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        current = datetime(
+            2026,
+            7,
+            30,
+            10,
+            0,
+            tzinfo=timezone.utc,
+        )
+
+        def now() -> datetime:
+            return current
+
+        sender = FakeSender()
+        audio_factory = FakeAudioAdapterFactory()
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                tick_interval_seconds=3600,
+                transcript_retention_seconds=10,
+                transcript_cleanup_interval_seconds=3600,
+                transcript_debug_log=True,
+            ),
+            sender=sender,
+            audio_adapter_factory=audio_factory,
+            now=now,
+        )
+        await manager.startup()
+        await manager.handle(_started())
+        event = TranscriptFinalizedEvent(
+            session_id="15",
+            user_id="1",
+            participant_identity="user-1",
+            client_instance_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            utterance_id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            seq=1,
+            session_elapsed_ms=2_000,
+            confidence=0.91,
+            payload=TranscriptPayload(
+                text="메모리에 남는 문장",
+                language="ko",
+                segment_start_ms=1_000,
+                segment_end_ms=2_000,
+            ),
+        )
+        assert await manager.runtime("15").push_stt_event(event)
+
+        active_segment = (
+            manager.runtime("15")
+            .aggregator.state.transcript_buffer
+            .ordered_segments()[0]
+        )
+        assert active_segment.utterance_id == event.utterance_id
+        assert active_segment.participant_identity == "user-1"
+        assert active_segment.confidence == 0.91
+
+        await manager.handle(_ended())
+        retained = manager.retained_transcript("15")
+        assert retained is not None
+        assert retained.segment_count == 1
+        assert retained.segments[0] == active_segment
+        assert manager.active_session_count == 0
+        assert manager.retained_transcript_count == 1
+
+        current = datetime(
+            2026,
+            7,
+            30,
+            10,
+            0,
+            11,
+            tzinfo=timezone.utc,
+        )
+        assert manager.retained_transcript("15") is None
+        assert manager.retained_transcript_count == 0
+        await manager.close()
+
+    caplog.set_level(logging.INFO)
+    asyncio.run(scenario())
+    messages = [record.message for record in caplog.records]
+    assert any(
+        "transcript stored" in message
+        and "메모리에 남는 문장" in message
+        for message in messages
+    )
+    assert any("transcript retained" in message for message in messages)
+    assert any(
+        "transcript expired and deleted" in message
+        for message in messages
+    )
 
 
 def test_livekit_adapter_routes_important_vision_event_to_backend() -> None:

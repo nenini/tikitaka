@@ -56,3 +56,26 @@ def test_rejects_session_wide_command_without_target_user() -> None:
         assert "targetUserId" in str(error)
     else:
         raise AssertionError("target-less Backend request must be rejected")
+
+
+def test_dynamic_message_text_overrides_catalog_without_changing_v1() -> None:
+    command = CoachingCommand(
+        session_id="15",
+        target_user_id="1",
+        coaching_type="SILENCE_RECOVERY",
+        message_key="SILENCE_RECOVERY_01",
+        message_text="제주도에서 기억에 남은 장소를 물어보세요.",
+        priority="LOW",
+        reason_code="LONG_SILENCE",
+        triggered_at_session_elapsed_ms=10_000,
+        expires_at_session_elapsed_ms=25_000,
+        deduplication_key="15:1:SILENCE_RECOVERY:event-1",
+    )
+
+    request = to_backend_coaching_request(command)
+
+    assert request.version == 1
+    assert request.message_key == "SILENCE_RECOVERY_01"
+    assert request.message_text == (
+        "제주도에서 기억에 남은 장소를 물어보세요."
+    )
