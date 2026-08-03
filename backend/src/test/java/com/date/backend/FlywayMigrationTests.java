@@ -247,7 +247,22 @@ class FlywayMigrationTests {
 		);
 		Integer practiceGoalCount = rowCount("practice_goal_catalog");
 
-		assertThat(migrationCount).isEqualTo(34);
+		Integer moderationMigrationCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM \"flyway_schema_history\" "
+						+ "WHERE \"success\" = TRUE AND \"version\" = '41'",
+				Integer.class
+		);
+		Integer moderationEvidenceTableCount =
+				tableCount("REPORT_EVIDENCES");
+		Integer reportSessionSnapshotColumnCount = columnCount(
+				"REPORTS",
+				"SESSIONSTATUSSNAPSHOT"
+		);
+
+		assertThat(migrationCount).isEqualTo(35);
+		assertThat(moderationMigrationCount).isEqualTo(1);
+		assertThat(moderationEvidenceTableCount).isEqualTo(1);
+		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
