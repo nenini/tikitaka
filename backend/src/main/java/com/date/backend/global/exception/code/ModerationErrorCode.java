@@ -44,7 +44,10 @@ public enum ModerationErrorCode implements ErrorCode {
 	NO_SHOW_REPORTER_NOT_JOINED(HttpStatus.CONFLICT, "NO_SHOW_REPORTER_NOT_JOINED", "세션에 입장한 참여자만 상대방의 노쇼를 판정할 수 있습니다."),
 	NO_SHOW_GRACE_PERIOD_NOT_ELAPSED(HttpStatus.CONFLICT, "NO_SHOW_GRACE_PERIOD_NOT_ELAPSED", "노쇼 판정 유예 시간이 지나지 않았습니다."),
 	NO_SHOW_TARGET_NOT_FOUND(HttpStatus.CONFLICT, "NO_SHOW_TARGET_NOT_FOUND", "노쇼로 판정할 참여자가 없습니다."),
-	USER_RESTRICTED(HttpStatus.FORBIDDEN, "USER_RESTRICTED", "현재 이용 제한 중입니다.");
+	USER_RESTRICTED(HttpStatus.FORBIDDEN, "USER_RESTRICTED", "현재 이용 제한 중입니다."),
+	AI_TRANSCRIPT_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "AI_TRANSCRIPT_NOT_CONFIGURED", "AI STT 조회 설정이 필요합니다."),
+	AI_TRANSCRIPT_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "AI_TRANSCRIPT_FETCH_FAILED", "AI 서버에서 세션 STT 내역을 가져오지 못했습니다."),
+	AI_TRANSCRIPT_EMPTY(HttpStatus.UNPROCESSABLE_ENTITY, "AI_TRANSCRIPT_EMPTY", "세션 STT 내역이 비어 있습니다.");
 
 	private final HttpStatus status;
 	private final String code;

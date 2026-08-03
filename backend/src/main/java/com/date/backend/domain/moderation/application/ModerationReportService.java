@@ -3,7 +3,6 @@ package com.date.backend.domain.moderation.application;
 import com.date.backend.domain.moderation.domain.ModerationReport;
 import com.date.backend.domain.moderation.domain.ReportEvidence;
 import com.date.backend.domain.moderation.dto.request.ModerationReportCreateRequest;
-import com.date.backend.domain.moderation.dto.request.ReportEvidenceRequest;
 import com.date.backend.domain.moderation.dto.response.ModerationReportResponse;
 import com.date.backend.domain.moderation.dto.response.ReportEvidenceResponse;
 import com.date.backend.domain.moderation.repository.ModerationReportRepository;
@@ -13,6 +12,7 @@ import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.ModerationErrorCode;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -24,17 +24,20 @@ public class ModerationReportService {
 	private final RoomParticipantRepository participantRepository;
 	private final ModerationReportRepository reportRepository;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public ModerationReportService(
 			WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
 			ModerationReportRepository reportRepository,
-			Clock clock
+			Clock clock,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.reportRepository = reportRepository;
 		this.clock = clock;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -90,18 +93,13 @@ public class ModerationReportService {
 				session.getStatus(),
 				reportedAt
 		);
-		for (ReportEvidenceRequest evidence : request.evidences()) {
-			report.addEvidence(
-					evidence.evidenceType(),
-					evidence.objectKey(),
-					evidence.originalFileName(),
-					evidence.contentType(),
-					evidence.sizeBytes(),
-					evidence.capturedAt()
+		ModerationReport saved = reportRepository.saveAndFlush(report);
+		if (session.isEnded()) {
+			eventPublisher.publishEvent(
+					new ModerationTranscriptRequestedEvent(request.sessionId())
 			);
 		}
-
-		return toResponse(reportRepository.saveAndFlush(report));
+		return toResponse(saved);
 	}
 
 	private ModerationReportResponse toResponse(ModerationReport report) {

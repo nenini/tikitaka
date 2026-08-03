@@ -40,6 +40,9 @@ public class ReportEvidence {
 	@Column(name = "contentType", length = 100)
 	private String contentType;
 
+	@Column(name = "contentText", columnDefinition = "LONGTEXT")
+	private String contentText;
+
 	@Column(name = "sizeBytes", nullable = false)
 	private long sizeBytes;
 
@@ -68,6 +71,21 @@ public class ReportEvidence {
 		}
 		this.sizeBytes = sizeBytes;
 		this.capturedAt = capturedAt;
+	}
+
+	static ReportEvidence transcript(ModerationReport report, Long sessionId,
+			String transcript, LocalDateTime generatedAt) {
+		ReportEvidence evidence = new ReportEvidence(
+				report,
+				ReportEvidenceType.CHAT_TRANSCRIPT,
+				"ai-session:" + sessionId + ":transcript",
+				"session-" + sessionId + "-transcript.txt",
+				"text/plain; charset=UTF-8",
+				transcript.getBytes(java.nio.charset.StandardCharsets.UTF_8).length,
+				generatedAt
+		);
+		evidence.contentText = requireText(transcript, "STT 원문");
+		return evidence;
 	}
 
 	private static String requireText(String value, String fieldName) {
@@ -107,5 +125,9 @@ public class ReportEvidence {
 
 	public LocalDateTime getCapturedAt() {
 		return capturedAt;
+	}
+
+	public String getContentText() {
+		return contentText;
 	}
 }

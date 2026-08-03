@@ -111,6 +111,22 @@ public class ModerationReport {
 		));
 	}
 
+	public void addTranscriptEvidence(Long sessionId, String transcript,
+			LocalDateTime generatedAt) {
+		evidences.add(ReportEvidence.transcript(
+				this,
+				sessionId,
+				transcript,
+				generatedAt
+		));
+	}
+
+	public boolean hasTranscriptEvidence() {
+		return evidences.stream().anyMatch(
+				evidence -> evidence.getEvidenceType() == ReportEvidenceType.CHAT_TRANSCRIPT
+		);
+	}
+
 	private static String trimToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
 	}

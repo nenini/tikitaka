@@ -34,8 +34,7 @@ class ModerationReportControllerTest {
 						15L,
 						2L,
 						ModerationReportReason.OTHER,
-						"상세 내용",
-						List.of()
+						"상세 내용"
 				);
 		ModerationReportResponse expected = new ModerationReportResponse(
 				31L,

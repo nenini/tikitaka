@@ -258,11 +258,16 @@ class FlywayMigrationTests {
 				"REPORTS",
 				"SESSIONSTATUSSNAPSHOT"
 		);
+		Integer reportTranscriptColumnCount = columnCount(
+				"REPORT_EVIDENCES",
+				"CONTENTTEXT"
+		);
 
-		assertThat(migrationCount).isEqualTo(35);
+		assertThat(migrationCount).isEqualTo(36);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
+		assertThat(reportTranscriptColumnCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
