@@ -67,7 +67,15 @@ export async function getMe(): Promise<MeResponse> {
  * ⚠️ 콜백(`.../callback`)은 현재 JSON 토큰을 반환한다(백엔드 redirect-uri = 백엔드 자신).
  *    SPA 가 토큰을 받으려면 백엔드가 FE 라우트로 리다이렉트하도록 조율이 필요하다. AUTH_FLOW.md §5 참고.
  */
+// 이동 중 중복 클릭 가드. 두 번 호출되면 두 번째 시작이 발급한 state 로 서버 쿠키가
+// 덮어써지는데, 브라우저는 첫 번째 이동을 계속 진행해 콜백에 첫 번째 state 가 돌아온다.
+// 그 state 는 이미 덮어써진 쿠키와 달라 INVALID_OAUTH_STATE 로 실패한다.
+let oauthStarting = false
+
 export function oauthStart(provider: OAuthProviderId): void {
+  if (oauthStarting) return
+  oauthStarting = true
+
   // `??` 가 아니라 `||` — .env 에 빈 값(VITE_API_BASE_URL=)이 들어와도 프록시 경로로 폴백해야 한다.
   // (`??` 는 빈 문자열을 통과시켜 `/api` 프리픽스가 빠지고, 프록시를 못 타 SPA 라우터로 떨어진다)
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
