@@ -47,6 +47,20 @@ describe("visionConfigSchema", () => {
     );
   });
 
+  it("keeps attention recovery above the away threshold", () => {
+    expect(defaultVisionConfig.screenAttention.attentionAwayScore).toBe(75);
+    expect(defaultVisionConfig.screenAttention.attentionRecoveryScore).toBe(80);
+    expect(defaultVisionConfig.screenAttention.awayMinimumDurationMs).toBe(1_000);
+    expect(defaultVisionConfig.screenAttention.prolongedDurationMs).toBe(3_000);
+
+    const invalidConfig = structuredClone(defaultVisionConfig);
+    invalidConfig.screenAttention.attentionRecoveryScore =
+      invalidConfig.screenAttention.attentionAwayScore;
+    expect(() => visionConfigSchema.parse(invalidConfig)).toThrow(
+      /recovery score must exceed/,
+    );
+  });
+
   it("keeps nod disabled by default until empirical tuning is complete", () => {
     expect(defaultVisionConfig.nod.enabledByDefault).toBe(false);
   });

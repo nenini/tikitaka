@@ -329,6 +329,14 @@ export const visionConfigSchema = z
           }
         }
 
+        if (attention.attentionRecoveryScore <= attention.attentionAwayScore) {
+          context.addIssue({
+            code: "custom",
+            path: ["attentionRecoveryScore"],
+            message: "attention recovery score must exceed the away score",
+          });
+        }
+
         if (attention.prolongedDurationMs <= attention.awayMinimumDurationMs) {
           context.addIssue({
             code: "custom",
