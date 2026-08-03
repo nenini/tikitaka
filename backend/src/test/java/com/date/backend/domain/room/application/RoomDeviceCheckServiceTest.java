@@ -2,6 +2,7 @@ package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchStatus;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.domain.RoomDeviceCheck;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import com.date.backend.domain.room.domain.WaitingRoom;
@@ -38,6 +39,7 @@ class RoomDeviceCheckServiceTest {
 			mock(RoomParticipantRepository.class);
 	private final RoomDeviceCheckRepository deviceCheckRepository =
 			mock(RoomDeviceCheckRepository.class);
+	private final UserRestrictionPolicy restrictionPolicy = mock(UserRestrictionPolicy.class);
 	private final Clock clock = Clock.fixed(
 			Instant.parse("2026-07-29T01:00:00Z"),
 			ZoneId.of("Asia/Seoul")
@@ -46,7 +48,8 @@ class RoomDeviceCheckServiceTest {
 			roomRepository,
 			participantRepository,
 			deviceCheckRepository,
-			clock
+			clock,
+			restrictionPolicy
 	);
 
 	private WaitingRoom room;

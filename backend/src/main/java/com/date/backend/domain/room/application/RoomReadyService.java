@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.match.domain.MatchStatus;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.room.domain.RoomDeviceCheck;
@@ -37,6 +38,7 @@ public class RoomReadyService {
 	private final ProfileRepository profileRepository;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
+	private final UserRestrictionPolicy restrictionPolicy;
 
 	public RoomReadyService(
 			WaitingRoomRepository roomRepository,
@@ -44,7 +46,8 @@ public class RoomReadyService {
 			RoomDeviceCheckRepository deviceCheckRepository,
 			ProfileRepository profileRepository,
 			ApplicationEventPublisher eventPublisher,
-			Clock clock
+			Clock clock,
+			UserRestrictionPolicy restrictionPolicy
 	) {
 		this.roomRepository = roomRepository;
 		this.participantRepository = participantRepository;
@@ -52,10 +55,12 @@ public class RoomReadyService {
 		this.profileRepository = profileRepository;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
+		this.restrictionPolicy = restrictionPolicy;
 	}
 
 	@Transactional
 	public RoomParticipantsStatusResponse markReady(Long userId, Long roomId) {
+		restrictionPolicy.assertNotRestricted(userId);
 		WaitingRoom room = findRoomForUpdate(roomId);
 		validateChangeable(room);
 		RoomParticipant participant = findParticipantForUpdate(userId, roomId);
@@ -81,6 +86,7 @@ public class RoomReadyService {
 
 	@Transactional
 	public RoomParticipantsStatusResponse cancelReady(Long userId, Long roomId) {
+		restrictionPolicy.assertNotRestricted(userId);
 		WaitingRoom room = findRoomForUpdate(roomId);
 		validateChangeable(room);
 		RoomParticipant participant = findParticipantForUpdate(userId, roomId);

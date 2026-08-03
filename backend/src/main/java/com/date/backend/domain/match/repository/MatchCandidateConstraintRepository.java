@@ -62,6 +62,19 @@ public class MatchCandidateConstraintRepository {
 		return count != null && count > 0;
 	}
 
+	public Set<Long> findRestrictedUserIds(Collection<Long> userIds, LocalDateTime now) {
+		if (userIds.isEmpty()) return Set.of();
+		MapSqlParameterSource parameters = new MapSqlParameterSource()
+				.addValue("userIds", userIds)
+				.addValue("now", now);
+		return new HashSet<>(jdbcTemplate.queryForList("""
+				SELECT DISTINCT userId FROM sanctions
+				WHERE userId IN (:userIds)
+				AND startsAt <= :now
+				AND (endsAt IS NULL OR endsAt > :now)
+				""", parameters, Long.class));
+	}
+
 	public Set<Long> findCooldownCandidateUserIds(
 			Long sourceUserId,
 			Collection<Long> candidateUserIds,

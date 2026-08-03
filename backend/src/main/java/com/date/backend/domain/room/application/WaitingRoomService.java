@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.application;
 
 import com.date.backend.domain.match.domain.MatchStatus;
+import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.profile.domain.Profile;
 import com.date.backend.domain.profile.repository.ProfileRepository;
 import com.date.backend.domain.room.config.RoomEntryProperties;
@@ -31,22 +32,26 @@ public class WaitingRoomService {
 	private final ProfileRepository profileRepository;
 	private final RoomEntryProperties entryProperties;
 	private final Clock clock;
+	private final UserRestrictionPolicy restrictionPolicy;
 
 	public WaitingRoomService(
 			WaitingRoomRepository roomRepository,
 			RoomParticipantRepository participantRepository,
 			ProfileRepository profileRepository,
 			RoomEntryProperties entryProperties,
-			Clock clock
+			Clock clock,
+			UserRestrictionPolicy restrictionPolicy
 	) {
 		this.roomRepository = roomRepository;
 		this.participantRepository = participantRepository;
 		this.profileRepository = profileRepository;
 		this.entryProperties = entryProperties;
 		this.clock = clock;
+		this.restrictionPolicy = restrictionPolicy;
 	}
 
 	public WaitingRoomDetailResponse getDetail(Long userId, Long roomId) {
+		restrictionPolicy.assertNotRestricted(userId);
 		WaitingRoom room = roomRepository.findWithMatchPairById(roomId)
 				.orElseThrow(() -> new BusinessException(RoomErrorCode.ROOM_NOT_FOUND));
 		var participants = participantRepository.findAllByRoom_IdOrderByUserIdAsc(roomId);

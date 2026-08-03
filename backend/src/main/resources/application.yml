@@ -166,6 +166,13 @@ livekit:
   empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
   max-participants: ${LIVEKIT_MAX_PARTICIPANTS:3}
 
+moderation:
+  no-show:
+    grace-period: ${NO_SHOW_GRACE_PERIOD:5m}
+    first-restriction: ${NO_SHOW_FIRST_RESTRICTION:1d}
+    second-restriction: ${NO_SHOW_SECOND_RESTRICTION:3d}
+    repeated-restriction: ${NO_SHOW_REPEATED_RESTRICTION:7d}
+
 notification:
   waiting-recommendation:
     enabled: ${NOTIFICATION_WAITING_RECOMMENDATION_ENABLED:true}

@@ -38,7 +38,13 @@ public enum ModerationErrorCode implements ErrorCode {
 			HttpStatus.BAD_REQUEST,
 			"SELF_BLOCK_NOT_ALLOWED",
 			"자기 자신을 차단할 수 없습니다."
-	);
+	),
+	NO_SHOW_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "NO_SHOW_SESSION_NOT_FOUND", "세션을 찾을 수 없습니다."),
+	NO_SHOW_NOT_SESSION_PARTICIPANT(HttpStatus.FORBIDDEN, "NO_SHOW_NOT_SESSION_PARTICIPANT", "세션 참여자만 노쇼를 판정할 수 있습니다."),
+	NO_SHOW_REPORTER_NOT_JOINED(HttpStatus.CONFLICT, "NO_SHOW_REPORTER_NOT_JOINED", "세션에 입장한 참여자만 상대방의 노쇼를 판정할 수 있습니다."),
+	NO_SHOW_GRACE_PERIOD_NOT_ELAPSED(HttpStatus.CONFLICT, "NO_SHOW_GRACE_PERIOD_NOT_ELAPSED", "노쇼 판정 유예 시간이 지나지 않았습니다."),
+	NO_SHOW_TARGET_NOT_FOUND(HttpStatus.CONFLICT, "NO_SHOW_TARGET_NOT_FOUND", "노쇼로 판정할 참여자가 없습니다."),
+	USER_RESTRICTED(HttpStatus.FORBIDDEN, "USER_RESTRICTED", "현재 이용 제한 중입니다.");
 
 	private final HttpStatus status;
 	private final String code;
