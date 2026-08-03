@@ -28,6 +28,16 @@ public enum ModerationErrorCode implements ErrorCode {
 			HttpStatus.CONFLICT,
 			"DUPLICATE_SESSION_REPORT",
 			"동일한 세션과 대상에 대한 신고가 이미 접수되었습니다."
+	),
+	BLOCK_TARGET_NOT_FOUND(
+			HttpStatus.NOT_FOUND,
+			"BLOCK_TARGET_NOT_FOUND",
+			"차단 대상 사용자를 찾을 수 없습니다."
+	),
+	SELF_BLOCK_NOT_ALLOWED(
+			HttpStatus.BAD_REQUEST,
+			"SELF_BLOCK_NOT_ALLOWED",
+			"자기 자신을 차단할 수 없습니다."
 	);
 
 	private final HttpStatus status;

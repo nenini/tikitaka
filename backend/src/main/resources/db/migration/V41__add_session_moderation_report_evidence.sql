@@ -22,3 +22,14 @@ CREATE TABLE `report_evidences` (
 
 CREATE INDEX `IDX_report_evidences_report`
     ON `report_evidences` (`reportId`, `reportEvidenceId`);
+
+ALTER TABLE `user_blocks`
+    ADD CONSTRAINT `UK_user_blocks_blocker_blocked`
+        UNIQUE (`blockerUserId`, `blockedUserId`);
+
+ALTER TABLE `user_blocks`
+    ADD CONSTRAINT `CK_user_blocks_distinct_users`
+        CHECK (`blockerUserId` <> `blockedUserId`);
+
+CREATE INDEX `IDX_user_blocks_blocked_blocker`
+    ON `user_blocks` (`blockedUserId`, `blockerUserId`);
