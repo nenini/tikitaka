@@ -7,6 +7,7 @@ import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } 
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
 import { authErrorMessage } from '@/features/auth/api'
+import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
@@ -97,6 +98,9 @@ export function ProfilePage() {
         gender: data.gender === 'female' ? 'FEMALE' : 'MALE', // 폼(소문자) → 백엔드 enum(대문자)
         regionCity: data.regionSido,
       })
+      // 프로필이 생겼으므로 온보딩 게이트를 즉시 연다(ProtectedRoute 가 이 값을 본다).
+      // 갱신하지 않으면 온보딩을 마치고도 보호 라우트에서 다시 이 흐름으로 튕긴다.
+      useAuthStore.getState().setOnboarding('ready')
       navigate('/signup/survey')
     } catch (e) {
       // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출

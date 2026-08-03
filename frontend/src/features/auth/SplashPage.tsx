@@ -7,8 +7,10 @@ import { useAuthStore } from '@/stores/auth.store'
 /*  1차 확정 옵션:                                                             */
 /*   ① 히어로 사진 풀블리드(문구 없음 · 사진만)                                 */
 /*   ② 정중앙 START — 배경 없는 투명 텍스트                                     */
-/*   ③ 3초 후 자동 이동(누르면 즉시). 인증 상태로 분기:                          */
-/*      토큰 있음 → 홈(/) · 없음 → 랜딩·로그인(/login)                          */
+/*   ③ 3초 후 자동 이동(누르면 즉시). 인증·온보딩 상태로 분기:                   */
+/*      미로그인 → 랜딩·로그인(/login)                                          */
+/*      로그인 + 프로필 없음 → 온보딩 첫 단계(/signup/verify)                    */
+/*      로그인 + 프로필 있음 → 홈(/)                                            */
 /*  - 사진은 다음 화면(W-01 히어로)으로 이어지며 좌측 패널로 정착한다.            */
 /* -------------------------------------------------------------------------- */
 
@@ -21,7 +23,6 @@ export const SPLASH_SEEN_KEY = 'tk.splash-seen'
 
 export function SplashPage() {
   const navigate = useNavigate()
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const [ready, setReady] = useState(false) // 마운트 직후 페이드 인 + 진행선 시작
   const [leaving, setLeaving] = useState(false)
   const advancedRef = useRef(false) // 클릭과 타이머의 중복 이동 방지
@@ -35,11 +36,14 @@ export function SplashPage() {
     } catch {
       /* 프라이빗 모드 등 스토리지 불가 — 노출 1회 제한만 포기한다 */
     }
-    window.setTimeout(
-      () => navigate(isAuthenticated ? '/' : '/login', { replace: true }),
-      FADE_OUT_MS,
-    )
-  }, [isAuthenticated, navigate])
+    window.setTimeout(() => {
+      // 이동 직전에 읽는다 — 3초 동안 hydrate() 가 온보딩 상태를 채웠을 수 있다
+      const { isAuthenticated: authed, onboarding, user } = useAuthStore.getState()
+      const needsOnboarding = onboarding === 'needs-profile' && user?.role !== 'ADMIN'
+      const to = !authed ? '/login' : needsOnboarding ? '/signup/verify' : '/'
+      navigate(to, { replace: true })
+    }, FADE_OUT_MS)
+  }, [navigate])
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setReady(true))
