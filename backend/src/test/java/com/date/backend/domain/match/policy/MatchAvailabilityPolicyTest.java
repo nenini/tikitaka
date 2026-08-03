@@ -17,7 +17,7 @@ class MatchAvailabilityPolicyTest {
 	private final MatchAvailabilityPolicy policy = new MatchAvailabilityPolicy();
 
 	@Test
-	void findsEarliestThirtyMinuteIntersectionWithinSevenDays() {
+	void findsEarliestThirtyFiveMinuteIntersectionWithinSevenDays() {
 		MatchRequest request = mock(MatchRequest.class);
 		List<MatchRequestSlot> first = List.of(new MatchRequestSlot(
 				request,
@@ -40,7 +40,7 @@ class MatchAvailabilityPolicyTest {
 	}
 
 	@Test
-	void rejectsIntersectionShorterThanThirtyMinutes() {
+	void rejectsThirtyMinuteIntersectionBecauseSessionNeedsThirtyFiveMinutes() {
 		MatchRequest request = mock(MatchRequest.class);
 		List<MatchRequestSlot> first = List.of(new MatchRequestSlot(
 				request,
@@ -51,8 +51,8 @@ class MatchAvailabilityPolicyTest {
 		List<MatchRequestSlot> second = List.of(new MatchRequestSlot(
 				request,
 				DayOfWeek.MONDAY,
-				LocalTime.of(19, 45),
-				LocalTime.of(20, 10)
+				LocalTime.of(19, 30),
+				LocalTime.of(20, 0)
 		));
 
 		assertThat(policy.findEarliestStart(

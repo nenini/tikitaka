@@ -63,6 +63,16 @@ public enum SessionErrorCode implements ErrorCode {
 			HttpStatus.CONFLICT,
 			"SESSION_CONNECTION_CONFLICT",
 			"현재 세션 연결과 일치하지 않는 요청입니다."
+	),
+	SESSION_EXTENSION_WINDOW_NOT_OPEN(
+			HttpStatus.CONFLICT,
+			"SESSION_EXTENSION_WINDOW_NOT_OPEN",
+			"세션 종료 5분 전부터 의사를 선택할 수 있습니다."
+	),
+	SESSION_EXTENSION_DECISION_CONFLICT(
+			HttpStatus.CONFLICT,
+			"SESSION_EXTENSION_DECISION_CONFLICT",
+			"이미 제출한 의사와 다른 값으로 변경할 수 없습니다."
 	);
 
 	private final HttpStatus status;

@@ -73,6 +73,18 @@ class RoomStompAuthInterceptorTest {
 	}
 
 	@Test
+	void sessionParticipantCanSubscribeToExtensionDecisionTopic() {
+		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
+				.thenReturn(true);
+		Message<?> message = message(
+				StompCommand.SUBSCRIBE,
+				"/topic/sessions/15/extensions"
+		);
+
+		assertThat(interceptor.preSend(message, null)).isSameAs(message);
+	}
+
+	@Test
 	void sessionParticipantCanSubscribeToOwnCoachingQueue() {
 		when(participantRepository.existsByRoom_IdAndUserId(15L, 101L))
 				.thenReturn(true);

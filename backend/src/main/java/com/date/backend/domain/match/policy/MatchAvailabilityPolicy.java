@@ -15,7 +15,7 @@ import java.util.Optional;
 @Component
 public class MatchAvailabilityPolicy {
 
-	private static final Duration SESSION_DURATION = Duration.ofMinutes(30);
+	private static final Duration SESSION_DURATION = Duration.ofMinutes(35);
 	public Optional<LocalDateTime> findEarliestStart(
 			Collection<MatchRequestSlot> firstSlots,
 			Collection<MatchRequestSlot> secondSlots,

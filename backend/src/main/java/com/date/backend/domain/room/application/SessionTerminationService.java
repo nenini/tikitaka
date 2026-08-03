@@ -97,6 +97,21 @@ public class SessionTerminationService {
 		return end(sessionId, reason, null, endedAt).changed();
 	}
 
+	@Transactional
+	public SessionEndedResponse terminateForContactDecline(
+			Long sessionId,
+			Long declinedByUserId,
+			LocalDateTime endedAt
+	) {
+		assertParticipant(declinedByUserId, sessionId);
+		return end(
+				sessionId,
+				SessionTerminationReason.CONTACT_DECLINED,
+				declinedByUserId,
+				endedAt
+		).response();
+	}
+
 	private EndResult end(
 			Long sessionId,
 			SessionTerminationReason reason,

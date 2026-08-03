@@ -14,7 +14,7 @@ import java.util.List;
 @Service
 public class MatchCompletionService {
 
-	private static final Duration SESSION_DURATION = Duration.ofMinutes(30);
+	private static final Duration SESSION_DURATION = Duration.ofMinutes(35);
 
 	private final MatchPairRepository pairRepository;
 	private final ActiveMatchRequestRepository activeRequestRepository;

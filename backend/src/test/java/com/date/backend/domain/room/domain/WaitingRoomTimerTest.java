@@ -33,10 +33,26 @@ class WaitingRoomTimerTest {
 
 	@Test
 	void expectedEndIncludesPlannedAndExtensionDuration() {
-		ReflectionTestUtils.setField(session, "extensionDurationSec", 300);
+		session.grantExtension();
 
 		assertThat(session.expectedEndAt())
 				.isEqualTo(STARTED_AT.plusMinutes(35));
+	}
+
+	@Test
+	void sessionUsesThirtyFiveMinutePlannedDurationByDefault() {
+		assertThat(session.getPlannedDurationSec()).isEqualTo(35 * 60);
+		assertThat(session.expectedEndAt())
+				.isEqualTo(STARTED_AT.plusMinutes(35));
+		assertThat(session.extensionDecisionDeadlineAt())
+				.isEqualTo(STARTED_AT.plusMinutes(30));
+	}
+
+	@Test
+	void extensionIsGrantedOnlyOnce() {
+		assertThat(session.grantExtension()).isTrue();
+		assertThat(session.grantExtension()).isFalse();
+		assertThat(session.getExtensionDurationSec()).isEqualTo(5 * 60);
 	}
 
 	@Test

@@ -20,17 +20,20 @@ import java.util.List;
 @Service
 public class SessionTimerService {
 	private final WaitingRoomRepository sessionRepository;
+	private final SessionExtensionAgreementPolicy extensionAgreementPolicy;
 	private final SessionTimerProperties properties;
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public SessionTimerService(
 			WaitingRoomRepository sessionRepository,
+			SessionExtensionAgreementPolicy extensionAgreementPolicy,
 			SessionTimerProperties properties,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock
 	) {
 		this.sessionRepository = sessionRepository;
+		this.extensionAgreementPolicy = extensionAgreementPolicy;
 		this.properties = properties;
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
@@ -55,7 +58,11 @@ public class SessionTimerService {
 			WaitingRoom session,
 			LocalDateTime now
 	) {
-		LocalDateTime endsAt = session.expectedEndAt();
+		LocalDateTime endsAt = extensionAgreementPolicy.isMutuallyAgreed(
+				session.getId()
+		)
+				? session.expectedEndAt()
+				: session.extensionDecisionDeadlineAt();
 		long remainingSeconds = Math.max(
 				0,
 				Duration.between(now, endsAt).getSeconds()

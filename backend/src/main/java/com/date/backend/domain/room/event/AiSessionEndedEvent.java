@@ -44,7 +44,7 @@ public record AiSessionEndedEvent(
 				case SAFETY_CONCERN, OTHER -> ROOM_CLOSED;
 				case TECHNICAL_ISSUE -> ERROR;
 				case TIME_EXPIRED -> TIMEOUT;
-				case RECONNECT_TIMEOUT -> PARTICIPANT_LEFT;
+				case RECONNECT_TIMEOUT, CONTACT_DECLINED -> PARTICIPANT_LEFT;
 			};
 		}
 	}
