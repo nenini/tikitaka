@@ -7,6 +7,19 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 class SessionReportTest {
+	@Test
+	void resetsFailedReportForRetry() {
+		LocalDateTime now = LocalDateTime.of(2026, 8, 4, 10, 0);
+		SessionReport report = new SessionReport(1L, 2L, now);
+		report.markRequestFailed("AI_REPORT_NOT_CONFIGURED", "missing", now.plusMinutes(1));
+
+		report.resetForRetry(now.plusMinutes(2));
+
+		assertThat(report.getStatus()).isEqualTo(SessionReportStatus.PENDING);
+		assertThat(report.getFailureCode()).isNull();
+		assertThat(report.getAttemptCount()).isZero();
+		assertThat(report.getRequestedAt()).isEqualTo(now.plusMinutes(2));
+	}
 	private final LocalDateTime now = LocalDateTime.of(2026, 8, 4, 10, 0);
 
 	@Test

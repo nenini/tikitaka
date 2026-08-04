@@ -78,6 +78,23 @@ public class SessionReport {
 		updatedAt = failedAt;
 	}
 
+	public void resetForRetry(LocalDateTime requestedAt) {
+		if (status != SessionReportStatus.FAILED) {
+			throw new IllegalStateException("실패한 리포트만 다시 요청할 수 있습니다.");
+		}
+		status = SessionReportStatus.PENDING;
+		generationMode = null;
+		failureCode = null;
+		failureReason = null;
+		resultPayloadHash = null;
+		generationStartedAt = null;
+		lastAttemptAt = null;
+		attemptCount = 0;
+		generatedAt = null;
+		this.requestedAt = Objects.requireNonNull(requestedAt);
+		updatedAt = requestedAt;
+	}
+
 	public boolean complete(String analysisVersion, String reportVersion, String payloadHash,
 			ReportGenerationMode generationMode, String summaryText,
 			List<String> strengths, List<String> improvements, List<String> nextMissions,

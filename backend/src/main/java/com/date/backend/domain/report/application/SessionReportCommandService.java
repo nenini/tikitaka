@@ -38,10 +38,12 @@ public class SessionReportCommandService {
 			throw new BusinessException(ReportErrorCode.REPORT_DELETED);
 		}
 		LocalDateTime requestedAt = LocalDateTime.now(clock);
-		boolean created = generationService.prepare(sessionId, requestedAt);
+		generationService.prepare(sessionId, requestedAt);
+		generationService.resetFailedForRetry(sessionId, requestedAt);
+		boolean dispatch = generationService.claimForDispatch(sessionId, requestedAt);
 		SessionReport report = reports.findBySessionIdAndUserId(sessionId, userId)
 				.orElseThrow(() -> new BusinessException(ReportErrorCode.REPORT_NOT_PREPARED));
-		if (created) {
+		if (dispatch) {
 			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 				@Override public void afterCommit() { requester.submit(sessionId, requestedAt); }
 			});

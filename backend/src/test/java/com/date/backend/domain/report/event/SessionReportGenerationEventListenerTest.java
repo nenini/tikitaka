@@ -18,6 +18,7 @@ class SessionReportGenerationEventListenerTest {
 		SessionReportGenerationService service = mock(SessionReportGenerationService.class);
 		AiReportGenerationClient client = mock(AiReportGenerationClient.class);
 		when(service.prepare(eq(1L), any())).thenReturn(true);
+		when(service.claimForDispatch(eq(1L), any())).thenReturn(true);
 		when(client.configured()).thenReturn(true);
 		AiReportGenerationProperties properties = new AiReportGenerationProperties(
 				"http://ai", "/generate", Duration.ofSeconds(1), Duration.ofSeconds(1),
@@ -30,7 +31,7 @@ class SessionReportGenerationEventListenerTest {
 
 		verify(service).recordAttempt(eq(1L), any());
 		verify(client).request(any(AiReportGenerationRequest.class));
-		verify(service).markGenerating(eq(1L), any());
+		verify(service).claimForDispatch(eq(1L), any());
 	}
 
 	@Test
@@ -38,6 +39,7 @@ class SessionReportGenerationEventListenerTest {
 		SessionReportGenerationService service = mock(SessionReportGenerationService.class);
 		AiReportGenerationClient client = mock(AiReportGenerationClient.class);
 		when(service.prepare(eq(1L), any())).thenReturn(true);
+		when(service.claimForDispatch(eq(1L), any())).thenReturn(true);
 		when(client.configured()).thenReturn(false);
 		AiReportGenerationProperties properties = new AiReportGenerationProperties(
 				"", "/generate", Duration.ofSeconds(1), Duration.ofSeconds(1),

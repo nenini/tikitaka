@@ -67,6 +67,26 @@ public class SessionReportGenerationService {
 	}
 
 	@Transactional
+	public boolean claimForDispatch(Long sessionId, LocalDateTime claimedAt) {
+		List<SessionReport> reports = requiredReports(sessionId);
+		boolean dispatchable = reports.stream().allMatch(report ->
+				report.getStatus() == SessionReportStatus.PENDING);
+		if (!dispatchable) return false;
+		for (SessionReport report : reports) report.markGenerating(claimedAt);
+		return true;
+	}
+
+	@Transactional
+	public boolean resetFailedForRetry(Long sessionId, LocalDateTime requestedAt) {
+		List<SessionReport> reports = requiredReports(sessionId);
+		if (!reports.stream().allMatch(report -> report.getStatus() == SessionReportStatus.FAILED)) {
+			return false;
+		}
+		for (SessionReport report : reports) report.resetForRetry(requestedAt);
+		return true;
+	}
+
+	@Transactional
 	public void markGenerating(Long sessionId, LocalDateTime startedAt) {
 		for (SessionReport report : requiredReports(sessionId)) report.markGenerating(startedAt);
 	}

@@ -37,7 +37,6 @@ public class SessionReportGenerationRequester {
 			try {
 				client.request(AiReportGenerationRequest.of(sessionId,
 						requestedAt.atZone(clock.getZone()).toOffsetDateTime()));
-				service.markGenerating(sessionId, LocalDateTime.now(clock));
 				return;
 			} catch (AiReportGenerationException exception) {
 				if (!exception.retryable() || attempt == properties.maxAttempts()) {

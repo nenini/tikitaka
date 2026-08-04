@@ -8,7 +8,7 @@ ALTER TABLE `session_reports` ADD COLUMN `requestedAt` DATETIME(6) NULL;
 ALTER TABLE `session_reports` ADD COLUMN `generationStartedAt` DATETIME(6) NULL;
 ALTER TABLE `session_reports` ADD COLUMN `lastAttemptAt` DATETIME(6) NULL;
 ALTER TABLE `session_reports` ADD COLUMN `attemptCount` INT NOT NULL DEFAULT 0;
-ALTER TABLE `session_reports` ADD COLUMN `updatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE `session_reports` ADD COLUMN `updatedAt` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6);
 
 ALTER TABLE `session_reports` ADD CONSTRAINT `UK_session_reports_session_user`
     UNIQUE (`sessionId`, `userId`);

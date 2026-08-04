@@ -39,6 +39,9 @@ public class SessionReportGenerationEventListener {
 			if (!service.prepare(sessionId, requestedAt)) {
 				log.info("AI report generation already prepared. sessionId={}", sessionId); return;
 			}
+			if (!service.claimForDispatch(sessionId, requestedAt)) {
+				log.info("AI report generation already dispatched. sessionId={}", sessionId); return;
+			}
 		} catch (RuntimeException exception) {
 			log.error("AI report preparation failed. sessionId={}", sessionId, exception); return;
 		}
@@ -57,7 +60,6 @@ public class SessionReportGenerationEventListener {
 			try {
 				client.request(AiReportGenerationRequest.of(sessionId,
 						requestedAt.atZone(clock.getZone()).toOffsetDateTime()));
-				service.markGenerating(sessionId, LocalDateTime.now(clock));
 				log.info("AI report generation requested. sessionId={}, attempt={}", sessionId, attempt);
 				return;
 			} catch (AiReportGenerationException exception) {

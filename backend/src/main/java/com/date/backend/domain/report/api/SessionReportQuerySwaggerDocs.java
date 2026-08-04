@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Positive;
 @Tag(name = "AI Report", description = "인증 사용자의 세션 AI 리포트 생성·상태·조회·삭제 API")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public interface SessionReportQuerySwaggerDocs {
-	@Operation(summary = "AI 리포트 생성 요청", description = "종료된 세션의 본인 리포트 생성을 요청합니다. 이미 요청되었다면 기존 상태를 반환하여 중복 생성을 막습니다.")
+	@Operation(summary = "AI 리포트 생성 요청", description = "종료된 세션의 본인 리포트 생성을 요청합니다. 진행 중이거나 완료된 요청은 기존 상태를 반환하며, 이전 요청이 실패했다면 다시 생성 요청합니다.")
 	ApiResponse<SessionReportStatusResponse> requestGeneration(
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "종료된 화상 세션 ID", example = "15") @Positive Long sessionId);
