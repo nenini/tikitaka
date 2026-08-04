@@ -55,7 +55,9 @@ class SessionReportQueryServiceTest {
 				+ "\"longSilenceCount\":2,\"silenceThresholdMs\":10000,"
 				+ "\"interruptionCount\":1,\"backchannelCount\":3,\"fillerCount\":4,"
 				+ "\"questionCount\":null,\"smileEpisodeCount\":null,"
-				+ "\"gazeAwayCount\":null,\"faceMissingCount\":null,\"visionMeasured\":false}";
+				+ "\"gazeAwayCount\":null,\"faceMissingCount\":null,\"visionMeasured\":false,"
+				+ "\"coverage\":{\"faceDetectionRate\":0.8,\"speechRecognitionRate\":null,\"cameraUptimeRate\":0.9},"
+				+ "\"fillerBreakdown\":{\"뭐\":4}}";
 		SessionParticipantAnalysis analysis = new SessionParticipantAnalysis(
 				receipt, 1L, 2L, AnalysisStatus.COMPLETED, axesJson, metricsJson, now);
 		ReflectionTestUtils.setField(analysis, "id", 11L);
@@ -72,6 +74,8 @@ class SessionReportQueryServiceTest {
 		assertThat(response.status()).isEqualTo(SessionReportStatus.COMPLETED);
 		assertThat(response.axes()).containsKey("flow");
 		assertThat(response.metrics().speakingMs()).isEqualTo(500000L);
+		assertThat(response.metrics().coverage().speechRecognitionRate()).isNull();
+		assertThat(response.metrics().fillerBreakdown()).containsEntry("뭐", 4);
 		assertThat(response.nextMissions()).containsExactly("미션");
 		assertThat(response.evidenceSegments()).hasSize(1);
 	}

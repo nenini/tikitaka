@@ -162,6 +162,11 @@ public class SessionAnalysisIngestionService {
 				|| metrics.gazeAwayCount() != null || metrics.faceMissingCount() != null)) invalid();
 		if (metrics.visionMeasured() && (metrics.smileEpisodeCount() == null
 				|| metrics.gazeAwayCount() == null || metrics.faceMissingCount() == null)) invalid();
+		if (metrics.fillerBreakdown() != null) {
+			long detailedCount = metrics.fillerBreakdown().values().stream()
+					.mapToLong(Integer::longValue).sum();
+			if (detailedCount != metrics.fillerCount()) invalid();
+		}
 	}
 
 	private String serialize(Object value) {

@@ -1,6 +1,7 @@
 package com.date.backend.domain.report.dto.response;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 public record ReportMetricsResponse(
 		Long speakingMs,
@@ -14,5 +15,7 @@ public record ReportMetricsResponse(
 		Integer smileEpisodeCount,
 		Integer gazeAwayCount,
 		Integer faceMissingCount,
-		boolean visionMeasured
+		boolean visionMeasured,
+		ReportCoverageResponse coverage,
+		Map<String, Integer> fillerBreakdown
 ) {}

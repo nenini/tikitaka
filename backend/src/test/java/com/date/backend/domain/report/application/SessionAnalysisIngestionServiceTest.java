@@ -84,12 +84,39 @@ class SessionAnalysisIngestionServiceTest {
 	void rejectsVisionCountsWhenVisionWasNotMeasured() {
 		SessionAnalysisRequest base = validRequest();
 		SessionAnalysisRequest.MetricsRequest invalidMetrics = new SessionAnalysisRequest.MetricsRequest(
-				100L, new BigDecimal("0.5"), 1, 10000, 1, 1, 1, null, 0, null, null, false);
+				100L, new BigDecimal("0.5"), 1, 10000, 1, 1, 1, null, 0, null, null, false,
+				new SessionAnalysisRequest.CoverageRequest(new BigDecimal("0.8"), null, new BigDecimal("0.9")),
+				Map.of("뭐", 1));
 		SessionAnalysisRequest.ParticipantAnalysisRequest invalidParticipant =
 				new SessionAnalysisRequest.ParticipantAnalysisRequest(10L, AnalysisStatus.COMPLETED,
 						base.participants().getFirst().axes(), invalidMetrics, List.of());
 		SessionAnalysisRequest invalid = new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
 				base.analyzedAt(), List.of(invalidParticipant));
+		when(sessions.findWithMatchPairByIdForUpdate(1L))
+				.thenAnswer(ignored -> Optional.of(endedSession()));
+		when(participants.existsByRoom_IdAndUserId(1L, 10L)).thenReturn(true);
+		when(receipts.findBySessionIdAndAnalysisVersion(anyLong(), anyString())).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.receive(invalid))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ReportErrorCode.ANALYSIS_CONTRACT_INVALID));
+	}
+
+	@Test
+	void rejectsFillerBreakdownWhenSumDiffersFromTotal() {
+		SessionAnalysisRequest base = validRequest();
+		SessionAnalysisRequest.MetricsRequest metrics = base.participants().getFirst().metrics();
+		SessionAnalysisRequest.MetricsRequest invalidMetrics = new SessionAnalysisRequest.MetricsRequest(
+				metrics.speakingMs(), metrics.speakingRatio(), metrics.longSilenceCount(),
+				metrics.silenceThresholdMs(), metrics.interruptionCount(), metrics.backchannelCount(),
+				metrics.fillerCount(), metrics.questionCount(), metrics.smileEpisodeCount(),
+				metrics.gazeAwayCount(), metrics.faceMissingCount(), metrics.visionMeasured(),
+				metrics.coverage(), Map.of("뭐", 2));
+		SessionAnalysisRequest.ParticipantAnalysisRequest participant =
+				new SessionAnalysisRequest.ParticipantAnalysisRequest(10L, AnalysisStatus.COMPLETED,
+						base.participants().getFirst().axes(), invalidMetrics, List.of());
+		SessionAnalysisRequest invalid = new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
+				base.analyzedAt(), List.of(participant));
 		when(sessions.findWithMatchPairByIdForUpdate(1L))
 				.thenAnswer(ignored -> Optional.of(endedSession()));
 		when(participants.existsByRoom_IdAndUserId(1L, 10L)).thenReturn(true);
@@ -119,7 +146,9 @@ class SessionAnalysisIngestionServiceTest {
 					measured ? AnalysisRawUnit.COUNT_PER_30_MINUTES : null, "근거"));
 		}
 		SessionAnalysisRequest.MetricsRequest metrics = new SessionAnalysisRequest.MetricsRequest(
-				500L, new BigDecimal("0.5"), 1, 10000, 1, 1, 1, null, null, null, null, false);
+				500L, new BigDecimal("0.5"), 1, 10000, 1, 1, 1, null, null, null, null, false,
+				new SessionAnalysisRequest.CoverageRequest(new BigDecimal("0.8"), null, new BigDecimal("0.9")),
+				Map.of("뭐", 1));
 		return new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
 				OffsetDateTime.parse("2026-08-03T09:00:00+09:00"),
 				List.of(new SessionAnalysisRequest.ParticipantAnalysisRequest(

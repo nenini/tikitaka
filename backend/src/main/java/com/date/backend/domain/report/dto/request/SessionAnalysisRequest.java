@@ -63,7 +63,15 @@ public record SessionAnalysisRequest(
 			@PositiveOrZero Integer smileEpisodeCount,
 			@PositiveOrZero Integer gazeAwayCount,
 			@PositiveOrZero Integer faceMissingCount,
-			boolean visionMeasured
+			boolean visionMeasured,
+			@Valid CoverageRequest coverage,
+			Map<@NotBlank @Size(max = 50) String, @NotNull @PositiveOrZero Integer> fillerBreakdown
+	) {}
+
+	public record CoverageRequest(
+			@DecimalMin("0.0") @DecimalMax("1.0") BigDecimal faceDetectionRate,
+			@DecimalMin("0.0") @DecimalMax("1.0") BigDecimal speechRecognitionRate,
+			@DecimalMin("0.0") @DecimalMax("1.0") BigDecimal cameraUptimeRate
 	) {}
 
 	public record EvidenceSegmentRequest(
