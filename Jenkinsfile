@@ -76,6 +76,12 @@ pipeline {
             }
         }
 
+        stage('Frontend Image Build') {
+            steps {
+                sh 'docker build -f frontend/Dockerfile.prod -t a307-frontend:ci-${BUILD_NUMBER} .'
+            }
+        }
+
         stage('Deployment Decision') {
             steps {
                 script {
@@ -111,7 +117,11 @@ pipeline {
             }
             steps {
                 sh 'chmod +x scripts/deploy-prod.sh'
-                sh 'CI_IMAGE=a307-backend:ci-${BUILD_NUMBER} scripts/deploy-prod.sh'
+                sh '''
+                    BACKEND_CI_IMAGE=a307-backend:ci-${BUILD_NUMBER} \
+                    FRONTEND_CI_IMAGE=a307-frontend:ci-${BUILD_NUMBER} \
+                    scripts/deploy-prod.sh
+                '''
             }
         }
     }
@@ -119,6 +129,7 @@ pipeline {
     post {
         always {
             sh 'docker image rm a307-backend:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
+            sh 'docker image rm a307-frontend:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
             deleteDir()
         }
     }

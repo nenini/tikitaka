@@ -5,18 +5,23 @@ set -Eeuo pipefail
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/a307/app}"
 ENV_FILE="${ENV_FILE:-/opt/a307/.env.prod}"
 COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
-IMAGE_NAME="a307-backend"
-CI_IMAGE="${CI_IMAGE:-}"
+BACKEND_IMAGE_NAME="a307-backend"
+FRONTEND_IMAGE_NAME="a307-frontend"
+BACKEND_CI_IMAGE="${BACKEND_CI_IMAGE:-}"
+FRONTEND_CI_IMAGE="${FRONTEND_CI_IMAGE:-}"
 RELEASE_TAG="deploy-${BUILD_NUMBER:-manual}-$(date -u +%Y%m%d%H%M%S)"
-CANDIDATE_IMAGE="${IMAGE_NAME}:${RELEASE_TAG}"
-ROLLBACK_IMAGE="${IMAGE_NAME}:rollback-${BUILD_NUMBER:-manual}"
+BACKEND_CANDIDATE_IMAGE="${BACKEND_IMAGE_NAME}:${RELEASE_TAG}"
+FRONTEND_CANDIDATE_IMAGE="${FRONTEND_IMAGE_NAME}:${RELEASE_TAG}"
+BACKEND_ROLLBACK_IMAGE="${BACKEND_IMAGE_NAME}:rollback-${BUILD_NUMBER:-manual}"
+FRONTEND_ROLLBACK_IMAGE="${FRONTEND_IMAGE_NAME}:rollback-${BUILD_NUMBER:-manual}"
 LOCK_FILE="/tmp/a307-prod-deploy.lock"
 BACKUP_DIR="$(mktemp -d /tmp/a307-prod-config.XXXXXX)"
-HAD_PREVIOUS_IMAGE=false
+HAD_PREVIOUS_BACKEND_IMAGE=false
+HAD_PREVIOUS_FRONTEND_IMAGE=false
 DEPLOY_STARTED=false
 
 compose() {
-    APP_VERSION=latest docker compose \
+    APP_VERSION=latest FRONTEND_VERSION=latest docker compose \
         --env-file "${ENV_FILE}" \
         -f "${COMPOSE_FILE}" \
         "$@"
@@ -39,10 +44,18 @@ rollback() {
     echo "Deployment failed. Restoring the previous production release."
     restore_config
 
-    if [[ "${DEPLOY_STARTED}" == true && "${HAD_PREVIOUS_IMAGE}" == true ]]; then
-        docker tag "${ROLLBACK_IMAGE}" "${IMAGE_NAME}:latest"
-        compose up -d --no-build --no-deps --force-recreate backend
-        compose up -d --no-build nginx
+    if [[ "${DEPLOY_STARTED}" == true ]]; then
+        if [[ "${HAD_PREVIOUS_BACKEND_IMAGE}" == true ]]; then
+            docker tag "${BACKEND_ROLLBACK_IMAGE}" "${BACKEND_IMAGE_NAME}:latest"
+            compose up -d --no-build --no-deps --force-recreate backend
+        fi
+        if [[ "${HAD_PREVIOUS_FRONTEND_IMAGE}" == true ]]; then
+            docker tag "${FRONTEND_ROLLBACK_IMAGE}" "${FRONTEND_IMAGE_NAME}:latest"
+            if compose config --services | grep -qx frontend; then
+                compose up -d --no-build --no-deps --force-recreate frontend
+            fi
+        fi
+        compose up -d --no-build --force-recreate nginx
     fi
 
     echo "Rollback completed. Inspect service logs before retrying the deployment."
@@ -51,8 +64,10 @@ rollback() {
 
 cleanup() {
     rm -rf "${BACKUP_DIR}"
-    docker image rm "${CANDIDATE_IMAGE}" >/dev/null 2>&1 || true
-    docker image rm "${ROLLBACK_IMAGE}" >/dev/null 2>&1 || true
+    docker image rm "${BACKEND_CANDIDATE_IMAGE}" >/dev/null 2>&1 || true
+    docker image rm "${FRONTEND_CANDIDATE_IMAGE}" >/dev/null 2>&1 || true
+    docker image rm "${BACKEND_ROLLBACK_IMAGE}" >/dev/null 2>&1 || true
+    docker image rm "${FRONTEND_ROLLBACK_IMAGE}" >/dev/null 2>&1 || true
 }
 
 trap rollback ERR
@@ -78,25 +93,39 @@ if [[ -f "${DEPLOY_DIR}/nginx/conf.d/default.conf" ]]; then
     cp "${DEPLOY_DIR}/nginx/conf.d/default.conf" "${BACKUP_DIR}/default.conf"
 fi
 
-if [[ -n "${CI_IMAGE}" ]] && docker image inspect "${CI_IMAGE}" >/dev/null 2>&1; then
-    docker tag "${CI_IMAGE}" "${CANDIDATE_IMAGE}"
+if [[ -n "${BACKEND_CI_IMAGE}" ]] && docker image inspect "${BACKEND_CI_IMAGE}" >/dev/null 2>&1; then
+    docker tag "${BACKEND_CI_IMAGE}" "${BACKEND_CANDIDATE_IMAGE}"
 else
-    docker build --target runtime -t "${CANDIDATE_IMAGE}" backend
+    docker build --target runtime -t "${BACKEND_CANDIDATE_IMAGE}" backend
 fi
 
-if docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
-    docker tag "${IMAGE_NAME}:latest" "${ROLLBACK_IMAGE}"
-    HAD_PREVIOUS_IMAGE=true
+if [[ -n "${FRONTEND_CI_IMAGE}" ]] && docker image inspect "${FRONTEND_CI_IMAGE}" >/dev/null 2>&1; then
+    docker tag "${FRONTEND_CI_IMAGE}" "${FRONTEND_CANDIDATE_IMAGE}"
+else
+    docker build -f frontend/Dockerfile.prod -t "${FRONTEND_CANDIDATE_IMAGE}" .
+fi
+
+if docker image inspect "${BACKEND_IMAGE_NAME}:latest" >/dev/null 2>&1; then
+    docker tag "${BACKEND_IMAGE_NAME}:latest" "${BACKEND_ROLLBACK_IMAGE}"
+    HAD_PREVIOUS_BACKEND_IMAGE=true
+fi
+
+if docker image inspect "${FRONTEND_IMAGE_NAME}:latest" >/dev/null 2>&1; then
+    docker tag "${FRONTEND_IMAGE_NAME}:latest" "${FRONTEND_ROLLBACK_IMAGE}"
+    HAD_PREVIOUS_FRONTEND_IMAGE=true
 fi
 
 cp docker-compose.prod.yml "${COMPOSE_FILE}"
 cp nginx/conf.d/default.conf "${DEPLOY_DIR}/nginx/conf.d/default.conf"
 
-docker tag "${CANDIDATE_IMAGE}" "${IMAGE_NAME}:latest"
+docker tag "${BACKEND_CANDIDATE_IMAGE}" "${BACKEND_IMAGE_NAME}:latest"
+docker tag "${FRONTEND_CANDIDATE_IMAGE}" "${FRONTEND_IMAGE_NAME}:latest"
 DEPLOY_STARTED=true
 
 compose config --quiet
-compose up -d --no-build mysql backend nginx
+compose up -d --no-build mysql
+compose up -d --no-build --no-deps --force-recreate backend frontend
+compose up -d --no-build --force-recreate nginx
 
 echo "Waiting for the backend health check."
 for attempt in $(seq 1 30); do
@@ -114,8 +143,14 @@ for attempt in $(seq 1 30); do
     sleep 5
 done
 
+compose exec -T frontend \
+    wget --quiet --spider http://localhost/frontend-health
+
 curl --fail --silent --show-error \
     https://i15a307.p.ssafy.io/actuator/health >/dev/null
+
+curl --fail --silent --show-error \
+    https://i15a307.p.ssafy.io/ >/dev/null
 
 compose ps
 DEPLOY_STARTED=false
