@@ -16,12 +16,24 @@ import { useAuthStore } from '@/stores/auth.store'
 /*  (세션 등 몰입형 화면은 이 셸 밖에 둔다 — router 참고)                        */
 /* -------------------------------------------------------------------------- */
 
-const NAV: readonly { to: string; label: string; icon: IconName; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
+
+/** 데스크탑 상단 탭. 마이페이지는 우측 아바타가 맡으므로 여기 넣지 않는다. */
+const NAV: readonly NavItem[] = [
   { to: '/', label: '홈', icon: 'home', end: true },
   { to: '/matching', label: '매칭', icon: 'heart' },
   { to: '/reports', label: '리포트', icon: 'report' },
   { to: '/growth', label: '성장', icon: 'sparkle' },
 ]
+
+/**
+ * 모바일 하단 네비. 상단 헤더가 `md:block` 이라 **모바일에는 아바타 진입점이 아예 없다** —
+ * 마이페이지로 갈 길이 없어서 여기에 항목을 더한다.
+ *
+ * 라벨을 '마이페이지'가 아니라 '마이'로 둔 이유: `.bt-nav__item` 이 `min-width: 56px` 이고
+ * 나머지 라벨이 전부 2~3자라, 5자를 넣으면 이 칸만 넓어져 간격이 어긋난다.
+ */
+const MOBILE_NAV: readonly NavItem[] = [...NAV, { to: '/me', label: '마이', icon: 'user' }]
 
 export function AppShell() {
   const [notiOpen, setNotiOpen] = useState(false)
@@ -116,7 +128,7 @@ export function AppShell() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--bt-color-border)] bg-surface md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <BottomNav items={NAV.map(({ to, label, icon, end }) => ({ to, label, icon, end }))} />
+        <BottomNav items={MOBILE_NAV.map(({ to, label, icon, end }) => ({ to, label, icon, end }))} />
       </div>
     </div>
   )
