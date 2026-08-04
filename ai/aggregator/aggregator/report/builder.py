@@ -251,6 +251,15 @@ def _format_metrics(metrics: SpeakerMetrics | None, duration_ms: int) -> str:
         f"- 말 끊기: {metrics.interruption_count}회 (맞장구는 제외한 수)",
         f"- 맞장구: {metrics.backchannel_count}회",
     ]
+    if metrics.filler_breakdown:
+        breakdown = ", ".join(
+            f'"{token}" {count}회'
+            for token, count in sorted(
+                metrics.filler_breakdown.items(),
+                key=lambda item: (-item[1], item[0]),
+            )
+        )
+        lines.append(f"- 필러워드별: {breakdown}")
     if metrics.vision_measured:
         lines += [
             f"- 미소: {metrics.smile_episode_count}회",

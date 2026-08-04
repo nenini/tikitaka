@@ -52,6 +52,7 @@ BACKCHANNEL_MAX_MS = 1_500
 
 SCORE_MIN = 1.0
 SCORE_MAX = 5.0
+VISION_COVERAGE_THRESHOLD = 0.70
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,7 @@ class SpeakerMetrics:
     speaking_ratio: float | None
     question_count: int
     filler_count: int
+    filler_breakdown: dict[str, int]
     long_silence_count: int
     interruption_count: int
     backchannel_count: int
@@ -257,8 +259,16 @@ def _score_question() -> AxisScore:
 
 def _score_reaction(vision: VisionInput | None, backchannels: int, duration_ms: int) -> AxisScore:
     """리액션 — 미소 에피소드 + 말맞장구. vision 없으면 맞장구만으로는 판정하지 않는다."""
-    if vision is None or not vision.available:
+    if vision is None or vision.coverage is None:
         return AxisScore(AXIS_REACTION, None, None, False, "vision 미수신 — 측정 부족")
+    if vision.coverage < VISION_COVERAGE_THRESHOLD:
+        return AxisScore(
+            AXIS_REACTION,
+            None,
+            None,
+            False,
+            f"vision 커버리지 {vision.coverage:.0%} — 측정 부족",
+        )
     smiles = vision.count("SMILE_STARTED")
     normalized = _per_30min(smiles + backchannels, duration_ms)
     score = _interpolate(normalized, ((2.0, 1.0), (5.0, 2.0), (10.0, 3.0), (18.0, 4.0), (30.0, 5.0)))
@@ -273,8 +283,16 @@ def _score_nonverbal(vision: VisionInput | None, duration_ms: int) -> AxisScore:
 
     문서 정의는 '화면 응시 비율'이지만 누적 시간이 상태에 없어 **횟수**로 대신한다.
     """
-    if vision is None or not vision.available:
+    if vision is None or vision.coverage is None:
         return AxisScore(AXIS_NONVERBAL, None, None, False, "vision 미수신 — 측정 부족")
+    if vision.coverage < VISION_COVERAGE_THRESHOLD:
+        return AxisScore(
+            AXIS_NONVERBAL,
+            None,
+            None,
+            False,
+            f"vision 커버리지 {vision.coverage:.0%} — 측정 부족",
+        )
     away = vision.count("GAZE_AWAY_STARTED") + vision.count("FACE_MISSING_STARTED")
     normalized = _per_30min(away, duration_ms)
     score = _interpolate(normalized, ((2.0, 5.0), (5.0, 4.0), (9.0, 3.0), (14.0, 2.0), (20.0, 1.0)))
@@ -289,13 +307,19 @@ def _metrics_for(
 ) -> tuple[SpeakerMetrics, int]:
     interruptions, backchannels = count_overlaps(timeline, speaker.speaker_id)
     vision = report.vision_for(speaker.speaker_id)
-    vision_measured = report.vision_enabled and vision is not None and vision.available
+    vision_measured = (
+        report.vision_enabled
+        and vision is not None
+        and vision.coverage is not None
+        and vision.coverage >= VISION_COVERAGE_THRESHOLD
+    )
     metrics = SpeakerMetrics(
         speaker_id=speaker.speaker_id,
         speaking_ms=speaker.speaking_ms,
         speaking_ratio=_ratio(report, speaker.speaker_id),
         question_count=speaker.question_count,
         filler_count=speaker.filler_count,
+        filler_breakdown=dict(speaker.filler_breakdown),
         long_silence_count=count_long_silences(timeline, SILENCE_THRESHOLD_MS),
         interruption_count=interruptions,
         backchannel_count=backchannels,
@@ -325,7 +349,11 @@ def score_report(report: ReportInput) -> ReportScores:
     for speaker in report.speakers:
         speaker_metrics, backchannels = _metrics_for(report, speaker, timeline)
         metrics.append(speaker_metrics)
-        vision = report.vision_for(speaker.speaker_id) if report.vision_enabled else None
+        vision = (
+            report.vision_for(speaker.speaker_id)
+            if report.vision_enabled
+            else None
+        )
         axes[speaker.speaker_id] = (
             _score_flow(speaker_metrics.long_silence_count, duration),
             _score_question(),

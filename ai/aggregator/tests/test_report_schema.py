@@ -62,8 +62,8 @@ def _report(*, vision: bool = True) -> ReportInput:
         ),
         vision=(
             VisionInput(A, vision, {"SMILE_STARTED": 7, "GAZE_AWAY_STARTED": 9,
-                                    "FACE_MISSING_STARTED": 1}),
-            VisionInput(B, vision, {}),
+                                    "FACE_MISSING_STARTED": 1}, 1.0 if vision else 0.0),
+            VisionInput(B, vision, {}, 1.0 if vision else 0.0),
         ),
         vision_enabled=vision,
     )

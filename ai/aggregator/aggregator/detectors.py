@@ -67,6 +67,10 @@ class FillerDetector(Detector):
             return []
         speaker = state.speaker(utterance.speaker_id)
         speaker.filler_count += len(hits)
+        for token in hits:
+            speaker.filler_breakdown[token] = (
+                speaker.filler_breakdown.get(token, 0) + 1
+            )
         event = FillerDetected(
             session_id=state.session_id,
             speaker_id=utterance.speaker_id,

@@ -60,12 +60,20 @@ def _report(*, vision: bool = True) -> ReportInput:
         session_id="s1",
         session_duration_ms=30 * 60 * 1000,
         speakers=(
-            SpeakerInput(A, mine, sum(u.duration_ms for u in mine), 2, 4),
+            SpeakerInput(
+                A,
+                mine,
+                sum(u.duration_ms for u in mine),
+                2,
+                4,
+                {"뭐": 3, "음": 1},
+            ),
             SpeakerInput(B, yours, sum(u.duration_ms for u in yours), 1, 1),
         ),
         vision=(
-            VisionInput(A, vision, {"SMILE_STARTED": 6, "GAZE_AWAY_STARTED": 2}),
-            VisionInput(B, vision, {}),
+            VisionInput(A, vision, {"SMILE_STARTED": 6, "GAZE_AWAY_STARTED": 2},
+                        1.0 if vision else 0.0),
+            VisionInput(B, vision, {}, 1.0 if vision else 0.0),
         ),
         vision_enabled=vision,
     )
@@ -112,6 +120,7 @@ def test_prompt_injects_computed_numbers() -> None:
     assert "재계산 금지" in prompt
     assert "말 끊기" in prompt
     assert "MARRIAGE_PRESSURE" in prompt  # 사전이 프롬프트에 들어간다
+    assert '"뭐" 3회' in prompt
 
 
 def test_prompt_forbids_quotes_when_not_consented() -> None:

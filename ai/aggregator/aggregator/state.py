@@ -40,6 +40,7 @@ class SpeakerState:
     speaking_ms: int = 0
     question_count: int = 0
     filler_count: int = 0
+    filler_breakdown: dict[str, int] = field(default_factory=dict)
 
     @property
     def last_end_ms(self) -> int:
@@ -59,6 +60,10 @@ class VisionUserState:
     low_smile_observed_ms: float = 0.0
     low_smile_episode: int = 0
     hand_over_mouth_active: bool = False
+    metric_snapshot_count: int = 0
+    usable_snapshot_count: int = 0
+    observation_window_ms: float = 0.0
+    usable_observed_ms: float = 0.0
 
     def apply_behavior(self, event: VisionBehaviorEvent) -> None:
         self.latest_behavior = event
@@ -148,6 +153,15 @@ class SessionState:
         vision = self.vision_user(event.user_id)
         vision.latest_metric = event
         vision.vision_available = event.payload.quality.usable
+        interval = event.payload.observation_interval
+        vision.metric_snapshot_count += 1
+        vision.observation_window_ms += (
+            interval.ended_at_session_elapsed_ms
+            - interval.started_at_session_elapsed_ms
+        )
+        if event.payload.quality.usable:
+            vision.usable_snapshot_count += 1
+            vision.usable_observed_ms += interval.observed_duration_ms
 
     def speaking_ratio(self, speaker_id: str) -> float | None:
         """화자 발화시간 / 두 화자 발화시간 합. 1명뿐이면 None(비율 무의미)."""

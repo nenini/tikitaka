@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from aggregator.state import SessionState, Utterance
+from aggregator.state import SessionState, Utterance, VisionUserState
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,7 @@ class VisionInput:
     user_id: str
     available: bool
     behavior_counts: dict[str, int] = field(default_factory=dict)
+    coverage: float | None = None
 
     def count(self, event_type: str) -> int:
         return self.behavior_counts.get(event_type, 0)
@@ -39,6 +40,7 @@ class SpeakerInput:
     speaking_ms: int
     question_count: int
     filler_count: int
+    filler_breakdown: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -82,21 +84,46 @@ def build_report_input(
     session_duration_ms를 안 주면 마지막 발화 종료 시각으로 대신한다
     (BE가 actualStartAt~endedAt을 주면 그 값을 쓰는 편이 정확하다).
     """
+    speaker_ids = tuple(
+        dict.fromkeys((*state.participant_user_ids, *state.speakers))
+    )
     speakers = tuple(
         SpeakerInput(
-            speaker_id=speaker.speaker_id,
-            utterances=tuple(speaker.utterances),
-            speaking_ms=speaker.speaking_ms,
-            question_count=speaker.question_count,
-            filler_count=speaker.filler_count,
+            speaker_id=speaker_id,
+            utterances=(
+                tuple(state.speakers[speaker_id].utterances)
+                if speaker_id in state.speakers
+                else ()
+            ),
+            speaking_ms=(
+                state.speakers[speaker_id].speaking_ms
+                if speaker_id in state.speakers
+                else 0
+            ),
+            question_count=(
+                state.speakers[speaker_id].question_count
+                if speaker_id in state.speakers
+                else 0
+            ),
+            filler_count=(
+                state.speakers[speaker_id].filler_count
+                if speaker_id in state.speakers
+                else 0
+            ),
+            filler_breakdown=(
+                dict(state.speakers[speaker_id].filler_breakdown)
+                if speaker_id in state.speakers
+                else {}
+            ),
         )
-        for speaker in state.speakers.values()
+        for speaker_id in speaker_ids
     )
     vision = tuple(
         VisionInput(
             user_id=user.user_id,
             available=user.vision_available,
             behavior_counts=dict(user.behavior_event_counts),
+            coverage=_vision_coverage(user),
         )
         for user in state.vision_users.values()
     )
@@ -110,3 +137,21 @@ def build_report_input(
         vision=vision,
         vision_enabled=vision_enabled,
     )
+
+
+def _vision_coverage(user: VisionUserState) -> float | None:
+    """Return the usable share of the browser's Vision observation window."""
+    if user.observation_window_ms > 0:
+        return min(
+            1.0,
+            max(0.0, user.usable_observed_ms / user.observation_window_ms),
+        )
+    if user.metric_snapshot_count > 0:
+        return min(
+            1.0,
+            max(
+                0.0,
+                user.usable_snapshot_count / user.metric_snapshot_count,
+            ),
+        )
+    return None

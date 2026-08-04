@@ -195,7 +195,8 @@ def _report(*, empty: bool = False) -> ReportInput:
             SpeakerInput(A, mine, 10_000, 0, 3),
             SpeakerInput(B, yours, 8_000, 0, 1),
         ),
-        vision=(VisionInput(A, True, {"SMILE_STARTED": 2}), VisionInput(B, True, {})),
+        vision=(VisionInput(A, True, {"SMILE_STARTED": 2}, 1.0),
+                VisionInput(B, True, {}, 1.0)),
         vision_enabled=True,
     )
 

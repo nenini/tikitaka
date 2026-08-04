@@ -81,7 +81,8 @@ def _report(
     )
     vision = tuple(
         VisionInput(user_id=speaker, available=vision_available,
-                    behavior_counts=dict(vision_counts or {}))
+                    behavior_counts=dict(vision_counts or {}),
+                    coverage=1.0 if vision_available else 0.0)
         for speaker in by_speaker
     )
     return ReportInput(
@@ -248,6 +249,33 @@ def test_vision_axes_measured_when_available() -> None:
     assert axes[AXIS_NONVERBAL].measured
 
 
+def test_vision_axes_unmeasured_below_seventy_percent_coverage() -> None:
+    report = _report(
+        [_u(A, 0, 10_000), _u(B, 10_100, 20_000)],
+        vision_counts={"SMILE_STARTED": 12},
+    )
+    low_coverage = ReportInput(
+        session_id=report.session_id,
+        session_duration_ms=report.session_duration_ms,
+        speakers=report.speakers,
+        vision=tuple(
+            VisionInput(
+                item.user_id,
+                item.available,
+                item.behavior_counts,
+                0.69,
+            )
+            for item in report.vision
+        ),
+        vision_enabled=True,
+    )
+
+    axes = {a.axis: a for a in score_report(low_coverage).for_speaker(A)}
+
+    assert not axes[AXIS_REACTION].measured
+    assert not axes[AXIS_NONVERBAL].measured
+
+
 # ── 질문균형 ─────────────────────────────────────────────────────────
 def test_question_axis_is_unmeasured() -> None:
     """STT가 짧은 발화에 문장부호를 안 붙여 질문 집계를 믿을 수 없다.
@@ -288,6 +316,14 @@ def test_build_report_input_snapshots_state() -> None:
     state = SessionState(session_id="s1")
     state.add_utterance(_u(A, 0, 3_000, "안녕하세요"))
     state.add_utterance(_u(B, 3_500, 6_000, "반가워요"))
+    speaker = state.speaker(A)
+    speaker.filler_count = 3
+    speaker.filler_breakdown = {"뭐": 2, "음": 1}
+    vision = state.vision_user(A)
+    vision.metric_snapshot_count = 10
+    vision.usable_snapshot_count = 8
+    vision.observation_window_ms = 10_000
+    vision.usable_observed_ms = 8_000
 
     snapshot = build_report_input(state)
 
@@ -295,6 +331,10 @@ def test_build_report_input_snapshots_state() -> None:
     assert snapshot.session_duration_ms == 6_000
     assert len(snapshot.all_utterances) == 2
     assert snapshot.all_utterances[0].text == "안녕하세요"
+    assert snapshot.speaker(A) is not None
+    assert snapshot.speaker(A).filler_breakdown == {"뭐": 2, "음": 1}  # type: ignore[union-attr]
+    assert snapshot.vision_for(A) is not None
+    assert snapshot.vision_for(A).coverage == 0.8  # type: ignore[union-attr]
 
     # 스냅샷 이후 state가 바뀌어도 스냅샷은 그대로여야 한다
     state.add_utterance(_u(A, 7_000, 8_000, "나중 발화"))

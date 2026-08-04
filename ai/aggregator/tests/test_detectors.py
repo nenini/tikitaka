@@ -64,6 +64,9 @@ def test_filler_counted() -> None:
 
     fillers = [event for event in out if isinstance(event, FillerDetected)]
     assert len(fillers) == 1
+    speaker = agg.state.speaker("user-A")
+    assert speaker.filler_count == 3
+    assert speaker.filler_breakdown == {"음": 1, "그": 1, "약간": 1}
 
 
 def test_silence_fires_once_then_resets() -> None:
