@@ -269,7 +269,7 @@ class FlywayMigrationTests {
 				"CONTENTTEXT"
 		);
 
-		assertThat(migrationCount).isEqualTo(36);
+		assertThat(migrationCount).isEqualTo(38);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);

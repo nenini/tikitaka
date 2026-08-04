@@ -26,6 +26,7 @@ import com.date.backend.domain.silence.repository.SilenceEventRepository;
 import com.date.backend.domain.survey.repository.FaceTagCatalogRepository;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,14 +35,17 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
 		"spring.datasource.url=jdbc:h2:mem:ai-session-assist-integration;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
@@ -89,6 +93,17 @@ class AiSessionAssistIntegrationTest {
 
 	@MockitoBean
 	private LiveKitRoomManager liveKitRoomManager;
+	@MockitoBean
+	private Clock clock;
+
+	@BeforeEach
+	void setUpClock() {
+		ZoneId zone = ZoneId.systemDefault();
+		when(clock.getZone()).thenReturn(zone);
+		when(clock.instant()).thenReturn(
+				SESSION_TIME.plusSeconds(2).atZone(zone).toInstant()
+		);
+	}
 
 	@Test
 	void coachingSilenceAndSafetyEventsShareActiveSessionAndRemainIdempotent() {
