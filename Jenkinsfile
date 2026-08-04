@@ -43,7 +43,7 @@ pipeline {
                       -v "$WORKSPACE:/workspace" \
                       -w /workspace/ai/vision-analysis \
                       "$NODE_IMAGE" \
-                      sh -c 'npm ci && npm run build'
+                      sh -c 'corepack pnpm install --frozen-lockfile && corepack pnpm run build'
                 '''
             }
         }
