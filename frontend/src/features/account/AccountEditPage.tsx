@@ -117,16 +117,7 @@ export function AccountEditPage() {
 
 /* 얼굴 재촬영은 온보딩 촬영 화면을 모드로 재사용한다 — features/face/FaceCapturePage */
 
-export function SurveyEditPage() {
-  return (
-    <AuthPlaceholder
-      title="이상형 · 개선 목표 설문 재응답 (W-19b)"
-      note="온보딩 설문(W-06)을 다시 응답합니다 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
+/* 설문 재응답은 온보딩 설문 화면을 모드로 재사용한다 — features/survey/SurveyPage */
 
 export function ProfileEditPage() {
   return (

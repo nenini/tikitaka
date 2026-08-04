@@ -9,14 +9,15 @@ import { SignupPage } from '@/features/auth/SignupPage'
 import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
-import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+import { ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+// 설문(W-06 / W-19b) — 온보딩 등록과 재응답이 같은 화면을 모드로 나눠 쓴다
+import { SurveyPage, SurveyEditPage } from '@/features/survey/SurveyPage'
 import { OAuthCallbackPage } from '@/features/auth/OAuthCallbackPage'
 // 계정(#28) — 마이 · 동의 관리 · 개인정보 수정 허브
 import { MyPage } from '@/features/account/MyPage'
 import { ConsentManagePage } from '@/features/account/ConsentManagePage'
 import {
   AccountEditPage,
-  SurveyEditPage,
   ProfileEditPage,
   RegionEditPage,
 } from '@/features/account/AccountEditPage'
