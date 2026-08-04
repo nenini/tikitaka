@@ -47,6 +47,8 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	maxHeapSize = '2g'
+	maxParallelForks = 1
 }
 
 tasks.withType(JavaCompile).configureEach {
