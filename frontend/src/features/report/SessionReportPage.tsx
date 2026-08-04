@@ -19,14 +19,28 @@ export function SessionReportPage() {
   const [retrying, setRetrying] = useState(false)
   const aliveRef = useRef(true)
 
+  /** 서버에 리포트 기능 자체가 없는가(404). 생성 실패와 구분해 다른 문구를 쓴다. */
+  const [unavailable, setUnavailable] = useState(false)
+
   const load = useCallback(async () => {
-    const s = await getReportStatus(sessionId)
-    if (!aliveRef.current) return
-    setStatus(s.reportStatus)
-    setDeadlineAt(s.peerReviewDeadlineAt ?? null)
-    if (s.reportStatus === 'COMPLETED') {
-      const r = await getSessionReport(sessionId)
-      if (aliveRef.current) setReport(r)
+    try {
+      const s = await getReportStatus(sessionId)
+      if (!aliveRef.current) return
+      if (s == null) {
+        // 엔드포인트 부재 — 만들다 실패한 게 아니라 아직 없는 기능이다.
+        setUnavailable(true)
+        return
+      }
+      setUnavailable(false)
+      setStatus(s.reportStatus)
+      setDeadlineAt(s.peerReviewDeadlineAt ?? null)
+      if (s.reportStatus === 'COMPLETED') {
+        const r = await getSessionReport(sessionId)
+        if (aliveRef.current) setReport(r)
+      }
+    } catch {
+      // 네트워크·5xx — 상태를 세우지 않고 다음 시도에 맡긴다(가짜 완료를 만들지 않는다)
+      if (aliveRef.current) setStatus('FAILED')
     }
   }, [sessionId])
 
@@ -55,6 +69,26 @@ export function SessionReportPage() {
     } finally {
       setRetrying(false)
     }
+  }
+
+  // 아직 서버에 없는 기능이다. '실패'로 보여주면 다시 시도하면 될 것처럼 오해시킨다.
+  if (unavailable) {
+    return (
+      <main className="mx-auto w-full max-w-[560px] px-5 py-16">
+        <Card>
+          <EmptyState
+            icon={<Icon name="sparkle" size={28} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
+            title="AI 리포트는 준비 중이에요"
+            text="세션 분석 리포트는 아직 제공되지 않아요. 준비되면 알려드릴게요."
+            action={
+              <Button variant="primary" onClick={() => navigate(`/session/${sessionId}/review`)}>
+                평가 결과 보기
+              </Button>
+            }
+          />
+        </Card>
+      </main>
+    )
   }
 
   if (status == null) return <ReportSkeleton />
