@@ -271,11 +271,17 @@ class FlywayMigrationTests {
 		Integer sessionAnalysisReceiptTableCount = tableCount("SESSION_ANALYSIS_RECEIPTS");
 		Integer sessionParticipantAnalysisTableCount = tableCount("SESSION_PARTICIPANT_ANALYSES");
 		Integer sessionAnalysisEvidenceTableCount = tableCount("SESSION_ANALYSIS_EVIDENCE_SEGMENTS");
+		Integer sessionReportAttemptColumnCount = columnCount("SESSION_REPORTS", "ATTEMPTCOUNT");
+		Integer sessionReportFailureCodeColumnCount = columnCount("SESSION_REPORTS", "FAILURECODE");
+		Integer sessionReportPayloadHashColumnCount = columnCount("SESSION_REPORTS", "RESULTPAYLOADHASH");
 
-		assertThat(migrationCount).isEqualTo(39);
+		assertThat(migrationCount).isEqualTo(40);
 		assertThat(sessionAnalysisReceiptTableCount).isEqualTo(1);
 		assertThat(sessionParticipantAnalysisTableCount).isEqualTo(1);
 		assertThat(sessionAnalysisEvidenceTableCount).isEqualTo(1);
+		assertThat(sessionReportAttemptColumnCount).isEqualTo(1);
+		assertThat(sessionReportFailureCodeColumnCount).isEqualTo(1);
+		assertThat(sessionReportPayloadHashColumnCount).isEqualTo(1);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);

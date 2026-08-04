@@ -8,7 +8,11 @@ public enum ReportErrorCode implements ErrorCode {
 	ANALYSIS_PARTICIPANT_NOT_FOUND(HttpStatus.BAD_REQUEST, "ANALYSIS_PARTICIPANT_NOT_FOUND", "세션에 참여하지 않은 사용자의 분석 결과가 포함되어 있습니다."),
 	ANALYSIS_CONTRACT_INVALID(HttpStatus.BAD_REQUEST, "ANALYSIS_CONTRACT_INVALID", "세션 분석 결과 계약이 올바르지 않습니다."),
 	ANALYSIS_IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "ANALYSIS_IDEMPOTENCY_CONFLICT", "동일한 멱등 키 또는 분석 버전에 다른 요청이 이미 저장되어 있습니다."),
-	ANALYSIS_SERIALIZATION_FAILED(HttpStatus.BAD_REQUEST, "ANALYSIS_SERIALIZATION_FAILED", "세션 분석 지표를 저장할 수 없습니다.");
+	ANALYSIS_SERIALIZATION_FAILED(HttpStatus.BAD_REQUEST, "ANALYSIS_SERIALIZATION_FAILED", "세션 분석 지표를 저장할 수 없습니다."),
+	REPORT_NOT_PREPARED(HttpStatus.CONFLICT, "REPORT_NOT_PREPARED", "생성 요청이 준비되지 않은 세션 리포트입니다."),
+	REPORT_RESULT_CONTRACT_INVALID(HttpStatus.BAD_REQUEST, "REPORT_RESULT_CONTRACT_INVALID", "AI 리포트 결과 계약이 올바르지 않습니다."),
+	REPORT_RESULT_CONFLICT(HttpStatus.CONFLICT, "REPORT_RESULT_CONFLICT", "동일한 리포트 버전에 다른 결과가 이미 저장되어 있습니다."),
+	REPORT_GENERATION_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_GENERATION_REQUEST_FAILED", "AI 리포트 생성 요청에 실패했습니다.");
 
 	private final HttpStatus status;
 	private final String code;

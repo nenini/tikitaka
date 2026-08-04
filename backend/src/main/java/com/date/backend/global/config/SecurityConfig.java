@@ -42,6 +42,7 @@ public class SecurityConfig {
 			"/internal/ai/question-recommendations",
 			"/internal/ai/safety-events",
 			"/internal/v1/session-analyses",
+			"/internal/v1/session-reports/results",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",

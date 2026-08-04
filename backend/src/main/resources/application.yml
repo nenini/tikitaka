@@ -120,6 +120,17 @@ ai:
     internal-token: ${AI_TRANSCRIPT_INTERNAL_TOKEN:${AI_SESSION_INTERNAL_TOKEN:}}
     max-attempts: ${AI_TRANSCRIPT_MAX_ATTEMPTS:5}
     retry-delay: ${AI_TRANSCRIPT_RETRY_DELAY:2s}
+  report:
+    base-url: ${AI_REPORT_BASE_URL:${AI_SESSION_BASE_URL:}}
+    generation-path: ${AI_REPORT_GENERATION_PATH:/internal/v1/session-reports/generate}
+    connect-timeout: ${AI_REPORT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_REPORT_REQUEST_TIMEOUT:10s}
+    max-attempts: ${AI_REPORT_MAX_ATTEMPTS:3}
+    retry-delay: ${AI_REPORT_RETRY_DELAY:2s}
+    generation-timeout: ${AI_REPORT_GENERATION_TIMEOUT:5m}
+    timeout-batch-size: ${AI_REPORT_TIMEOUT_BATCH_SIZE:100}
+    timeout-monitor-fixed-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_FIXED_DELAY_MS:30000}
+    timeout-monitor-initial-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_INITIAL_DELAY_MS:30000}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
