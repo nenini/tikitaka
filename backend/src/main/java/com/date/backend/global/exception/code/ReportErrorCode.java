@@ -12,7 +12,10 @@ public enum ReportErrorCode implements ErrorCode {
 	REPORT_NOT_PREPARED(HttpStatus.CONFLICT, "REPORT_NOT_PREPARED", "생성 요청이 준비되지 않은 세션 리포트입니다."),
 	REPORT_RESULT_CONTRACT_INVALID(HttpStatus.BAD_REQUEST, "REPORT_RESULT_CONTRACT_INVALID", "AI 리포트 결과 계약이 올바르지 않습니다."),
 	REPORT_RESULT_CONFLICT(HttpStatus.CONFLICT, "REPORT_RESULT_CONFLICT", "동일한 리포트 버전에 다른 결과가 이미 저장되어 있습니다."),
-	REPORT_GENERATION_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_GENERATION_REQUEST_FAILED", "AI 리포트 생성 요청에 실패했습니다.");
+	REPORT_GENERATION_REQUEST_FAILED(HttpStatus.BAD_GATEWAY, "REPORT_GENERATION_REQUEST_FAILED", "AI 리포트 생성 요청에 실패했습니다."),
+	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND", "사용자 리포트를 찾을 수 없습니다."),
+	REPORT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "REPORT_ACCESS_DENIED", "해당 리포트를 조회할 권한이 없습니다."),
+	REPORT_RESPONSE_SERIALIZATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "REPORT_RESPONSE_SERIALIZATION_FAILED", "저장된 리포트 분석 지표를 읽을 수 없습니다.");
 
 	private final HttpStatus status;
 	private final String code;

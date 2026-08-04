@@ -32,4 +32,9 @@ public class SessionParticipantAnalysis {
 	}
 
 	public Long getId() { return id; }
+	public Long getSessionId() { return sessionId; }
+	public Long getUserId() { return userId; }
+	public AnalysisStatus getStatus() { return status; }
+	public String getAxesJson() { return axesJson; }
+	public String getMetricsJson() { return metricsJson; }
 }

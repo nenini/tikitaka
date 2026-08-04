@@ -27,4 +27,10 @@ public class SessionAnalysisEvidenceSegment {
 		this.endMs = endMs;
 		this.description = description;
 	}
+
+	public String getEvidenceKey() { return evidenceKey; }
+	public AnalysisEvidenceType getEventType() { return eventType; }
+	public long getStartMs() { return startMs; }
+	public long getEndMs() { return endMs; }
+	public String getDescription() { return description; }
 }

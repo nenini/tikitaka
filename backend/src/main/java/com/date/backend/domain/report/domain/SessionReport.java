@@ -140,4 +140,11 @@ public class SessionReport {
 	public String getFailureReason() { return failureReason; }
 	public String getSummaryText() { return summaryText; }
 	public List<String> getStrengths() { return strengths; }
+	public List<String> getImprovements() { return improvements; }
+	public List<String> getNextMissions() { return nextMissions; }
+	public String getAnalysisVersion() { return analysisVersion; }
+	public LocalDateTime getRequestedAt() { return requestedAt; }
+	public LocalDateTime getGenerationStartedAt() { return generationStartedAt; }
+	public LocalDateTime getGeneratedAt() { return generatedAt; }
+	public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

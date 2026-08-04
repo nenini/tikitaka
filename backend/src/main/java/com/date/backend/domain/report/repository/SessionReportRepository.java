@@ -14,6 +14,7 @@ import com.date.backend.domain.report.domain.SessionReportStatus;
 public interface SessionReportRepository extends JpaRepository<SessionReport, Long> {
 	List<SessionReport> findAllBySessionIdOrderByUserIdAsc(Long sessionId);
 	boolean existsBySessionIdAndUserId(Long sessionId, Long userId);
+	Optional<SessionReport> findBySessionIdAndUserId(Long sessionId, Long userId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select report from SessionReport report where report.sessionId = :sessionId and report.userId = :userId")
