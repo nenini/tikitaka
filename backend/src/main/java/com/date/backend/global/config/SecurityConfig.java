@@ -82,6 +82,7 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/rooms/**").authenticated()
 						.requestMatchers("/api/v1/sessions/**").authenticated()
 						.requestMatchers("/api/v1/notifications/**").authenticated()
+						.requestMatchers("/api/v1/growth/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
 				)
