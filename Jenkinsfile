@@ -76,6 +76,16 @@ pipeline {
             }
         }
 
+        stage('Deployment Decision') {
+            steps {
+                script {
+                    echo "GIT_BRANCH=${env.GIT_BRANCH ?: '(empty)'}, " +
+                         "BRANCH_NAME=${env.BRANCH_NAME ?: '(empty)'}, " +
+                         "DEPLOY_PRODUCTION=${params.DEPLOY_PRODUCTION}"
+                }
+            }
+        }
+
         stage('Deploy Production') {
             when {
                 expression {
@@ -84,6 +94,18 @@ pipeline {
                     def isDeploymentFeature = branch == 'feature/#44-cicd-deployment' ||
                                               branch.endsWith('/feature/#44-cicd-deployment') ||
                                               branch.endsWith('feature/#44-cicd-deployment')
+                    if (!isDevelop) {
+                        isDevelop = sh(
+                            script: '''test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/develop)"''',
+                            returnStatus: true
+                        ) == 0
+                    }
+                    if (!isDeploymentFeature) {
+                        isDeploymentFeature = sh(
+                            script: '''test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/remotes/origin/feature/#44-cicd-deployment')"''',
+                            returnStatus: true
+                        ) == 0
+                    }
                     return isDevelop || (isDeploymentFeature && params.DEPLOY_PRODUCTION == true)
                 }
             }
