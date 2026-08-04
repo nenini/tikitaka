@@ -67,6 +67,8 @@ services:
       dockerfile: Dockerfile
       target: runtime
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ${ENV_FILE:-/opt/a307/.env.prod}
     environment:
