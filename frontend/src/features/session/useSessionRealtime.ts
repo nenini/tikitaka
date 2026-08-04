@@ -153,7 +153,14 @@ export function useSessionRealtime({
     const event = body as CoachingMessageEvent
     if (!event?.messageText) return
     // 코칭 스토어는 "화면에 띄울 카드"만 담는다 — 원시 이벤트를 그대로 넣지 않는다.
-    pushCoachMessage({ tone: toCoachTone(event.coachingType), text: event.messageText })
+    // 우선순위와 만료(TTL)는 겹침·자동 사라짐 처리에 쓰이므로 반드시 함께 넘긴다.
+    pushCoachMessage({
+      tone: toCoachTone(event.coachingType),
+      text: event.messageText,
+      priority: event.priority,
+      triggeredAtSessionElapsedMs: event.triggeredAtSessionElapsedMs,
+      expiresAtSessionElapsedMs: event.expiresAtSessionElapsedMs,
+    })
   })
 
   useStompSubscription(connection, topics?.safety ?? null, (body) => {

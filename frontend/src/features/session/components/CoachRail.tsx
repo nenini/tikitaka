@@ -17,8 +17,14 @@ export interface CoachRailProps {
   /**
    * 현재 띄울 코칭 메시지. **한 번에 하나만** 받는다(원칙 2) —
    * 배열을 받아 쌓으면 규칙이 화면에서 조용히 깨진다.
+   * 어느 것을 띄울지는 부모가 우선순위·도착순으로 고른다.
    */
   message: CoachMessage | null
+  /**
+   * 뒤에서 대기 중인 코칭 수.
+   * 표시하지 않으면 사용자는 코칭이 하나뿐이라고 믿고 닫아버린다.
+   */
+  pendingMessageCount?: number
   onDismissMessage: () => void
   /** 안전 경고 카드. 코칭보다 위에 놓는다 — 성격이 다르고 더 급하다 */
   safetyWarning?: ReactNode
@@ -54,6 +60,7 @@ const TONE_TITLE: Record<CoachMessage['tone'], string> = {
 export function CoachRail({
   silenceHint,
   message,
+  pendingMessageCount = 0,
   onDismissMessage,
   safetyWarning,
   goalLabel,
@@ -89,14 +96,25 @@ export function CoachRail({
       {silenceHint}
 
       {message && (
-        <CoachToast
-          messageId={message.id}
-          title={TONE_TITLE[message.tone]}
-          text={message.text}
-          // 표정·반응 추정 기반 코칭에는 헤지 표기가 필수다(원칙 3).
-          hedge={message.tone !== 'neutral'}
-          onDismiss={onDismissMessage}
-        />
+        <div className="flex flex-col gap-1">
+          <CoachToast
+            messageId={message.id}
+            title={TONE_TITLE[message.tone]}
+            text={message.text}
+            // 표정·반응 추정 기반 코칭에는 헤지 표기가 필수다(원칙 3).
+            hedge={message.tone !== 'neutral'}
+            // 서버가 정한 유효 시간이 지나면 스스로 사라진다(COACH-04).
+            // 사용자가 직접 닫는 길도 그대로 열어 둔다.
+            autoDismissMs={message.ttlMs}
+            urgent={message.priority === 'HIGH'}
+            onDismiss={onDismissMessage}
+          />
+          {pendingMessageCount > 0 && (
+            <span className="bt-caption bt-muted" role="status" aria-live="polite">
+              코칭 <span className="bt-numeric">{pendingMessageCount}</span>건이 더 기다리고 있어요
+            </span>
+          )}
+        </div>
       )}
 
       {/* 발화 비율 지표는 서버 경로가 생길 때만 그린다(가짜 숫자 금지) */}
