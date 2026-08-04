@@ -126,14 +126,20 @@ def test_runner_withdraw_stops_stream(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_runner_close_flushes_inprogress(monkeypatch: pytest.MonkeyPatch) -> None:
+    """close()가 진행 중 발화를 끝내고 **전사까지 함께** 돌려줘야 한다.
+
+    close()가 SPEECH_ENDED만 돌려주면 세션 마지막 발화의 전사가 worker 출력 큐에
+    남아 그대로 유실된다(2026-08-04 실측 — 고정 오디오 6개에서 전사 7건 전부 사라졌다).
+    호출자가 close() 뒤에 poll_transcripts()를 또 부르게 만들면 잊어버린다.
+    """
     _patch_vad(monkeypatch, start=0, end=8000)
     runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
     e1 = runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
     assert [e.event_type for e in e1] == ["SPEECH_STARTED"]  # 진행 중
     final = runner.close()          # flush → SESSION_ENDED + 전사
-    transcripts = runner.poll_transcripts()
-    assert [e.event_type for e in final] == ["SPEECH_ENDED"]
-    assert [t.event_type for t in transcripts] == ["TRANSCRIPT_FINALIZED"]
+    assert [e.event_type for e in final] == ["SPEECH_ENDED", "TRANSCRIPT_FINALIZED"]
+    # close()가 다 돌려줬으므로 뒤에 또 꺼낼 게 없어야 한다
+    assert runner.poll_transcripts() == []
     ended = final[0]
     assert isinstance(ended, SpeechEndedEvent)
     assert ended.payload.termination_reason == "SESSION_ENDED"
