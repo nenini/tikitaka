@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(
+            name: 'DEPLOY_PRODUCTION',
+            defaultValue: false,
+            description: 'feature/#44 브랜치에서 운영 배포를 수동 검증할 때만 선택합니다. develop 브랜치는 자동 배포됩니다.'
+        )
+    }
+
     options {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
@@ -65,6 +73,23 @@ pipeline {
         stage('Backend Image Build') {
             steps {
                 sh 'docker build --target runtime -t a307-backend:ci-${BUILD_NUMBER} backend'
+            }
+        }
+
+        stage('Deploy Production') {
+            when {
+                expression {
+                    def branch = env.GIT_BRANCH ?: env.BRANCH_NAME ?: ''
+                    return branch == 'origin/develop' ||
+                           branch == 'develop' ||
+                           ((branch == 'origin/feature/#44-cicd-deployment' ||
+                             branch == 'feature/#44-cicd-deployment') &&
+                            params.DEPLOY_PRODUCTION)
+                }
+            }
+            steps {
+                sh 'chmod +x scripts/deploy-prod.sh'
+                sh 'CI_IMAGE=a307-backend:ci-${BUILD_NUMBER} scripts/deploy-prod.sh'
             }
         }
     }
