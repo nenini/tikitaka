@@ -34,6 +34,20 @@ pipeline {
             }
         }
 
+        stage('Vision Package Build') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      --user "$(id -u):$(id -g)" \
+                      -e HOME=/tmp \
+                      -v "$WORKSPACE:/workspace" \
+                      -w /workspace/ai/vision-analysis \
+                      "$NODE_IMAGE" \
+                      sh -c 'npm ci && npm run build'
+                '''
+            }
+        }
+
         stage('Frontend Check') {
             steps {
                 sh '''
