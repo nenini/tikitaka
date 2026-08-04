@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } from '@/components'
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
+import { SIDO } from '@/features/profile/regions'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
@@ -36,13 +37,6 @@ type NickStatus = 'idle' | 'checking' | 'available' | 'taken'
 const GENDERS: { value: ProfileForm['gender']; label: string }[] = [
   { value: 'female', label: '여성' },
   { value: 'male', label: '남성' },
-]
-
-/** 시·도 17개 (행정 표준). 구·군은 수집하지 않는다(정확한 지역 미노출). */
-const SIDO = [
-  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시', '대전광역시',
-  '울산광역시', '세종특별자치시', '경기도', '강원특별자치도', '충청북도', '충청남도',
-  '전북특별자치도', '전라남도', '경상북도', '경상남도', '제주특별자치도',
 ]
 
 /** 데모용 닉네임 중복 확인 스텁. TODO(AUTH): GET /api/me/nickname/check 로 교체. */
