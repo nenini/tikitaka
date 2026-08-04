@@ -1,13 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState, useEffect } from 'react'
 import { Button, Field, Icon, IconButton, Modal, Rating, Switch, Textarea } from '@/components'
-import { blockUser, getReportTypes, reportSessionUser } from './api'
-import { FALLBACK_REPORT_TYPES, PEER_REVIEW_TEXT_MAX } from './types'
-import type { PeerReviewMetricDef, ReportTypeOption } from './types'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { blockUser, reportSessionUser } from './api'
+import { EVALUATION_ITEM_HELP, EVALUATION_TEXT_MAX, MODERATION_DETAIL_MAX, MODERATION_REASONS } from './types'
+import type { EvaluationItemDef, ModerationReasonCode } from './types'
 
 /* ── 정량 평가 한 줄 ────────────────────────────────────── */
 
 export interface MetricRowProps {
-  metric: PeerReviewMetricDef
+  metric: EvaluationItemDef
   value?: number
   onChange: (value: number) => void
   disabled?: boolean
@@ -18,10 +19,14 @@ export interface MetricRowProps {
 }
 
 /**
- * 정량 평가 1행 — 항목명 + 기준 한 줄 + 1~5 Rating.
+ * 정량 평가 1행 — 항목명 + 기준 한 줄 + Rating.
  * Rating 은 네이티브 radio 그룹이라 방향키 탐색이 그대로 동작한다.
+ *
+ * 척도 범위는 서버(`minScore`~`maxScore`)를 따른다. 보조 문구는 서버가 주지 않아
+ * `EVALUATION_ITEM_HELP` 에서 찾고, 모르는 key 면 label 만 그린다.
  */
 export function MetricRow({ metric, value, onChange, disabled, compact, last }: MetricRowProps) {
+  const help = EVALUATION_ITEM_HELP[metric.key]
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-3 py-3"
@@ -30,11 +35,12 @@ export function MetricRow({ metric, value, onChange, disabled, compact, last }: 
     >
       <div className="flex min-w-[8rem] flex-col gap-1">
         <b className="bt-body-sm">{metric.label}</b>
-        {!compact && <span className="bt-caption bt-muted">{metric.help}</span>}
+        {!compact && help && <span className="bt-caption bt-muted">{help}</span>}
       </div>
       <Rating
-        aria-label={`${metric.label} — ${metric.help}`}
-        name={`peer-review-${metric.key}`}
+        aria-label={help ? `${metric.label} — ${help}` : metric.label}
+        name={`peer-evaluation-${metric.key}`}
+        max={metric.maxScore}
         value={value}
         onChange={onChange}
         disabled={disabled}
@@ -56,10 +62,19 @@ export interface FreeTextFieldProps {
   value: string
   onChange: (next: string) => void
   disabled?: boolean
+  /** 서버가 준 상한(`EvaluationItems.maxTextLength`). 응답 전에는 상수로 폴백한다. */
+  maxLength?: number
 }
 
 /** 서술형은 **선택**이다 — required 를 붙이지 않는다(§W-14 규칙). */
-export function FreeTextField({ label, placeholder, value, onChange, disabled }: FreeTextFieldProps) {
+export function FreeTextField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  disabled,
+  maxLength = EVALUATION_TEXT_MAX,
+}: FreeTextFieldProps) {
   return (
     <Field
       label={
@@ -68,12 +83,12 @@ export function FreeTextField({ label, placeholder, value, onChange, disabled }:
           {/* <span className="bt-caption bt-muted">(선택)</span> */}
         </>
       }
-      help={`${value.length} / ${PEER_REVIEW_TEXT_MAX}자`}
+      help={`${value.length} / ${maxLength}자`}
     >
       <Textarea
         rows={3}
         placeholder={placeholder}
-        maxLength={PEER_REVIEW_TEXT_MAX}
+        maxLength={maxLength}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
@@ -160,8 +175,8 @@ export function OverflowMenu({ label, items }: { label: string; items: readonly 
 export interface ReportBlockDialogProps {
   open: boolean
   onClose: () => void
-  sessionId: string
-  opponent: { userId: string; nickname: string }
+  sessionId: number
+  opponent: { userId: number; nickname: string }
   onDone?: () => void
 }
 
@@ -179,33 +194,48 @@ export function ReportBlockDialog({
   opponent,
   onDone,
 }: ReportBlockDialogProps) {
-  const [types, setTypes] = useState<ReportTypeOption[]>([...FALLBACK_REPORT_TYPES])
-  const [typeCode, setTypeCode] = useState<string>('')
+  const [reasonCode, setReasonCode] = useState<ModerationReasonCode | ''>('')
   const [detail, setDetail] = useState('')
   const [alsoBlock, setAlsoBlock] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 닫았다 다시 열면 이전 입력이 남아 있지 않게 초기화한다
   useEffect(() => {
-    if (!open) return
-    let alive = true
-    getReportTypes().then((list) => alive && setTypes(list))
-    return () => {
-      alive = false
-    }
+    if (open) return
+    setReasonCode('')
+    setDetail('')
+    setError(null)
   }, [open])
 
+  const detailText = detail.trim()
+  // 서버가 details 를 @NotBlank 로 받으므로 상세 없이는 제출할 수 없다
+  const canSubmit = Boolean(reasonCode) && detailText.length > 0
+
   async function submit() {
-    if (!typeCode || submitting) return
+    if (!reasonCode || !canSubmit || submitting) return
     setSubmitting(true)
     setError(null)
     try {
-      await reportSessionUser(sessionId, { reportTypeCode: typeCode, detail: detail.trim() || undefined })
-      if (alsoBlock) await blockUser(opponent.userId)
+      await reportSessionUser({
+        sessionId,
+        reportedUserId: opponent.userId,
+        reasonCode,
+        details: detailText,
+      })
+      // 차단 실패로 신고까지 실패한 것처럼 보이지 않게 분리해서 처리한다
+      if (alsoBlock) {
+        try {
+          await blockUser(opponent.userId)
+        } catch {
+          setError('신고는 접수됐지만 차단에 실패했어요. 마이페이지에서 다시 시도해 주세요.')
+          return
+        }
+      }
       onDone?.()
       onClose()
-    } catch {
-      setError('접수에 실패했어요. 잠시 후 다시 시도해 주세요.')
+    } catch (submitError) {
+      setError(errorMessageOf(submitError, '접수에 실패했어요. 잠시 후 다시 시도해 주세요.'))
     } finally {
       setSubmitting(false)
     }
@@ -226,7 +256,7 @@ export function ReportBlockDialog({
             leadingIcon="report"
             onClick={submit}
             loading={submitting}
-            disabled={!typeCode}
+            disabled={!canSubmit}
           >
             접수하기
           </Button>
@@ -240,24 +270,24 @@ export function ReportBlockDialog({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="bt-label mb-1">어떤 점이 문제였나요?</legend>
-          {types.map((t) => (
+          {MODERATION_REASONS.map((t) => (
             <label key={t.code} className="bt-body-sm flex items-center gap-2.5">
               <input
                 type="radio"
-                name="report-type"
+                name="report-reason"
                 value={t.code}
-                checked={typeCode === t.code}
-                onChange={() => setTypeCode(t.code)}
+                checked={reasonCode === t.code}
+                onChange={() => setReasonCode(t.code)}
               />
               {t.label}
             </label>
           ))}
         </fieldset>
 
-        <Field label="상세 설명" help="선택 입력이에요.">
+        <Field label="상세 설명" help={`필수 입력이에요. ${detail.length} / ${MODERATION_DETAIL_MAX}자`}>
           <Textarea
             rows={3}
-            maxLength={PEER_REVIEW_TEXT_MAX}
+            maxLength={MODERATION_DETAIL_MAX}
             placeholder="언제, 어떤 상황이었는지 적어주시면 확인이 빨라져요."
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
