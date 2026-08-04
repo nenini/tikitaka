@@ -1,4 +1,4 @@
-"""MVP conversation coaching: two-sided silence, response and reactions."""
+"""MVP conversation coaching: directed silence, response and reactions."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def _speech_started(
     )
 
 
-def test_silence_sends_one_command_to_each_participant() -> None:
+def test_silence_coaches_only_the_last_speakers_counterpart() -> None:
     aggregator, analysis, coaching = _aggregator()
     aggregator.push_stt_event(
         _transcript("user-a", "반갑습니다.", 0, 1000, client_id=_CLIENT_A)
@@ -95,11 +95,8 @@ def test_silence_sends_one_command_to_each_participant() -> None:
         for command in coaching
         if command.coaching_type == "SILENCE_RECOVERY"
     ]
-    assert {command.target_user_id for command in silence} == {
-        "user-a",
-        "user-b",
-    }
-    assert len(silence) == 2
+    assert len(silence) == 1
+    assert silence[0].target_user_id == "user-b"
 
 
 def test_long_talk_without_verbal_reaction_prompts_listener() -> None:

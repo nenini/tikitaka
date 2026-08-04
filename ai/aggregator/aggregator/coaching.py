@@ -53,6 +53,9 @@ class CoachingCommand(_CamelModel):
     triggered_at_session_elapsed_ms: int
     expires_at_session_elapsed_ms: int
     deduplication_key: str
+    # Runtime-only override. Internal v2 remains stable and Backend receives it
+    # as messageText after local contextual generation.
+    message_text: str | None = Field(default=None, exclude=True)
 
     event_id: str = Field(default_factory=_new_event_id)
     version: Literal[2] = 2

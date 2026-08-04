@@ -7,6 +7,7 @@ import { SessionTimeline } from "../../src/common/SessionTimeline.js";
 import { defaultVisionConfig } from "../../src/vision/config/defaultVisionConfig.js";
 import { visionConfigSchema } from "../../src/vision/config/VisionConfig.js";
 import type { NormalizedFaceFrame } from "../../src/vision/core/NormalizedFaceFrame.js";
+import type { NormalizedHand } from "../../src/vision/core/NormalizedHand.js";
 import { VisionPipeline } from "../../src/vision/core/VisionPipeline.js";
 import type {
   DetectorSuspensionContext,
@@ -78,7 +79,77 @@ function createFactory(): VisionEventFactory {
   );
 }
 
+function createMouthCoveringHand(): NormalizedHand {
+  const centerX = 0.5;
+  const centerY = 0.63;
+  const landmarks = Array.from({ length: 21 }, (_, index) => ({
+    x: centerX + ((index % 4) - 1.5) * 0.018,
+    y: centerY + (Math.floor(index / 4) - 2) * 0.014,
+    z: 0,
+  }));
+  const palmOffsets: Readonly<Record<number, readonly [number, number]>> = {
+    0: [-0.02, 0.08],
+    1: [-0.07, 0.03],
+    5: [-0.07, -0.06],
+    9: [-0.02, -0.08],
+    13: [0.05, -0.06],
+    17: [0.08, 0.03],
+  };
+  for (const [rawIndex, offset] of Object.entries(palmOffsets)) {
+    landmarks[Number(rawIndex)] = {
+      x: centerX + offset[0],
+      y: centerY + offset[1],
+      z: 0,
+    };
+  }
+  return {
+    handedness: "RIGHT",
+    handednessConfidence: 0.95,
+    box: {
+      left: 0.4,
+      top: 0.53,
+      right: 0.6,
+      bottom: 0.73,
+      centerX,
+      centerY,
+      areaRatio: 0.04,
+      inFrameRatio: 1,
+    },
+    landmarks,
+  };
+}
+
 describe("VisionPipeline", () => {
+  it("publishes only reduced hand-over-mouth state in the v4 metric", () => {
+    const pipeline = new VisionPipeline(defaultVisionConfig, createFactory());
+    const hand = createMouthCoveringHand();
+
+    pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 0, hands: [hand] }),
+    );
+    pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 400, hands: [hand] }),
+    );
+    const output = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 1_000, hands: [hand] }),
+    );
+
+    expect(output.metricSnapshot?.version).toBe(4);
+    expect(output.metricSnapshot?.payload.metrics.handOverMouth.active).toBe(
+      true,
+    );
+    expect(
+      output.metricSnapshot?.payload.metrics.handOverMouth.overlapRatio,
+    ).toBeGreaterThanOrEqual(0.45);
+    expect(
+      output.metricSnapshot?.payload.metrics.handOverMouth.confidence,
+    ).toBe(0.95);
+    expect(JSON.stringify(output.metricSnapshot)).not.toContain("landmarks");
+    expect(visionEventSchema.parse(output.metricSnapshot)).toEqual(
+      output.metricSnapshot,
+    );
+  });
+
   it("isolates one detector failure and limits metrics to once per second", () => {
     const screen = new RecordingDetector("screen");
     const smile = new RecordingDetector("smile", true);

@@ -60,6 +60,13 @@ def test_max_per_session() -> None:
     assert policy.evaluate(_silence(3000), state) is None  # 세션 상한 초과
 
 
+def test_default_coaching_limits_match_mvp_policy() -> None:
+    config = MvpCoachingConfig()
+    assert config.max_per_user == 25
+    assert config.max_per_session == 50
+    assert config.low_smile_score_threshold == 0.15
+
+
 def _attention_candidate(
     *,
     user_id: str,

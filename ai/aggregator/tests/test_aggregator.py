@@ -125,3 +125,19 @@ def test_duplicate_stt_event_is_ignored() -> None:
     assert agg.push_stt_event(event)
     assert not agg.push_stt_event(event)
     assert len(agg.state.speaker("user-A").utterances) == 1
+
+
+def test_vision_tick_does_not_wake_speech_time_detectors() -> None:
+    out: list[AnalysisEvent] = []
+    agg = SessionAggregator(
+        "t",
+        on_analysis=out.append,
+        participant_user_ids=["user-A", "user-B"],
+    )
+    agg.push_transcript(_transcript("user-A", 0, 1_000, "안녕하세요"))
+
+    # Even a far-ahead browser timestamp must not be interpreted as STT
+    # silence. The authoritative session/STT scheduler calls ``tick``.
+    agg.tick_vision(100_000)
+
+    assert not any(event.event_type == "SILENCE_DETECTED" for event in out)

@@ -19,6 +19,10 @@ import {
   type ScreenAttentionDetectorState,
 } from "../detectors/ScreenAttentionDetector.js";
 import { SmileExpressionDetector } from "../detectors/SmileExpressionDetector.js";
+import {
+  HandOverMouthDetector,
+  type HandOverMouthState,
+} from "../detectors/HandOverMouthDetector.js";
 import type {
   DetectorSuspensionReason,
   VisionDetector,
@@ -130,6 +134,7 @@ export class VisionPipeline {
   private readonly smileExpression: BehaviorDetector;
   private readonly expressionActivity: BehaviorDetector;
   private readonly nod: BehaviorDetector;
+  private readonly handOverMouth = new HandOverMouthDetector();
   private readonly detectorEntries: readonly DetectorEntry[];
   private lastMetricSnapshotAtMs: number | null = null;
   private processingDurationSumMs = 0;
@@ -142,6 +147,7 @@ export class VisionPipeline {
   private latestMetricFrameSummary: MetricFrameSummary | null = null;
   private latestQuality: FaceQualityDecision | null = null;
   private latestBaseline: VisionBaseline | null = null;
+  private latestHandOverMouth: HandOverMouthState | null = null;
 
   constructor(
     private readonly config: VisionConfig,
@@ -253,6 +259,7 @@ export class VisionPipeline {
     this.qualityDetector.reset();
     this.calibrator.reset();
     this.adaptiveBaseline.reset();
+    this.handOverMouth.reset();
     for (const entry of this.detectorEntries) {
       try {
         entry.detector.reset();
@@ -272,6 +279,7 @@ export class VisionPipeline {
     this.latestMetricFrameSummary = null;
     this.latestQuality = null;
     this.latestBaseline = null;
+    this.latestHandOverMouth = null;
   }
 
   private processAtFrameTime(
@@ -282,6 +290,7 @@ export class VisionPipeline {
     // Quality always executes first; no behavior detector can bypass this gate.
     const qualityOutput = this.updateQuality(frame, runtime, errors);
     const behaviorEvents: VisionBehaviorEvent[] = [...qualityOutput.events];
+    this.latestHandOverMouth = this.handOverMouth.update(frame);
 
     // The calibrator sees unusable frames only to break timing continuity; it
     // never records their pose or expression values as baseline samples.
@@ -563,6 +572,12 @@ export class VisionPipeline {
         blurScore: frame.blurScore,
       },
       metrics: {
+        handOverMouth: {
+          active: this.latestHandOverMouth?.active ?? false,
+          overlapRatio: this.latestHandOverMouth?.overlapRatio ?? null,
+          confidence:
+            this.latestHandOverMouth?.matchedHandConfidence ?? null,
+        },
         smile: {
           configurationScore: this.readNullableNumber(
             smileState,

@@ -49,6 +49,11 @@
       "blurScore": 0.81
     },
     "metrics": {
+      "handOverMouth": {
+        "active": false,
+        "overlapRatio": 0,
+        "confidence": null
+      },
       "smile": {
         "configurationScore": 0.31,
         "baselineScore": 0.24,
