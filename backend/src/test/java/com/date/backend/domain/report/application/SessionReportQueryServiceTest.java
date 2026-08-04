@@ -96,6 +96,30 @@ class SessionReportQueryServiceTest {
 						assertThat(exception.getErrorCode()).isEqualTo(ReportErrorCode.REPORT_ACCESS_DENIED));
 	}
 
+	@Test
+	void returnsIndependentGenerationStatus() {
+		SessionReport report = report(1L, 2L);
+		when(sessions.existsById(1L)).thenReturn(true);
+		when(participants.existsByRoom_IdAndUserId(1L, 2L)).thenReturn(true);
+		when(reports.findBySessionIdAndUserId(1L, 2L)).thenReturn(Optional.of(report));
+
+		var response = service.getStatus(2L, 1L);
+
+		assertThat(response.reportId()).isEqualTo(10L);
+		assertThat(response.status()).isEqualTo(SessionReportStatus.PENDING);
+	}
+
+	@Test
+	void rejectsAxisQueryUntilReportIsCompleted() {
+		SessionReport report = report(1L, 2L);
+		when(reports.findById(10L)).thenReturn(Optional.of(report));
+		when(participants.existsByRoom_IdAndUserId(1L, 2L)).thenReturn(true);
+
+		assertThatThrownBy(() -> service.getAxis(2L, 10L, "flow"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ReportErrorCode.REPORT_NOT_COMPLETED));
+	}
+
 	private SessionReport report(Long sessionId, Long userId) {
 		SessionReport report = new SessionReport(sessionId, userId, now);
 		ReflectionTestUtils.setField(report, "id", 10L);

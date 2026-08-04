@@ -9,24 +9,37 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Positive;
 
-@Tag(name = "AI Report", description = "인증 사용자 본인의 AI 세션 리포트 조회 API")
+@Tag(name = "AI Report", description = "인증 사용자의 세션 AI 리포트 생성·상태·조회·삭제 API")
 @SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 public interface SessionReportQuerySwaggerDocs {
-	@Operation(summary = "세션 AI 리포트 요약 조회", description = """
-			세션 참여자가 자신의 리포트 상태와 레이더 6축, 요약, 강점, 개선점을 조회합니다.
-			PENDING·GENERATING 상태에서는 생성 결과가 null 또는 빈 배열이며 현재 상태와 요청 시각을 확인할 수 있습니다.
-			FAILED 상태에서는 failureCode와 failureReason을 반환합니다. 다른 참여자의 리포트는 조회할 수 없습니다.
-			""")
+	@Operation(summary = "AI 리포트 생성 요청", description = "종료된 세션의 본인 리포트 생성을 요청합니다. 이미 요청되었다면 기존 상태를 반환하여 중복 생성을 막습니다.")
+	ApiResponse<SessionReportStatusResponse> requestGeneration(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "종료된 화상 세션 ID", example = "15") @Positive Long sessionId);
+
+	@Operation(summary = "AI 리포트 생성 상태 조회", description = "PENDING·GENERATING·COMPLETED·FAILED 상태와 실패 코드 및 처리 시각을 조회합니다.")
+	ApiResponse<SessionReportStatusResponse> getStatus(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "화상 세션 ID", example = "15") @Positive Long sessionId);
+
+	@Operation(summary = "세션 AI 리포트 종합 조회", description = "세션 참여자가 자신의 상태, 6축 요약, 강점과 개선점을 조회합니다. 미생성 상태는 REPORT_NOT_FOUND로 응답합니다.")
 	ApiResponse<SessionReportSummaryResponse> getBySession(
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "화상 세션 ID", example = "15") @Positive Long sessionId);
 
-	@Operation(summary = "AI 리포트 상세 피드백 조회", description = """
-			리포트 소유자가 원본 행동 지표, 다음 미션과 근거 구간을 포함한 상세 결과를 조회합니다.
-			근거 구간이 아직 제공되지 않은 분석 버전에서는 evidenceSegments가 빈 배열입니다.
-			question처럼 측정하지 못한 축은 measured=false이고 score·raw·rawUnit이 null입니다.
-			""")
+	@Operation(summary = "AI 리포트 상세 조회", description = "리포트 소유자가 전체 행동 지표, 다음 미션과 근거 구간을 조회합니다. 측정하지 못한 축은 measured=false이고 점수는 null입니다.")
 	ApiResponse<SessionReportDetailResponse> getDetail(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "AI 리포트 ID", example = "21") @Positive Long reportId);
+
+	@Operation(summary = "리포트 세부 분석 항목 조회", description = "6축 중 한 항목과 관련 원본 지표·근거 구간을 조회합니다. axisCode는 flow, question, listening, reaction, balance, nonverbal 중 하나입니다.")
+	ApiResponse<ReportAxisDetailResponse> getAxis(
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "AI 리포트 ID", example = "21") @Positive Long reportId,
+			@Parameter(description = "분석 축 코드", example = "flow") String axisCode);
+
+	@Operation(summary = "본인 AI 리포트 삭제", description = "완료 또는 실패한 본인 리포트 결과를 영구 삭제합니다. AI 원본 분석 지표는 감사 목적으로 보존하며, 생성 중 삭제는 409로 거부합니다. 삭제한 사용자 리포트는 다시 생성할 수 없습니다.")
+	ApiResponse<SessionReportDeleteResponse> delete(
 			@Parameter(hidden = true) AuthUser authUser,
 			@Parameter(description = "AI 리포트 ID", example = "21") @Positive Long reportId);
 }
