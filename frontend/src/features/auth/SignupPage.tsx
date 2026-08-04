@@ -32,11 +32,19 @@ function isAtLeast19(iso: string): boolean {
 const signupSchema = z
   .object({
     email: z.string().min(1, '이메일을 입력하세요').email('올바른 이메일 형식이 아니에요'),
+    /**
+     * 서버 정책(`PasswordPolicy.REGEXP`)과 **같은 규칙**이어야 한다.
+     * 예전에는 영문·숫자만 검사해서, 특수문자 없는 비밀번호가 프론트 검증을 통과한 뒤
+     * 서버에서 거부됐다. 정책 정본은 백엔드다.
+     */
     password: z
       .string()
       .min(8, '비밀번호는 8자 이상이어야 합니다')
+      .max(64, '비밀번호는 64자 이하여야 합니다')
       .regex(/[A-Za-z]/, '영문을 포함해주세요')
-      .regex(/\d/, '숫자를 포함해주세요'),
+      .regex(/\d/, '숫자를 포함해주세요')
+      .regex(/[^A-Za-z\d\s]/, '특수문자를 포함해주세요')
+      .regex(/^\S*$/, '공백은 쓸 수 없어요'),
     passwordConfirm: z.string().min(1, '비밀번호를 한 번 더 입력하세요'),
     realName: z.string().trim().min(2, '실명을 입력하세요'),
     phone: z
@@ -65,13 +73,19 @@ async function checkEmailAvailable(email: string): Promise<boolean> {
 }
 
 /** 비밀번호 강도 0~4 → 미터/라벨. */
+/**
+ * 강도 표시용 점수(0~4).
+ * 서버 정책의 필수 조건(길이·영문·숫자·특수문자)을 앞쪽 3점에 두어,
+ * **3점 미만이면 어차피 서버가 거부**한다는 사실이 막대에 드러나게 한다.
+ * 4점은 대소문자 혼용까지 한 경우의 가산점이다.
+ */
 function passwordScore(pw: string): number {
   if (!pw) return 0
   let s = 0
-  if (pw.length >= 8) s++
+  if (pw.length >= 8 && pw.length <= 64) s++
+  if (/[A-Za-z]/.test(pw) && /\d/.test(pw)) s++
+  if (/[^A-Za-z\d\s]/.test(pw)) s++
   if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++
-  if (/\d/.test(pw)) s++
-  if (/[^A-Za-z0-9]/.test(pw)) s++
   return s
 }
 const STRENGTH = ['너무 짧아요', '약함', '보통', '강함', '아주 강함'] as const
