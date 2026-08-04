@@ -63,6 +63,11 @@ class IntegrationSettings:
     transcript_cleanup_interval_seconds: float = 30.0
     transcript_debug_log: bool = False
     transcript_debug_full_on_session_end: bool = False
+    # 사후 리포트 LLM — 실시간 코칭(coaching_llm_*)과 **다른 인스턴스**를 쓴다.
+    # 실시간은 2초 타임아웃이라 배치 생성(6~10초)과 같은 GPU를 쓰면 코칭이 밀린다.
+    report_llm_base_url: str = ""
+    report_llm_model: str = "exaone3.5:7.8b"
+    report_llm_timeout_seconds: float = 120.0
     coaching_llm_enabled: bool = False
     coaching_llm_base_url: str = "http://127.0.0.1:8100"
     coaching_llm_model: str = (
@@ -135,6 +140,12 @@ class IntegrationSettings:
                 "TRANSCRIPT_DEBUG_FULL_ON_SESSION_END",
                 False,
             ),
+            report_llm_base_url=os.getenv("REPORT_LLM_BASE_URL", "").strip().rstrip("/"),
+            report_llm_model=os.getenv("REPORT_LLM_MODEL", "exaone3.5:7.8b").strip(),
+            report_llm_timeout_seconds=_positive_float(
+                "REPORT_LLM_TIMEOUT_SECONDS",
+                120.0,
+            ),
             coaching_llm_enabled=_boolean(
                 "COACHING_LLM_ENABLED",
                 False,
@@ -164,6 +175,10 @@ class IntegrationSettings:
     @property
     def backend_configured(self) -> bool:
         return bool(self.backend_base_url and self.internal_token)
+
+    @property
+    def report_llm_configured(self) -> bool:
+        return bool(self.report_llm_base_url)
 
     @property
     def coaching_llm_configured(self) -> bool:
