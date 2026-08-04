@@ -8,6 +8,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/a307/certbot/www:/var/www/certbot:ro
     depends_on:
       backend:
         condition: service_healthy
