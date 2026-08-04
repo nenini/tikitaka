@@ -11,6 +11,7 @@ import {
   EmptyState,
   Icon,
   ListRow,
+  Stack,
   TagChip,
 } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
@@ -24,18 +25,22 @@ import { useAuthStore } from '@/stores/auth.store'
 /*  - 데이터는 데모 고정(백엔드 수정 중). API 자리는 TODO 로 표시.               */
 /* -------------------------------------------------------------------------- */
 
-/** 데모 예정 세션. null 이면 EmptyState 분기. TODO(HOME): GET /api/v1/sessions/upcoming */
+/**
+ * 데모 예정 세션. null 이면 EmptyState 분기. TODO(HOME): GET /api/v1/sessions/upcoming
+ *
+ * ⚠️ 키(cm)는 넣지 않는다. **수집하지 않기로 확정된 항목**이라
+ *    (`ProfilePage` W-04 확정 옵션 ②, D-08) 서버 `PublicProfileResponse` 에도 필드가 없다.
+ *    데모 데이터에만 있으면 영영 채워지지 않는 칸이 화면에 남는다.
+ */
 const UPCOMING: {
   partnerName: string
   age: string
-  height: string
   face: string
   when: string
   startsIn: string
 } | null = {
   partnerName: '유월',
   age: '20대 후반',
-  height: '167cm',
   face: '🐰 토끼상 · 차분한 인상',
   when: '오늘 19:00 · 저녁 식당 테마',
   startsIn: '2시간 12분 뒤',
@@ -119,37 +124,64 @@ export function HomePage() {
 
         {UPCOMING ? (
           <Card>
-            <div className="flex items-center justify-between">
-              <CardHeader title="예정된 세션" />
-              <Badge tone="warning">{UPCOMING.startsIn}</Badge>
-            </div>
-            <div className="mt-1 flex items-center gap-3">
-              <Avatar size="md" name={UPCOMING.partnerName} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <b className="text-[15px]">{UPCOMING.partnerName}</b>
-                  <TagChip>{UPCOMING.age}</TagChip>
-                  <TagChip>{UPCOMING.height}</TagChip>
-                </div>
-                <p className="bt-caption mt-0.5">
-                  {UPCOMING.face} · {UPCOMING.when}
-                </p>
+            {/* `.bt-card` 에는 gap 이 없어 자식들이 그대로 붙는다. 자식마다 mt-* 를 다는 대신
+                Stack 으로 세로 리듬을 한 번에 준다 — 옆의 '사랑의 온도' 카드와도 간격이 맞는다. */}
+            <Stack gap={12}>
+              <div className="flex items-center justify-between gap-2">
+                <CardHeader title="예정된 세션" />
+                <Badge tone="warning" className="shrink-0">
+                  {UPCOMING.startsIn}
+                </Badge>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => navigate('/session/demo')}>
-                상세
-              </Button>
-            </div>
-            <Callout tone="info">
-              <b>시작 1시간 전까지</b> 취소하면 패널티가 없어요. 이후 취소는 온도 감소 + 노쇼 1회.
-            </Callout>
-            <div className="flex gap-2">
-              <Button variant="primary" block onClick={() => navigate('/session/demo')}>
-                대기방 입장
-              </Button>
-              <Button variant="secondary" onClick={() => console.log('TODO(HOME): 일정 취소')}>
-                일정 취소
-              </Button>
-            </div>
+
+              {/* items-start: 이름·태그가 줄바꿈돼도 아바타와 '상세' 가 위에 정렬돼 있어야
+                  행 높이가 튀지 않는다. 버튼은 shrink-0 으로 텍스트에 밀리지 않게 고정한다. */}
+              <div className="flex items-start gap-3">
+                <Avatar size="md" name={UPCOMING.partnerName} className="shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <b className="text-[15px]">{UPCOMING.partnerName}</b>
+                    <TagChip>{UPCOMING.age}</TagChip>
+                  </div>
+                  <p className="bt-caption mt-1">
+                    {UPCOMING.face} · {UPCOMING.when}
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => navigate('/session/demo')}
+                >
+                  상세
+                </Button>
+              </div>
+
+              <Callout tone="info">
+                <b>시작 1시간 전까지</b> 취소하면 패널티가 없어요. 이후 취소는 온도 감소 + 노쇼 1회.
+              </Callout>
+
+              {/* 모바일은 세로로 쌓는다 — 한 줄에 두면 '일정 취소' 가 눌려 글자가 깨진다.
+                  주 동작(대기방 입장)을 위에 둬 엄지에서 먼 쪽이 파괴적 동작이 되지 않게 한다.
+                  ⚠️ `block` 프로퍼티(`width:100%`)를 쓰지 않는다 — 가로 배치에서 두 번째 버튼이
+                     100% 를 요구해 행을 밀어낸다. 폭은 유틸리티로 브레이크포인트마다 정한다. */}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="primary"
+                  className="w-full sm:w-auto sm:flex-1"
+                  onClick={() => navigate('/session/demo')}
+                >
+                  대기방 입장
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => console.log('TODO(HOME): 일정 취소')}
+                >
+                  일정 취소
+                </Button>
+              </div>
+            </Stack>
           </Card>
         ) : (
           <Card className="flex items-center justify-center">
