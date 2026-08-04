@@ -4,6 +4,7 @@ import { Button, Callout, Card, ConsentRow, Spinner, Stack, Steps } from '@/comp
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getActiveConsentTypes, saveMyConsents } from '@/features/consent/api'
 import { CONSENT_DESCRIPTION, isRequiredConsent, type ConsentType } from '@/features/consent/types'
+import { useAuthStore } from '@/stores/auth.store'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
 /* -------------------------------------------------------------------------- */
@@ -64,6 +65,8 @@ export function ConsentPage() {
           consented: granted[t.consentTypeId] ?? isRequiredConsent(t.code),
         })),
       })
+      // 게이트를 다음 단계로 넘긴다 — 갱신하지 않으면 보호 라우트가 동의 화면으로 되돌린다
+      useAuthStore.getState().setOnboarding('needs-profile')
       navigate('/signup/profile')
     } catch (error) {
       setSubmitError(errorMessageOf(error, '동의를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'))

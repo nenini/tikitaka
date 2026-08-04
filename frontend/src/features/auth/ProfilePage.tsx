@@ -92,9 +92,10 @@ export function ProfilePage() {
         gender: data.gender === 'female' ? 'FEMALE' : 'MALE', // 폼(소문자) → 백엔드 enum(대문자)
         regionCity: data.regionSido,
       })
-      // 프로필이 생겼으므로 온보딩 게이트를 즉시 연다(ProtectedRoute 가 이 값을 본다).
-      // 갱신하지 않으면 온보딩을 마치고도 보호 라우트에서 다시 이 흐름으로 튕긴다.
-      useAuthStore.getState().setOnboarding('ready')
+      // 게이트를 다음 단계로 넘긴다(ProtectedRoute 가 이 값을 본다).
+      // 갱신하지 않으면 보호 라우트가 여전히 프로필 단계로 튕겨낸다.
+      // 아직 'ready' 가 아니다 — 설문이 남아 있다.
+      useAuthStore.getState().setOnboarding('needs-survey')
       navigate('/signup/face')
     } catch (e) {
       // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Callout, Card, CardHeader, Spinner, Stack, Steps } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
+import { useAuthStore } from '@/stores/auth.store'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
 import { createMySurvey, getMySurvey, getSurveyOptions, updateMySurvey } from './api'
 import { AgeRangeField, MultiChoice, SingleChoice } from './parts'
@@ -143,6 +144,9 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
     try {
       if (hasExisting) await updateMySurvey(payload)
       else await createMySurvey(payload)
+      // 설문이 온보딩의 마지막 단계다 — 여기서 게이트를 연다.
+      // 갱신하지 않으면 홈으로 이동하자마자 보호 라우트가 설문으로 되돌린다.
+      useAuthStore.getState().setOnboarding('ready')
       navigate(onboarding ? '/' : '/me/edit', { replace: true })
     } catch (error) {
       setSubmitError(errorMessageOf(error, '설문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'))

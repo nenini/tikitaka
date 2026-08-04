@@ -3,6 +3,9 @@ import { create } from 'zustand'
 import { tokenStore } from '@/shared/api/tokens'
 import { getMe, logout as logoutApi } from '@/features/auth/api'
 import { getOnboardingStatus } from '@/features/profile/api'
+import { getMyConsents } from '@/features/consent/api'
+import { isRequiredConsent } from '@/features/consent/types'
+import { getMySurvey } from '@/features/survey/api'
 import type { AuthTokens, MeResponse, UserRole } from '@/features/auth/types'
 
 export interface AuthUser {
@@ -27,24 +30,38 @@ function toAuthUser(me: MeResponse): AuthUser {
 }
 
 /**
- * 온보딩 게이트 판정값.
+ * 온보딩 게이트 판정값 — **어느 단계에서 멈췄는지**까지 구분한다.
  *  - `unknown`      : 아직 모름(조회 전) 또는 판단 불가 → 통과시킨다
- *  - `needs-profile`: 기본 프로필이 없다 → 온보딩으로 되돌린다
- *  - `ready`        : 프로필이 있다 → 통과
+ *  - `needs-consent`: 필수 동의를 아직 안 했다
+ *  - `needs-profile`: 기본 프로필이 없다
+ *  - `needs-survey` : 프로필은 있는데 설문을 안 냈다
+ *  - `ready`        : 통과
+ *
+ * 되돌려보낼 화면은 `ProtectedRoute` 가 이 값으로 정한다.
  */
-export type OnboardingStatus = 'unknown' | 'needs-profile' | 'ready'
+export type OnboardingStatus =
+  | 'unknown'
+  | 'needs-consent'
+  | 'needs-profile'
+  | 'needs-survey'
+  | 'ready'
 
 /**
- * 온보딩 상태를 조회한다.
+ * 중간 이탈 지점을 찾는다. 동의 → 프로필 → 설문 순으로 앞 단계부터 확인하고,
+ * 처음 비어 있는 단계를 돌려준다.
  *
- * 판정 기준이 '설문까지 완료'가 아니라 **'기본 프로필 존재'** 인 이유:
- * 백엔드에서 `onboardingCompleted=true` 로 만드는 경로가 현재 로컬 시드
- * 초기화(LocalMatchTestDataInitializer)뿐이라, 실사용자는 이 값을 true 로 만들 수
- * 없다. 그 값으로 막으면 아무도 온보딩을 빠져나가지 못한다.
- * → 지금은 프로필 유무로만 막고, 설문 완료 여부는 매칭 시점에 백엔드가 검증한다.
+ * ⚠️ `onboardingCompleted` 를 단독 기준으로 쓸 수 없다.
+ *    백엔드에서 이 값을 true 로 만드는 경로가 로컬 시드 초기화
+ *    (`LocalMatchTestDataInitializer`)뿐이라 실사용자는 영원히 false 다.
+ *    그것만 보고 막으면 아무도 온보딩을 빠져나가지 못한다.
+ *    → true 면 곧바로 통과시키되(시드 계정), false 여도 각 단계의 실제 데이터로
+ *      다시 판정한다.
+ *    TODO(ONBOARDING): 설문 제출이 `markOnboardingCompleted()` 를 호출하도록
+ *    백엔드가 바뀌면 이 함수를 그 한 번의 호출로 줄인다.
  *
- * TODO(ONBOARDING): 설문 제출(POST /users/me/survey)이 markOnboardingCompleted 를
- * 호출하도록 백엔드가 바뀌면, 아래 판정을 `onboardingCompleted === true` 로 좁힌다.
+ * ⚠️ 본인인증(KYC)은 판정에서 뺐다. 완료 여부를 알 수 있는 신호가 없다
+ *    (`/users/me` 응답에 생년월일·전화번호가 없다). 이메일 가입자는 가입 폼에서
+ *    이미 받았고, 소셜 가입자는 백엔드가 아예 수집하지 않는 별개 문제다.
  *
  * 계약 주의: 프로필이 없으면 `{onboardingCompleted:false}` 가 아니라
  * **404 PROFILE_NOT_FOUND** 가 온다 — 오류가 아니라 '프로필 없음' 신호다.
@@ -52,14 +69,42 @@ export type OnboardingStatus = 'unknown' | 'needs-profile' | 'ready'
  * 가두지 않게 한다(실제 기능 제한은 백엔드가 다시 건다).
  */
 async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
+  // 1) 프로필. `onboardingCompleted` 가 true 면 더 볼 것 없이 통과시킨다
+  //    — 로컬 시드 계정이 여기로 빠진다(그 값을 세우는 유일한 경로다).
+  let hasProfile: boolean
   try {
-    await getOnboardingStatus()
-    return 'ready'
+    const { onboardingCompleted } = await getOnboardingStatus()
+    if (onboardingCompleted) return 'ready'
+    hasProfile = true
   } catch (error) {
     const e = error as AxiosError<{ code?: string }>
     if (e?.response?.status === 404 || e?.response?.data?.code === 'PROFILE_NOT_FOUND') {
-      return 'needs-profile'
+      hasProfile = false
+    } else {
+      return 'unknown'
     }
+  }
+
+  // 2) 필수 동의. 프로필보다 **앞 단계**라 프로필이 없어도 먼저 확인한다 —
+  //    둘 다 비어 있으면 흐름 순서대로 동의부터 보내야 한다.
+  //    서버는 활성 유형을 미동의 항목까지 전부 행으로 준다(consented 플래그로 구분).
+  //    조회가 실패하면 동의 여부를 알 수 없으니 가두지 않는다.
+  try {
+    const required = (await getMyConsents()).filter((consent) => isRequiredConsent(consent.code))
+    if (required.length > 0 && !required.every((consent) => consent.consented)) {
+      return 'needs-consent'
+    }
+  } catch {
+    return 'unknown'
+  }
+
+  if (!hasProfile) return 'needs-profile'
+
+  // 3) 설문. 아직 안 냈으면 api 계층이 null 로 정규화해 준다.
+  //    얼굴 촬영은 선택이라 게이트에 넣지 않는다(CONTRACT_DECISIONS.md A8).
+  try {
+    return (await getMySurvey()) ? 'ready' : 'needs-survey'
+  } catch {
     return 'unknown'
   }
 }
