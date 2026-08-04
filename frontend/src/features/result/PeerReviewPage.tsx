@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar, Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getPublicProfile } from '@/features/profile/api'
+import { getReportStatus } from '@/features/report/api'
+import type { ReportStatus } from '@/features/report/types'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
   getEvaluationItems,
@@ -10,6 +12,7 @@ import {
   getReceivedEvaluation,
   submitEvaluation,
 } from './api'
+import { canOpenReport, PHASE_NOTICE, resolveSessionEndPhase } from './sessionEndFlow'
 // OverflowMenu 는 아래 '이 세션 관리' 블록을 다시 켤 때 함께 import 한다(현재 주석 처리됨).
 import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
@@ -50,6 +53,8 @@ export function PeerReviewPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
+  /** 리포트 생성 상태. null 이면 서버에 리포트 기능이 아직 없다는 뜻이다. */
+  const [reportStatus, setReportStatus] = useState<ReportStatus | null>(null)
 
   /**
    * 화면 데이터 적재.
@@ -79,6 +84,14 @@ export function PeerReviewPage() {
 
       // 열람 가능 판정은 서버 몫이다 — 화면에서 숨기는 것으로 잠금을 대신하지 않는다
       setReceived(nextStatus.resultAvailable ? await getReceivedEvaluation(sessionId) : null)
+
+      // 리포트 상태를 함께 읽어 다음 단계를 정한다. 실패해도 평가 화면은 그대로 떠야 하므로
+      // 여기서 예외를 삼킨다(없으면 null = '리포트 기능 없음'과 같은 취급).
+      setReportStatus(
+        await getReportStatus(String(sessionId))
+          .then((result) => result?.reportStatus ?? null)
+          .catch(() => null),
+      )
     } catch (fetchError) {
       setLoadError(errorMessageOf(fetchError, '평가 정보를 불러오지 못했어요.'))
     } finally {
@@ -89,6 +102,9 @@ export function PeerReviewPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 종료 흐름의 현재 단계. 평가 상태 + 리포트 상태를 한 규칙으로 접는다. */
+  const endPhase = resolveSessionEndPhase({ evaluation: status, reportStatus })
 
   const metrics = items?.items ?? []
   // 6개짜리 배열이라 메모이즈할 이유가 없다(매 렌더 새 배열이면 useMemo 가 오히려 헛돈다).
@@ -266,9 +282,19 @@ export function PeerReviewPage() {
                   제출한 평가는 익명으로 전달돼 다시 볼 수 없어요.
                 </p>
               )}
-              <Button variant="primary" block onClick={() => navigate(`/session/${sessionId}/report`)}>
-                내 리포트 보기
-              </Button>
+              {/* 리포트로 넘어갈 수 있는 단계인지 상태 머신에 묻는다.
+                  서버에 리포트 기능이 없는데 버튼만 열어두면 눌렀다가 빈 화면을 본다. */}
+              {canOpenReport(endPhase) ? (
+                <Button
+                  variant="primary"
+                  block
+                  onClick={() => navigate(`/session/${sessionId}/report`)}
+                >
+                  내 리포트 보기
+                </Button>
+              ) : (
+                <p className="bt-caption bt-muted">{PHASE_NOTICE[endPhase]}</p>
+              )}
             </>
           )}
         </aside>
