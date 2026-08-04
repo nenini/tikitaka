@@ -14,6 +14,7 @@ import {
 import { errorMessageOf } from '@/shared/api/envelope'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
 import { getMyFaceAnalysis } from './api'
+import { faceTypeImage } from './faceImage'
 import { FACE_TYPE_DESCRIPTION, type FaceAnalysisResult } from './types'
 
 /* -------------------------------------------------------------------------- */
@@ -202,11 +203,22 @@ function ResultBody({ result, onboarding, onRefresh, onCapture, onNext }: Result
     <Stack gap={12}>
       <Card>
         <Stack gap={14}>
-          <div>
-            <span className="bt-overline">가장 가까운 얼굴상</span>
-            <div className="bt-h1 mt-1">{result.primaryTypeDisplayName}</div>
-            <p className="bt-body-sm mt-2">{FACE_TYPE_DESCRIPTION[result.primaryType]}</p>
+          {/* 진단 결과 이미지가 곧 프로필 사진이 된다 — 여기서 먼저 보여줘
+              마이페이지·헤더에서 다시 봤을 때 같은 그림이라는 걸 알게 한다. */}
+          <div className="flex items-center gap-4">
+            <img
+              src={faceTypeImage(result.primaryType)}
+              alt=""
+              width={96}
+              height={96}
+              className="size-24 shrink-0 rounded-full border border-line bg-surface-sunken object-cover"
+            />
+            <div className="min-w-0">
+              <span className="bt-overline">가장 가까운 얼굴상</span>
+              <div className="bt-h1 mt-1">{result.primaryTypeDisplayName}</div>
+            </div>
           </div>
+          <p className="bt-body-sm">{FACE_TYPE_DESCRIPTION[result.primaryType]}</p>
 
           {others.length > 0 && (
             <div>

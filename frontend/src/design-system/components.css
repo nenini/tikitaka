@@ -358,6 +358,25 @@
   height: 56px;
 }
 
+/* 36px — 헤더처럼 세로 공간이 좁고 아이템이 몰려 있는 곳.
+   옆에 서는 `.bt-avatar--sm` 과 같은 치수라 나란히 두면 높이가 맞는다.
+   기본 44px 는 터치 최소 타깃이므로, 모바일에서 단독으로 쓰는 버튼에는 쓰지 않는다. */
+.bt-icon-btn--sm {
+  width: 36px;
+  height: 36px;
+}
+
+/* 이미 표면(헤더·카드) 위에 있는 버튼. 기본형의 흰 배경 + 그림자를 지워
+   떠 있는 칩처럼 보이지 않게 한다. */
+.bt-icon-btn--flat {
+  background: transparent;
+  box-shadow: none;
+}
+
+.bt-icon-btn--flat:hover {
+  background: var(--bt-color-surface-sunken);
+}
+
 .bt-icon-btn--on {
   background: var(--bt-color-action);
   color: var(--bt-color-action-on);
