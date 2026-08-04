@@ -10,6 +10,7 @@ import {
   Chip,
   ListRowButton,
   ListRowLink,
+  Spinner,
   Stack,
 } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
@@ -54,7 +55,31 @@ function LoveTemperature({ value }: { value: number }) {
 export function MyPage() {
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
+  const signOut = useAuthStore((s) => s.signOut)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  /**
+   * 로그아웃.
+   *
+   * `logout`(로컬 토큰만 삭제)이 아니라 `signOut` 을 쓴다 — 서버 `/auth/logout` 으로
+   * **refresh 토큰까지 무효화**해야 한다. 로컬만 지우면 그 refresh 토큰이 서버에
+   * 살아 있어 재사용될 수 있다.
+   *
+   * 서버 호출이 실패해도 스토어가 로컬 세션을 반드시 비우므로(스토어 주석 참고),
+   * 여기서는 실패를 따로 처리하지 않고 항상 로그인 화면으로 보낸다 —
+   * "로그아웃을 눌렀는데 로그인 상태로 남는" 상황이 가장 나쁘다.
+   */
+  const onSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await signOut()
+    } finally {
+      setSigningOut(false)
+      navigate('/login', { replace: true })
+    }
+  }
 
   const onWithdraw = () => {
     // TODO(ACCOUNT): DELETE /api/me — §22 보존·삭제 범위 안내 후 처리
@@ -143,8 +168,23 @@ export function MyPage() {
                 <ListRowButton title="차단 목록" meta="2명" onClick={() => console.log('TODO: 차단 목록')} />
                 <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit')} />
                 <ListRowButton title="비밀번호 변경" onClick={() => console.log('TODO: 비밀번호 변경')} />
+                {/* 로그아웃과 회원 탈퇴는 성격이 전혀 다르다(되돌릴 수 있음 vs 없음).
+                    구분선으로 떼어 두 행이 나란히 보이지 않게 한다 — 오클릭이 곧 탈퇴가 되면 안 된다. */}
+                <ListRowButton
+                  title="로그아웃"
+                  meta={signingOut ? '로그아웃 중…' : undefined}
+                  disabled={signingOut}
+                  trailing={signingOut ? <Spinner size={16} /> : undefined}
+                  onClick={() => void onSignOut()}
+                />
+                <div
+                  aria-hidden="true"
+                  className="my-1"
+                  style={{ borderTop: '1px solid var(--bt-color-border)' }}
+                />
                 <ListRowButton
                   title={<span className="text-danger">회원 탈퇴</span>}
+                  disabled={signingOut}
                   onClick={() => setWithdrawOpen(true)}
                 />
               </Stack>
