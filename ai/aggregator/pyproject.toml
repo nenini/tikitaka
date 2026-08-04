@@ -48,6 +48,10 @@ module = [
     "faster_whisper.*",
     "livekit",
     "livekit.*",
+    "torch",
+    "torch.*",
+    "transformers",
+    "transformers.*",
 ]
 ignore_missing_imports = true
 

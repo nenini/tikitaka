@@ -318,7 +318,8 @@ class SessionAggregator:
             for event in events:
                 self._on_analysis(event)
                 if isinstance(event, SilenceDetected):
-                    for target_user_id in self.state.participant_user_ids:
+                    target_user_id = self._silence_coaching_target()
+                    if target_user_id is not None:
                         candidates.append(
                             CoachingCandidate(
                                 coaching_type="SILENCE_RECOVERY",
@@ -339,6 +340,27 @@ class SessionAggregator:
         candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
         self._dispatch_candidates(
             self._coaching_arbitrator.select(candidates)
+        )
+
+    def _silence_coaching_target(self) -> str | None:
+        """Return the counterpart of the most recent finalized speaker.
+
+        Silence coaching must not ask the person who just spoke to carry the
+        conversation again. The dating session contract has two participants,
+        so the other registered participant is the single coaching target.
+        If either side cannot be identified, it is safer to emit no coaching.
+        """
+        segments = self.state.transcript_buffer.ordered_segments()
+        if not segments:
+            return None
+        last_speaker_id = segments[-1].user_id
+        return next(
+            (
+                user_id
+                for user_id in self.state.participant_user_ids
+                if user_id != last_speaker_id
+            ),
+            None,
         )
 
     def tick_vision(self, now_ms: int) -> None:

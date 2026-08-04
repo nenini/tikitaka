@@ -1,4 +1,4 @@
-"""Backend lifecycle -> active aggregator -> two-sided silence coaching."""
+"""Backend lifecycle -> active aggregator -> directed silence coaching."""
 
 from __future__ import annotations
 
@@ -51,14 +51,15 @@ class FakeSender:
 class FakeMessageGenerator:
     def __init__(self, message: str | None) -> None:
         self.message = message
-        self.calls: list[tuple[TranscriptSegment, ...]] = []
+        self.calls: list[tuple[tuple[TranscriptSegment, ...], str]] = []
         self.closed = False
 
     async def generate(
         self,
         segments: Sequence[TranscriptSegment],
+        target_user_id: str,
     ) -> str | None:
-        self.calls.append(tuple(segments))
+        self.calls.append((tuple(segments), target_user_id))
         return self.message
 
     async def close(self) -> None:
@@ -218,11 +219,11 @@ def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
     asyncio.run(scenario())
 
 
-def test_ten_second_silence_delivers_one_coaching_per_user() -> None:
+def test_ten_second_silence_coaches_last_speakers_counterpart() -> None:
     async def scenario() -> None:
         sender = FakeSender()
         message_generator = FakeMessageGenerator(
-            "최근 관심 있는 활동을 더 물어보세요."
+            "최근에는 어떤 활동에 가장 관심이 있으세요?"
         )
         audio_factory = FakeAudioAdapterFactory()
         manager = SessionManager(
@@ -268,15 +269,17 @@ def test_ten_second_silence_delivers_one_coaching_per_user() -> None:
             for command in sender.commands
             if command.coaching_type == "SILENCE_RECOVERY"
         ]
-        assert len(silence) == 2
-        assert {command.target_user_id for command in silence} == {"1", "2"}
+        assert len(silence) == 1
+        assert silence[0].target_user_id == "2"
         assert all(command.version == 2 for command in silence)
         assert all(
-            command.message_text == "최근 관심 있는 활동을 더 물어보세요."
+            command.message_text == "최근에는 어떤 활동에 가장 관심이 있으세요?"
             for command in silence
         )
         assert len(message_generator.calls) == 1
-        assert message_generator.calls[0][0].text == "반갑습니다."
+        segments, target_user_id = message_generator.calls[0]
+        assert segments[0].text == "반갑습니다."
+        assert target_user_id == "2"
         assert all(
             command.expires_at_session_elapsed_ms
             - command.triggered_at_session_elapsed_ms

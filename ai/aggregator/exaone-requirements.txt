@@ -1,8 +1,7 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 torch==2.8.0
-transformers==4.57.1
+transformers==4.43.4
 accelerate==1.10.0
-bitsandbytes==0.47.0
 hf-xet==1.1.9
 fastapi==0.116.1
 uvicorn[standard]==0.35.0

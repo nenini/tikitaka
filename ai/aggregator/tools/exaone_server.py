@@ -1,25 +1,27 @@
-"""OpenAI-compatible Kanana server for local and dedicated GPU hosts."""
+"""OpenAI-compatible EXAONE 3.5 server for the dedicated GPU host."""
 
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
 
 import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_ID = os.getenv("KANANA_MODEL_ID", "kakaocorp/kanana-2-3b-instruct")
-MAX_INPUT_TOKENS = int(os.getenv("KANANA_MAX_INPUT_TOKENS", "2048"))
-LOAD_IN_4BIT = os.getenv("KANANA_LOAD_IN_4BIT", "true").lower() in {
-    "1", "true", "yes", "on"
-}
-TRUST_REMOTE_CODE = os.getenv(
-    "KANANA_TRUST_REMOTE_CODE",
-    "false",
-).lower() in {"1", "true", "yes", "on"}
+MODEL_ID = os.getenv(
+    "EXAONE_MODEL_ID",
+    "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",
+)
+# The initial official revision is compatible with Transformers 4.43.x.
+MODEL_REVISION = os.getenv(
+    "EXAONE_MODEL_REVISION",
+    "496aef060b296b34c6b0035149f5af9e2b8c168c",
+)
+MAX_INPUT_TOKENS = int(os.getenv("EXAONE_MAX_INPUT_TOKENS", "2048"))
 
 
 class ChatMessage(BaseModel):
@@ -36,31 +38,22 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int = Field(default=80, ge=1, le=128)
 
 
-class LoadedKanana:
+class LoadedExaone:
     def __init__(self) -> None:
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA GPU is required for this Kanana server")
-        quantization_config = (
-            BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-                bnb_4bit_use_double_quant=True,
-            )
-            if LOAD_IN_4BIT
-            else None
-        )
+            raise RuntimeError("CUDA GPU is required for the EXAONE server")
         self.tokenizer = AutoTokenizer.from_pretrained(
             MODEL_ID,
-            trust_remote_code=TRUST_REMOTE_CODE,
+            revision=MODEL_REVISION,
+            trust_remote_code=True,
         )
         self.model = AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
+            revision=MODEL_REVISION,
             device_map="auto",
-            torch_dtype="auto",
-            quantization_config=quantization_config,
+            torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
-            trust_remote_code=TRUST_REMOTE_CODE,
+            trust_remote_code=True,
         )
         self.model.eval()
 
@@ -69,7 +62,6 @@ class LoadedKanana:
             [message.model_dump() for message in request.messages],
             tokenize=False,
             add_generation_prompt=True,
-            thinking_mode="no_think",
         )
         inputs = self.tokenizer(
             rendered,
@@ -86,23 +78,28 @@ class LoadedKanana:
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         generated = output[0, inputs["input_ids"].shape[1] :]
-        return self.tokenizer.decode(generated, skip_special_tokens=True).strip()
+        return str(
+            self.tokenizer.decode(
+                generated,
+                skip_special_tokens=True,
+            )
+        ).strip()
 
 
-runtime: LoadedKanana | None = None
+runtime: LoadedExaone | None = None
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     global runtime
-    runtime = LoadedKanana()
+    runtime = LoadedExaone()
     yield
     runtime = None
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
 
-app = FastAPI(title="A307 Local Kanana Server", lifespan=lifespan)
+app = FastAPI(title="A307 EXAONE Coaching Server", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -110,21 +107,22 @@ async def health() -> dict[str, object]:
     return {
         "status": "UP" if runtime is not None else "LOADING",
         "model": MODEL_ID,
-        "quantized4Bit": LOAD_IN_4BIT,
-        "trustRemoteCode": TRUST_REMOTE_CODE,
+        "revision": MODEL_REVISION,
         "cudaAvailable": torch.cuda.is_available(),
     }
 
 
 @app.post("/v1/chat/completions")
-async def chat_completion(request: ChatCompletionRequest) -> dict[str, object]:
+async def chat_completion(
+    request: ChatCompletionRequest,
+) -> dict[str, object]:
     if runtime is None:
-        raise HTTPException(status_code=503, detail="Kanana is still loading")
+        raise HTTPException(status_code=503, detail="EXAONE is still loading")
     content = runtime.generate(request)
     if not content:
-        raise HTTPException(status_code=502, detail="Kanana returned no text")
+        raise HTTPException(status_code=502, detail="EXAONE returned no text")
     return {
-        "id": "local-kanana",
+        "id": "local-exaone",
         "object": "chat.completion",
         "model": MODEL_ID,
         "choices": [{

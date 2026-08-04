@@ -31,7 +31,7 @@ from aggregator.livekit_stt import LiveKitSttAdapterFactory
 from aggregator.llm_coaching import (
     CoachingMessageGenerator,
     ContextualCoachingError,
-    KananaCoachingClient,
+    ExaoneCoachingClient,
 )
 from aggregator.session_contracts import (
     SessionEventRequest,
@@ -355,7 +355,7 @@ class SessionRuntime:
             )
 
     async def _delivery_loop(self) -> None:
-        contextual_cache: dict[tuple[str, int], str | None] = {}
+        contextual_cache: dict[tuple[str, int, str], str | None] = {}
         while True:
             queued = await self._commands.get()
             command = queued.command
@@ -364,6 +364,7 @@ class SessionRuntime:
                     cache_key = (
                         command.coaching_type,
                         command.triggered_at_session_elapsed_ms,
+                        command.target_user_id or "",
                     )
                     if cache_key in contextual_cache:
                         message_text = contextual_cache[cache_key]
@@ -413,7 +414,12 @@ class SessionRuntime:
             ),
         )
         try:
-            message = await self._message_generator.generate(segments)
+            if command.target_user_id is None:
+                return None
+            message = await self._message_generator.generate(
+                segments,
+                command.target_user_id,
+            )
         except ContextualCoachingError as error:
             logger.warning(
                 "llm fallback session=%s type=%s reason=%s",
@@ -490,7 +496,7 @@ class SessionManager:
         self.settings = settings
         self._sender = sender or BackendCoachingClient(settings)
         self._vision_sender = vision_sender or BackendVisionClient(settings)
-        self._message_generator = message_generator or KananaCoachingClient(
+        self._message_generator = message_generator or ExaoneCoachingClient(
             settings
         )
         self._audio_adapter_factory = (

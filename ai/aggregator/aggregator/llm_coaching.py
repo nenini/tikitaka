@@ -1,4 +1,4 @@
-"""Local Kanana adapter for contextual silence-coaching text only."""
+"""EXAONE adapter for contextual silence-coaching text only."""
 
 from __future__ import annotations
 
@@ -16,11 +16,21 @@ from aggregator.transcripts import TranscriptSegment
 class ContextualCoachingError(RuntimeError):
     """The local model failed or returned an unsafe/unusable sentence."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw_output: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.raw_output = raw_output
+
 
 class CoachingMessageGenerator(Protocol):
     async def generate(
         self,
         segments: Sequence[TranscriptSegment],
+        target_user_id: str,
     ) -> str | None: ...
 
     async def close(self) -> None: ...
@@ -55,11 +65,20 @@ _FORBIDDEN_FRAGMENTS = (
     "연락처를 알려",
     "주소를 알려",
     "주민등록번호",
+    "질문해 보세요",
+    "물어보세요",
+    "대화를 이어",
+    "즐거운 대화",
+    "응원합니다",
+    "질문 작성 예시",
+    "질문만 출력",
+    "출력하세요",
+    "작성하세요",
 )
 
 
-class KananaCoachingClient:
-    """Call an OpenAI-compatible Kanana server on the private AI network."""
+class ExaoneCoachingClient:
+    """Call an OpenAI-compatible EXAONE server on the private AI network."""
 
     def __init__(
         self,
@@ -76,6 +95,7 @@ class KananaCoachingClient:
     async def generate(
         self,
         segments: Sequence[TranscriptSegment],
+        target_user_id: str,
     ) -> str | None:
         if not self._settings.coaching_llm_configured or not segments:
             return None
@@ -84,7 +104,11 @@ class KananaCoachingClient:
         ]
         conversation = [
             {
-                "speaker": f"사용자 {segment.user_id}",
+                "speaker": (
+                    "코칭 대상"
+                    if segment.user_id == target_user_id
+                    else "상대방"
+                ),
                 "text": segment.text,
             }
             for segment in recent
@@ -95,17 +119,24 @@ class KananaCoachingClient:
                 {
                     "role": "system",
                     "content": (
-                        "당신은 소개팅 대화 도우미입니다. 최근 대화에 직접 연결되는 "
-                        "부담 없는 후속 질문을 한국어 한 문장으로만 작성하세요. "
-                        "결혼·출산 압박, 외모 평가, 성적 질문, 개인정보 요청, "
-                        "설명·번호·따옴표는 금지합니다."
+                        "당신은 소개팅 대화 컨설턴트입니다. 대화가 잠시 멈췄을 때 "
+                        "코칭 대상이 상대방에게 바로 건넬 수 있는 후속 질문을 "
+                        "작성합니다. 최근 대화에서 상대방이 실제로 말한 주제 하나에 "
+                        "직접 연결하고, 이미 답한 내용을 다시 묻거나 새로운 사실을 "
+                        "지어내지 마세요. 결과는 자연스러운 존댓말 질문 한 문장만 "
+                        "출력하고 반드시 물음표로 끝내세요. 대화 평가·요약·인사·응원·"
+                        "종료 표현과 '질문해 보세요' 같은 지시문은 금지합니다. "
+                        "결혼·출산 압박, 외모 평가, 성적 질문, 개인정보·연락처·주소·"
+                        "연봉 요청도 금지합니다. 설명·번호·따옴표를 붙이지 마세요."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        "최근 대화: "
+                        "최근 대화는 다음과 같습니다.\n"
                         + json.dumps(conversation, ensure_ascii=False)
+                        + "\n코칭 대상이 상대방의 마지막 발언에 이어서 말할 수 있는 "
+                        "후속 질문 한 문장만 작성하세요."
                     ),
                 },
             ],
@@ -122,20 +153,32 @@ class KananaCoachingClient:
             parsed = _ChatResponse.model_validate(response.json())
         except (httpx.HTTPError, ValueError) as error:
             raise ContextualCoachingError(
-                "Kanana request or response validation failed"
+                "EXAONE request or response validation failed"
             ) from error
         return self._validate_sentence(parsed.choices[0].message.content)
 
     def _validate_sentence(self, raw: str) -> str:
         sentence = " ".join(raw.strip().strip("\"'").split())
         if not sentence:
-            raise ContextualCoachingError("Kanana returned an empty sentence")
+            raise ContextualCoachingError(
+                "EXAONE returned an empty sentence",
+                raw_output=raw,
+            )
         if len(sentence) > self._settings.coaching_llm_max_message_characters:
-            raise ContextualCoachingError("Kanana sentence is too long")
+            raise ContextualCoachingError(
+                "EXAONE sentence is too long",
+                raw_output=sentence,
+            )
         if any(fragment in sentence for fragment in _FORBIDDEN_FRAGMENTS):
-            raise ContextualCoachingError("Kanana sentence failed safety filter")
-        if sentence.count("?") > 1:
-            raise ContextualCoachingError("Kanana returned multiple questions")
+            raise ContextualCoachingError(
+                "EXAONE sentence failed safety filter",
+                raw_output=sentence,
+            )
+        if sentence.count("?") != 1 or not sentence.endswith("?"):
+            raise ContextualCoachingError(
+                "EXAONE must return exactly one question",
+                raw_output=sentence,
+            )
         return sentence
 
     async def close(self) -> None:
@@ -146,5 +189,5 @@ class KananaCoachingClient:
 __all__ = [
     "CoachingMessageGenerator",
     "ContextualCoachingError",
-    "KananaCoachingClient",
+    "ExaoneCoachingClient",
 ]

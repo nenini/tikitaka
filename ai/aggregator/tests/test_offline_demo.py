@@ -15,7 +15,7 @@ from aggregator.offline_demo import run
         ("normal", []),
         ("camera", ["VISION_SETUP_GUIDANCE"]),
         ("attention", ["ATTENTION_RECOVERY"]),
-        ("silence", ["SILENCE_RECOVERY", "SILENCE_RECOVERY"]),
+        ("silence", ["SILENCE_RECOVERY"]),
         ("response", ["RESPONSE_PROMPT"]),
         ("reaction", ["REACTION_PROMPT"]),
     ],

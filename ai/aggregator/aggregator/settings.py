@@ -65,8 +65,10 @@ class IntegrationSettings:
     transcript_debug_full_on_session_end: bool = False
     coaching_llm_enabled: bool = False
     coaching_llm_base_url: str = "http://127.0.0.1:8100"
-    coaching_llm_model: str = "kakaocorp/kanana-2-3b-instruct"
-    coaching_llm_timeout_seconds: float = 2.0
+    coaching_llm_model: str = (
+        "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
+    )
+    coaching_llm_timeout_seconds: float = 3.0
     coaching_llm_max_context_utterances: int = 10
     coaching_llm_max_message_characters: int = 100
 
@@ -143,11 +145,11 @@ class IntegrationSettings:
             ).strip().rstrip("/"),
             coaching_llm_model=os.getenv(
                 "COACHING_LLM_MODEL",
-                "kakaocorp/kanana-2-3b-instruct",
+                "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",
             ).strip(),
             coaching_llm_timeout_seconds=_positive_float(
                 "COACHING_LLM_TIMEOUT_SECONDS",
-                2.0,
+                3.0,
             ),
             coaching_llm_max_context_utterances=_positive_int(
                 "COACHING_LLM_MAX_CONTEXT_UTTERANCES",
