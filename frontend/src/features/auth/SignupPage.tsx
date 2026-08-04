@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
 import { serverMessageOf } from '@/shared/api/envelope'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 import { useAuthStore } from '@/stores/auth.store'
 import { signup } from './api'
 
@@ -16,7 +17,6 @@ import { signup } from './api'
 /*  - 공통 컴포넌트 규약 준수: Steps / Field / Input / Progress / Badge / Callout */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 /** 오늘(yyyy-MM-dd) — 생년월일 입력의 상한. */
 const TODAY_ISO = new Date().toISOString().slice(0, 10)
@@ -157,7 +157,11 @@ export function SignupPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={1} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.account}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">계정 만들기</h1>
         <p className="bt-body-sm bt-muted mt-1">이메일과 비밀번호로 시작해요. 4단계만 더 하면 끝나요.</p>
       </header>

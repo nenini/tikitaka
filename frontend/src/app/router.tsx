@@ -16,11 +16,12 @@ import { MyPage } from '@/features/account/MyPage'
 import { ConsentManagePage } from '@/features/account/ConsentManagePage'
 import {
   AccountEditPage,
-  FaceRecapturePage,
   SurveyEditPage,
   ProfileEditPage,
   RegionEditPage,
 } from '@/features/account/AccountEditPage'
+// 얼굴상 분석(W-05 / W-19b) — 온보딩 촬영과 재촬영이 같은 화면을 모드로 나눠 쓴다
+import { FaceCapturePage, FaceRecapturePage } from '@/features/face/FaceCapturePage'
 // 세션 · 대기방
 import { SessionPage } from '@/features/session/SessionPage'
 import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
   { path: '/signup/verify', element: <VerifyKycPage /> },
   { path: '/signup/consent', element: <ConsentPage /> },
   { path: '/signup/profile', element: <ProfilePage /> },
+  { path: '/signup/face', element: <FaceCapturePage /> },
   { path: '/signup/survey', element: <SurveyPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   // OAuth 콜백 수신(공개) — 백엔드가 302로 토큰을 URL 프래그먼트에 실어 되돌려보낸다

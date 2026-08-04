@@ -8,6 +8,7 @@ import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
 /* -------------------------------------------------------------------------- */
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
@@ -18,7 +19,6 @@ import { useAuthStore } from '@/stores/auth.store'
 /*  - 실명·전화·정확한 주소·직업 미노출·미수집(D-08)                             */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 const profileSchema = z.object({
   nickname: z
@@ -101,7 +101,7 @@ export function ProfilePage() {
       // 프로필이 생겼으므로 온보딩 게이트를 즉시 연다(ProtectedRoute 가 이 값을 본다).
       // 갱신하지 않으면 온보딩을 마치고도 보호 라우트에서 다시 이 흐름으로 튕긴다.
       useAuthStore.getState().setOnboarding('ready')
-      navigate('/signup/survey')
+      navigate('/signup/face')
     } catch (e) {
       // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출
       setSubmitError(errorMessageOf(e, '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.'))
@@ -116,7 +116,11 @@ export function ProfilePage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={4} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.profile}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">기본 프로필</h1>
         <p className="bt-body-sm bt-muted mt-1">상대에게 보일 정보와 매칭에만 쓰는 정보를 나눠 받아요.</p>
       </header>

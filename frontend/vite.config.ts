@@ -79,6 +79,12 @@ export default defineConfig(({ mode }) => {
   const proxyTarget =
     env.VITE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8080'
 
+  // 얼굴상 분석 AI 서비스(ai/face-analysis). 백엔드와 별개 프로세스이고,
+  // 원본 이미지가 백엔드를 거치지 않도록 프론트가 직접 호출한다.
+  // 로컬 docker compose 기준 8001 (컨테이너 내부 8000).
+  const aiFaceTarget =
+    env.VITE_AI_FACE_TARGET || process.env.VITE_AI_FACE_TARGET || 'http://localhost:8001'
+
   return {
   plugins: [react(), tailwindcss(), mediapipeWasmDevServer()],
   resolve: {
@@ -121,6 +127,13 @@ export default defineConfig(({ mode }) => {
         target: proxyTarget,
         changeOrigin: true,
         ws: true,
+      },
+      // 얼굴상 분석 AI 서비스. 접두사를 떼고 그대로 넘긴다.
+      //   /ai/face/v1/face-analysis/analyze → {aiFaceTarget}/v1/face-analysis/analyze
+      '/ai/face': {
+        target: aiFaceTarget,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ai\/face/, ''),
       },
     },
   },

@@ -115,16 +115,7 @@ export function AccountEditPage() {
 /*  항목별 편집 화면 — 이번 차수 전부 스텁(별도 스토리). backTo = 허브(/me/edit)  */
 /* -------------------------------------------------------------------------- */
 
-export function FaceRecapturePage() {
-  return (
-    <AuthPlaceholder
-      title="얼굴 재촬영 (W-19b)"
-      note="카메라로 얼굴을 다시 촬영해 얼굴상을 재분석합니다. 원본은 분석 후 즉시 삭제 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
+/* 얼굴 재촬영은 온보딩 촬영 화면을 모드로 재사용한다 — features/face/FaceCapturePage */
 
 export function SurveyEditPage() {
   return (

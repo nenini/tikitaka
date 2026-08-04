@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Callout, Card, ConsentRow, Stack, Steps, Switch } from '@/components'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
 /* -------------------------------------------------------------------------- */
 /*  W-03 · 목적별 개인정보 동의 (AUTH-03) — 온보딩 3/5                           */
@@ -15,7 +16,6 @@ import { Button, Callout, Card, ConsentRow, Stack, Steps, Switch } from '@/compo
 /*   ④ 전체 동의 단축 = 제공 (선택 항목 일괄 on/off · §7.2 예외로 편의 제공)      */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 type OptionalKey = 'face' | 'expression' | 'voice' | 'report'
 
@@ -78,7 +78,11 @@ export function ConsentPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[640px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={3} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.consent}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">목적별 개인정보 동의</h1>
         <p className="bt-body-sm bt-muted mt-1">필요한 목적에만 동의할 수 있어요.</p>
       </header>
