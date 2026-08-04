@@ -13,7 +13,7 @@ import {
 } from '@/components'
 import { cn } from '@/shared/lib/cn'
 import { getMessageFeedback, requestSuggestions } from './api'
-import { PERSONALITY_DESC, PERSONALITY_LABEL, STAGE_DESC, STAGE_LABEL } from './types'
+import { STAGE_DESC, STAGE_LABEL } from './types'
 import type { AiChatSession, ChatMessage, MessageFeedback, SuggestedSentence } from './types'
 
 /* ── 페르소나 요약 패널 ─────────────────────────────────
@@ -57,11 +57,6 @@ export function PersonaPanel({ session, onEnd, plain, className }: PersonaPanelP
             label="연습 단계"
             value={STAGE_LABEL[session.stage]}
             desc={STAGE_DESC[session.stage]}
-          />
-          <SettingRow
-            label="성향"
-            value={PERSONALITY_LABEL[persona.personality]}
-            desc={PERSONALITY_DESC[persona.personality]}
           />
         </div>
 
@@ -348,9 +343,7 @@ export function ChatHeader({
       <Avatar size="sm" name={session.persona.name} fallback={session.persona.emoji ?? undefined} />
       <div className="min-w-0 flex-1">
         <b className="bt-body-sm block truncate">{session.persona.name}</b>
-        <span className="bt-caption">
-          {STAGE_LABEL[session.stage]} · {PERSONALITY_LABEL[session.persona.personality]}
-        </span>
+        <span className="bt-caption">{STAGE_LABEL[session.stage]}</span>
       </div>
       {session.status === 'COMPLETED' && <Badge>종료됨</Badge>}
       {right}
