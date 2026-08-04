@@ -49,6 +49,7 @@ tasks.named('test') {
 	useJUnitPlatform()
 	maxHeapSize = '2g'
 	maxParallelForks = 1
+	systemProperty 'user.timezone', 'Asia/Seoul'
 }
 
 tasks.withType(JavaCompile).configureEach {
