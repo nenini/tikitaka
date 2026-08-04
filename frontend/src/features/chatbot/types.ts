@@ -34,8 +34,14 @@ export type ServerConversationStage = 'INTRO' | 'CONVERSATION' | 'CLOSING'
 /** 백엔드 `ChatSessionPurpose`. 현재 값이 하나뿐이고 생성 요청에 **필수**다. */
 export type ChatSessionPurpose = 'DATE_PRACTICE'
 
-/** 페르소나 성향(말투·난이도·반응 정도 항목은 제거됨 — W-10 규칙). */
-export type PersonaPersonality = 'ACTIVE' | 'MIDDLE' | 'INTROVERTED'
+/*
+ * 페르소나 성향(적극적·중간·내향적)은 **제거됐다**.
+ *
+ * 세션 생성 요청은 `purpose` 하나만 받고 그 값도 `'DATE_PRACTICE'` 고정이라
+ * 성향은 서버에 전달된 적이 없다 — localStorage 에만 남아 화면에 되비치는 값이었다.
+ * AI 응답에 아무 영향을 주지 못하는 선택지를 사용자에게 고르게 할 이유가 없어
+ * 설정 항목과 표시를 함께 걷어냈다. 남은 사용자 선택지는 연습 단계뿐이다.
+ */
 
 /** 백엔드 `ChatSessionStatus`. */
 export type ChatSessionStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
@@ -62,7 +68,6 @@ export interface AiPersonaSummary {
   name: string
   /** 아바타 대체 이모지 */
   emoji?: string | null
-  personality: PersonaPersonality
 }
 
 /**
@@ -197,7 +202,6 @@ export interface ChatReport {
   /** 대화가 이어진 시간(분) */
   durationMin: number
   stage: ConversationStage
-  personality: PersonaPersonality
   practiceGoal?: string | null
   /** 한 줄 총평 */
   summaryText?: string | null
@@ -250,31 +254,16 @@ export interface AiPersonaOptions {
 /** POST /ai-personas/recommendations 응답. 초기 선택값을 채우는 용도(조건 기반 추천). */
 export interface PersonaRecommendation {
   stage: ConversationStage
-  personality: PersonaPersonality
 }
 
 /** POST /ai-chat-sessions 요청 본문. 페르소나는 서버가 조합하므로 personaId 를 직접 넘기지 않는다. */
 export interface CreateChatSessionInput {
   stage: ConversationStage
-  personality: PersonaPersonality
 }
 
 export const STAGE_LABEL: Record<ConversationStage, string> = {
   BEFORE_DATE: '소개팅 전',
   AFTER_DATE: '소개팅 후',
-}
-
-export const PERSONALITY_LABEL: Record<PersonaPersonality, string> = {
-  ACTIVE: '적극적',
-  MIDDLE: '중간',
-  INTROVERTED: '내향적',
-}
-
-/** 성향이 대화에서 어떻게 나타나는지(W-10 설정 화면과 같은 문구). */
-export const PERSONALITY_DESC: Record<PersonaPersonality, string> = {
-  ACTIVE: '먼저 말 걸고 리드하는 편',
-  MIDDLE: '상황에 맞춰가는 편',
-  INTROVERTED: '듣고 반응하는 편',
 }
 
 export const STAGE_DESC: Record<ConversationStage, string> = {

@@ -17,7 +17,6 @@ import type {
   CreateChatSessionInput,
   MessageFeedback,
   MessageSender,
-  PersonaPersonality,
   PersonaRecommendation,
   ServerConversationStage,
   SuggestedSentence,
@@ -50,20 +49,19 @@ const BASE = '/v1/ai-chat/sessions'
 /* ── 로컬 보관 설정 ────────────────────────────────────── */
 
 /**
- * 연습 단계·성향은 서버가 받지 않는다(`AiChatSessionCreateRequest` 는 `purpose` 만).
- * 화면은 이 값으로 상대 소개와 헤더를 그리므로 세션별로 브라우저에 보관한다.
+ * 연습 단계는 서버가 받지 않는다(`AiChatSessionCreateRequest` 는 `purpose` 만).
+ * 화면은 이 값으로 헤더를 그리므로 세션별로 브라우저에 보관한다.
  *
  * ⚠️ 기기가 바뀌면 초기값으로 되돌아간다. 서버가 필드를 받아주면 이 저장소는 지운다.
  */
 interface SessionPreference {
   stage: ConversationStage
-  personality: PersonaPersonality
   personaName?: string
   proactiveMessageEnabled?: boolean
 }
 
 const PREF_KEY = (sessionId: number) => `bd_chat_pref_${sessionId}`
-const DEFAULT_PREFERENCE: SessionPreference = { stage: 'BEFORE_DATE', personality: 'MIDDLE' }
+const DEFAULT_PREFERENCE: SessionPreference = { stage: 'BEFORE_DATE' }
 
 function readPreference(sessionId: number): SessionPreference {
   try {
@@ -153,7 +151,6 @@ function toSession(raw: RawSessionSummary, practiceGoal: string | null): AiChatS
       personaId: raw.aiPersonaKey ?? '',
       name: pref.personaName ?? '상대',
       emoji: '🙂',
-      personality: pref.personality,
     },
     practiceGoal,
     aiResponseState: raw.aiResponseState,
@@ -200,7 +197,7 @@ export async function getPersonaOptions(): Promise<AiPersonaOptions> {
  * ⚠️ **백엔드 미구현**(`POST /ai-personas/recommendations` 없음) → 고정 초기값.
  */
 export async function requestPersonaRecommendation(): Promise<PersonaRecommendation> {
-  return { stage: 'BEFORE_DATE', personality: 'MIDDLE' }
+  return { stage: 'BEFORE_DATE' }
 }
 
 /** 챗봇 최초 이용 시 시·도 저장 — `PATCH /api/v1/users/me/profile`. */
@@ -212,7 +209,7 @@ export async function saveRegionCity(regionCity: string): Promise<void> {
 
 /**
  * 세션 생성('대화 시작').
- * 서버는 `purpose` 만 받는다 — 연습 단계·성향은 로컬에 보관한다.
+ * 서버는 `purpose` 만 받는다(값도 'DATE_PRACTICE' 고정) — 연습 단계는 로컬에 보관한다.
  * 이미 ACTIVE 세션이 있으면 409(`ACTIVE_CHAT_SESSION_EXISTS`) → 그 세션을 돌려준다.
  */
 export async function createChatSession(input: CreateChatSessionInput): Promise<AiChatSession> {
@@ -220,7 +217,7 @@ export async function createChatSession(input: CreateChatSessionInput): Promise<
     const created = unwrap(
       await apiClient.post<ApiEnvelope<RawSessionCreated>>(BASE, { purpose: 'DATE_PRACTICE' }),
     )
-    writePreference(created.sessionId, { stage: input.stage, personality: input.personality })
+    writePreference(created.sessionId, { stage: input.stage })
     const practiceGoal = await getMyPracticeGoal().catch(() => null)
     return toSession(
       {
@@ -245,12 +242,10 @@ export async function createChatSession(input: CreateChatSessionInput): Promise<
         // 진행 중 세션의 설정을 사용자가 방금 고른 값으로 갱신한다.
         writePreference(current.chatSessionId, {
           stage: input.stage,
-          personality: input.personality,
         })
         return {
           ...current,
           stage: input.stage,
-          persona: { ...current.persona, personality: input.personality },
         }
       }
     }
@@ -630,7 +625,6 @@ export async function getChatReport(chatSessionId: number): Promise<ChatReport> 
     totalMessageCount: messages.length,
     durationMin,
     stage: pref.stage,
-    personality: pref.personality,
     practiceGoal,
     // 아래부터는 백엔드 분석 결과가 없어 샘플 문구다.
     summaryText: '대화 분석은 아직 서버에 연결되지 않았어요. 아래 내용은 화면 확인용 예시입니다.',
