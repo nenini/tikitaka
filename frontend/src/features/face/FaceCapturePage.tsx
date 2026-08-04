@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, Spinner, Stack, Steps } from '@/components'
+import { Button, Callout, Card, Cluster, Spinner, Stack, Steps } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getMyProfile } from '@/features/profile/api'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
@@ -17,7 +17,6 @@ import {
   FACE_FAILURE_GUIDE,
   RETAKE_LIMIT,
   type FaceAnalysisGroup,
-  type FaceAnalysisResult,
   type FaceFailureCode,
 } from './types'
 
@@ -50,7 +49,6 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
   const [attempts, setAttempts] = useState(0)
   const [failureCode, setFailureCode] = useState<FaceFailureCode | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<FaceAnalysisResult | null>(null)
   const [skipping, setSkipping] = useState(false)
 
   /**
@@ -112,7 +110,8 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
       if (requestIdRef.current == null) {
         requestIdRef.current = (await createFaceAnalysisRequest()).analysisRequestId
       }
-      const saved = await submitFaceAnalysisResult(requestIdRef.current, {
+      // 반환값은 쓰지 않는다 — 결과 화면이 서버에서 최신 상태를 다시 읽는다
+      await submitFaceAnalysisResult(requestIdRef.current, {
         modelVersion: analysis.modelVersion,
         tags: analysis.tags.map((tag) => ({
           code: tag.code,
@@ -121,9 +120,10 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
           rank: tag.rank,
         })),
       })
-      setResult(saved)
-      setPhase('done')
       camera.stop()
+      // 결과 표시는 별도 화면(PROFILE-03)이 맡는다. 그 화면이 서버에서 최신 결과를
+      // 다시 읽으므로, 저장 직후 PENDING 이어도 거기서 상태를 추적할 수 있다.
+      navigate(onboarding ? '/signup/face-result' : '/me/edit/face-result', { replace: true })
     } catch (analyzeError) {
       // AI 서비스 오류와 백엔드 오류를 구분해 안내한다
       setError(
@@ -294,43 +294,8 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
         </Card>
       )}
 
-      {phase === 'done' && result && (
-        <Card>
-          <Stack gap={14}>
-            <div>
-              <span className="bt-overline">분석 결과</span>
-              <div className="bt-h1 mt-1">{result.primaryTypeDisplayName}</div>
-            </div>
-            <Cluster gap={8}>
-              {result.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag.code} tone="neutral">
-                  {tag.displayName}
-                </Badge>
-              ))}
-            </Cluster>
-            <p className="bt-caption bt-muted">
-              재미로 보는 결과예요. 매칭에서는 참고 정보로만 쓰입니다.
-            </p>
-            <Cluster gap={8}>
-              <Button variant="primary" onClick={goNext}>
-                {onboarding ? '다음' : '완료'}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setResult(null)
-                  setAttempts(0)
-                  setFailureCode(null)
-                  requestIdRef.current = null
-                  void startCamera()
-                }}
-              >
-                다시 찍기
-              </Button>
-            </Cluster>
-          </Stack>
-        </Card>
-      )}
+      {/* 결과 표시는 이 화면에 두지 않는다 — 저장 직후 /…/face-result 로 넘어간다.
+          그 화면이 서버에서 최신 결과를 다시 읽어, 새로고침해도 결과가 유지된다. */}
     </main>
   )
 }

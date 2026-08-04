@@ -41,6 +41,30 @@ export type FaceFailureCode =
   | 'EXTREME_HEAD_POSE'
   | 'INVALID_IMAGE'
 
+/**
+ * 1순위 얼굴상 한 줄 설명.
+ *
+ * ⚠️ **프론트 임시 문구다.** 서버 `face_tag_catalog.description` 이 전부 NULL 이라
+ *    내려줄 설명이 없다(`V5__add_survey_schema_and_catalog.sql` 시드 확인).
+ *    카탈로그에 설명이 채워지면 이 표를 지우고 서버 값을 쓴다.
+ *    TODO(FACE): 기획 확정 문구로 교체하거나 백엔드 카탈로그로 이관.
+ *
+ * 외모를 평가하지 않고 **첫인상의 분위기**만 적는다 — 결과는 재미 요소이자
+ * 매칭 참고 정보일 뿐이라는 화면 문구(`ENTERTAINMENT_ONLY`)와 톤을 맞춘다.
+ */
+export const FACE_TYPE_DESCRIPTION: Readonly<Record<FaceTypeCode, string>> = {
+  DOG: '보고 있으면 마음이 놓이는, 다가가기 쉬운 인상이에요.',
+  CAT: '또렷한 눈매가 먼저 눈에 들어오는 인상이에요.',
+  RABBIT: '동그란 느낌이 도드라지는 부드러운 인상이에요.',
+  FOX: '차분하면서도 시선을 붙드는 인상이에요.',
+  DEER: '맑고 잔잔한 분위기가 먼저 느껴지는 인상이에요.',
+  TURTLE: '서두르지 않는 편안한 분위기의 인상이에요.',
+  HAMSTER: '작고 동글동글한 인상이 오래 기억에 남아요.',
+  SNAKE: '분위기가 또렷하게 남는, 인상이 강한 얼굴이에요.',
+  DINOSAUR: '개성이 뚜렷해 쉽게 잊히지 않는 인상이에요.',
+  WOLF: '선이 또렷하고 분위기가 뚜렷한 인상이에요.',
+}
+
 /** 품질 미달 사유별 사용자 안내. 무엇을 바꿔야 하는지까지 적는다. */
 export const FACE_FAILURE_GUIDE: Readonly<Record<FaceFailureCode, string>> = {
   NO_FACE: '얼굴이 보이지 않아요. 화면 안내선 안에 얼굴을 맞춰주세요.',

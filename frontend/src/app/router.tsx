@@ -21,6 +21,8 @@ import { ProfileEditPage } from '@/features/account/ProfileEditPage'
 import { RegionEditPage } from '@/features/account/RegionEditPage'
 // 얼굴상 분석(W-05 / W-19b) — 온보딩 촬영과 재촬영이 같은 화면을 모드로 나눠 쓴다
 import { FaceCapturePage, FaceRecapturePage } from '@/features/face/FaceCapturePage'
+// 얼굴상 결과(W-05b / PROFILE-03) — 촬영과 분리해 결과만 다시 볼 수 있게 한다
+import { FaceResultPage, FaceResultRecapturePage } from '@/features/face/FaceResultPage'
 // 세션 · 대기방
 import { SessionPage } from '@/features/session/SessionPage'
 import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
@@ -63,6 +65,7 @@ export const router = createBrowserRouter([
   { path: '/signup/consent', element: <ConsentPage /> },
   { path: '/signup/profile', element: <ProfilePage /> },
   { path: '/signup/face', element: <FaceCapturePage /> },
+  { path: '/signup/face-result', element: <FaceResultPage /> },
   { path: '/signup/survey', element: <SurveyPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   // OAuth 콜백 수신(공개) — 백엔드가 302로 토큰을 URL 프래그먼트에 실어 되돌려보낸다
@@ -89,6 +92,7 @@ export const router = createBrowserRouter([
           // 개인정보 수정·관리(W-19b) 허브 + 항목별 별도 편집 화면
           { path: '/me/edit', element: <AccountEditPage /> },
           { path: '/me/edit/face', element: <FaceRecapturePage /> },
+          { path: '/me/edit/face-result', element: <FaceResultRecapturePage /> },
           { path: '/me/edit/survey', element: <SurveyEditPage /> },
           { path: '/me/edit/profile', element: <ProfileEditPage /> },
           { path: '/me/edit/region', element: <RegionEditPage /> },
