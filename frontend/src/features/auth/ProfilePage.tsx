@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } from '@/components'
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
-import { authErrorMessage } from '@/features/auth/api'
+import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
@@ -104,7 +104,7 @@ export function ProfilePage() {
       navigate('/signup/survey')
     } catch (e) {
       // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출
-      setSubmitError(authErrorMessage(e) ?? '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.')
+      setSubmitError(errorMessageOf(e, '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.'))
     }
   }
 

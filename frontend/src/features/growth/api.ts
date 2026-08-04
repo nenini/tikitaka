@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/client'
+import { unwrap, type ApiEnvelope } from '@/shared/api/envelope'
 import type { EarnedBadge, GrowthDashboard, GrowthKeyword, GrowthTrack, TemperaturePoint } from './types'
 
 /**
@@ -6,6 +7,7 @@ import type { EarnedBadge, GrowthDashboard, GrowthKeyword, GrowthTrack, Temperat
  *
  * 백엔드 미가동 시 데모 폴백을 돌려준다(매칭·챗봇과 동일 방침).
  * apiClient.baseURL 이 `/api` 이므로 여기서는 `/v1/...` 부터 적는다.
+ * 성공 응답은 `{ success, data }` 래퍼 → `unwrap()` (규칙 SSOT: `@/shared/api/envelope`).
  *
  *   GET /api/v1/users/me/growth-dashboard              현재 온도·세션/노쇼/뱃지 스탯·온도 추이
  *   GET /api/v1/users/me/growth-keywords/strengths     누적 강점 키워드
@@ -22,10 +24,11 @@ import type { EarnedBadge, GrowthDashboard, GrowthKeyword, GrowthTrack, Temperat
 
 export async function getGrowthDashboard(track: GrowthTrack = 'ALL'): Promise<GrowthDashboard> {
   try {
-    const { data } = await apiClient.get<GrowthDashboard>('/v1/users/me/growth-dashboard', {
-      params: track === 'ALL' ? undefined : { track },
-    })
-    return data
+    return unwrap(
+      await apiClient.get<ApiEnvelope<GrowthDashboard>>('/v1/users/me/growth-dashboard', {
+        params: track === 'ALL' ? undefined : { track },
+      }),
+    )
   } catch {
     return demoDashboard()
   }
@@ -33,8 +36,9 @@ export async function getGrowthDashboard(track: GrowthTrack = 'ALL'): Promise<Gr
 
 export async function getStrengthKeywords(): Promise<GrowthKeyword[]> {
   try {
-    const { data } = await apiClient.get<GrowthKeyword[]>('/v1/users/me/growth-keywords/strengths')
-    return data
+    return unwrap(
+      await apiClient.get<ApiEnvelope<GrowthKeyword[]>>('/v1/users/me/growth-keywords/strengths'),
+    )
   } catch {
     return [
       { label: '편안한 분위기', count: 5 },
@@ -46,8 +50,9 @@ export async function getStrengthKeywords(): Promise<GrowthKeyword[]> {
 
 export async function getImprovementKeywords(): Promise<GrowthKeyword[]> {
   try {
-    const { data } = await apiClient.get<GrowthKeyword[]>('/v1/users/me/growth-keywords/improvements')
-    return data
+    return unwrap(
+      await apiClient.get<ApiEnvelope<GrowthKeyword[]>>('/v1/users/me/growth-keywords/improvements'),
+    )
   } catch {
     return [
       { label: '자기 이야기 전환', count: 4 },
@@ -58,8 +63,7 @@ export async function getImprovementKeywords(): Promise<GrowthKeyword[]> {
 
 export async function getMyBadges(): Promise<EarnedBadge[]> {
   try {
-    const { data } = await apiClient.get<EarnedBadge[]>('/v1/users/me/badges')
-    return data
+    return unwrap(await apiClient.get<ApiEnvelope<EarnedBadge[]>>('/v1/users/me/badges'))
   } catch {
     // 코드는 badges.ts 의 아트 카탈로그와 맞춘다 — 아트가 없는 코드는 화면에 그려지지 않는다.
     return [

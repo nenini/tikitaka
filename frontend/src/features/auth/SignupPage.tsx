@@ -4,8 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
+import { serverMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
-import { authErrorMessage, signup } from './api'
+import { signup } from './api'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
@@ -132,7 +133,8 @@ export function SignupPage() {
       await signIn(tokens) // 토큰 저장 + GET /v1/users/me 하이드레이션
       navigate('/signup/verify')
     } catch (error) {
-      const message = authErrorMessage(error)
+      // 메시지 유무로 분기하므로 폴백을 받지 않는 serverMessageOf 를 쓴다
+      const message = serverMessageOf(error)
       if (message && /이메일|email/i.test(message)) {
         setError('email', { message })
         setEmailStatus('taken')
