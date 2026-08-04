@@ -209,7 +209,7 @@ export function SignupPage() {
                 label="비밀번호"
                 required
                 error={errors.password?.message}
-                help={errors.password ? undefined : '영문·숫자 포함 8자 이상'}
+                help={errors.password ? undefined : '영문·숫자·특수문자 포함 8자 이상'}
               >
                 <Input
                   type="password"
