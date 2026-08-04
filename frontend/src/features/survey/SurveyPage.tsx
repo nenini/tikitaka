@@ -79,8 +79,19 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
       setOptions(nextOptions)
       setHasExisting(existing != null)
       if (existing) {
+        /**
+         * 얼굴상 선택지는 **프로필 성별에 따라 달라진다**(서버가 `ALL` + 상대 성별만 준다).
+         * 프로필에서 성별을 바꾸면 전에 고른 얼굴상이 목록에서 사라지는데, 그 id 를 그대로
+         * 들고 있으면 화면에는 아무것도 선택돼 보이지 않으면서 저장 버튼만 열려 있다가
+         * 서버에서 `INVALID_SURVEY_OPTION` 으로 거절된다 — 사용자가 손쓸 수 없는 막다른 길이다.
+         * 목록에 없으면 미선택으로 되돌려, 기존 안내("선호 얼굴상을 골라주세요")가 뜨고
+         * 다시 고르기 전까지 저장이 잠기게 한다.
+         */
+        const faceTagStillOffered = nextOptions.faceTags.some(
+          (tag) => tag.id === existing.preferredFaceTag.id,
+        )
         setForm({
-          faceTagId: existing.preferredFaceTag.id,
+          faceTagId: faceTagStillOffered ? existing.preferredFaceTag.id : null,
           preferredTraitIds: existing.preferredTraits.map((t) => t.id),
           userTraitIds: existing.userTraits.map((t) => t.id),
           minAge: existing.minPreferredAge,
@@ -89,13 +100,19 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
         })
       }
     } catch (error) {
+      // 편집 모드로 온 사용자는 프로필이 이미 있다 — 온보딩용 안내를 그대로 쓰면 틀린 말이 된다
       setLoadError(
-        errorMessageOf(error, '설문 선택지를 불러오지 못했어요. 기본 프로필을 먼저 입력해 주세요.'),
+        errorMessageOf(
+          error,
+          onboarding
+            ? '설문 선택지를 불러오지 못했어요. 기본 프로필을 먼저 입력해 주세요.'
+            : '설문을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        ),
       )
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [onboarding])
 
   useEffect(() => {
     void load()
@@ -153,9 +170,14 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
             <Button variant="secondary" onClick={() => void load()}>
               다시 시도
             </Button>
-            {onboarding && (
+            {/* 조회 실패 시에도 빠져나갈 곳을 준다 — 모드에 따라 되돌아갈 자리가 다르다 */}
+            {onboarding ? (
               <Button variant="ghost" onClick={() => navigate('/signup/profile')}>
                 프로필 입력으로
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => navigate('/me/edit')}>
+                개인정보 관리로
               </Button>
             )}
           </div>
@@ -167,12 +189,18 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
   return (
     <main className="mx-auto w-full max-w-[720px] px-5 py-6">
       <header className="mb-5">
-        {onboarding && (
+        {onboarding ? (
           <Steps
             count={ONBOARDING_STEP_COUNT}
             current={ONBOARDING_STEP.survey}
             labels={ONBOARDING_STEP_LABELS}
           />
+        ) : (
+          /* 온보딩은 되돌아갈 곳이 흐름상 정해져 있지만, 편집은 허브에서 들어온다.
+             프로필·지역 편집 화면과 같은 자리에 같은 문구로 둔다. */
+          <Button variant="ghost" size="sm" onClick={() => navigate('/me/edit')}>
+            ‹ 개인정보 관리
+          </Button>
         )}
         <h1 className="bt-h2 mt-4">{onboarding ? '이상형과 개선 목표' : '설문 다시 응답'}</h1>
         <p className="bt-body-sm bt-muted mt-1">
