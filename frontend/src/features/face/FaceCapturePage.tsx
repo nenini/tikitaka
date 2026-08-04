@@ -229,7 +229,10 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
               style={{ aspectRatio: '4 / 3' }}
             >
               <video
-                ref={camera.videoRef}
+                // 콜백 ref — 이 엘리먼트는 촬영 단계에서야 마운트되므로, 먼저 열린
+                // 스트림을 여기서 붙여야 한다(useFaceCamera 주석 참고).
+                ref={camera.attachVideo}
+                autoPlay
                 muted
                 playsInline
                 className="h-full w-full object-cover"

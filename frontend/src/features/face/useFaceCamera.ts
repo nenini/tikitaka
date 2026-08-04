@@ -4,7 +4,15 @@ import { CAPTURE_JPEG_QUALITY, CAPTURE_MAX_WIDTH } from './types'
 export type FaceCameraStatus = 'idle' | 'requesting' | 'ready' | 'denied' | 'error'
 
 export interface UseFaceCamera {
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  /**
+   * `<video>` 에 붙이는 **콜백 ref**.
+   *
+   * 일반 ref 를 쓰면 안 된다. 미리보기 `<video>` 는 촬영 단계에 들어가야 렌더되는데
+   * `getUserMedia` 는 그보다 먼저 끝난다 — 스트림을 붙이려는 시점에 엘리먼트가 아직
+   * 없어서 srcObject 가 영영 설정되지 않고, 권한만 잡힌 채 화면이 검게 남는다.
+   * 콜백 ref 로 두면 엘리먼트가 마운트되는 순간 붙이므로 순서에 영향받지 않는다.
+   */
+  attachVideo: (element: HTMLVideoElement | null) => void
   status: FaceCameraStatus
   /** 사용자에게 보여줄 실패 사유. `status` 가 denied·error 일 때만 채워진다. */
   errorMessage: string | null
@@ -55,6 +63,25 @@ export function useFaceCamera(): UseFaceCamera {
   const [status, setStatus] = useState<FaceCameraStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  /** 엘리먼트와 스트림이 **둘 다 준비된 순간** 연결한다. 어느 쪽이 먼저 와도 된다. */
+  const bind = useCallback(() => {
+    const video = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream || video.srcObject === stream) return
+    video.srcObject = stream
+    void video.play().catch(() => {
+      /* 자동재생 차단은 muted+playsInline 로 이미 막았고, 실패해도 프레임은 읽힌다 */
+    })
+  }, [])
+
+  const attachVideo = useCallback(
+    (element: HTMLVideoElement | null) => {
+      videoRef.current = element
+      bind()
+    },
+    [bind],
+  )
+
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
@@ -84,19 +111,15 @@ export function useFaceCamera(): UseFaceCamera {
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => {
-          /* 자동재생 차단은 muted+playsInline 로 이미 막았고, 실패해도 프레임은 읽힌다 */
-        })
-      }
+      // 이 시점엔 아직 <video> 가 없을 수 있다. 없으면 attachVideo 가 마운트 때 붙인다.
+      bind()
       setStatus('ready')
     } catch (error) {
       const described = describeError(error)
       setStatus(described.status)
       setErrorMessage(described.message)
     }
-  }, [])
+  }, [bind])
 
   const capture = useCallback(async (): Promise<Blob | null> => {
     const video = videoRef.current
@@ -123,5 +146,5 @@ export function useFaceCamera(): UseFaceCamera {
   // 언마운트 시 트랙 해제 — 카메라 표시등이 남지 않게 한다
   useEffect(() => stop, [stop])
 
-  return { videoRef, status, errorMessage, start, stop, capture }
+  return { attachVideo, status, errorMessage, start, stop, capture }
 }
