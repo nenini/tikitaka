@@ -80,11 +80,11 @@ pipeline {
             when {
                 expression {
                     def branch = env.GIT_BRANCH ?: env.BRANCH_NAME ?: ''
-                    return branch == 'origin/develop' ||
-                           branch == 'develop' ||
-                           ((branch == 'origin/feature/#44-cicd-deployment' ||
-                             branch == 'feature/#44-cicd-deployment') &&
-                            params.DEPLOY_PRODUCTION)
+                    def isDevelop = branch == 'develop' || branch.endsWith('/develop')
+                    def isDeploymentFeature = branch == 'feature/#44-cicd-deployment' ||
+                                              branch.endsWith('/feature/#44-cicd-deployment') ||
+                                              branch.endsWith('feature/#44-cicd-deployment')
+                    return isDevelop || (isDeploymentFeature && params.DEPLOY_PRODUCTION == true)
                 }
             }
             steps {
