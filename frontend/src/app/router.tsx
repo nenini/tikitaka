@@ -16,11 +16,9 @@ import { OAuthCallbackPage } from '@/features/auth/OAuthCallbackPage'
 // 계정(#28) — 마이 · 동의 관리 · 개인정보 수정 허브
 import { MyPage } from '@/features/account/MyPage'
 import { ConsentManagePage } from '@/features/account/ConsentManagePage'
-import {
-  AccountEditPage,
-  ProfileEditPage,
-  RegionEditPage,
-} from '@/features/account/AccountEditPage'
+import { AccountEditPage } from '@/features/account/AccountEditPage'
+import { ProfileEditPage } from '@/features/account/ProfileEditPage'
+import { RegionEditPage } from '@/features/account/RegionEditPage'
 // 얼굴상 분석(W-05 / W-19b) — 온보딩 촬영과 재촬영이 같은 화면을 모드로 나눠 쓴다
 import { FaceCapturePage, FaceRecapturePage } from '@/features/face/FaceCapturePage'
 // 세션 · 대기방
