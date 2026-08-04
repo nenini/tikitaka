@@ -33,6 +33,14 @@ from aggregator.llm_coaching import (
     ContextualCoachingError,
     ExaoneCoachingClient,
 )
+from aggregator.report import (
+    ReportInput,
+    ReportPublisher,
+    build_report_input,
+    generator_from_settings,
+    run_report_job,
+)
+from aggregator.report.builder import ReportLlmError
 from aggregator.session_contracts import (
     SessionEventRequest,
     SessionEventResponse,
@@ -491,6 +499,7 @@ class SessionManager:
         vision_sender: VisionAnalysisSender | None = None,
         audio_adapter_factory: SessionAudioAdapterFactory | None = None,
         message_generator: CoachingMessageGenerator | None = None,
+        report_publisher: ReportPublisher | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.settings = settings
@@ -509,6 +518,11 @@ class SessionManager:
         self._lifecycle_lock = asyncio.Lock()
         self._retained_transcripts: dict[str, RetainedTranscript] = {}
         self._retention_task: asyncio.Task[None] | None = None
+        self._report_publisher = report_publisher
+        self._report_tasks: set[asyncio.Task[None]] = set()
+        self._report_semaphore = asyncio.Semaphore(
+            settings.report_max_concurrency
+        )
         self._started = False
 
     @property
@@ -519,6 +533,10 @@ class SessionManager:
     def retained_transcript_count(self) -> int:
         self._purge_expired_transcripts()
         return len(self._retained_transcripts)
+
+    @property
+    def pending_report_count(self) -> int:
+        return len(self._report_tasks)
 
     def retained_transcript(
         self,
@@ -650,7 +668,93 @@ class SessionManager:
         if runtime is not None:
             await runtime.stop()
             self._retain_transcript(runtime, event.ended_at)
+            self._schedule_report(runtime, event.ended_at)
         return "PROCESSED"
+
+    def _schedule_report(
+        self,
+        runtime: SessionRuntime,
+        ended_at: datetime,
+    ) -> None:
+        """Freeze session state and enqueue one non-blocking report task."""
+        try:
+            session_id = int(runtime.session_id)
+            user_ids = {
+                user_id: int(user_id)
+                for user_id in runtime.participants
+            }
+        except ValueError:
+            logger.warning(
+                "report skipped session=%s reason=non-numeric identity",
+                runtime.session_id,
+            )
+            return
+        if len(user_ids) != len(runtime.participants):
+            logger.warning(
+                "report skipped session=%s reason=incomplete participants",
+                runtime.session_id,
+            )
+            return
+
+        duration_ms = int(
+            (ended_at - runtime.actual_start_at).total_seconds() * 1000
+        )
+        vision_enabled = (
+            runtime.features is None
+            or runtime.features.vision_enabled
+        )
+        snapshot = build_report_input(
+            runtime.aggregator.state,
+            session_duration_ms=max(0, duration_ms),
+            vision_enabled=vision_enabled,
+        )
+        task = asyncio.create_task(
+            self._run_report(snapshot, session_id, user_ids, ended_at),
+            name=f"report-{runtime.session_id}",
+        )
+        self._report_tasks.add(task)
+        task.add_done_callback(self._report_done)
+        logger.info(
+            "report scheduled session=%s pending=%d",
+            runtime.session_id,
+            len(self._report_tasks),
+        )
+
+    def _report_done(self, task: asyncio.Task[None]) -> None:
+        self._report_tasks.discard(task)
+        if task.cancelled():
+            logger.warning("report task cancelled name=%s", task.get_name())
+            return
+        error = task.exception()
+        if error is not None:
+            logger.error(
+                "unexpected report task failure name=%s",
+                task.get_name(),
+                exc_info=(type(error), error, error.__traceback__),
+            )
+
+    async def _run_report(
+        self,
+        snapshot: ReportInput,
+        session_id: int,
+        user_ids: dict[str, int],
+        ended_at: datetime,
+    ) -> None:
+        async with self._report_semaphore:
+            if self._report_publisher is None:
+                self._report_publisher = ReportPublisher(self.settings)
+            try:
+                generator = generator_from_settings(self.settings)
+            except ReportLlmError:
+                generator = None
+            await run_report_job(
+                snapshot,
+                session_id=session_id,
+                user_ids=user_ids,
+                analyzed_at=ended_at.isoformat(),
+                publisher=self._report_publisher,
+                generator=generator,
+            )
 
     def _retain_transcript(
         self,
@@ -753,7 +857,33 @@ class SessionManager:
                 len(self._retained_transcripts),
             )
             self._retained_transcripts.clear()
+        await self._finish_report_tasks()
+        if self._report_publisher is not None:
+            await self._report_publisher.close()
+            self._report_publisher = None
         await self._sender.close()
         await self._vision_sender.close()
         await self._message_generator.close()
         await self._audio_adapter_factory.close()
+
+    async def _finish_report_tasks(self) -> None:
+        tasks = tuple(self._report_tasks)
+        if not tasks:
+            return
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=self.settings.report_shutdown_timeout_seconds,
+            )
+        except TimeoutError:
+            logger.warning(
+                "report shutdown timeout pending=%d timeoutSeconds=%s",
+                len(self._report_tasks),
+                self.settings.report_shutdown_timeout_seconds,
+            )
+            for task in tuple(self._report_tasks):
+                task.cancel()
+            await asyncio.gather(
+                *tuple(self._report_tasks),
+                return_exceptions=True,
+            )

@@ -10,12 +10,14 @@ from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 
 import pytest
+import aggregator.session_manager as session_manager_module
 from stt.events import SttEvent, TranscriptFinalizedEvent, TranscriptPayload
 
 from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.session_manager import SessionManager
+from aggregator.report.input import ReportInput
 from aggregator.settings import IntegrationSettings
 from aggregator.transcripts import TranscriptSegment
 from aggregator.vision_backend import BackendVisionReceipt
@@ -129,6 +131,34 @@ class FakeVisionSender:
         self.closed = True
 
 
+class FakeReportPublisher:
+    def __init__(self) -> None:
+        self.analyses: list[dict[str, object]] = []
+        self.reports: list[dict[str, object]] = []
+        self.closed = False
+
+    async def publish_analysis(
+        self,
+        payload: dict[str, object],
+        *,
+        idempotency_key: str,
+    ) -> bool:
+        self.analyses.append(payload)
+        return False
+
+    async def publish_report(
+        self,
+        payload: dict[str, object],
+        *,
+        idempotency_key: str,
+    ) -> int:
+        self.reports.append(payload)
+        return 1
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 def _started() -> SessionEventRequest:
     return SessionEventRequest.model_validate(
         {
@@ -179,10 +209,100 @@ def _ended() -> SessionEventRequest:
     )
 
 
+def test_report_concurrency_is_limited_to_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        active = 0
+        maximum = 0
+
+        async def fake_report_job(*args: object, **kwargs: object) -> None:
+            nonlocal active, maximum
+            active += 1
+            maximum = max(maximum, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+
+        monkeypatch.setattr(
+            session_manager_module,
+            "run_report_job",
+            fake_report_job,
+        )
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                report_max_concurrency=1,
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=FakeAudioAdapterFactory(),
+            report_publisher=FakeReportPublisher(),  # type: ignore[arg-type]
+        )
+        snapshot = ReportInput("15", 1_000, (), (), False)
+        ended_at = datetime(2026, 7, 30, tzinfo=timezone.utc)
+
+        await asyncio.gather(
+            manager._run_report(snapshot, 15, {}, ended_at),
+            manager._run_report(snapshot, 16, {}, ended_at),
+        )
+
+        assert maximum == 1
+        await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_shutdown_cancels_report_after_configured_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        started = asyncio.Event()
+
+        async def hanging_report_job(*args: object, **kwargs: object) -> None:
+            started.set()
+            await asyncio.Future()
+
+        monkeypatch.setattr(
+            session_manager_module,
+            "run_report_job",
+            hanging_report_job,
+        )
+        publisher = FakeReportPublisher()
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                report_shutdown_timeout_seconds=0.01,
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=FakeAudioAdapterFactory(),
+            report_publisher=publisher,  # type: ignore[arg-type]
+        )
+        task = asyncio.create_task(
+            manager._run_report(
+                ReportInput("15", 1_000, (), (), False),
+                15,
+                {},
+                datetime(2026, 7, 30, tzinfo=timezone.utc),
+            )
+        )
+        manager._report_tasks.add(task)
+        task.add_done_callback(manager._report_done)
+        await started.wait()
+
+        await manager.close()
+
+        assert task.cancelled()
+        assert publisher.closed
+
+    asyncio.run(scenario())
+
+
 def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
     async def scenario() -> None:
         sender = FakeSender()
         audio_factory = FakeAudioAdapterFactory()
+        report_publisher = FakeReportPublisher()
         manager = SessionManager(
             IntegrationSettings(
                 internal_token="token",
@@ -191,6 +311,7 @@ def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
             ),
             sender=sender,
             audio_adapter_factory=audio_factory,
+            report_publisher=report_publisher,  # type: ignore[arg-type]
             now=lambda: datetime(
                 2026,
                 7,
@@ -213,6 +334,7 @@ def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
         assert manager.active_session_count == 0
         assert audio_factory.adapters[0].stopped
         await manager.close()
+        assert report_publisher.closed
         assert sender.closed
         assert audio_factory.closed
 
@@ -296,6 +418,7 @@ def test_livekit_adapter_routes_transcript_into_runtime() -> None:
     async def scenario() -> None:
         sender = FakeSender()
         audio_factory = FakeAudioAdapterFactory()
+        report_publisher = FakeReportPublisher()
         manager = SessionManager(
             IntegrationSettings(
                 internal_token="token",
@@ -304,6 +427,7 @@ def test_livekit_adapter_routes_transcript_into_runtime() -> None:
             ),
             sender=sender,
             audio_adapter_factory=audio_factory,
+            report_publisher=report_publisher,  # type: ignore[arg-type]
         )
         await manager.startup()
         await manager.handle(_started())
@@ -360,6 +484,7 @@ def test_transcript_is_retained_after_end_and_expires_from_memory(
 
         sender = FakeSender()
         audio_factory = FakeAudioAdapterFactory()
+        report_publisher = FakeReportPublisher()
         manager = SessionManager(
             IntegrationSettings(
                 internal_token="token",
@@ -371,6 +496,7 @@ def test_transcript_is_retained_after_end_and_expires_from_memory(
             ),
             sender=sender,
             audio_adapter_factory=audio_factory,
+            report_publisher=report_publisher,  # type: ignore[arg-type]
             now=now,
         )
         await manager.startup()
@@ -422,6 +548,8 @@ def test_transcript_is_retained_after_end_and_expires_from_memory(
         assert manager.retained_transcript("15") is None
         assert manager.retained_transcript_count == 0
         await manager.close()
+        assert len(report_publisher.analyses) == 1
+        assert len(report_publisher.reports) == 2
 
     caplog.set_level(logging.INFO)
     asyncio.run(scenario())

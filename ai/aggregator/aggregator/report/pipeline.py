@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aggregator.report.builder import (
@@ -137,8 +138,13 @@ async def _publish_one(
             narrative = fallback_narrative(scores, speaker_id)
         else:
             # build_narrative는 LLM 실패를 스스로 폴백으로 흡수한다
-            narrative = build_narrative(
-                report, scores, speaker_id, generator, include_quotes=include_quotes
+            narrative = await asyncio.to_thread(
+                build_narrative,
+                report,
+                scores,
+                speaker_id,
+                generator,
+                include_quotes=include_quotes,
             )
     except ReportLlmError:
         logger.exception("문장 생성 실패 session=%s user=%s", session_id, user_id)

@@ -19,6 +19,7 @@ from aggregator.session_manager import (
 )
 from aggregator.audio_adapter import SessionAudioAdapterFactory
 from aggregator.settings import IntegrationSettings
+from aggregator.report import ReportPublisher
 from aggregator.llm_coaching import CoachingMessageGenerator
 
 
@@ -28,6 +29,7 @@ def create_app(
     sender: CoachingSender | None = None,
     audio_adapter_factory: SessionAudioAdapterFactory | None = None,
     message_generator: CoachingMessageGenerator | None = None,
+    report_publisher: ReportPublisher | None = None,
 ) -> FastAPI:
     resolved_settings = settings or IntegrationSettings.from_env()
     manager = SessionManager(
@@ -35,6 +37,7 @@ def create_app(
         sender=sender,
         audio_adapter_factory=audio_adapter_factory,
         message_generator=message_generator,
+        report_publisher=report_publisher,
     )
 
     @asynccontextmanager
@@ -58,6 +61,8 @@ def create_app(
             "retainedTranscriptCount": manager.retained_transcript_count,
             "backendConfigured": resolved_settings.backend_configured,
             "coachingLlmEnabled": resolved_settings.coaching_llm_configured,
+            "reportLlmEnabled": resolved_settings.report_llm_configured,
+            "pendingReportCount": manager.pending_report_count,
         }
 
     @app.post(

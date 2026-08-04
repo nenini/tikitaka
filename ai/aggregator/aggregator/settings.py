@@ -68,6 +68,8 @@ class IntegrationSettings:
     report_llm_base_url: str = ""
     report_llm_model: str = "exaone3.5:7.8b"
     report_llm_timeout_seconds: float = 120.0
+    report_max_concurrency: int = 1
+    report_shutdown_timeout_seconds: float = 30.0
     coaching_llm_enabled: bool = False
     coaching_llm_base_url: str = "http://127.0.0.1:8100"
     coaching_llm_model: str = (
@@ -140,11 +142,25 @@ class IntegrationSettings:
                 "TRANSCRIPT_DEBUG_FULL_ON_SESSION_END",
                 False,
             ),
-            report_llm_base_url=os.getenv("REPORT_LLM_BASE_URL", "").strip().rstrip("/"),
-            report_llm_model=os.getenv("REPORT_LLM_MODEL", "exaone3.5:7.8b").strip(),
+            report_llm_base_url=os.getenv(
+                "REPORT_LLM_BASE_URL",
+                "",
+            ).strip().rstrip("/"),
+            report_llm_model=os.getenv(
+                "REPORT_LLM_MODEL",
+                "exaone3.5:7.8b",
+            ).strip(),
             report_llm_timeout_seconds=_positive_float(
                 "REPORT_LLM_TIMEOUT_SECONDS",
                 120.0,
+            ),
+            report_max_concurrency=_positive_int(
+                "REPORT_MAX_CONCURRENCY",
+                1,
+            ),
+            report_shutdown_timeout_seconds=_positive_float(
+                "REPORT_SHUTDOWN_TIMEOUT_SECONDS",
+                30.0,
             ),
             coaching_llm_enabled=_boolean(
                 "COACHING_LLM_ENABLED",
@@ -177,13 +193,13 @@ class IntegrationSettings:
         return bool(self.backend_base_url and self.internal_token)
 
     @property
-    def report_llm_configured(self) -> bool:
-        return bool(self.report_llm_base_url)
-
-    @property
     def coaching_llm_configured(self) -> bool:
         return bool(
             self.coaching_llm_enabled
             and self.coaching_llm_base_url
             and self.coaching_llm_model
         )
+
+    @property
+    def report_llm_configured(self) -> bool:
+        return bool(self.report_llm_base_url and self.report_llm_model)
