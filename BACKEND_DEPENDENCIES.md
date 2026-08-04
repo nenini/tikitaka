@@ -60,9 +60,24 @@ POST /api/v1/sessions/{sessionId}/extensions
 | A45 | 매칭 지연 사유 | `GET /match-requests/{id}/delay-reason` | P1 | ✅ 사유 미표시 | BE | |
 | A53 | 리포트 목록 | 세션 히스토리/리포트 목록 | P1 | ⚠️ 현재 `/reports` 는 막다른 페이지 | BE | |
 | A51 | 챗봇 페르소나 저장 | persona 옵션/추천 API | P1 | ⚠️ 서버는 `purpose` 만 받음 | BE | |
+| A54 | 세션 분석 설정 조회 | `GET /sessions/{id}/analysis-settings` | P2 | ⚠️ sessionStorage 스냅샷으로 버팀 | BE | |
 
 **"FE 대안" 이 ✅ 인 것은 서버 없이도 안전한 상태로 만들 수 있다** —
 가짜 데이터를 지우고 '준비중'을 명시하면 된다. ⚠️ 는 대안이 불완전해 서버가 필요하다.
+
+### A54 — 분석 설정을 읽을 방법이 없다
+
+`PATCH /sessions/{id}/analysis-settings` 는 있는데 **GET 이 없다.** 게다가 세션이
+`IN_PROGRESS` 가 되면 PATCH 가 409라, 세션 도중에는 현재 설정을 알아낼 길이 아예 없다.
+
+지금은 대기방에서 입장할 때 받은 PATCH 응답을 `sessionStorage` 에 스냅샷으로 남겨
+쓰고 있다(`features/session/vision/analysisConsent.ts`). 새로고침은 견디지만
+**다른 탭·기기에서는 복원되지 않고**, 프라이빗 모드처럼 스토리지가 막힌 브라우저에서는
+읽지 못한다. 그 경우 **분석하지 않는 쪽(false)** 으로 떨어뜨려 안전하게는 처리했으나,
+사용자가 켜 둔 분석이 조용히 꺼지는 것이라 정상 동작은 아니다.
+
+GET 하나면 스냅샷 전체를 걷어낼 수 있다. 우선순위는 낮다(P2) — 현재 대안이 안전한 방향으로
+실패하기 때문이다.
 
 ### 가장 급한 것: REPORT API (A38 · A37)
 
