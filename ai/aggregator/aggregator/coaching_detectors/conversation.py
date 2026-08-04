@@ -6,20 +6,10 @@ import re
 
 from aggregator.coaching_candidates import CoachingCandidate
 from aggregator.config import MvpCoachingConfig
+from aggregator.conversation_signals import looks_like_question
 from aggregator.state import SessionState, Utterance
 
 _PUNCTUATION = re.compile(r"[\s.,!?~…]+")
-_QUESTION_ENDINGS = (
-    "나요",
-    "가요",
-    "까요",
-    "인가요",
-    "있어요",
-    "없어요",
-    "어때요",
-    "뭐예요",
-    "무엇인가요",
-)
 _SHORT_VERBAL_REACTIONS = {"네", "예", "응", "아하"}
 _VERBAL_REACTION_PHRASES = (
     "맞아요",
@@ -35,14 +25,6 @@ _VERBAL_REACTION_PHRASES = (
 
 def _normalize(text: str) -> str:
     return _PUNCTUATION.sub("", text.strip())
-
-
-def _looks_like_question(text: str) -> bool:
-    stripped = text.strip()
-    if stripped.endswith("?"):
-        return True
-    normalized = _normalize(stripped)
-    return any(normalized.endswith(ending) for ending in _QUESTION_ENDINGS)
 
 
 def _looks_like_verbal_reaction(text: str) -> bool:
@@ -68,7 +50,7 @@ class ConversationCoachingDetector:
         utterance: Utterance,
     ) -> None:
         user = state.user(utterance.speaker_id)
-        if _looks_like_question(utterance.text):
+        if looks_like_question(utterance.text):
             user.last_question_ended_at_ms = utterance.end_ms
             user.last_question_trigger_id = (
                 f"question:{utterance.speaker_id}:{utterance.end_ms}"

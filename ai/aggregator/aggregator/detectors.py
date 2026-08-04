@@ -10,8 +10,10 @@ CoachingPolicy(coaching.py)가 게이트·쿨다운·TTL로 판단한다(친구 
 
 from __future__ import annotations
 
-import re
-
+from aggregator.conversation_signals import (
+    DEFAULT_SILENCE_THRESHOLD_MS,
+    looks_like_question,
+)
 from aggregator.events import (
     AnalysisEvent,
     FillerDetected,
@@ -34,26 +36,11 @@ class Detector:
         return []
 
 
-# ── 질문 감지 (통제실 설계 §4.3, 고정밀 우선) ──────────────────────
-# '?'가 1차 신호(문장부호가 있으면 무조건 질문). '?'가 없으면 '세요·죠'처럼 인사·평서와
-# 겹치는 어미는 제외하고, 명백한 의문 어미만 본다(고정밀 우선).
-_QUESTION_ENDINGS = re.compile(r"(나요|는가요|은가요|ㄴ가요|을까요|ㄹ까요)$")
-
-
-def _looks_like_question(text: str) -> bool:
-    stripped = text.strip().rstrip(".!… ")
-    if not stripped:
-        return False
-    if stripped.endswith("?"):
-        return True
-    return _QUESTION_ENDINGS.search(stripped) is not None
-
-
 class QuestionDetector(Detector):
     """발화가 상대에게 던지는 질문인지 감지한다(분석/리포트용, 코칭 트리거 아님)."""
 
     def on_utterance(self, state: SessionState, utterance: Utterance) -> list[AnalysisEvent]:
-        if not _looks_like_question(utterance.text):
+        if not looks_like_question(utterance.text):
             return []
         speaker = state.speaker(utterance.speaker_id)
         speaker.question_count += 1
@@ -97,7 +84,10 @@ class SilenceDetector(Detector):
     쿨다운: 한 번 감지하면 발화가 재개될 때까지 재발동하지 않는다.
     """
 
-    def __init__(self, threshold_ms: int = 10_000) -> None:
+    def __init__(
+        self,
+        threshold_ms: int = DEFAULT_SILENCE_THRESHOLD_MS,
+    ) -> None:
         self.threshold_ms = threshold_ms
         self._fired_for_ms = -1
 
