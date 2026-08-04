@@ -1,18 +1,22 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, EmptyState, Icon } from '@/components'
-import { KIND_ICON } from './useNotifications'
-import type { AppNotification } from './useNotifications'
+import { Badge, EmptyState, Icon, Spinner } from '@/components'
+import { KIND_ICON } from './types'
+import type { AppNotification } from './types'
 
 interface NotificationPanelProps {
   open: boolean
   onClose: () => void
   items: AppNotification[]
   unread: number
-  markOne: (id: string) => void
+  markOne: (id: number) => void
   markAll: () => void
   loadMore: () => void
   hasMore: boolean
+  /** 최초 로딩 중 — '알림 없음'과 구분해 그린다 */
+  loading?: boolean
+  /** 실시간 연결 끊김. 목록이 낡았을 수 있다는 사실을 숨기지 않는다 */
+  streamDisconnected?: boolean
 }
 
 /* -------------------------------------------------------------------------- */
@@ -23,7 +27,18 @@ interface NotificationPanelProps {
 /*   ③ '지난 알림 더보기' 인라인 확장   ④ 개별 + 전체(모두 읽음)               */
 /* -------------------------------------------------------------------------- */
 
-export function NotificationPanel({ open, onClose, items, unread, markOne, markAll, loadMore, hasMore }: NotificationPanelProps) {
+export function NotificationPanel({
+  open,
+  onClose,
+  items,
+  unread,
+  markOne,
+  markAll,
+  loadMore,
+  hasMore,
+  loading = false,
+  streamDisconnected = false,
+}: NotificationPanelProps) {
   const navigate = useNavigate()
 
   // ② 바깥 클릭으로는 닫지 않음 — 대신 Esc 로 닫는 안전장치는 둔다
@@ -36,7 +51,7 @@ export function NotificationPanel({ open, onClose, items, unread, markOne, markA
 
   if (!open) return null
 
-  const openItem = (id: string, to?: string) => {
+  const openItem = (id: number, to?: string) => {
     markOne(id)
     if (to) {
       navigate(to)
@@ -65,7 +80,18 @@ export function NotificationPanel({ open, onClose, items, unread, markOne, markA
         </div>
       </header>
 
-      {items.length === 0 ? (
+      {/* 실시간이 끊기면 새 알림이 안 뜬다. 사용자가 모른 채 기다리지 않게 알린다. */}
+      {streamDisconnected && (
+        <p className="bt-caption border-b border-[var(--bt-color-border)] bg-surface-sunken px-4 py-2">
+          실시간 연결이 끊겼어요. 새 알림은 다시 열 때 반영돼요.
+        </p>
+      )}
+
+      {loading && items.length === 0 ? (
+        <div className="grid place-items-center py-10" aria-busy="true">
+          <Spinner size={22} />
+        </div>
+      ) : items.length === 0 ? (
         <EmptyState icon={<Icon name="bell" size={28} />} title="새 알림이 없어요" />
       ) : (
         <ul className="max-h-[320px] overflow-auto">

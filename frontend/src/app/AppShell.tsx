@@ -77,6 +77,8 @@ export function AppShell() {
                 markAll={noti.markAll}
                 loadMore={noti.loadMore}
                 hasMore={noti.hasMore}
+                loading={noti.loading}
+                streamDisconnected={noti.streamDisconnected}
               />
             </div>
             <NavLink to="/me" aria-label="내 정보" className="rounded-full">
