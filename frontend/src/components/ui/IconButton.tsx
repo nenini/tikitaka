@@ -13,6 +13,10 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   state?: IconButtonState
   /** 56px 대형 (세션 통화 컨트롤 권장) */
   large?: boolean
+  /** 36px 소형 (헤더 등 밀집 영역). 터치 최소 타깃(44px)을 밑돌므로 모바일 단독 버튼에는 쓰지 않는다 */
+  small?: boolean
+  /** 배경·그림자 없이 평면으로 — 이미 표면 위에 있어 떠 보이면 안 되는 자리 */
+  flat?: boolean
   /** 처리 중(장치 전환 등) — 스피너 표시 + 클릭 차단 */
   loading?: boolean
   /** 접근성상 필수 — 아이콘만 있는 버튼은 항상 라벨을 준다 */
@@ -37,6 +41,8 @@ export function IconButton({
   icon,
   state = 'default',
   large = false,
+  small = false,
+  flat = false,
   loading = false,
   disabled,
   className,
@@ -45,12 +51,19 @@ export function IconButton({
   type = 'button',
   ...rest
 }: IconButtonProps) {
-  const iconSize = large ? 22 : 19
+  const iconSize = large ? 22 : small ? 18 : 19
   return (
     <button
       ref={ref}
       type={type}
-      className={cn('bt-icon-btn', STATE_CLASS[state], large && 'bt-icon-btn--lg', className)}
+      className={cn(
+        'bt-icon-btn',
+        STATE_CLASS[state],
+        large && 'bt-icon-btn--lg',
+        small && 'bt-icon-btn--sm',
+        flat && 'bt-icon-btn--flat',
+        className,
+      )}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}

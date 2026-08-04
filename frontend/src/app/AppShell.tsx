@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Avatar, BottomNav, IconButton } from '@/components'
 import type { IconName } from '@/components'
+import { faceTypeImage } from '@/features/face/faceImage'
+import { useMyFaceAnalysis } from '@/features/face/useMyFaceAnalysis'
 import { NotificationPanel } from '@/features/notifications/NotificationPanel'
 import { useNotifications } from '@/features/notifications/useNotifications'
+import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
 /*  AppShell — 앱 전체가 공유하는 셸(chrome).                                   */
@@ -23,6 +26,9 @@ const NAV: readonly { to: string; label: string; icon: IconName; end?: boolean }
 export function AppShell() {
   const [notiOpen, setNotiOpen] = useState(false)
   const noti = useNotifications()
+  const user = useAuthStore((s) => s.user)
+  // 얼굴상 진단을 마쳤으면 그 동물 이미지가 프로필 사진이 된다. 없으면 닉네임 이니셜.
+  const faceImage = faceTypeImage(useMyFaceAnalysis()?.primaryType)
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       {/* ── 데스크탑 상단 네비 (모바일 숨김) ───────────────────────── */}
@@ -50,11 +56,16 @@ export function AppShell() {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-2">
+          {/* 벨과 마이페이지 진입 버튼을 같은 규격으로 맞춘다 — 둘 다 36px 원형·평면.
+              기본 IconButton 은 44px 에 흰 배경 + 그림자라, 흰 헤더 위에서는 혼자 떠 보이고
+              옆의 36px 아바타와 높이도 어긋났다. */}
+          <div className="flex items-center gap-1.5">
             {/* 알림 벨 — 드롭다운 토글 + 안읽음 카운트 배지 (바깥클릭 미닫힘: onClose=벨 재클릭·X·Esc) */}
             <div className="relative">
               <IconButton
                 icon="bell"
+                small
+                flat
                 aria-label={noti.unread > 0 ? `알림 (안읽음 ${noti.unread}개)` : '알림'}
                 aria-expanded={notiOpen}
                 onClick={() => setNotiOpen((v) => !v)}
@@ -81,8 +92,14 @@ export function AppShell() {
                 streamDisconnected={noti.streamDisconnected}
               />
             </div>
-            <NavLink to="/me" aria-label="내 정보" className="rounded-full">
-              <Avatar size="sm" name="유월" />
+            {/* 아바타를 round 로 둬 옆의 원형 벨과 형태를 맞춘다. 기본 sm 은 12px 라운드라
+                포커스 링(rounded-full)과 실제 도형이 어긋났다. */}
+            <NavLink
+              to="/me"
+              aria-label="내 정보"
+              className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--bt-color-focus)]"
+            >
+              <Avatar size="sm" round name={user?.nickname ?? '내 정보'} src={faceImage} />
             </NavLink>
           </div>
         </div>
