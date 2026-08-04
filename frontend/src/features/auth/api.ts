@@ -1,7 +1,6 @@
-import { AxiosError } from 'axios'
 import { apiClient } from '@/shared/api/client'
+import { unwrap, type ApiEnvelope } from '@/shared/api/envelope'
 import type {
-  ApiEnvelope,
   AuthTokens,
   LoginPayload,
   MeResponse,
@@ -15,25 +14,27 @@ import type {
  * 경로 규약
  *  - apiClient.baseURL = '/api' (vite 프록시 → :8080, rewrite 없음)
  *  - 백엔드는 `/api/v1/...` 라 여기서는 '/v1/...' 로 호출한다.
- *  - 성공 응답은 `{ success, data }` 래퍼 → data 만 벗겨서 반환한다.
- *    (전역 언랩은 room/api 등 기존 호출과 충돌하므로 이 모듈에서 지역적으로만 처리)
+ *  - 성공 응답은 `{ success, data }` 래퍼 → `unwrap()` 으로 벗겨서 반환한다.
+ *    (규칙 SSOT: `@/shared/api/envelope`)
  */
 const AUTH = '/v1/auth'
 
 /** 회원가입 → 토큰 발급(가입 즉시 로그인 상태). birthDate 는 'yyyy-MM-dd'. */
 export async function signup(payload: SignupPayload): Promise<AuthTokens> {
-  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/signup`, payload, {
-    skipAuthRefresh: true,
-  })
-  return data.data
+  return unwrap(
+    await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/signup`, payload, {
+      skipAuthRefresh: true,
+    }),
+  )
 }
 
 /** 이메일/비밀번호 로그인 → 토큰 발급. (자격 오류 401 을 refresh 루프로 넘기지 않음) */
 export async function login(payload: LoginPayload): Promise<AuthTokens> {
-  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/login`, payload, {
-    skipAuthRefresh: true,
-  })
-  return data.data
+  return unwrap(
+    await apiClient.post<ApiEnvelope<AuthTokens>>(`${AUTH}/login`, payload, {
+      skipAuthRefresh: true,
+    }),
+  )
 }
 
 /**
@@ -42,12 +43,13 @@ export async function login(payload: LoginPayload): Promise<AuthTokens> {
  * skipAuthRefresh 플래그로 이 요청 자체는 401 재발급 루프에서 제외한다.
  */
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
-  const { data } = await apiClient.post<ApiEnvelope<AuthTokens>>(
-    `${AUTH}/refresh`,
-    { refreshToken },
-    { skipAuthRefresh: true },
+  return unwrap(
+    await apiClient.post<ApiEnvelope<AuthTokens>>(
+      `${AUTH}/refresh`,
+      { refreshToken },
+      { skipAuthRefresh: true },
+    ),
   )
-  return data.data
 }
 
 /** 로그아웃 — 서버의 refresh 토큰 무효화. 실패해도 클라 토큰은 별도로 정리한다. */
@@ -57,8 +59,7 @@ export async function logout(refreshToken: string): Promise<void> {
 
 /** 현재 로그인 사용자 신원. 토큰 응답엔 유저 정보가 없어 로그인 직후 이걸로 하이드레이션한다. */
 export async function getMe(): Promise<MeResponse> {
-  const { data } = await apiClient.get<ApiEnvelope<MeResponse>>('/v1/users/me')
-  return data.data
+  return unwrap(await apiClient.get<ApiEnvelope<MeResponse>>('/v1/users/me'))
 }
 
 /**
@@ -80,10 +81,4 @@ export function oauthStart(provider: OAuthProviderId): void {
   // (`??` 는 빈 문자열을 통과시켜 `/api` 프리픽스가 빠지고, 프록시를 못 타 SPA 라우터로 떨어진다)
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
   window.location.assign(`${base}/v1/auth/oauth2/${provider}`)
-}
-
-/** 백엔드 에러 래퍼({code,message})에서 사용자 메시지를 뽑는다. 없으면 undefined. */
-export function authErrorMessage(error: unknown): string | undefined {
-  const e = error as AxiosError<{ message?: string }>
-  return e?.response?.data?.message
 }

@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { tokenStore } from './tokens'
-import type { ApiEnvelope, AuthTokens } from '@/features/auth/types'
+import { unwrap, type ApiEnvelope } from './envelope'
+import type { AuthTokens } from '@/features/auth/types'
 
 /**
  * 공용 Axios 인스턴스. (모든 REST 요청은 이 인스턴스를 통해 나간다)
@@ -37,7 +38,7 @@ function requestRefresh(): Promise<string | null> {
     // skipAuthRefresh: 이 요청이 401 이어도 다시 재발급을 시도하지 않는다(무한 루프 방지)
     .post<ApiEnvelope<AuthTokens>>('/v1/auth/refresh', { refreshToken }, { skipAuthRefresh: true })
     .then((res) => {
-      const tokens = res.data.data
+      const tokens = unwrap(res)
       tokenStore.set(tokens.accessToken, tokens.refreshToken)
       return tokens.accessToken
     })

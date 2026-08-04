@@ -3,11 +3,8 @@
  * 백엔드 SSOT: AuthTokenResponse / UserResponse / SignupRequest / LoginRequest.
  */
 
-/** 백엔드 공통 응답 래퍼. 모든 성공 응답이 `{ success, data }` 로 감싸져 온다. */
-export interface ApiEnvelope<T> {
-  success: boolean
-  data: T
-}
+/* 공통 응답 래퍼 `ApiEnvelope` 는 도메인 타입이 아니라 전송 규약이므로
+   `@/shared/api/envelope` 에만 둔다. (여기 있던 중복 정의는 제거) */
 
 /** POST /login·/signup·/refresh 의 응답 본문(AuthTokenResponse). */
 export interface AuthTokens {

@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Callout, Card, Field, Input, Stack } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
-import { authErrorMessage, login, oauthStart } from './api'
+import { login, oauthStart } from './api'
 import type { OAuthProviderId } from './types'
 
 /* -------------------------------------------------------------------------- */
@@ -220,7 +221,7 @@ function LoginCard() {
       await signIn(tokens) // 토큰 저장 + GET /v1/users/me 로 신원 하이드레이션
       navigate('/')
     } catch (error) {
-      setFormError(authErrorMessage(error) ?? '이메일 또는 비밀번호를 다시 확인해주세요.')
+      setFormError(errorMessageOf(error, '이메일 또는 비밀번호를 다시 확인해주세요.'))
     }
   }
 

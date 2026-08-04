@@ -4,8 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
+import { serverMessageOf } from '@/shared/api/envelope'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 import { useAuthStore } from '@/stores/auth.store'
-import { authErrorMessage, signup } from './api'
+import { signup } from './api'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
@@ -15,7 +17,6 @@ import { authErrorMessage, signup } from './api'
 /*  - 공통 컴포넌트 규약 준수: Steps / Field / Input / Progress / Badge / Callout */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 /** 오늘(yyyy-MM-dd) — 생년월일 입력의 상한. */
 const TODAY_ISO = new Date().toISOString().slice(0, 10)
@@ -31,11 +32,19 @@ function isAtLeast19(iso: string): boolean {
 const signupSchema = z
   .object({
     email: z.string().min(1, '이메일을 입력하세요').email('올바른 이메일 형식이 아니에요'),
+    /**
+     * 서버 정책(`PasswordPolicy.REGEXP`)과 **같은 규칙**이어야 한다.
+     * 예전에는 영문·숫자만 검사해서, 특수문자 없는 비밀번호가 프론트 검증을 통과한 뒤
+     * 서버에서 거부됐다. 정책 정본은 백엔드다.
+     */
     password: z
       .string()
       .min(8, '비밀번호는 8자 이상이어야 합니다')
+      .max(64, '비밀번호는 64자 이하여야 합니다')
       .regex(/[A-Za-z]/, '영문을 포함해주세요')
-      .regex(/\d/, '숫자를 포함해주세요'),
+      .regex(/\d/, '숫자를 포함해주세요')
+      .regex(/[^A-Za-z\d\s]/, '특수문자를 포함해주세요')
+      .regex(/^\S*$/, '공백은 쓸 수 없어요'),
     passwordConfirm: z.string().min(1, '비밀번호를 한 번 더 입력하세요'),
     realName: z.string().trim().min(2, '실명을 입력하세요'),
     phone: z
@@ -64,13 +73,19 @@ async function checkEmailAvailable(email: string): Promise<boolean> {
 }
 
 /** 비밀번호 강도 0~4 → 미터/라벨. */
+/**
+ * 강도 표시용 점수(0~4).
+ * 서버 정책의 필수 조건(길이·영문·숫자·특수문자)을 앞쪽 3점에 두어,
+ * **3점 미만이면 어차피 서버가 거부**한다는 사실이 막대에 드러나게 한다.
+ * 4점은 대소문자 혼용까지 한 경우의 가산점이다.
+ */
 function passwordScore(pw: string): number {
   if (!pw) return 0
   let s = 0
-  if (pw.length >= 8) s++
+  if (pw.length >= 8 && pw.length <= 64) s++
+  if (/[A-Za-z]/.test(pw) && /\d/.test(pw)) s++
+  if (/[^A-Za-z\d\s]/.test(pw)) s++
   if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++
-  if (/\d/.test(pw)) s++
-  if (/[^A-Za-z0-9]/.test(pw)) s++
   return s
 }
 const STRENGTH = ['너무 짧아요', '약함', '보통', '강함', '아주 강함'] as const
@@ -132,7 +147,8 @@ export function SignupPage() {
       await signIn(tokens) // 토큰 저장 + GET /v1/users/me 하이드레이션
       navigate('/signup/verify')
     } catch (error) {
-      const message = authErrorMessage(error)
+      // 메시지 유무로 분기하므로 폴백을 받지 않는 serverMessageOf 를 쓴다
+      const message = serverMessageOf(error)
       if (message && /이메일|email/i.test(message)) {
         setError('email', { message })
         setEmailStatus('taken')
@@ -155,7 +171,11 @@ export function SignupPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={1} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.account}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">계정 만들기</h1>
         <p className="bt-body-sm bt-muted mt-1">이메일과 비밀번호로 시작해요. 4단계만 더 하면 끝나요.</p>
       </header>

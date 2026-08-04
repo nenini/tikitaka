@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/client'
+import { unwrap, type ApiEnvelope } from '@/shared/api/envelope'
 import type { ReportStatusResponse, SessionReport } from './types'
 
 /**
@@ -6,6 +7,7 @@ import type { ReportStatusResponse, SessionReport } from './types'
  *
  * 백엔드 미가동 시 데모 폴백을 돌려준다(매칭·챗봇과 동일 방침).
  * apiClient.baseURL 이 `/api` 이므로 여기서는 `/v1/...` 부터 적는다.
+ * 성공 응답은 `{ success, data }` 래퍼 → `unwrap()` (규칙 SSOT: `@/shared/api/envelope`).
  *
  *   GET  /api/v1/sessions/{id}/reports/status     생성 상태(PENDING·GENERATING·COMPLETED·FAILED)
  *   GET  /api/v1/sessions/{id}/reports/me         내 세션 리포트 (W-16 본체)
@@ -22,8 +24,9 @@ const reportBase = (sessionId: string) => `/v1/sessions/${sessionId}/reports`
 
 export async function getReportStatus(sessionId: string): Promise<ReportStatusResponse> {
   try {
-    const { data } = await apiClient.get<ReportStatusResponse>(`${reportBase(sessionId)}/status`)
-    return data
+    return unwrap(
+      await apiClient.get<ApiEnvelope<ReportStatusResponse>>(`${reportBase(sessionId)}/status`),
+    )
   } catch {
     return { reportStatus: 'COMPLETED', generatedAt: new Date().toISOString() }
   }
@@ -31,8 +34,7 @@ export async function getReportStatus(sessionId: string): Promise<ReportStatusRe
 
 export async function getSessionReport(sessionId: string): Promise<SessionReport> {
   try {
-    const { data } = await apiClient.get<SessionReport>(`${reportBase(sessionId)}/me`)
-    return data
+    return unwrap(await apiClient.get<ApiEnvelope<SessionReport>>(`${reportBase(sessionId)}/me`))
   } catch {
     return demoReport(sessionId)
   }
