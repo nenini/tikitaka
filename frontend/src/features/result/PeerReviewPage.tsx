@@ -1,96 +1,126 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar, Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { getPublicProfile } from '@/features/profile/api'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
-  getPeerReviewForm,
-  getReceivedReview,
-  getReceivedStatus,
-  getSubmittedReview,
-  submitPeerReview,
+  getEvaluationItems,
+  getEvaluationStatus,
+  getReceivedEvaluation,
+  submitEvaluation,
 } from './api'
 // OverflowMenu 는 아래 '이 세션 관리' 블록을 다시 켤 때 함께 import 한다(현재 주석 처리됨).
 import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
 import type {
-  PeerReviewForm,
-  PeerReviewMetricKey,
-  PeerReviewScores,
-  ReceivedReview,
-  ReceivedReviewStatus,
+  EvaluationItemKey,
+  EvaluationItems,
+  EvaluationScores,
+  EvaluationStatus,
+  ReceivedEvaluation,
 } from './types'
 
+/** 화면이 다루는 상대 정보. `/items` 는 userId 만 주므로 닉네임은 공개 프로필에서 채운다. */
+interface Opponent {
+  userId: number
+  nickname: string
+}
 
 export function PeerReviewPage() {
-  const { sessionId = 'demo' } = useParams()
+  const { sessionId: sessionIdParam } = useParams()
   const navigate = useNavigate()
   const compact = useIsCompactViewport()
 
-  const [form, setForm] = useState<PeerReviewForm | null>(null)
-  const [status, setStatus] = useState<ReceivedReviewStatus | null>(null)
-  const [received, setReceived] = useState<ReceivedReview | null>(null)
+  // 라우트 파라미터는 문자열이지만 서버 계약은 Long 이다. 숫자가 아니면 조회 자체를 하지 않는다.
+  const sessionId = Number(sessionIdParam)
+  const sessionIdValid = Number.isInteger(sessionId) && sessionId > 0
 
-  const [scores, setScores] = useState<PeerReviewScores>({})
+  const [items, setItems] = useState<EvaluationItems | null>(null)
+  const [status, setStatus] = useState<EvaluationStatus | null>(null)
+  const [opponent, setOpponent] = useState<Opponent | null>(null)
+  const [received, setReceived] = useState<ReceivedEvaluation | null>(null)
+
+  const [scores, setScores] = useState<Partial<EvaluationScores>>({})
   const [goodText, setGoodText] = useState('')
   const [improveText, setImproveText] = useState('')
 
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    Promise.all([getPeerReviewForm(sessionId), getReceivedStatus(sessionId)]).then(([f, s]) => {
-      if (!alive) return
-      setForm(f)
-      setStatus(s)
-      if (s.unlocked) getReceivedReview(sessionId).then((r) => alive && setReceived(r))
-      // 이미 제출한 뒤 다시 들어온 경우 — 빈 폼이 아니라 내가 낸 평가를 읽기 전용으로 되살린다
-      if (f.submitted || s.mySubmitted) {
-        getSubmittedReview(sessionId).then((mine) => {
-          if (!alive || !mine) return
-          setScores(mine.scores)
-          setGoodText(mine.goodBehaviorText ?? '')
-          setImproveText(mine.improvementText ?? '')
-        })
-      }
-    })
-    return () => {
-      alive = false
+  /**
+   * 화면 데이터 적재.
+   * 데모 폴백을 두지 않는다 — 실패하면 실패로 보여주고 재시도를 제공한다.
+   * 닉네임 조회만 실패했을 때는 화면 전체를 막지 않고 상대를 익명으로 그린다.
+   */
+  const load = useCallback(async () => {
+    if (!sessionIdValid) {
+      setLoading(false)
+      setLoadError('잘못된 세션 주소예요.')
+      return
     }
-  }, [sessionId])
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [nextItems, nextStatus] = await Promise.all([
+        getEvaluationItems(sessionId),
+        getEvaluationStatus(sessionId),
+      ])
+      setItems(nextItems)
+      setStatus(nextStatus)
 
-  const metrics = form?.metrics ?? []
+      const nickname = await getPublicProfile(nextItems.partnerUserId)
+        .then((profile) => profile.nickname)
+        .catch(() => '상대방')
+      setOpponent({ userId: nextItems.partnerUserId, nickname })
+
+      // 열람 가능 판정은 서버 몫이다 — 화면에서 숨기는 것으로 잠금을 대신하지 않는다
+      setReceived(nextStatus.resultAvailable ? await getReceivedEvaluation(sessionId) : null)
+    } catch (fetchError) {
+      setLoadError(errorMessageOf(fetchError, '평가 정보를 불러오지 못했어요.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [sessionId, sessionIdValid])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const metrics = items?.items ?? []
   // 6개짜리 배열이라 메모이즈할 이유가 없다(매 렌더 새 배열이면 useMemo 가 오히려 헛돈다).
   const ratedCount = metrics.filter((m) => scores[m.key] != null).length
   const allRated = metrics.length > 0 && ratedCount === metrics.length
 
-  const submitted = Boolean(form?.submitted || status?.mySubmitted)
-  const expired = Boolean(status?.expired)
+  const submitted = Boolean(status?.mySubmitted)
+  // 제출 가능 여부는 서버 판정을 그대로 쓴다(미제출 && 마감 전). 마감 초과 판정은 GateCallout 안에서 한다.
+  const canEdit = Boolean(status?.submissionOpen)
 
   async function handleSubmit() {
-    if (!form || !allRated || submitting) return
+    if (!items || !status || !allRated || submitting) return
     setSubmitting(true)
     setError(null)
     try {
-      await submitPeerReview(sessionId, {
-        scores: scores as Record<PeerReviewMetricKey, number>,
+      await submitEvaluation(sessionId, {
+        ...(scores as EvaluationScores),
         goodBehaviorText: goodText.trim() || undefined,
         improvementText: improveText.trim() || undefined,
       })
       // 제출 직후 게이트 상태를 서버에서 다시 읽는다 — 통과 판정은 서버 몫이다.
-      const next = await getReceivedStatus(sessionId)
+      const next = await getEvaluationStatus(sessionId)
       setStatus(next)
-      setForm({ ...form, submitted: true })
-      if (next.unlocked) setReceived(await getReceivedReview(sessionId))
-    } catch {
-      setError('제출에 실패했어요. 잠시 후 다시 시도해 주세요.')
+      setReceived(next.resultAvailable ? await getReceivedEvaluation(sessionId) : null)
+    } catch (submitError) {
+      setError(errorMessageOf(submitError, '제출에 실패했어요. 잠시 후 다시 시도해 주세요.'))
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (!form || !status) {
+  if (loading) {
     return (
       <main className="mx-auto grid w-full max-w-[1080px] place-items-center px-5 py-20" aria-busy="true">
         <Spinner size={28} />
@@ -98,30 +128,46 @@ export function PeerReviewPage() {
     )
   }
 
+  if (loadError || !items || !status) {
+    return (
+      <main className="mx-auto w-full max-w-[1080px] px-5 py-10">
+        <Stack gap={12}>
+          <Callout tone="danger" icon="report">
+            {loadError ?? '평가 정보를 불러오지 못했어요.'}
+          </Callout>
+          {sessionIdValid && (
+            <div>
+              <Button variant="secondary" onClick={() => void load()}>
+                다시 시도
+              </Button>
+            </div>
+          )}
+        </Stack>
+      </main>
+    )
+  }
+
+  const opponentName = opponent?.nickname ?? '상대방'
+
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <Avatar name={form.opponent.nickname} className="mt-0.5 shrink-0" />
+          <Avatar name={opponentName} className="mt-0.5 shrink-0" />
           <div className="min-w-0">
-            <h1 className="bt-h1">{form.opponent.nickname}님과의 대화, 어떠셨나요?</h1>
+            <h1 className="bt-h1">{opponentName}님과의 대화, 어떠셨나요?</h1>
             <p className="bt-body-sm bt-muted mt-1">
               외모나 조건이 아니라 대화 행동만 평가해요. 익명으로 전달됩니다.
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Badge tone="neutral">
-            <span className="bt-numeric">{form.sessionRoundNo}</span>회차 ·{' '}
-            <span className="bt-numeric">{form.durationMin}</span>분 완료
-          </Badge>
-          {/* TODO: 추후 global header 생기면 신고/차단 기능 더보기로 넣기 */}
-          {/* <OverflowMenu
-            label="이 세션 관리"
-            items={[{ label: '신고 · 차단', danger: true, onSelect: () => setReportOpen(true) }]}
-          /> */}
-        </div>
+        {/* 회차·진행 시간 배지는 평가 API 계약에 없어서 뺐다. 세션 상세를 붙일 때 되살린다. */}
+        {/* TODO: 추후 global header 생기면 신고/차단 기능 더보기로 넣기 */}
+        {/* <OverflowMenu
+          label="이 세션 관리"
+          items={[{ label: '신고 · 차단', danger: true, onSelect: () => setReportOpen(true) }]}
+        /> */}
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -129,16 +175,20 @@ export function PeerReviewPage() {
         <Card className="flex flex-col lg:flex-1">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
             <span className="bt-h3">
-              정량 평가 <span className="bt-caption bt-muted">(1~5점)</span>
+              정량 평가{' '}
+              <span className="bt-caption bt-muted">
+                ({metrics[0]?.minScore ?? 1}~{metrics[0]?.maxScore ?? 5}점)
+              </span>
             </span>
             {/* 몇 개 남았는지는 제출 버튼까지 내려가서 알 일이 아니다 — 항목 바로 위에 둔다 */}
-            {!submitted && !expired && (
+            {canEdit && (
               <span className="bt-caption bt-muted" role="status" aria-live="polite">
-                <span className="bt-numeric">{ratedCount}</span> / <span className="bt-numeric">{metrics.length}</span> 선택함
+                <span className="bt-numeric">{ratedCount}</span> /{' '}
+                <span className="bt-numeric">{metrics.length}</span> 선택함
               </span>
             )}
           </div>
-          {!submitted && !expired && (
+          {canEdit && (
             <Progress
               className="mb-1"
               value={metrics.length ? (ratedCount / metrics.length) * 100 : 0}
@@ -152,7 +202,7 @@ export function PeerReviewPage() {
               compact={compact}
               last={i === metrics.length - 1}
               value={scores[m.key]}
-              disabled={submitted || expired}
+              disabled={!canEdit}
               onChange={(v) => setScores((prev) => ({ ...prev, [m.key]: v }))}
             />
           ))}
@@ -170,18 +220,20 @@ export function PeerReviewPage() {
               placeholder="어떤 행동이 좋았는지 적어주세요"
               value={goodText}
               onChange={setGoodText}
-              disabled={submitted || expired}
+              disabled={!canEdit}
+              maxLength={items.maxTextLength}
             />
             <FreeTextField
               label="개선하면 좋을 행동"
               placeholder="완곡하게 적어주세요. 욕설은 필터링됩니다"
               value={improveText}
               onChange={setImproveText}
-              disabled={submitted || expired}
+              disabled={!canEdit}
+              maxLength={items.maxTextLength}
             />
           </Card>
 
-          <GateCallout status={status} submitted={submitted} />
+          <GateCallout status={status} />
 
           {error && (
             <span className="bt-error" role="alert">
@@ -189,7 +241,7 @@ export function PeerReviewPage() {
             </span>
           )}
 
-          {!submitted && !expired ? (
+          {canEdit ? (
             <>
               <Button
                 variant="primary"
@@ -202,27 +254,35 @@ export function PeerReviewPage() {
               </Button>
               {!allRated && (
                 <p className="bt-caption bt-muted">
-                  6개 지표를 모두 평가하면 제출할 수 있어요. 한마디는 비워두셔도 됩니다.
+                  <span className="bt-numeric">{metrics.length}</span>개 지표를 모두 평가하면 제출할 수
+                  있어요. 한마디는 비워두셔도 됩니다.
                 </p>
               )}
             </>
           ) : (
-            <Button variant="primary" block onClick={() => navigate(`/session/${sessionId}/report`)}>
-              내 리포트 보기
-            </Button>
+            <>
+              {submitted && (
+                <p className="bt-caption bt-muted">
+                  제출한 평가는 익명으로 전달돼 다시 볼 수 없어요.
+                </p>
+              )}
+              <Button variant="primary" block onClick={() => navigate(`/session/${sessionId}/report`)}>
+                내 리포트 보기
+              </Button>
+            </>
           )}
         </aside>
       </div>
 
-      {/* 상대가 남긴 평가 — 내 제출이 확인됐을 때만 서버가 내려준다 */}
+      {/* 상대가 남긴 평가 — 양측 제출이 확인됐을 때만 서버가 내려준다 */}
       {received && (
         <Card className="mt-4">
-          <div className="bt-h3 mb-3">{form.opponent.nickname}님이 남긴 평가</div>
+          <div className="bt-h3 mb-3">{opponentName}님이 남긴 평가</div>
           <Stack gap={10}>
             <Cluster gap={8}>
               {metrics.map((m) => (
                 <Badge key={m.key} tone="neutral">
-                  {m.label} <span className="bt-numeric">{received.scores[m.key]}</span>
+                  {m.label} <span className="bt-numeric">{received[m.key as EvaluationItemKey]}</span>
                 </Badge>
               ))}
             </Cluster>
@@ -245,12 +305,14 @@ export function PeerReviewPage() {
         </Card>
       )}
 
-      <ReportBlockDialog
-        open={reportOpen}
-        onClose={() => setReportOpen(false)}
-        sessionId={sessionId}
-        opponent={form.opponent}
-      />
+      {opponent && (
+        <ReportBlockDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          sessionId={sessionId}
+          opponent={opponent}
+        />
+      )}
     </main>
   )
 }
@@ -260,8 +322,10 @@ export function PeerReviewPage() {
  *
  * 내부 용어("상호성 게이트")는 화면에 쓰지 않는다 — 규칙을 그대로 풀어 쓰면 설명이 끝난다.
  */
-function GateCallout({ status, submitted }: { status: ReceivedReviewStatus; submitted: boolean }) {
-  if (status.expired) {
+function GateCallout({ status }: { status: EvaluationStatus }) {
+  const deadline = formatDeadline(status.deadlineAt, status.remainingSeconds)
+
+  if (status.resultPermanentlyLocked) {
     return (
       <Callout tone="warning" icon="lock">
         48시간이 지나 평가가 확정됐어요. 상대가 남긴 평가는 더 이상 열리지 않지만, 내 AI 리포트는
@@ -269,21 +333,21 @@ function GateCallout({ status, submitted }: { status: ReceivedReviewStatus; subm
       </Callout>
     )
   }
-  if (submitted) {
-    return status.unlocked ? (
+  if (status.mySubmitted) {
+    return status.resultAvailable ? (
       <Callout tone="success" icon="check">
         제출 완료. 상대가 남긴 평가가 열렸어요.
       </Callout>
     ) : (
       <Callout tone="success" icon="check">
-        제출 완료. 상대가 평가를 제출하면 바로 열려요. 마감은 {formatDeadline(status.deadlineAt)}이에요.
+        제출 완료. 상대가 평가를 제출하면 바로 열려요. 마감은 {deadline}이에요.
       </Callout>
     )
   }
   return (
     <Callout tone="warning" icon="lock">
-      내 평가를 제출해야 상대가 남긴 평가를 볼 수 있어요. {formatDeadline(status.deadlineAt)}까지 내지
-      않으면 상대 평가는 열리지 않고 매칭 후순위가 됩니다.
+      내 평가를 제출해야 상대가 남긴 평가를 볼 수 있어요. {deadline}까지 내지 않으면 상대 평가는
+      열리지 않고 매칭 후순위가 됩니다.
     </Callout>
   )
 }
