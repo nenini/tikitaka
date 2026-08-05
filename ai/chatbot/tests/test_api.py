@@ -94,3 +94,145 @@ def test_token_enforced_when_set(client: TestClient, monkeypatch: pytest.MonkeyP
     assert bad.status_code == 401
     ok = client.post("/api/v1/chat/stream", json=_first_request(), headers={"X-Internal-Token": "secret"})
     assert ok.status_code == 200
+
+
+# ── 대기열 SSE 계약 (BE 계약 2026-08-05) ──────────────────────────────
+def _events(text: str) -> list[tuple[str, dict[str, object]]]:
+    """SSE 본문 → [(event, data)]."""
+    out: list[tuple[str, dict[str, object]]] = []
+    name: str | None = None
+    for line in text.splitlines():
+        if line.startswith("event:"):
+            name = line.split(":", 1)[1].strip()
+        elif line.startswith("data:") and name is not None:
+            out.append((name, json.loads(line.split(":", 1)[1].strip())))
+            name = None
+    return out
+
+
+def test_stream_emits_started_and_sequenced_chunks(client: TestClient) -> None:
+    response = client.post("/api/v1/chat/stream", json=_first_request())
+    assert response.status_code == 200
+    events = _events(response.text)
+    names = [n for n, _ in events]
+    assert "started" in names
+    assert names[-1] == "done"
+
+    started = next(d for n, d in events if n == "started")
+    assert started["sessionId"] == 15
+    done = next(d for n, d in events if n == "done")
+    assert done["sessionId"] == 15
+
+    chunks = [d for n, d in events if n == "chunk"]
+    assert chunks, "본문이 최소 한 조각은 나와야 한다"
+    assert [c["sequence"] for c in chunks] == list(range(1, len(chunks) + 1))
+    assert all(c["content"] for c in chunks)
+
+
+def test_no_queued_event_when_slot_is_free(client: TestClient) -> None:
+    """자리가 있으면 곧장 시작한다 — 불필요한 queued 로 FE를 대기 화면에 보내지 않는다."""
+    response = client.post("/api/v1/chat/stream", json=_first_request())
+    names = [n for n, _ in _events(response.text)]
+    assert "queued" not in names
+    assert "heartbeat" not in names
+
+
+def test_queue_full_returns_503_before_streaming(client: TestClient) -> None:
+    """스트림을 열기 전에 거절해야 503을 줄 수 있다. 200을 낸 뒤엔 못 준다."""
+    from chatbot.api import get_gate
+    from chatbot.queue_gate import LlmGate
+
+    full = LlmGate(max_concurrent=1, max_waiting=0, wait_timeout_seconds=1.0)
+    full.enter()  # 유일한 실행 자리를 미리 점유
+    app.dependency_overrides[get_gate] = lambda: full
+    try:
+        response = client.post("/api/v1/chat/stream", json=_first_request())
+        assert response.status_code == 503
+        assert response.json()["code"] == "AI_QUEUE_FULL"
+        assert response.headers["Retry-After"]
+    finally:
+        app.dependency_overrides.pop(get_gate, None)
+
+
+def test_queue_timeout_is_reported_as_error_event(client: TestClient) -> None:
+    """이미 스트림이 열렸으므로 HTTP 상태가 아니라 error 이벤트로 알린다."""
+    from chatbot.api import get_gate
+    from chatbot.queue_gate import LlmGate
+
+    busy = LlmGate(max_concurrent=1, max_waiting=5, wait_timeout_seconds=0.2)
+    busy.enter()  # 자리를 붙잡아 뒤 요청이 만료되게 한다
+    app.dependency_overrides[get_gate] = lambda: busy
+    try:
+        response = client.post("/api/v1/chat/stream", json=_first_request())
+        assert response.status_code == 200
+        events = _events(response.text)
+        names = [n for n, _ in events]
+        assert "queued" in names
+        assert names[-1] == "error"
+        assert dict(events[-1][1])["code"] == "AI_QUEUE_TIMEOUT"
+        assert "started" not in names
+    finally:
+        app.dependency_overrides.pop(get_gate, None)
+
+
+def test_queued_event_carries_position(client: TestClient) -> None:
+    from chatbot.api import get_gate
+    from chatbot.queue_gate import LlmGate
+
+    busy = LlmGate(max_concurrent=1, max_waiting=5, wait_timeout_seconds=0.2)
+    busy.enter()
+    app.dependency_overrides[get_gate] = lambda: busy
+    try:
+        response = client.post("/api/v1/chat/stream", json=_first_request())
+        queued = next(d for n, d in _events(response.text) if n == "queued")
+        assert queued["position"] == 1
+    finally:
+        app.dependency_overrides.pop(get_gate, None)
+
+
+def test_heartbeat_is_sent_while_waiting(monkeypatch: pytest.MonkeyPatch) -> None:
+    """대기 중 아무것도 안 보내면 nginx가 죽은 연결로 보고 끊는다."""
+    import chatbot.api as api
+    from chatbot.queue_gate import LlmGate
+
+    monkeypatch.setattr(api, "HEARTBEAT_SECONDS", 0.05)
+    busy = LlmGate(max_concurrent=1, max_waiting=5, wait_timeout_seconds=0.4)
+    busy.enter()
+    app.dependency_overrides[get_llm] = lambda: MockLLM("네")
+    app.dependency_overrides[api.get_gate] = lambda: busy
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/chat/stream", json=_first_request())
+        events = _events(response.text)
+        beats = [d for n, d in events if n == "heartbeat"]
+        assert beats, "만료 전에 heartbeat가 최소 한 번은 나가야 한다"
+        assert beats[0]["status"] == "QUEUED"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_new_events_are_not_mistaken_for_content_by_backend(client: TestClient) -> None:
+    """BE가 아직 안 고쳐졌어도 깨지지 않아야 한다.
+
+    BE HttpAiChatResponseStreamer 는 모르는 이벤트 이름을 chunk 로 흘려보내고
+    `content`/`text`/`token` 키를 찾는다. 새 이벤트에 그 키가 있으면 대기 안내가
+    답변 본문에 섞여 사용자에게 보인다.
+    """
+    from chatbot.api import get_gate
+    from chatbot.queue_gate import LlmGate
+
+    busy = LlmGate(max_concurrent=1, max_waiting=5, wait_timeout_seconds=0.2)
+    busy.enter()
+    app.dependency_overrides[get_gate] = lambda: busy
+    try:
+        response = client.post("/api/v1/chat/stream", json=_first_request())
+    finally:
+        app.dependency_overrides.pop(get_gate, None)
+
+    normal = client.post("/api/v1/chat/stream", json=_first_request())
+    for name, data in _events(response.text) + _events(normal.text):
+        if name == "chunk":
+            continue
+        assert not {"content", "text", "token"} & set(data), (
+            f"{name} 이벤트가 BE에서 답변 본문으로 오인된다: {data}"
+        )
