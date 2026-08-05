@@ -49,6 +49,11 @@ public enum AiChatErrorCode implements ErrorCode {
 			"AI_RESPONSE_STREAM_FAILED",
 			"AI 응답을 전송하지 못했습니다."
 	),
+	AI_CHAT_SERVER_BUSY(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"AI_CHAT_SERVER_BUSY",
+			"AI 채팅 요청이 많습니다. 잠시 후 다시 시도해 주세요."
+	),
 	CHAT_SESSION_CLOSED(
 			HttpStatus.CONFLICT,
 			"CHAT_SESSION_CLOSED",

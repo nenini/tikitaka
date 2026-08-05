@@ -125,6 +125,20 @@ class HttpAiChatResponseStreamerTest {
 				.hasMessageContaining("unavailable");
 	}
 
+	@Test
+	void sseTimeoutMustBeLongerThanRequestTimeout() {
+		assertThatThrownBy(() -> new AiChatProperties(
+				baseUrl,
+				"/chat/stream",
+				Duration.ofSeconds(1),
+				Duration.ofSeconds(5),
+				Duration.ofSeconds(5),
+				""
+		))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("SSE timeout");
+	}
+
 	private HttpAiChatResponseStreamer streamer(String path, String internalToken) {
 		return new HttpAiChatResponseStreamer(
 				new AiChatProperties(
@@ -132,6 +146,7 @@ class HttpAiChatResponseStreamerTest {
 						path,
 						Duration.ofSeconds(1),
 						Duration.ofSeconds(5),
+						Duration.ofSeconds(6),
 						internalToken
 				),
 				objectMapper

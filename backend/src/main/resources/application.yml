@@ -135,7 +135,8 @@ ai:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
     connect-timeout: ${AI_CHAT_CONNECT_TIMEOUT:3s}
-    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:60s}
+    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:270s}
+    sse-timeout: ${AI_CHAT_SSE_TIMEOUT:300s}
     internal-token: ${AI_CHAT_INTERNAL_TOKEN:}
 
 match:
