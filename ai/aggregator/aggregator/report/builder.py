@@ -31,6 +31,7 @@ from aggregator.report.dictionary import (
 from aggregator.report.input import ReportInput
 from aggregator.report.scoring import (
     AXIS_BALANCE,
+    SILENCE_THRESHOLD_MS,
     AxisScore,
     ReportScores,
     SpeakerMetrics,
@@ -256,7 +257,9 @@ def _format_metrics(metrics: SpeakerMetrics | None, duration_ms: int) -> str:
         # (scoring._score_question 참고). 틀린 숫자를 주면 LLM이 그걸로 문장을 만든다.
         "- 질문: 측정 부족 (질문 횟수·질문이 많다/적다는 언급하지 마라)",
         f"- 필러워드: {metrics.filler_count}회",
-        f"- 15초 이상 침묵: {metrics.long_silence_count}회",
+        # 초를 손으로 적지 않는다 — 임계값이 15초에서 10초로 바뀐 뒤에도 라벨만 15초로
+        # 남아 LLM에게 틀린 기준을 알려주고 있었다(2026-08-05 발견).
+        f"- {SILENCE_THRESHOLD_MS // 1000}초 이상 침묵: {metrics.long_silence_count}회",
         f"- 말 끊기: {metrics.interruption_count}회 (맞장구는 제외한 수)",
         f"- 맞장구: {metrics.backchannel_count}회",
     ]
