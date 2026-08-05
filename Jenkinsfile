@@ -13,7 +13,7 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
         timestamps()
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
 
@@ -82,6 +82,21 @@ pipeline {
             }
         }
 
+        stage('AI Service Image Build') {
+            parallel {
+                stage('Face Analysis Image') {
+                    steps {
+                        sh 'docker build -t a307-face-analysis:ci-${BUILD_NUMBER} ai/face-analysis'
+                    }
+                }
+                stage('Chatbot Image') {
+                    steps {
+                        sh 'docker build -t a307-chatbot:ci-${BUILD_NUMBER} ai/chatbot'
+                    }
+                }
+            }
+        }
+
         stage('Deployment Decision') {
             steps {
                 script {
@@ -99,7 +114,10 @@ pipeline {
                     def isDevelop = branch == 'develop' || branch.endsWith('/develop')
                     def isDeploymentFeature = branch == 'feature/#44-cicd-deployment' ||
                                               branch.endsWith('/feature/#44-cicd-deployment') ||
-                                              branch.endsWith('feature/#44-cicd-deployment')
+                                              branch.endsWith('feature/#44-cicd-deployment') ||
+                                              branch == 'feature/#44-ai-service-deployment' ||
+                                              branch.endsWith('/feature/#44-ai-service-deployment') ||
+                                              branch.endsWith('feature/#44-ai-service-deployment')
                     if (!isDevelop) {
                         isDevelop = sh(
                             script: '''test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/develop)"''',
@@ -108,7 +126,10 @@ pipeline {
                     }
                     if (!isDeploymentFeature) {
                         isDeploymentFeature = sh(
-                            script: '''test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/remotes/origin/feature/#44-cicd-deployment')"''',
+                            script: '''
+                                test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/remotes/origin/feature/#44-cicd-deployment')" ||
+                                test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/remotes/origin/feature/#44-ai-service-deployment')"
+                            ''',
                             returnStatus: true
                         ) == 0
                     }
@@ -120,6 +141,8 @@ pipeline {
                 sh '''
                     BACKEND_CI_IMAGE=a307-backend:ci-${BUILD_NUMBER} \
                     FRONTEND_CI_IMAGE=a307-frontend:ci-${BUILD_NUMBER} \
+                    FACE_ANALYSIS_CI_IMAGE=a307-face-analysis:ci-${BUILD_NUMBER} \
+                    CHATBOT_CI_IMAGE=a307-chatbot:ci-${BUILD_NUMBER} \
                     scripts/deploy-prod.sh
                 '''
             }
@@ -130,6 +153,8 @@ pipeline {
         always {
             sh 'docker image rm a307-backend:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
             sh 'docker image rm a307-frontend:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
+            sh 'docker image rm a307-face-analysis:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
+            sh 'docker image rm a307-chatbot:ci-${BUILD_NUMBER} >/dev/null 2>&1 || true'
             deleteDir()
         }
     }
