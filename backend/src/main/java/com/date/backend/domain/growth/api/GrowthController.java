@@ -3,10 +3,12 @@ package com.date.backend.domain.growth.api;
 import com.date.backend.domain.growth.application.GrowthSessionQueryService;
 import com.date.backend.domain.growth.application.GrowthMetricAggregationService;
 import com.date.backend.domain.growth.application.MannerTemperatureService;
+import com.date.backend.domain.growth.application.GrowthBadgeService;
 import com.date.backend.domain.growth.domain.GrowthSessionStatus;
 import com.date.backend.domain.growth.dto.response.GrowthSessionHistoryResponse;
 import com.date.backend.domain.growth.dto.response.GrowthMetricsResponse;
 import com.date.backend.domain.growth.dto.response.UserTemperatureResponse;
+import com.date.backend.domain.growth.dto.response.GrowthBadgesResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.constraints.*;
@@ -24,11 +26,13 @@ public class GrowthController implements GrowthSwaggerDocs {
 	private final GrowthSessionQueryService service;
 	private final GrowthMetricAggregationService metricService;
 	private final MannerTemperatureService temperatureService;
+	private final GrowthBadgeService badgeService;
 	public GrowthController(GrowthSessionQueryService service, GrowthMetricAggregationService metricService,
-			MannerTemperatureService temperatureService) {
+			MannerTemperatureService temperatureService, GrowthBadgeService badgeService) {
 		this.service = service;
 		this.metricService = metricService;
 		this.temperatureService = temperatureService;
+		this.badgeService = badgeService;
 	}
 
 	@GetMapping("/sessions")
@@ -53,5 +57,10 @@ public class GrowthController implements GrowthSwaggerDocs {
 	@GetMapping("/temperature")
 	public ApiResponse<UserTemperatureResponse> getTemperature(@AuthenticationPrincipal AuthUser authUser) {
 		return ApiResponse.success(temperatureService.getTemperature(authUser.userId()));
+	}
+
+	@GetMapping("/badges")
+	public ApiResponse<GrowthBadgesResponse> getBadges(@AuthenticationPrincipal AuthUser authUser) {
+		return ApiResponse.success(badgeService.getBadges(authUser.userId()));
 	}
 }

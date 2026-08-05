@@ -31,4 +31,7 @@ public interface GrowthSwaggerDocs {
 
     @Operation(summary = "내 매너 온도 조회", description = "기본 36.5°C에서 시작하는 현재 매너 온도와 최근 변경 이력 10건을 조회합니다. 평가와 노쇼는 정책 버전별로 한 번만 반영되며, 온도는 20.0~50.0°C 범위로 제한됩니다. 최근 변경에는 변경 전·후 온도, 실제 증감값, 세션·평가 또는 노쇼 원본 ID와 사유가 포함됩니다.")
     ApiResponse<UserTemperatureResponse> getTemperature(@Parameter(hidden = true) AuthUser authUser);
+
+    @Operation(summary = "성장 뱃지 조회", description = "완료 세션과 완료 리포트 횟수를 기준으로 획득·미획득 뱃지와 진행률을 조회합니다. 조회 시 활성 뱃지 조건을 다시 판정하므로 기존 실적도 소급 반영됩니다. 비활성 뱃지는 신규 지급하지 않지만 이미 획득한 기록과 획득 시각은 유지됩니다.")
+    ApiResponse<GrowthBadgesResponse> getBadges(@Parameter(hidden = true) AuthUser authUser);
 }
