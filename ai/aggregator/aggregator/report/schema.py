@@ -17,7 +17,7 @@ BE와 합의한 계약(2026-08-03):
 from __future__ import annotations
 
 from aggregator.report.builder import ReportNarrative
-from aggregator.report.input import ReportInput
+from aggregator.report.input import ReportInput, VisionInput
 from aggregator.report.scoring import (
     AXIS_BALANCE,
     AXIS_FLOW,
@@ -67,6 +67,29 @@ def _axis_payload(axis: AxisScore) -> dict[str, object]:
         "raw": axis.raw,
         "rawUnit": unit,
         "note": axis.note,
+    }
+
+
+def _coverage(vision: VisionInput | None, duration_ms: int) -> dict[str, float | None]:
+    """분석 커버리지 (BE 계약 2026-08-04). 비율은 0~1, **측정 불가는 0이 아니라 null**.
+
+    FE가 70% 미만인 축을 "측정 부족"으로 표기하는 데 쓴다.
+
+    speechRecognitionRate는 현재 항상 null이다 — 신뢰도 미달로 버려진 발화 수를
+    SessionState가 모른다(STT 워커 안에서만 센다). 살리려면 STT가 폐기 건수를
+    이벤트로 올려줘야 한다.
+    """
+    if vision is None:
+        return {"faceDetectionRate": None, "speechRecognitionRate": None,
+                "cameraUptimeRate": None}
+    uptime: float | None = None
+    if duration_ms > 0 and vision.observation_window_ms > 0:
+        uptime = round(min(1.0, vision.observation_window_ms / duration_ms), 4)
+    face = None if vision.coverage is None else round(vision.coverage, 4)
+    return {
+        "faceDetectionRate": face,
+        "speechRecognitionRate": None,
+        "cameraUptimeRate": uptime,
     }
 
 
@@ -158,6 +181,11 @@ def build_analysis_payload(
                     "gazeAwayCount": metrics.gaze_away_count if vision_ok else None,
                     "faceMissingCount": metrics.face_missing_count if vision_ok else None,
                     "visionMeasured": vision_ok,
+                    "coverage": _coverage(
+                        report.vision_for(speaker.speaker_id),
+                        report.session_duration_ms,
+                    ),
+                    "fillerBreakdown": dict(metrics.filler_breakdown),
                 },
                 "evidenceSegments": _evidence_segments(report, speaker.speaker_id),
             }
@@ -178,7 +206,13 @@ def analysis_failure_payload(
     analyzed_at: str,
     analysis_version: str = ANALYSIS_VERSION,
 ) -> dict[str, object]:
-    """수치조차 못 낸 경우. 안 보내면 BE가 PENDING에 머문다."""
+    """수치조차 못 낸 경우. 안 보내면 BE가 PENDING에 머문다.
+
+    axes·metrics는 **빈 객체가 아니라 null**이다. `{}`를 보내면 BE가 모든 필드가
+    null인 MetricsRequest로 역직렬화해 `@Valid` 캐스케이드가 @NotNull 6건을 한꺼번에
+    터뜨린다(speakingMs·longSilenceCount·silenceThresholdMs 등) → 400.
+    BE 스키마 주석도 "FAILED이면 axes와 metrics는 null"이라고 못박고 있다.
+    """
     return {
         "schemaVersion": SCHEMA_VERSION,
         "analysisVersion": analysis_version,
@@ -188,8 +222,8 @@ def analysis_failure_payload(
             {
                 "userId": user_id,
                 "analysisStatus": "FAILED",
-                "axes": {},
-                "metrics": {},
+                "axes": None,
+                "metrics": None,
                 "evidenceSegments": [],
             }
             for user_id in user_ids
@@ -197,19 +231,35 @@ def analysis_failure_payload(
     }
 
 
+def _report_entry(user_id: int, narrative: ReportNarrative) -> dict[str, object]:
+    return {
+        "userId": user_id,
+        "reportStatus": "COMPLETED" if narrative.generated_by_llm else "FALLBACK",
+        "generationMode": "LLM" if narrative.generated_by_llm else "RULE_BASED",
+        "summaryText": narrative.summary,
+        "strengths": list(narrative.strengths),
+        "improvements": list(narrative.improvements),
+        "nextMissions": list(narrative.missions),
+        "failureCode": None,
+        "failureReason": None,
+    }
+
+
 def build_report_payload(
-    narrative: ReportNarrative,
+    narratives: list[tuple[int, ReportNarrative]],
     *,
     session_id: int,
-    user_id: int,
     generated_at: str,
     analysis_version: str = ANALYSIS_VERSION,
     report_version: str = REPORT_VERSION,
 ) -> dict[str, object]:
-    """②번 API 본문. 유저 한 명분이다.
+    """②번 API 본문. **세션당 한 번**, 참가자 전원을 배열에 담는다(BE 계약 2026-08-04).
 
-    멱등키가 `session-{id}-report-{ver}-user-{uid}` 형식(유저 포함)이므로 유저별로
-    따로 POST한다. BE 예시의 `reports`가 배열이라 형태는 유지하고 원소 1개로 보낸다.
+    유저별로 따로 POST하지 않는다. BE는 `sessionId + 전체 버전 문자열 + payload`로
+    중복을 걸러낸다 — 같은 버전·같은 payload 재전송만 중복이다.
+
+    주의: `reports[].summaryText`는 LLM 산출물이라 재실행하면 문장이 달라진다.
+    같은 세션을 두 번 돌리면 payload가 달라져 BE 중복 판정에 걸리지 않는다.
     """
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -217,26 +267,14 @@ def build_report_payload(
         "analysisVersion": analysis_version,
         "reportVersion": report_version,
         "generatedAt": generated_at,
-        "reports": [
-            {
-                "userId": user_id,
-                "reportStatus": "COMPLETED" if narrative.generated_by_llm else "FALLBACK",
-                "generationMode": "LLM" if narrative.generated_by_llm else "RULE_BASED",
-                "summaryText": narrative.summary,
-                "strengths": list(narrative.strengths),
-                "improvements": list(narrative.improvements),
-                "nextMissions": list(narrative.missions),
-                "failureCode": None,
-                "failureReason": None,
-            }
-        ],
+        "reports": [_report_entry(user_id, n) for user_id, n in narratives],
     }
 
 
 def report_failure_payload(
     *,
     session_id: int,
-    user_id: int,
+    user_ids: list[int],
     generated_at: str,
     failure_code: str,
     failure_reason: str,
@@ -262,24 +300,24 @@ def report_failure_payload(
                 "failureCode": failure_code,
                 "failureReason": failure_reason,
             }
+            for user_id in user_ids
         ],
     }
 
 
 def analysis_idempotency_key(session_id: int, analysis_version: str = ANALYSIS_VERSION) -> str:
-    """`session-12345-analysis-v1` — 유저 무관(한 요청에 참가자 전원)."""
-    return f"session-{session_id}-{_version_slug(analysis_version)}"
+    """`session-12345-analysis-v1.0.0` — 유저 무관(한 요청에 참가자 전원)."""
+    return f"session-{session_id}-{analysis_version}"
 
 
-def report_idempotency_key(
-    session_id: int, user_id: int, report_version: str = REPORT_VERSION
-) -> str:
-    """`session-12345-report-v1-user-1001` — 유저별."""
-    return f"session-{session_id}-{_version_slug(report_version)}-user-{user_id}"
+def report_idempotency_key(session_id: int, report_version: str = REPORT_VERSION) -> str:
+    """`session-12345-report-v1.0.0` — 세션당 하나.
 
+    **BE는 이 헤더를 읽지 않는다**(계약 2026-08-04 갱신). 중복 판정은 `sessionId +
+    전체 버전 문자열 + payload`로 하고, 같은 버전에 같은 payload를 다시 보낸 것만
+    중복으로 본다. 계산 로직을 고쳐 patch를 올리면 새 결과로 저장된다.
 
-def _version_slug(version: str) -> str:
-    """`analysis-v1.0.0` → `analysis-v1`. 멱등키는 메이저 버전까지만 구분한다."""
-    name, _, rest = version.partition("-v")
-    major = rest.split(".")[0] if rest else "1"
-    return f"{name}-v{major}"
+    그래서 키를 메이저까지만 줄이지 않는다 — 줄이면 patch가 달라도 키가 같아져
+    BE 규칙과 어긋난 값을 보내게 된다.
+    """
+    return f"session-{session_id}-{report_version}"

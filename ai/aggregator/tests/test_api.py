@@ -194,3 +194,23 @@ def test_rejects_participant_identity_that_breaks_backend_mapping() -> None:
 
         assert response.status_code == 400
         assert "participantIdentity must be user-1" in response.json()["detail"]
+
+
+def test_practice_goals_are_optional() -> None:
+    """BE가 아직 안 보내는 필드다. 없어도 통과해야 기존 배포가 안 깨진다."""
+    parsed = SessionEventRequest.model_validate(_STARTED)
+    assert parsed.participants is not None
+    assert all(p.practice_goals == [] for p in parsed.participants)
+
+
+def test_practice_goals_are_carried_when_sent() -> None:
+    payload = deepcopy(_STARTED)
+    participants = payload["participants"]
+    assert isinstance(participants, list)
+    first = participants[0]
+    assert isinstance(first, dict)
+    first["practiceGoals"] = ["TALK_TOO_MUCH", "VOICE_TOO_LOUD"]
+    parsed = SessionEventRequest.model_validate(payload)
+    assert parsed.participants is not None
+    assert parsed.participants[0].practice_goals == ["TALK_TOO_MUCH", "VOICE_TOO_LOUD"]
+    assert parsed.participants[1].practice_goals == []

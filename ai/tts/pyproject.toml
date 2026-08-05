@@ -1,0 +1,40 @@
+[project]
+name = "tts"
+version = "0.1.0"
+description = "텍스트 → 한국어 음성 합성 (사람↔AI 음성 대화용 TTS 엔진)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "edge-tts>=7.2.8",
+    "httpx>=0.28",         # GMS(OpenAI 호환) HTTP 호출
+    "python-dotenv>=1.0",  # ai/tts/.env 에서 GMS 키 로드
+    "numpy>=2.4.6",
+    "soundfile>=0.14.0",   # MP3 디코딩 (libsndfile)
+    "soxr>=1.1.0",         # 24k → 16k 리샘플
+]
+
+# stt·aggregator와 같은 방식 — 라이브러리로 설치하지 않고 pythonpath로 참조한다.
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13",
+    "pytest>=8",
+    "sounddevice>=0.5",  # 데모 --play 옵션
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+# strict = implicit Any·bare generic·untyped def 전부 금지. 이 프로젝트 코드에는 Any를 쓰지 않는다.
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["tts", "tests"]
+
+# 서드파티(스텁 없음) — 런타임 전용, 타입체크에서 무시. edge_tts는 py.typed가 있어 제외.
+[[tool.mypy.overrides]]
+module = ["soundfile", "soxr", "sounddevice"]
+ignore_missing_imports = true
