@@ -47,8 +47,17 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	maxHeapSize = '2g'
+	maxParallelForks = 1
+	systemProperty 'user.timezone', 'Asia/Seoul'
 }
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
+}
+
+tasks.named('bootRun') {
+	// 로컬 네트워크에서 Google OAuth 등 외부 HTTPS 연결이 IPv6으로만 가능한 경우,
+	// JVM이 IPv6 주소를 우선 사용하도록 한다. bootRun 실행에만 적용된다.
+	jvmArgs += ['-Djava.net.preferIPv6Addresses=true']
 }

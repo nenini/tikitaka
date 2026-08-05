@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { AlertDialog, Button, CallControls, Callout, DarkScope, Icon, IconButton } from '@/components'
 import type { QuestionOption } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
-import { useCoachingStore } from '@/stores/coaching.store'
+import { countPendingMessages, selectVisibleMessage, useCoachingStore } from '@/stores/coaching.store'
 import { useSessionStore } from '@/stores/session.store'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
@@ -199,11 +199,23 @@ export function SessionPage() {
     }
   }, [vision.state, vision.error])
 
-  /* ── 코칭 ── 한 번에 하나만 띄운다(원칙 2). 스토어의 마지막 메시지만 꺼내 쓴다. */
+  /* ── 코칭 ──
+     화면에는 한 번에 하나만 띄우되(원칙 2), 겹쳐 들어온 코칭을 버리지 않는다.
+     큐에 쌓아두고 우선순위·도착순으로 하나만 고른다. 서버가 준 TTL 이 지나면
+     스스로 사라지고, 뒤에 대기하던 카드가 올라온다. */
   const messages = useCoachingStore((s) => s.messages)
-  const [dismissedId, setDismissedId] = useState<string | null>(null)
-  const latest = messages.at(-1) ?? null
-  const visibleMessage = latest && latest.id !== dismissedId ? latest : null
+  const dismissMessage = useCoachingStore((s) => s.dismiss)
+  const pruneExpired = useCoachingStore((s) => s.pruneExpired)
+
+  // 만료는 시간이 지나야 일어난다 — 이벤트가 없으면 아무도 다시 그리지 않으므로
+  // 초 단위로 직접 걷어낸다. 실제로 줄었을 때만 상태가 바뀌어 불필요한 렌더는 없다.
+  useEffect(() => {
+    const timer = window.setInterval(() => pruneExpired(), 1000)
+    return () => clearInterval(timer)
+  }, [pruneExpired])
+
+  const visibleMessage = selectVisibleMessage(messages)
+  const pendingMessageCount = countPendingMessages(messages)
 
   /* ── 침묵 힌트 ── 서버가 단계와 질문을 함께 내려준다(임계값 15/30/45초) */
   const silenceStage = silenceStageOfEvent(realtime.silence)
@@ -354,7 +366,8 @@ export function SessionPage() {
                 />
               }
               message={visibleMessage}
-              onDismissMessage={() => setDismissedId(latest?.id ?? null)}
+              pendingMessageCount={pendingMessageCount}
+              onDismissMessage={() => visibleMessage && dismissMessage(visibleMessage.id)}
               safetyWarning={
                 realtime.safety ? (
                   <SafetyWarningCard

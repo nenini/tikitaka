@@ -314,6 +314,13 @@ export const visionMetricSnapshotSchema = eventEnvelopeSchema
           .strict(),
         metrics: z
           .object({
+            handOverMouth: z
+              .object({
+                active: z.boolean(),
+                overlapRatio: unitScoreSchema.nullable(),
+                confidence: unitScoreSchema.nullable(),
+              })
+              .strict(),
             smile: z
               .object({
                 configurationScore: unitScoreSchema.nullable(),

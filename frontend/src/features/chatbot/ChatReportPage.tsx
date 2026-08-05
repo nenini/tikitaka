@@ -13,7 +13,7 @@ import {
   TagChip,
 } from '@/components'
 import { createChatReport, getChatReport } from './api'
-import { PERSONALITY_LABEL, STAGE_LABEL } from './types'
+import { STAGE_LABEL } from './types'
 import type { ChatHighlight, ChatReport } from './types'
 
 /** 생성 중일 때 다시 물어보는 주기. */
@@ -117,8 +117,7 @@ export function ChatReportPage() {
         <div>
           <h1 className="bt-h1">챗봇 연습 피드백</h1>
           <p className="bt-body-sm bt-muted mt-1">
-            {formatDate(report.startedAt)} · {STAGE_LABEL[report.stage]} ·{' '}
-            {PERSONALITY_LABEL[report.personality]} 상대
+            {formatDate(report.startedAt)} · {STAGE_LABEL[report.stage]}
           </p>
         </div>
         <Badge tone="neutral">텍스트 연습</Badge>

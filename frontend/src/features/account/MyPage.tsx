@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Avatar,
@@ -10,8 +10,16 @@ import {
   Chip,
   ListRowButton,
   ListRowLink,
+  Spinner,
   Stack,
 } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { faceTypeImage } from '@/features/face/faceImage'
+import { resetMyFaceAnalysis, useMyFaceAnalysis } from '@/features/face/useMyFaceAnalysis'
+import { getMyProfile, getPublicProfile } from '@/features/profile/api'
+import type { ProfileResponse } from '@/features/profile/types'
+import { getMySurvey } from '@/features/survey/api'
+import type { SurveyAnswer } from '@/features/survey/types'
 import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
@@ -22,6 +30,21 @@ import { useAuthStore } from '@/stores/auth.store'
 /*   ⑤ 개인정보 수정·관리(W-19b) = 진입 링크(/me/edit)                          */
 /*  - 마이페이지는 '허브' — 동의/개인정보 관리 실 구현은 각 별도 스토리(466/465) */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * 프로필 카드에 쓰는 요약값. 온보딩·개인정보 수정에서 설정한 것이 그대로 올라온다.
+ *
+ * ⚠️ **나이는 `GET /users/me/profile` 에도 `GET /users/me` 에도 없다.**
+ *    생년월일을 내려주는 응답이 없고, 나이가 들어 있는 건 `PublicProfileResponse`
+ *    뿐이라 내 `userId` 로 공개 프로필을 부른다. 이 엔드포인트에는 열람 제한이 없어
+ *    본인 조회도 그대로 통한다(2026-08-04 로컬 서버로 확인).
+ *    `/me` 계열에 나이가 추가되면 그쪽으로 옮기는 게 맞다.
+ */
+interface ProfileSummary {
+  profile: ProfileResponse
+  age: number | null
+  survey: SurveyAnswer | null
+}
 
 /** 사랑의 온도 표시. 36.5 기준, 현재값을 게이지로. (전용 컴포넌트 없어 페이지 로컬) */
 function LoveTemperature({ value }: { value: number }) {
@@ -54,7 +77,71 @@ function LoveTemperature({ value }: { value: number }) {
 export function MyPage() {
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
+  const signOut = useAuthStore((s) => s.signOut)
+  const authUser = useAuthStore((s) => s.user)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const face = useMyFaceAnalysis()
+  const [summary, setSummary] = useState<ProfileSummary | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+
+  const loadSummary = useCallback(async () => {
+    setSummaryLoading(true)
+    setSummaryError(null)
+    try {
+      // userId 를 알아야 공개 프로필을 부를 수 있어 프로필이 먼저다.
+      const profile = await getMyProfile()
+      const [publicProfile, survey] = await Promise.all([
+        // 설문은 아직 없을 수 있다(온보딩 중 이탈). 없다고 이 카드를 통째로 막지 않는다.
+        getPublicProfile(profile.userId).catch(() => null),
+        getMySurvey().catch(() => null),
+      ])
+      setSummary({ profile, age: publicProfile?.age ?? null, survey })
+    } catch (error) {
+      setSummaryError(errorMessageOf(error, '프로필을 불러오지 못했어요.'))
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadSummary()
+  }, [loadSummary])
+
+  /**
+   * 로그아웃.
+   *
+   * `logout`(로컬 토큰만 삭제)이 아니라 `signOut` 을 쓴다 — 서버 `/auth/logout` 으로
+   * **refresh 토큰까지 무효화**해야 한다. 로컬만 지우면 그 refresh 토큰이 서버에
+   * 살아 있어 재사용될 수 있다.
+   *
+   * 서버 호출이 실패해도 스토어가 로컬 세션을 반드시 비우므로(스토어 주석 참고),
+   * 여기서는 실패를 따로 처리하지 않고 항상 로그인 화면으로 보낸다 —
+   * "로그아웃을 눌렀는데 로그인 상태로 남는" 상황이 가장 나쁘다.
+   */
+  const onSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await signOut()
+    } finally {
+      setSigningOut(false)
+      // 얼굴상 캐시는 모듈 단위라 로그아웃해도 살아남는다 — 비우지 않으면 다음 계정이
+      // 로그인했을 때 이전 사용자의 동물 이미지가 헤더에 잠깐 남는다.
+      resetMyFaceAnalysis()
+      navigate('/login', { replace: true })
+    }
+  }
+
+  // 프로필을 읽기 전에는 /me 의 실명으로 버틴다 — 아바타 이니셜이 빈 칸으로 깜빡이지 않게.
+  const displayName = summary?.profile.nickname ?? authUser?.nickname ?? '내 프로필'
+
+  // 나이·지역 중 없는 값은 빼고 잇는다. 둘 다 없으면 줄 자체를 비우지 않고 미설정을 알린다.
+  const metaLine =
+    [summary?.age != null ? `${summary.age}세` : null, summary?.profile.regionCity || null]
+      .filter(Boolean)
+      .join(' · ') || '아직 설정하지 않았어요'
 
   const onWithdraw = () => {
     // TODO(ACCOUNT): DELETE /api/me — §22 보존·삭제 범위 안내 후 처리
@@ -75,13 +162,33 @@ export function MyPage() {
         {/* ── 좌: 프로필 요약 ─────────────────────────── */}
         <Card>
           <div className="flex flex-col items-center gap-2 text-center">
-            <Avatar size="lg" name="유월" />
-            <b className="text-[17px]">유월</b>
-            <span className="bt-caption">20대 후반 · 서울 강남구</span>
-            <div className="mt-1 flex gap-1.5">
-              <Chip>🐰 토끼상</Chip>
-              <Chip>🌙 차분한</Chip>
-            </div>
+            {/* 얼굴상 진단을 마쳤으면 그 동물 이미지가 프로필 사진이 된다.
+                아직이면 src 가 undefined 라 Avatar 가 닉네임 이니셜로 돌아간다. */}
+            <Avatar size="lg" round name={displayName} src={faceTypeImage(face?.primaryType)} />
+            <b className="text-[17px]">{displayName}</b>
+
+            {summaryLoading ? (
+              <Spinner size={18} />
+            ) : summaryError ? (
+              <>
+                <span className="bt-caption text-danger">{summaryError}</span>
+                <Button variant="ghost" size="sm" onClick={() => void loadSummary()}>
+                  다시 시도
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="bt-caption">{metaLine}</span>
+                {/* 얼굴상은 분석 결과, 성향은 설문의 `userTraits`(본인 성격 3개)에서 온다.
+                    둘 다 아직 없을 수 있으므로 칩이 하나도 없는 경우를 정상으로 둔다. */}
+                <div className="mt-1 flex flex-wrap justify-center gap-1.5">
+                  {face && <Chip>{face.primaryTypeDisplayName}</Chip>}
+                  {summary?.survey?.userTraits.map((trait) => (
+                    <Chip key={trait.id}>{trait.name}</Chip>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="mt-2 w-full">
               <LoveTemperature value={38.2} />
             </div>
@@ -143,8 +250,23 @@ export function MyPage() {
                 <ListRowButton title="차단 목록" meta="2명" onClick={() => console.log('TODO: 차단 목록')} />
                 <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit')} />
                 <ListRowButton title="비밀번호 변경" onClick={() => console.log('TODO: 비밀번호 변경')} />
+                {/* 로그아웃과 회원 탈퇴는 성격이 전혀 다르다(되돌릴 수 있음 vs 없음).
+                    구분선으로 떼어 두 행이 나란히 보이지 않게 한다 — 오클릭이 곧 탈퇴가 되면 안 된다. */}
+                <ListRowButton
+                  title="로그아웃"
+                  meta={signingOut ? '로그아웃 중…' : undefined}
+                  disabled={signingOut}
+                  trailing={signingOut ? <Spinner size={16} /> : undefined}
+                  onClick={() => void onSignOut()}
+                />
+                <div
+                  aria-hidden="true"
+                  className="my-1"
+                  style={{ borderTop: '1px solid var(--bt-color-border)' }}
+                />
                 <ListRowButton
                   title={<span className="text-danger">회원 탈퇴</span>}
+                  disabled={signingOut}
                   onClick={() => setWithdrawOpen(true)}
                 />
               </Stack>

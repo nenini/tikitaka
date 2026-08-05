@@ -67,6 +67,10 @@ def test_push_batch_updates_behavior_and_latest_metric() -> None:
     assert user.latest_behavior is not None
     assert user.latest_metric is not None
     assert user.latest_metric.seq == 126
+    assert user.metric_snapshot_count == 1
+    assert user.usable_snapshot_count == 1
+    assert user.observation_window_ms == 1_000
+    assert user.usable_observed_ms == 800
 
 
 def test_retrying_same_batch_is_idempotent() -> None:

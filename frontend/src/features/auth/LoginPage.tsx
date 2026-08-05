@@ -5,8 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Callout, Card, Field, Input, Stack } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
-import { authErrorMessage, login, oauthStart } from './api'
+import { login, oauthStart } from './api'
+import type { OAuthProviderId } from './types'
 
 /* -------------------------------------------------------------------------- */
 /*  W-01 · 랜딩 · 로그인 (AUTH-01)                                              */
@@ -219,7 +221,7 @@ function LoginCard() {
       await signIn(tokens) // 토큰 저장 + GET /v1/users/me 로 신원 하이드레이션
       navigate('/')
     } catch (error) {
-      setFormError(authErrorMessage(error) ?? '이메일 또는 비밀번호를 다시 확인해주세요.')
+      setFormError(errorMessageOf(error, '이메일 또는 비밀번호를 다시 확인해주세요.'))
     }
   }
 
@@ -295,13 +297,38 @@ function LoginCard() {
  * 브랜드색은 접근성 예외(로고타입)인 로고 마크에만 두고, 버튼 자체는 대비가 안전한 secondary 로 둔다.
  */
 function SocialButtons() {
+  // 클릭 즉시 두 버튼 모두 잠근다. 페이지가 곧 이동하므로 리셋은 불필요하다(unmount 됨).
+  // 중복 클릭 시 서버의 state 쿠키가 두 번째 시작으로 덮어써져 첫 이동이 콜백에서
+  // INVALID_OAUTH_STATE 로 실패하는 문제를 막는다 — 실제 방지는 oauthStart() 쪽 가드가 하고,
+  // 여기서는 그동안 버튼을 눌러도 반응 없어 보이지 않게 로딩 표시만 더한다.
+  const [starting, setStarting] = useState<OAuthProviderId | null>(null)
+  const start = (provider: OAuthProviderId) => {
+    if (starting) return
+    setStarting(provider)
+    oauthStart(provider)
+  }
+
   return (
     <Stack gap={8}>
-      <Button variant="secondary" size="lg" block onClick={() => oauthStart('google')}>
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        loading={starting === 'google'}
+        disabled={starting !== null && starting !== 'google'}
+        onClick={() => start('google')}
+      >
         <GoogleGlyph />
         Google로 계속하기
       </Button>
-      <Button variant="secondary" size="lg" block onClick={() => oauthStart('naver')}>
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        loading={starting === 'naver'}
+        disabled={starting !== null && starting !== 'naver'}
+        onClick={() => start('naver')}
+      >
         <NaverGlyph />
         네이버로 계속하기
       </Button>

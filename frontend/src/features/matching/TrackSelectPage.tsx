@@ -28,8 +28,17 @@ export function TrackSelectPage() {
   const [blockReason, setBlockReason] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // TODO(AUTH 연동): user_consents VOICE 동의 여부. 통합 필수 동의로 충족되면 true.
-  const voiceConsented = true
+  /*
+   * 음성 분석 동의 게이트를 두지 않는다.
+   *
+   * 확정 계약(CONTRACT_DECISIONS.md A8): 표정·음성 분석은 **별도 동의 항목이 아니라
+   * 가입 시 통합 필수 동의에 포함**되고, 세션 단위 on/off 는 동의가 아니라
+   * `PATCH /sessions/{id}/analysis-settings` 로 다룬다. `consent_types` 에도
+   * VOICE 코드가 없다(INTEGRATED_SERVICE_CONSENT · FACE_CAPTURE_CONSENT 2종뿐).
+   *
+   * 통합 동의는 온보딩 게이트가 이미 강제하므로(ProtectedRoute → needs-consent),
+   * 이 화면에 도달한 사용자는 동의를 마친 상태다. 여기서 다시 물을 근거가 없다.
+   */
 
   // 이미 대기 중인 요청이 있으면 트랙 선택 화면에 머무를 이유가 없다.
   useEffect(() => {
@@ -126,18 +135,9 @@ export function TrackSelectPage() {
             { icon: 'sparkle', label: '대화 코칭 + 표정 코칭' },
             { icon: 'close', label: '상호 평가·연락처 없음', muted: true },
           ]}
-          note={
-            voiceConsented
-              ? '음성 분석 동의가 필요해요.'
-              : '음성 분석에 동의해야 이용할 수 있어요.'
-          }
+          note="표정·음성 분석은 세션 시작 전에 끌 수 있어요."
           cta={
-            <Button
-              variant="secondary"
-              block
-              disabled={!voiceConsented}
-              onClick={() => navigate('/ai-video/setup')}
-            >
+            <Button variant="secondary" block onClick={() => navigate('/ai-video/setup')}>
               AI 화상 시작
             </Button>
           }
@@ -161,12 +161,6 @@ export function TrackSelectPage() {
           }
         />
       </div>
-
-      {!voiceConsented && (
-        <Callout tone="info" className="mt-4">
-          AI 화상은 음성 분석 동의가 필요해요. 마이페이지에서 동의하면 바로 이용할 수 있어요.
-        </Callout>
-      )}
 
       {/* 온보딩 미완료 안내 — 서버가 알려준 사유를 그대로 쓴다 */}
       {blockReason && (

@@ -9,18 +9,20 @@ import { SignupPage } from '@/features/auth/SignupPage'
 import { VerifyKycPage } from '@/features/auth/VerifyKycPage'
 import { ConsentPage } from '@/features/auth/ConsentPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
-import { SurveyPage, ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+import { ForgotPasswordPage } from '@/features/auth/AuthPlaceholder'
+// 설문(W-06 / W-19b) — 온보딩 등록과 재응답이 같은 화면을 모드로 나눠 쓴다
+import { SurveyPage, SurveyEditPage } from '@/features/survey/SurveyPage'
 import { OAuthCallbackPage } from '@/features/auth/OAuthCallbackPage'
 // 계정(#28) — 마이 · 동의 관리 · 개인정보 수정 허브
 import { MyPage } from '@/features/account/MyPage'
 import { ConsentManagePage } from '@/features/account/ConsentManagePage'
-import {
-  AccountEditPage,
-  FaceRecapturePage,
-  SurveyEditPage,
-  ProfileEditPage,
-  RegionEditPage,
-} from '@/features/account/AccountEditPage'
+import { AccountEditPage } from '@/features/account/AccountEditPage'
+import { ProfileEditPage } from '@/features/account/ProfileEditPage'
+import { RegionEditPage } from '@/features/account/RegionEditPage'
+// 얼굴상 분석(W-05 / W-19b) — 온보딩 촬영과 재촬영이 같은 화면을 모드로 나눠 쓴다
+import { FaceCapturePage, FaceRecapturePage } from '@/features/face/FaceCapturePage'
+// 얼굴상 결과(W-05b / PROFILE-03) — 촬영과 분리해 결과만 다시 볼 수 있게 한다
+import { FaceResultPage, FaceResultRecapturePage } from '@/features/face/FaceResultPage'
 // 세션 · 대기방
 import { SessionPage } from '@/features/session/SessionPage'
 import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
@@ -39,6 +41,7 @@ import { GrowthDashboardPage } from '@/features/growth/GrowthDashboardPage'
 // 개발/QA 전용
 import { ComponentGallery } from '@/features/dev/ComponentGallery'
 import { LiveKitDemoPage } from '@/features/session/LiveKitDemoPage'
+import { DemoEntryPage } from '@/features/demo/DemoEntryPage'
 // 관리자(#34)
 import { AdminProtectedRoute } from './AdminProtectedRoute'
 import { AdminShell } from '@/features/admin/AdminShell'
@@ -62,6 +65,8 @@ export const router = createBrowserRouter([
   { path: '/signup/verify', element: <VerifyKycPage /> },
   { path: '/signup/consent', element: <ConsentPage /> },
   { path: '/signup/profile', element: <ProfilePage /> },
+  { path: '/signup/face', element: <FaceCapturePage /> },
+  { path: '/signup/face-result', element: <FaceResultPage /> },
   { path: '/signup/survey', element: <SurveyPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   // OAuth 콜백 수신(공개) — 백엔드가 302로 토큰을 URL 프래그먼트에 실어 되돌려보낸다
@@ -88,6 +93,7 @@ export const router = createBrowserRouter([
           // 개인정보 수정·관리(W-19b) 허브 + 항목별 별도 편집 화면
           { path: '/me/edit', element: <AccountEditPage /> },
           { path: '/me/edit/face', element: <FaceRecapturePage /> },
+          { path: '/me/edit/face-result', element: <FaceResultRecapturePage /> },
           { path: '/me/edit/survey', element: <SurveyEditPage /> },
           { path: '/me/edit/profile', element: <ProfileEditPage /> },
           { path: '/me/edit/region', element: <RegionEditPage /> },
@@ -115,6 +121,9 @@ export const router = createBrowserRouter([
       //-----------
       // 개발용, 추후 삭제
       { path: '/livekit-demo', element: <LiveKitDemoPage /> },
+      // MVP 시연용 바로가기 — 매칭 UI 를 건너뛰고 대기방까지 자동 주행한다.
+      // ⚠️ 시연이 끝나면 이 라우트와 features/demo 를 함께 지운다.
+      { path: '/demo', element: <DemoEntryPage /> },
     ],
   },
 

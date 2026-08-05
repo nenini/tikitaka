@@ -95,6 +95,11 @@ function metricEvent(eventId: string): VisionMetricSnapshot {
         blurScore: 0.8,
       },
       metrics: {
+        handOverMouth: {
+          active: false,
+          overlapRatio: 0,
+          confidence: null,
+        },
         smile: {
           configurationScore: 0.2,
           baselineScore: 0.1,

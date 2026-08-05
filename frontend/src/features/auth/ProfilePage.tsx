@@ -6,7 +6,10 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } from '@/components'
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
-import { authErrorMessage } from '@/features/auth/api'
+import { SIDO } from '@/features/profile/regions'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { useAuthStore } from '@/stores/auth.store'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
 /* -------------------------------------------------------------------------- */
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
@@ -17,7 +20,6 @@ import { authErrorMessage } from '@/features/auth/api'
 /*  - 실명·전화·정확한 주소·직업 미노출·미수집(D-08)                             */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 const profileSchema = z.object({
   nickname: z
@@ -35,13 +37,6 @@ type NickStatus = 'idle' | 'checking' | 'available' | 'taken'
 const GENDERS: { value: ProfileForm['gender']; label: string }[] = [
   { value: 'female', label: '여성' },
   { value: 'male', label: '남성' },
-]
-
-/** 시·도 17개 (행정 표준). 구·군은 수집하지 않는다(정확한 지역 미노출). */
-const SIDO = [
-  '서울특별시', '부산광역시', '대구광역시', '인천광역시', '광주광역시', '대전광역시',
-  '울산광역시', '세종특별자치시', '경기도', '강원특별자치도', '충청북도', '충청남도',
-  '전북특별자치도', '전라남도', '경상북도', '경상남도', '제주특별자치도',
 ]
 
 /** 데모용 닉네임 중복 확인 스텁. TODO(AUTH): GET /api/me/nickname/check 로 교체. */
@@ -97,10 +92,14 @@ export function ProfilePage() {
         gender: data.gender === 'female' ? 'FEMALE' : 'MALE', // 폼(소문자) → 백엔드 enum(대문자)
         regionCity: data.regionSido,
       })
-      navigate('/signup/survey')
+      // 게이트를 다음 단계로 넘긴다(ProtectedRoute 가 이 값을 본다).
+      // 갱신하지 않으면 보호 라우트가 여전히 프로필 단계로 튕겨낸다.
+      // 아직 'ready' 가 아니다 — 설문이 남아 있다.
+      useAuthStore.getState().setOnboarding('needs-survey')
+      navigate('/signup/face')
     } catch (e) {
       // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출
-      setSubmitError(authErrorMessage(e) ?? '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.')
+      setSubmitError(errorMessageOf(e, '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.'))
     }
   }
 
@@ -112,7 +111,11 @@ export function ProfilePage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={4} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.profile}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">기본 프로필</h1>
         <p className="bt-body-sm bt-muted mt-1">상대에게 보일 정보와 매칭에만 쓰는 정보를 나눠 받아요.</p>
       </header>

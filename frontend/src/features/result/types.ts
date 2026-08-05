@@ -1,106 +1,148 @@
 /**
  * 상호 평가(RESULT · W-14 / `RESULT-02`) 도메인 타입.
- * ERD `peer_evaluations` 기준.
+ *
+ * 백엔드 SSOT: `PeerEvaluationController` + `result/dto/*`
+ *   GET  /api/v1/sessions/{sessionId}/evaluations/items
+ *   GET  /api/v1/sessions/{sessionId}/evaluations/status
+ *   POST /api/v1/sessions/{sessionId}/evaluations
+ *   GET  /api/v1/sessions/{sessionId}/evaluations/result
  *
  * ⚠️ 원칙: **대화 행동만** 평가한다. 외모·조건·매력 항목은 어떤 형태로도 추가하지 않는다.
- * 🔒 상호성 게이트는 서버가 최종 판정한다 — 클라이언트는 `ReceivedReviewStatus.unlocked` 를 신뢰만 하고,
- *    숨김 처리로 잠금을 대신하지 않는다.
+ * 🔒 상호성 게이트는 서버가 최종 판정한다 — 클라이언트는 `EvaluationStatus.resultAvailable` 을
+ *    신뢰만 하고, 숨김 처리로 잠금을 대신하지 않는다.
  */
 
-/** 정량 6항목. peer_evaluations 의 `*Score` 필드와 1:1 대응한다. */
-export type PeerReviewMetricKey =
-  | 'comfort'
-  | 'questionConnection'
-  | 'listening'
-  | 'reaction'
-  | 'balance'
-  | 'manner'
+/**
+ * 정량 6항목. 값은 백엔드 `EvaluationItem.key` 를 그대로 쓴다 —
+ * 이 문자열이 곧 제출 본문(`PeerEvaluationSubmitRequest`)의 필드명이라,
+ * 별도 이름을 두면 제출할 때마다 매핑 테이블이 하나 더 생긴다.
+ */
+export type EvaluationItemKey =
+  | 'comfortScore'
+  | 'questionConnectionScore'
+  | 'listeningScore'
+  | 'reactionScore'
+  | 'balanceScore'
+  | 'mannerScore'
 
-export interface PeerReviewMetricDef {
-  key: PeerReviewMetricKey
-  /** 항목명 (예: "대화의 편안함") */
+/** `EvaluationItemsResponse.items` 의 원소(EvaluationItemResponse). */
+export interface EvaluationItemDef {
+  key: EvaluationItemKey
+  /** 서버가 주는 항목 문구 (예: "대화가 편안했어요") */
   label: string
-  /** 판단 기준 한 줄 (예: "긴장되지 않고 편하게 이야기했나요?") */
-  help: string
+  minScore: number
+  maxScore: number
 }
 
 /**
- * 평가 항목은 서버(peer-review-form)가 내려주는 것이 원칙이지만,
- * 6항목 자체는 ERD 컬럼으로 고정돼 있어 폴백/정렬 기준으로 여기에 둔다.
- * 서버가 순서를 바꿔 내려주면 서버 순서를 따른다.
+ * 항목별 판단 기준 한 줄.
+ * 서버는 `label` 만 주므로 화면 보조 문구는 프론트가 붙인다.
+ * 서버가 모르는 key 를 내려주면 보조 문구 없이 label 만 그린다.
  */
-export const PEER_REVIEW_METRICS: readonly PeerReviewMetricDef[] = [
-  { key: 'comfort', label: '대화의 편안함', help: '긴장되지 않고 편하게 이야기했나요?' },
-  { key: 'questionConnection', label: '질문 연결성', help: '질문이 자연스럽게 이어졌나요?' },
-  { key: 'listening', label: '경청 태도', help: '내 말을 잘 들어주었나요?' },
-  { key: 'reaction', label: '리액션', help: '적절히 반응해주었나요?' },
-  { key: 'balance', label: '대화 균형', help: '발화량이 한쪽으로 치우치지 않았나요?' },
-  { key: 'manner', label: '매너', help: '존중받는 느낌이었나요?' },
-] as const
-
-/** 서술형 최대 길이. 서버 검증이 정본이고 여기서는 입력 단계 안내용. */
-export const PEER_REVIEW_TEXT_MAX = 500
-
-export type PeerReviewScores = Partial<Record<PeerReviewMetricKey, number>>
-
-/** GET /sessions/{id}/peer-review-form */
-export interface PeerReviewForm {
-  sessionId: string
-  /** 평가 대상(상대). 신고·차단에 userId 가 필요하다 */
-  opponent: { userId: string; nickname: string }
-  /** 몇 회차 세션인지 (헤더 배지) */
-  sessionRoundNo: number
-  durationMin: number
-  metrics: PeerReviewMetricDef[]
-  /** 상호성 게이트 마감(ISO) — 세션 종료 +48h */
-  submitDeadlineAt: string
-  /** 내가 이미 제출했는지 */
-  submitted: boolean
+export const EVALUATION_ITEM_HELP: Readonly<Partial<Record<EvaluationItemKey, string>>> = {
+  comfortScore: '긴장되지 않고 편하게 이야기했나요?',
+  questionConnectionScore: '질문이 자연스럽게 이어졌나요?',
+  listeningScore: '내 말을 잘 들어주었나요?',
+  reactionScore: '적절히 반응해주었나요?',
+  balanceScore: '발화량이 한쪽으로 치우치지 않았나요?',
+  mannerScore: '존중받는 느낌이었나요?',
 }
 
-/** POST /sessions/{id}/peer-reviews 본문. 서술형 2종은 **선택**. */
-export interface PeerReviewSubmission {
-  scores: Record<PeerReviewMetricKey, number>
+/**
+ * 서술형 최대 길이 폴백. 정본은 `EvaluationItems.maxTextLength`(서버 값)이고,
+ * 이 상수는 아직 응답이 오기 전 입력 단계 안내용이다.
+ */
+export const EVALUATION_TEXT_MAX = 1000
+
+/** GET .../evaluations/items (EvaluationItemsResponse). */
+export interface EvaluationItems {
+  sessionId: number
+  /** 평가 대상(상대). 닉네임은 여기 없어서 공개 프로필을 따로 조회한다. */
+  partnerUserId: number
+  items: EvaluationItemDef[]
+  maxTextLength: number
+}
+
+/**
+ * GET .../evaluations/status (EvaluationStatusResponse).
+ *
+ * ⚠️ `deadlineAt` 은 Java `LocalDateTime` 이라 오프셋 없는 `yyyy-MM-ddTHH:mm:ss` 로 온다.
+ *    `new Date()` 가 이를 **브라우저 로컬 시각**으로 해석하므로, 서버와 사용자의
+ *    시간대가 다르면 마감 표시가 어긋난다. 남은 시간은 `remainingSeconds` 를 쓰는 편이 안전하다.
+ */
+export interface EvaluationStatus {
+  sessionId: number
+  mySubmitted: boolean
+  partnerSubmitted: boolean
+  allSubmitted: boolean
+  deadlineAt: string
+  remainingSeconds: number
+  /** 아직 낼 수 있는가 = 미제출 && 마감 전 */
+  submissionOpen: boolean
+  /** 받은 평가를 열 수 있는가 = 양측 제출 완료 (서버 최종 판정) */
+  resultAvailable: boolean
+  /** 내가 안 낸 채 마감이 지나 영구히 못 보게 됐는가 */
+  resultPermanentlyLocked: boolean
+}
+
+export type EvaluationScores = Record<EvaluationItemKey, number>
+
+/** POST .../evaluations 본문. 점수는 중첩 없이 평탄하게 올라간다. */
+export type EvaluationSubmitPayload = EvaluationScores & {
   goodBehaviorText?: string
   improvementText?: string
 }
 
-/** GET /sessions/{id}/peer-reviews/received/status — 상호성 게이트 상태. */
-export interface ReceivedReviewStatus {
-  /** 내가 제출했는가 (게이트 통과 조건) */
-  mySubmitted: boolean
-  /** 상대가 제출했는가 */
-  opponentSubmitted: boolean
-  /** 서버 최종 판정 — 이 값이 true 일 때만 받은 평가를 조회한다 */
-  unlocked: boolean
-  /** 48h 마감(ISO) */
-  deadlineAt: string
-  /** 마감이 지나 영구 확정됐는가 (지각 제출은 반영하지 않는다) */
-  expired: boolean
-}
-
-/** GET /sessions/{id}/peer-reviews/received — 익명으로 전달되는 상대의 평가. */
-export interface ReceivedReview {
-  reviewId: string
-  scores: Record<PeerReviewMetricKey, number>
-  goodBehaviorText?: string | null
-  improvementText?: string | null
+/** POST .../evaluations 응답(PeerEvaluationSubmitResponse). */
+export interface EvaluationSubmitResult {
+  evaluationId: number
+  sessionId: number
+  status: string
+  allSubmitted: boolean
+  /** 양측 완료 이벤트 발행 여부이며 리포트 생성 완료가 아니다. */
+  reportRequested: boolean
   submittedAt: string
 }
 
-/** 평가 내용 신고(POST .../peer-reviews/{reviewId}/report) · 사용자 신고(MODERATION) 공통 사유. */
-export interface ReportTypeOption {
-  code: string
+/**
+ * GET .../evaluations/result — **내가 받은** 평가(PeerEvaluationResultResponse).
+ * 익명으로 전달되며, 양측이 모두 제출해야 열린다.
+ */
+export type ReceivedEvaluation = EvaluationScores & {
+  sessionId: number
+  goodBehaviorText: string | null
+  improvementText: string | null
+  submittedAt: string
+}
+
+/* ── 신고 · 차단(MODERATION) ───────────────────────────── */
+
+/**
+ * 백엔드 `ModerationReportReason` enum.
+ * 목록 조회 API 가 없어(서버가 enum 을 노출하지 않는다) 프론트 상수로 둔다 —
+ * 백엔드에서 값을 추가하면 여기도 함께 고쳐야 한다.
+ */
+export type ModerationReasonCode =
+  | 'INAPPROPRIATE_LANGUAGE'
+  | 'HARASSMENT'
+  | 'SEXUAL_CONTENT'
+  | 'THREAT'
+  | 'FRAUD'
+  | 'OTHER'
+
+export interface ModerationReasonOption {
+  code: ModerationReasonCode
   label: string
 }
 
-/** MODERATION 도메인의 report-types 가 비어 있을 때 쓰는 폴백 목록. */
-export const FALLBACK_REPORT_TYPES: readonly ReportTypeOption[] = [
-  { code: 'ABUSIVE_LANGUAGE', label: '욕설·비하 표현' },
-  { code: 'SEXUAL_HARASSMENT', label: '성적 불쾌감을 주는 언행' },
-  { code: 'HATE_DISCRIMINATION', label: '혐오·차별 발언' },
-  { code: 'PRESSURE', label: '결혼·출산·외모 등 압박' },
-  { code: 'COMMERCIAL', label: '홍보·영업·외부 유도' },
-  { code: 'IMPERSONATION', label: '사진·프로필과 다른 사람' },
-  { code: 'ETC', label: '기타' },
+export const MODERATION_REASONS: readonly ModerationReasonOption[] = [
+  { code: 'INAPPROPRIATE_LANGUAGE', label: '욕설·비하 표현' },
+  { code: 'HARASSMENT', label: '괴롭힘·불쾌한 언행' },
+  { code: 'SEXUAL_CONTENT', label: '성적 불쾌감을 주는 언행' },
+  { code: 'THREAT', label: '위협·협박' },
+  { code: 'FRAUD', label: '사기·허위·홍보' },
+  { code: 'OTHER', label: '기타' },
 ] as const
+
+/** 신고 상세는 서버에서 `@NotBlank @Size(max=2000)` 이라 **필수**다. */
+export const MODERATION_DETAIL_MAX = 2000

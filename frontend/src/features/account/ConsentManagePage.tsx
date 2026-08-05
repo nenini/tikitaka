@@ -1,96 +1,85 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertDialog, Button, Callout, Card, CardHeader, ConsentRow, Stack } from '@/components'
+import { AlertDialog, Button, Callout, Card, ConsentRow, Spinner, Stack } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { getMyConsents, saveMyConsents, withdrawMyConsent } from '@/features/consent/api'
+import { CONSENT_DESCRIPTION, isRequiredConsent, type UserConsentStatus } from '@/features/consent/types'
 
 /* -------------------------------------------------------------------------- */
-/*  AUTH-03 · 개인정보 동의 관리 (FE-CONSENT-02 · /me/consent)                  */
-/*  1차 확정 옵션:                                                            */
-/*   ① 철회 = 확인 다이얼로그   ② 필수(약관) 숨김(선택 항목만 노출)             */
-/*   ③ 기존 데이터 삭제 요청 제공   ④ 통합 1카드                               */
-/*   ⑤ 동의 일자 표시   ⑥ 삭제 요청 = 전체 일괄만                             */
-/*  - 데이터 데모 고정. TODO(CONSENT): GET/PATCH /api/v1/consents,             */
-/*    POST /api/v1/consents/data-deletion (처리방침 §22)                       */
+/*  AUTH-03 · 개인정보 동의 관리 (/me/consent)                                  */
+/*                                                                            */
+/*  확정 계약(2026-08-04, CONTRACT_DECISIONS.md A8):                           */
+/*   - 관리 대상은 **선택 동의뿐**(현재 얼굴 1건). 필수(통합)는 서비스 이용      */
+/*     조건이라 철회 대상이 아니어서 목록에 넣지 않는다.                        */
+/*   - 표정·음성은 세션 설정으로 이관했다 — 여기서 다루지 않는다.               */
+/*   - 리포트 저장은 통합 동의에 포함이라 별도 항목이 없다.                     */
+/*                                                                            */
+/*  UI 원칙: ① 철회 = 확인 다이얼로그  ② 동의 일자 표시  ③ 통합 1카드           */
 /* -------------------------------------------------------------------------- */
-
-type ConsentKey = 'face' | 'expression' | 'voice' | 'report'
-
-interface ManagedConsent {
-  key: ConsentKey
-  title: string
-  desc: string
-}
-
-/** 관리 대상 = 선택 동의 4항목. 필수(이용약관·개인정보 처리)는 서비스 조건이라 여기서 다루지 않는다. */
-const ITEMS: ManagedConsent[] = [
-  {
-    key: 'face',
-    title: '얼굴 촬영 및 얼굴상 분석',
-    desc: '분석 후 원본 이미지는 즉시 삭제해요. 끄면 얼굴상 태그가 생략됩니다.',
-  },
-  {
-    key: 'expression',
-    title: '세션 중 표정 · 시선 분석',
-    desc: '원본 영상은 저장하지 않고 지표만 저장해요. 끄면 표정 코칭이 제공되지 않아요.',
-  },
-  {
-    key: 'voice',
-    title: '세션 중 음성 · 대화 분석',
-    desc: '원본 음성 저장 여부는 별도로 고지해요. 끄면 대화 코칭이 제공되지 않아요.',
-  },
-  {
-    key: 'report',
-    title: '누적 성장 리포트 저장',
-    desc: '점수 · 키워드 · 통계값만 저장해요. 끄면 리포트 축소판으로 제공됩니다.',
-  },
-]
-
-interface ConsentState {
-  on: boolean
-  date: string | null
-}
-
-/** 데모 초기 상태. TODO(CONSENT): 서버 조회로 대체. */
-const INITIAL: Record<ConsentKey, ConsentState> = {
-  face: { on: true, date: '2026-07-14' },
-  expression: { on: true, date: '2026-07-14' },
-  voice: { on: false, date: null },
-  report: { on: true, date: '2026-07-14' },
-}
-
-const todayISO = () => new Date().toISOString().slice(0, 10)
 
 export function ConsentManagePage() {
   const navigate = useNavigate()
-  const [consents, setConsents] = useState<Record<ConsentKey, ConsentState>>(INITIAL)
-  const [pending, setPending] = useState<ConsentKey | null>(null) // 철회 확인 대상
-  const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const onChange = (key: ConsentKey, next: boolean) => {
-    if (next) {
-      // 재동의(다시 켜기) — 즉시 반영
-      setConsents((s) => ({ ...s, [key]: { on: true, date: todayISO() } }))
-      // TODO(CONSENT): PATCH /api/v1/consents/{key} { granted: true }
-    } else {
-      // 철회(끄기) — 확인 다이얼로그로 게이트 (①)
-      setPending(key)
+  const [items, setItems] = useState<UserConsentStatus[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  /** 철회 확인 대상 */
+  const [pending, setPending] = useState<UserConsentStatus | null>(null)
+  /** 처리 중인 항목 id — 연타로 중복 요청이 나가지 않게 막는다 */
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    getMyConsents()
+      .then((list) => {
+        // 필수는 철회할 수 없으므로 관리 화면에 올리지 않는다
+        if (alive) setItems(list.filter((c) => !isRequiredConsent(c.code)))
+      })
+      .catch((error) => {
+        if (alive) setLoadError(errorMessageOf(error, '동의 상태를 불러오지 못했어요.'))
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  function replace(next: UserConsentStatus) {
+    setItems((prev) =>
+      prev?.map((c) => (c.consentTypeId === next.consentTypeId ? next : c)) ?? prev,
+    )
+  }
+
+  /** 재동의(다시 켜기). 서버 응답으로 상태를 갈아끼워 동의 일자까지 정확히 맞춘다. */
+  async function grant(item: UserConsentStatus) {
+    setBusyId(item.consentTypeId)
+    setActionError(null)
+    try {
+      const saved = await saveMyConsents({
+        consents: [{ consentTypeId: item.consentTypeId, consented: true }],
+      })
+      const next = saved.find((c) => c.consentTypeId === item.consentTypeId)
+      if (next) replace(next)
+    } catch (error) {
+      setActionError(errorMessageOf(error, '동의를 저장하지 못했어요.'))
+    } finally {
+      setBusyId(null)
     }
   }
 
-  const confirmWithdraw = () => {
-    if (pending) {
-      setConsents((s) => ({ ...s, [pending]: { on: false, date: null } }))
-      // TODO(CONSENT): PATCH /api/v1/consents/{pending} { granted: false }
-    }
+  async function confirmWithdraw() {
+    const item = pending
     setPending(null)
+    if (!item) return
+    setBusyId(item.consentTypeId)
+    setActionError(null)
+    try {
+      replace(await withdrawMyConsent(item.consentTypeId))
+    } catch (error) {
+      setActionError(errorMessageOf(error, '철회하지 못했어요.'))
+    } finally {
+      setBusyId(null)
+    }
   }
-
-  const requestDelete = () => {
-    // TODO(CONSENT): POST /api/v1/consents/data-deletion (§22)
-    console.log('request existing-data deletion (all)')
-    setDeleteOpen(false)
-  }
-
-  const pendingTitle = pending ? ITEMS.find((i) => i.key === pending)?.title : ''
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 pt-6 sm:px-6">
@@ -101,55 +90,69 @@ export function ConsentManagePage() {
         <h1 className="bt-h2">개인정보 동의 관리</h1>
       </div>
       <p className="bt-body-sm bt-muted mb-4">
-        목적별로 켜고 끌 수 있어요. 켜둔 항목만 해당 AI 분석이 동작해요. 이용약관·개인정보 처리는 서비스 이용 조건이라
-        여기서 관리하지 않아요.
+        선택 동의를 켜고 끌 수 있어요. 이용약관·개인정보 처리는 서비스 이용 조건이라 여기서 관리하지
+        않아요. 세션 중 표정·음성 분석은 세션을 시작할 때마다 따로 설정해요.
       </p>
 
-      {/* ④ 통합 1카드 — ② 선택 동의 항목만(필수 숨김) */}
-      <Card>
-        <Stack gap={4}>
-          {ITEMS.map((it) => {
-            const c = consents[it.key]
-            return (
+      {loadError && (
+        <Callout tone="danger" icon="report">
+          {loadError}
+        </Callout>
+      )}
+
+      {!items && !loadError && (
+        <div className="grid place-items-center py-10" aria-busy="true">
+          <Spinner size={26} />
+        </div>
+      )}
+
+      {items && items.length === 0 && (
+        <Callout tone="info">관리할 선택 동의 항목이 없어요.</Callout>
+      )}
+
+      {items && items.length > 0 && (
+        <Card>
+          <Stack gap={4}>
+            {items.map((c) => (
               <ConsentRow
-                key={it.key}
-                title={it.title}
+                key={c.consentTypeId}
+                title={c.name}
                 desc={
                   <>
-                    {it.desc}
-                    {/* ⑤ 동의 일자 표시 */}
-                    {c.on && c.date && <span className="bt-caption mt-1 block">✓ {c.date} 동의</span>}
+                    {CONSENT_DESCRIPTION[c.code]}
+                    {c.consented && c.consentedAt && (
+                      <span className="bt-caption mt-1 block">
+                        ✓ {c.consentedAt.slice(0, 10)} 동의
+                      </span>
+                    )}
                   </>
                 }
-                checked={c.on}
-                onCheckedChange={(next) => onChange(it.key, next)}
+                checked={c.consented}
+                disabled={busyId === c.consentTypeId}
+                onCheckedChange={(next) => {
+                  // 켜기는 즉시, 끄기는 확인 다이얼로그를 거친다
+                  if (next) void grant(c)
+                  else setPending(c)
+                }}
               />
-            )
-          })}
-        </Stack>
-      </Card>
+            ))}
+          </Stack>
+        </Card>
+      )}
+
+      {actionError && (
+        <span className="bt-error mt-3 block" role="alert">
+          {actionError}
+        </span>
+      )}
 
       <Callout tone="info" className="mt-3">
-        철회하면 <b>신규 AI 분석이 중단</b>돼요(언제든 다시 켤 수 있어요). 이미 분석된 데이터는 아래에서 삭제 요청할 수
-        있어요.
+        철회하면 <b>신규 분석이 중단</b>돼요. 언제든 다시 켤 수 있어요.
       </Callout>
 
-      {/* ③⑥ 기존 분석 데이터 삭제 요청 — 전체 일괄 */}
-      <Card className="mt-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardHeader title="기존 분석 데이터 삭제 요청" />
-            <p className="bt-caption mt-1">
-              철회와 별개로, 이미 분석·저장된 데이터의 삭제를 요청해요(처리방침 §22).
-            </p>
-          </div>
-          <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
-            삭제 요청
-          </Button>
-        </div>
-      </Card>
+      {/* 기존 분석 데이터 삭제 요청은 대응 API 가 없어 화면에서 내렸다.
+          가짜 버튼을 두면 요청이 접수된 것처럼 보인다(처리방침 §22 · 백엔드 협의 항목). */}
 
-      {/* ① 철회 확인 다이얼로그 */}
       <AlertDialog
         open={pending !== null}
         onCancel={() => setPending(null)}
@@ -157,21 +160,11 @@ export function ConsentManagePage() {
         tone="danger"
         title="이 동의를 철회할까요?"
         description={
-          pending ? `철회하면 ${pendingTitle} 관련 신규 AI 분석이 중단돼요. 언제든 다시 켤 수 있어요.` : ''
+          pending
+            ? `철회하면 ${pending.name} 관련 신규 분석이 중단돼요. 언제든 다시 켤 수 있어요.`
+            : ''
         }
         confirmLabel="철회하기"
-        cancelLabel="취소"
-      />
-
-      {/* 기존 데이터 삭제 요청 확인 */}
-      <AlertDialog
-        open={deleteOpen}
-        onCancel={() => setDeleteOpen(false)}
-        onConfirm={requestDelete}
-        tone="danger"
-        title="기존 분석 데이터 삭제를 요청할까요?"
-        description="저장된 분석 데이터(점수·키워드·통계 등)의 삭제를 요청해요. 처리에는 최대 30일이 걸릴 수 있어요(§22)."
-        confirmLabel="삭제 요청"
         cancelLabel="취소"
       />
     </main>

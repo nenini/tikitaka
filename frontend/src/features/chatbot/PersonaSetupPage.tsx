@@ -3,23 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Segmented, Select, Spinner } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { createChatSession, getPersonaOptions, requestPersonaRecommendation, saveRegionCity } from './api'
-import {
-  PERSONALITY_DESC,
-  PERSONALITY_LABEL,
-  REGION_CITIES,
-  STAGE_DESC,
-  STAGE_LABEL,
-} from './types'
-import type { ConversationStage, PersonaPersonality } from './types'
+import { REGION_CITIES, STAGE_DESC, STAGE_LABEL } from './types'
+import type { ConversationStage } from './types'
 
 const STAGE_OPTIONS = (Object.keys(STAGE_LABEL) as ConversationStage[]).map((value) => ({
   value,
   label: STAGE_LABEL[value],
-}))
-
-const PERSONALITY_OPTIONS = (Object.keys(PERSONALITY_LABEL) as PersonaPersonality[]).map((value) => ({
-  value,
-  label: PERSONALITY_LABEL[value],
 }))
 
 /**
@@ -28,8 +17,10 @@ const PERSONALITY_OPTIONS = (Object.keys(PERSONALITY_LABEL) as PersonaPersonalit
  * 수집 항목
  *  - 지역(시·도만) · 최초 1회, 이미 있으면 건너뛴다
  *  - 연습 단계: 소개팅 전 / 소개팅 후
- *  - 성향: 적극적 / 중간 / 내향적
- * 
+ *
+ * ⚠️ 성향(적극적·중간·내향적) 선택은 제거했다. 세션 생성 요청이 `purpose` 하나만
+ *    받고 그 값도 고정이라 성향은 서버에 전달된 적이 없다 — AI 응답에 아무 영향을
+ *    주지 못하는 선택지였다. 사용자가 고르는 항목은 연습 단계뿐이다.
  */
 export function PersonaSetupPage() {
   const navigate = useNavigate()
@@ -38,7 +29,6 @@ export function PersonaSetupPage() {
   const [needsRegion, setNeedsRegion] = useState(false)
   const [regionCity, setRegionCity] = useState('')
   const [stage, setStage] = useState<ConversationStage>('BEFORE_DATE')
-  const [personality, setPersonality] = useState<PersonaPersonality>('MIDDLE')
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,7 +38,6 @@ export function PersonaSetupPage() {
       if (!alive) return
       setNeedsRegion(!options.regionCity)
       setStage(rec.stage)
-      setPersonality(rec.personality)
       setLoading(false)
     })
     return () => {
@@ -64,8 +53,8 @@ export function PersonaSetupPage() {
     setError(null)
     try {
       if (needsRegion) await saveRegionCity(regionCity)
-      // ⚠️ 서버는 `purpose` 만 받는다 — 연습 단계·성향은 브라우저에 보관된다(api.ts 참고).
-      const session = await createChatSession({ stage, personality })
+      // ⚠️ 서버는 `purpose` 만 받는다 — 연습 단계는 브라우저에 보관된다(api.ts 참고).
+      const session = await createChatSession({ stage })
       navigate(`/chatbot/${session.chatSessionId}`, { replace: true })
     } catch (startError) {
       setError(errorMessageOf(startError, '대화를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'))
@@ -116,17 +105,6 @@ export function PersonaSetupPage() {
           <b className="bt-h3">연습 단계</b>
           <Segmented aria-label="연습 단계" options={STAGE_OPTIONS} value={stage} onChange={setStage} />
           <p className="bt-caption bt-muted">{STAGE_DESC[stage]}</p>
-        </Card>
-
-        <Card className="flex flex-col gap-3">
-          <b className="bt-h3">성향</b>
-          <Segmented
-            aria-label="성향"
-            options={PERSONALITY_OPTIONS}
-            value={personality}
-            onChange={setPersonality}
-          />
-          <p className="bt-caption bt-muted">{PERSONALITY_DESC[personality]}</p>
         </Card>
 
         {/* <Callout tone="info">

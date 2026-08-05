@@ -12,6 +12,8 @@ FE-A_progress_checklist.csv
 # 로컬 환경 파일
 # ============================================================================
 .env
+.env.prod
+.env.production
 .env.local
 .env.*.local
 

@@ -120,6 +120,11 @@ describe("VisionEventFactory", () => {
           blurScore: 0.8,
         },
         metrics: {
+          handOverMouth: {
+            active: false,
+            overlapRatio: 0,
+            confidence: null,
+          },
           smile: {
             configurationScore: 0.52,
             baselineScore: 0.32,

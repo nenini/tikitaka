@@ -6,10 +6,11 @@ import asyncio
 import logging
 from collections import deque
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
-from stt.events import SttEvent
+from stt.events import SttEvent, TranscriptFinalizedEvent
 
 from aggregator.aggregator import (
     SessionAggregator,
@@ -27,11 +28,26 @@ from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
 from aggregator.events import AnalysisEvent, SilenceDetected
 from aggregator.livekit_stt import LiveKitSttAdapterFactory
+from aggregator.llm_coaching import (
+    CoachingMessageGenerator,
+    ContextualCoachingError,
+    ExaoneCoachingClient,
+)
+from aggregator.report import (
+    ReportInput,
+    ReportPublisher,
+    build_report_input,
+    generator_from_settings,
+    run_report_job,
+)
+from aggregator.report.builder import ReportLlmError
 from aggregator.session_contracts import (
     SessionEventRequest,
     SessionEventResponse,
 )
+from aggregator.speech_events import parse_stt_event
 from aggregator.settings import IntegrationSettings
+from aggregator.transcripts import RetainedTranscript, TranscriptSegment
 from aggregator.vision_events import (
     VisionBehaviorEvent,
     VisionEvent,
@@ -47,6 +63,12 @@ from aggregator.vision_backend import (
 logger = logging.getLogger(__name__)
 
 _PROCESSED_EVENT_CAPACITY = 4096
+
+
+@dataclass(frozen=True)
+class _QueuedCoaching:
+    command: CoachingCommand
+    transcript_context: tuple[TranscriptSegment, ...]
 
 
 class CoachingSender(Protocol):
@@ -86,6 +108,7 @@ class SessionRuntime:
         sender: CoachingSender,
         vision_sender: VisionAnalysisSender,
         audio_adapter_factory: SessionAudioAdapterFactory,
+        message_generator: CoachingMessageGenerator,
         *,
         now: Callable[[], datetime],
     ) -> None:
@@ -107,9 +130,10 @@ class SessionRuntime:
         self._settings = settings
         self._sender = sender
         self._vision_sender = vision_sender
+        self._message_generator = message_generator
         self._audio_adapter: SessionAudioAdapter | None = None
         self._now = now
-        self._commands: asyncio.Queue[CoachingCommand] = asyncio.Queue(
+        self._commands: asyncio.Queue[_QueuedCoaching] = asyncio.Queue(
             maxsize=100
         )
         self._vision_events: asyncio.Queue[
@@ -191,7 +215,14 @@ class SessionRuntime:
             command.reason_code,
         )
         try:
-            self._commands.put_nowait(command)
+            self._commands.put_nowait(
+                _QueuedCoaching(
+                    command=command,
+                    transcript_context=(
+                        self.aggregator.state.transcript_buffer.ordered_segments()
+                    ),
+                )
+            )
         except asyncio.QueueFull:
             logger.error(
                 "coaching queue full; dropped eventId=%s",
@@ -212,8 +243,31 @@ class SessionRuntime:
         self,
         event: SttEvent | Mapping[str, object],
     ) -> bool:
+        parsed = parse_stt_event(event)
         async with self._lock:
-            return self.aggregator.push_stt_event(event)
+            accepted = self.aggregator.push_stt_event(parsed)
+            if (
+                accepted
+                and isinstance(parsed, TranscriptFinalizedEvent)
+                and self._settings.transcript_debug_log
+            ):
+                speaker = self.aggregator.state.speaker(parsed.user_id)
+                buffer = self.aggregator.state.transcript_buffer
+                logger.info(
+                    "transcript stored session=%s user=%s "
+                    "utteranceId=%s startMs=%d endMs=%d confidence=%.2f "
+                    "userSegments=%d sessionSegments=%d text=%r",
+                    parsed.session_id,
+                    parsed.user_id,
+                    parsed.utterance_id,
+                    parsed.payload.segment_start_ms,
+                    parsed.payload.segment_end_ms,
+                    parsed.confidence,
+                    len(speaker.utterances),
+                    buffer.segment_count,
+                    parsed.payload.text,
+                )
+            return accepted
 
     async def push_vision_event(
         self,
@@ -309,9 +363,29 @@ class SessionRuntime:
             )
 
     async def _delivery_loop(self) -> None:
+        contextual_cache: dict[tuple[str, int, str], str | None] = {}
         while True:
-            command = await self._commands.get()
+            queued = await self._commands.get()
+            command = queued.command
             try:
+                if command.coaching_type == "SILENCE_RECOVERY":
+                    cache_key = (
+                        command.coaching_type,
+                        command.triggered_at_session_elapsed_ms,
+                        command.target_user_id or "",
+                    )
+                    if cache_key in contextual_cache:
+                        message_text = contextual_cache[cache_key]
+                    else:
+                        message_text = await self._generate_contextual_message(
+                            command,
+                            queued.transcript_context,
+                        )
+                        contextual_cache[cache_key] = message_text
+                    if message_text is not None:
+                        command = command.model_copy(
+                            update={"message_text": message_text}
+                        )
                 receipt = await self._sender.send(command)
                 logger.info(
                     "coaching receipt eventId=%s status=%s",
@@ -330,6 +404,59 @@ class SessionRuntime:
                 )
             finally:
                 self._commands.task_done()
+
+    async def _generate_contextual_message(
+        self,
+        command: CoachingCommand,
+        segments: tuple[TranscriptSegment, ...],
+    ) -> str | None:
+        if not self._settings.coaching_llm_configured or not segments:
+            return None
+        logger.info(
+            "llm request started session=%s type=%s contextSegments=%d",
+            command.session_id,
+            command.coaching_type,
+            min(
+                len(segments),
+                self._settings.coaching_llm_max_context_utterances,
+            ),
+        )
+        try:
+            if command.target_user_id is None:
+                return None
+            message = await self._message_generator.generate(
+                segments,
+                command.target_user_id,
+            )
+        except ContextualCoachingError as error:
+            logger.warning(
+                "llm fallback session=%s type=%s reason=%s",
+                command.session_id,
+                command.coaching_type,
+                type(error).__name__,
+            )
+            return None
+        except Exception:
+            logger.exception(
+                "llm fallback session=%s type=%s reason=UNEXPECTED_ERROR",
+                command.session_id,
+                command.coaching_type,
+            )
+            return None
+        if message is None:
+            logger.info(
+                "llm fallback session=%s type=%s reason=EMPTY_CONTEXT",
+                command.session_id,
+                command.coaching_type,
+            )
+            return None
+        logger.info(
+            "llm response accepted session=%s type=%s characters=%d",
+            command.session_id,
+            command.coaching_type,
+            len(message),
+        )
+        return message
 
     async def _vision_delivery_loop(self) -> None:
         while True:
@@ -371,11 +498,16 @@ class SessionManager:
         sender: CoachingSender | None = None,
         vision_sender: VisionAnalysisSender | None = None,
         audio_adapter_factory: SessionAudioAdapterFactory | None = None,
+        message_generator: CoachingMessageGenerator | None = None,
+        report_publisher: ReportPublisher | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
         self.settings = settings
         self._sender = sender or BackendCoachingClient(settings)
         self._vision_sender = vision_sender or BackendVisionClient(settings)
+        self._message_generator = message_generator or ExaoneCoachingClient(
+            settings
+        )
         self._audio_adapter_factory = (
             audio_adapter_factory or LiveKitSttAdapterFactory(settings)
         )
@@ -384,11 +516,35 @@ class SessionManager:
         self._processed_event_ids: set[str] = set()
         self._processed_event_order: deque[str] = deque()
         self._lifecycle_lock = asyncio.Lock()
+        self._retained_transcripts: dict[str, RetainedTranscript] = {}
+        self._retention_task: asyncio.Task[None] | None = None
+        self._report_publisher = report_publisher
+        self._report_tasks: set[asyncio.Task[None]] = set()
+        self._report_semaphore = asyncio.Semaphore(
+            settings.report_max_concurrency
+        )
         self._started = False
 
     @property
     def active_session_count(self) -> int:
         return len(self._sessions)
+
+    @property
+    def retained_transcript_count(self) -> int:
+        self._purge_expired_transcripts()
+        return len(self._retained_transcripts)
+
+    @property
+    def pending_report_count(self) -> int:
+        return len(self._report_tasks)
+
+    def retained_transcript(
+        self,
+        session_id: str,
+    ) -> RetainedTranscript | None:
+        """Future report/reporting adapters can read a live TTL snapshot."""
+        self._purge_expired_transcripts()
+        return self._retained_transcripts.get(session_id)
 
     async def handle(
         self,
@@ -423,6 +579,10 @@ class SessionManager:
             return
         await self._audio_adapter_factory.warmup()
         self._started = True
+        self._retention_task = asyncio.create_task(
+            self._retention_loop(),
+            name="transcript-retention-cleanup",
+        )
 
     async def _start(
         self,
@@ -478,12 +638,14 @@ class SessionManager:
             raise RuntimeError("SessionManager.startup() must run first")
         if event.session_id in self._sessions:
             return "DUPLICATE"
+        self._retained_transcripts.pop(event.session_id, None)
         runtime = SessionRuntime(
             event,
             self.settings,
             self._sender,
             self._vision_sender,
             self._audio_adapter_factory,
+            self._message_generator,
             now=self._now,
         )
         self._sessions[event.session_id] = runtime
@@ -498,10 +660,169 @@ class SessionManager:
             raise SessionEventContractError(
                 "AI_SESSION_ENDED requires endedAt"
             )
+        if event.ended_at.tzinfo is None:
+            raise SessionEventContractError(
+                "endedAt must include a timezone"
+            )
         runtime = self._sessions.pop(event.session_id, None)
         if runtime is not None:
             await runtime.stop()
+            self._retain_transcript(runtime, event.ended_at)
+            self._schedule_report(runtime, event.ended_at)
         return "PROCESSED"
+
+    def _schedule_report(
+        self,
+        runtime: SessionRuntime,
+        ended_at: datetime,
+    ) -> None:
+        """Freeze session state and enqueue one non-blocking report task."""
+        try:
+            session_id = int(runtime.session_id)
+            user_ids = {
+                user_id: int(user_id)
+                for user_id in runtime.participants
+            }
+        except ValueError:
+            logger.warning(
+                "report skipped session=%s reason=non-numeric identity",
+                runtime.session_id,
+            )
+            return
+        if len(user_ids) != len(runtime.participants):
+            logger.warning(
+                "report skipped session=%s reason=incomplete participants",
+                runtime.session_id,
+            )
+            return
+
+        duration_ms = int(
+            (ended_at - runtime.actual_start_at).total_seconds() * 1000
+        )
+        vision_enabled = (
+            runtime.features is None
+            or runtime.features.vision_enabled
+        )
+        snapshot = build_report_input(
+            runtime.aggregator.state,
+            session_duration_ms=max(0, duration_ms),
+            vision_enabled=vision_enabled,
+        )
+        task = asyncio.create_task(
+            self._run_report(snapshot, session_id, user_ids, ended_at),
+            name=f"report-{runtime.session_id}",
+        )
+        self._report_tasks.add(task)
+        task.add_done_callback(self._report_done)
+        logger.info(
+            "report scheduled session=%s pending=%d",
+            runtime.session_id,
+            len(self._report_tasks),
+        )
+
+    def _report_done(self, task: asyncio.Task[None]) -> None:
+        self._report_tasks.discard(task)
+        if task.cancelled():
+            logger.warning("report task cancelled name=%s", task.get_name())
+            return
+        error = task.exception()
+        if error is not None:
+            logger.error(
+                "unexpected report task failure name=%s",
+                task.get_name(),
+                exc_info=(type(error), error, error.__traceback__),
+            )
+
+    async def _run_report(
+        self,
+        snapshot: ReportInput,
+        session_id: int,
+        user_ids: dict[str, int],
+        ended_at: datetime,
+    ) -> None:
+        async with self._report_semaphore:
+            if self._report_publisher is None:
+                self._report_publisher = ReportPublisher(self.settings)
+            try:
+                generator = generator_from_settings(self.settings)
+            except ReportLlmError:
+                generator = None
+            await run_report_job(
+                snapshot,
+                session_id=session_id,
+                user_ids=user_ids,
+                analyzed_at=ended_at.isoformat(),
+                publisher=self._report_publisher,
+                generator=generator,
+            )
+
+    def _retain_transcript(
+        self,
+        runtime: SessionRuntime,
+        ended_at: datetime,
+    ) -> None:
+        buffer = runtime.aggregator.state.transcript_buffer
+        segments = buffer.ordered_segments()
+        if not segments:
+            logger.info(
+                "transcript retention skipped session=%s reason=empty",
+                runtime.session_id,
+            )
+            return
+        expires_at = self._now() + timedelta(
+            seconds=self.settings.transcript_retention_seconds
+        )
+        retained = RetainedTranscript(
+            session_id=runtime.session_id,
+            ended_at=ended_at,
+            expires_at=expires_at,
+            segments=segments,
+        )
+        self._retained_transcripts[runtime.session_id] = retained
+        logger.info(
+            "transcript retained session=%s segments=%d characters=%d "
+            "expiresAt=%s",
+            runtime.session_id,
+            retained.segment_count,
+            retained.character_count,
+            retained.expires_at.isoformat(),
+        )
+        if (
+            self.settings.transcript_debug_log
+            and self.settings.transcript_debug_full_on_session_end
+        ):
+            logger.info(
+                "transcript completed session=%s\n%s",
+                runtime.session_id,
+                retained.render(),
+            )
+
+    def _purge_expired_transcripts(self) -> None:
+        now = self._now()
+        expired_session_ids = [
+            session_id
+            for session_id, retained in self._retained_transcripts.items()
+            if retained.expires_at <= now
+        ]
+        for session_id in expired_session_ids:
+            retained = self._retained_transcripts.pop(session_id)
+            logger.info(
+                "transcript expired and deleted session=%s segments=%d "
+                "characters=%d",
+                session_id,
+                retained.segment_count,
+                retained.character_count,
+            )
+
+    async def _retention_loop(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(
+                    self.settings.transcript_cleanup_interval_seconds
+                )
+                self._purge_expired_transcripts()
+        except asyncio.CancelledError:
+            raise
 
     def runtime(self, session_id: str) -> SessionRuntime:
         try:
@@ -523,6 +844,46 @@ class SessionManager:
             *(runtime.stop() for runtime in sessions),
             return_exceptions=True,
         )
+        if self._retention_task is not None:
+            self._retention_task.cancel()
+            await asyncio.gather(
+                self._retention_task,
+                return_exceptions=True,
+            )
+            self._retention_task = None
+        if self._retained_transcripts:
+            logger.info(
+                "transcript memory cleared on shutdown sessions=%d",
+                len(self._retained_transcripts),
+            )
+            self._retained_transcripts.clear()
+        await self._finish_report_tasks()
+        if self._report_publisher is not None:
+            await self._report_publisher.close()
+            self._report_publisher = None
         await self._sender.close()
         await self._vision_sender.close()
+        await self._message_generator.close()
         await self._audio_adapter_factory.close()
+
+    async def _finish_report_tasks(self) -> None:
+        tasks = tuple(self._report_tasks)
+        if not tasks:
+            return
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=self.settings.report_shutdown_timeout_seconds,
+            )
+        except TimeoutError:
+            logger.warning(
+                "report shutdown timeout pending=%d timeoutSeconds=%s",
+                len(self._report_tasks),
+                self.settings.report_shutdown_timeout_seconds,
+            )
+            for task in tuple(self._report_tasks):
+                task.cancel()
+            await asyncio.gather(
+                *tuple(self._report_tasks),
+                return_exceptions=True,
+            )

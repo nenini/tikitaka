@@ -363,8 +363,16 @@ class SessionSttRunner:
         return self._worker.wait_idle(timeout)
 
     def close(self, *, timeout: float = 3.0) -> List[StreamEvent]:
+        """스트림을 비우고 남은 전사까지 모두 돌려준다.
+
+        `flush()`가 마지막 발화를 worker에 제출하고 `worker.close(flush=True)`가 그걸
+        끝까지 전사한다. 그런데 완성된 TRANSCRIPT_FINALIZED는 worker의 출력 큐에 쌓이므로
+        **여기서 꺼내지 않으면 세션 마지막 발화들이 그대로 유실된다.**
+        호출자가 close() 뒤에 poll_transcripts()를 또 부르게 만들면 잊어버린다.
+        """
         final: List[StreamEvent] = []
         for s in self._streams.values():
             final += s.flush()
         self._worker.close(flush=True, timeout=timeout)
+        final += self.poll_transcripts()
         return final

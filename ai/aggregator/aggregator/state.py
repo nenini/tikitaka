@@ -8,7 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from aggregator.transcripts import TranscriptBuffer, TranscriptSegment
 from aggregator.vision_events import VisionBehaviorEvent, VisionMetricSnapshot
+
+# Existing detectors use this domain name in type annotations. Keep the name
+# while the stored object now carries the full STT v2 identity contract.
+Utterance = TranscriptSegment
 
 _VISION_EPISODE_START_TYPES = {
     "FACE_MISSING_STARTED",
@@ -29,24 +34,13 @@ _VISION_EPISODE_END_TYPES = {
 
 
 @dataclass
-class Utterance:
-    speaker_id: str
-    start_ms: int
-    end_ms: int
-    text: str
-
-    @property
-    def duration_ms(self) -> int:
-        return max(0, self.end_ms - self.start_ms)
-
-
-@dataclass
 class SpeakerState:
     speaker_id: str
-    utterances: list[Utterance] = field(default_factory=list)
+    utterances: list[TranscriptSegment] = field(default_factory=list)
     speaking_ms: int = 0
     question_count: int = 0
     filler_count: int = 0
+    filler_breakdown: dict[str, int] = field(default_factory=dict)
 
     @property
     def last_end_ms(self) -> int:
@@ -65,6 +59,11 @@ class VisionUserState:
     vision_available: bool = False
     low_smile_observed_ms: float = 0.0
     low_smile_episode: int = 0
+    hand_over_mouth_active: bool = False
+    metric_snapshot_count: int = 0
+    usable_snapshot_count: int = 0
+    observation_window_ms: float = 0.0
+    usable_observed_ms: float = 0.0
 
     def apply_behavior(self, event: VisionBehaviorEvent) -> None:
         self.latest_behavior = event
@@ -105,6 +104,7 @@ class UserRuntimeState:
 @dataclass
 class SessionState:
     session_id: str
+    transcript_buffer: TranscriptBuffer = field(default_factory=TranscriptBuffer)
     speakers: dict[str, SpeakerState] = field(default_factory=dict)
     vision_users: dict[str, VisionUserState] = field(default_factory=dict)
     users: dict[str, UserRuntimeState] = field(default_factory=dict)
@@ -119,9 +119,10 @@ class SessionState:
             self.speakers[speaker_id] = state
         return state
 
-    def add_utterance(self, utterance: Utterance) -> None:
+    def add_utterance(self, utterance: TranscriptSegment) -> None:
         state = self.speaker(utterance.speaker_id)
         state.utterances.append(utterance)
+        self.transcript_buffer.append(utterance)
         state.speaking_ms += utterance.duration_ms
         self.last_activity_ms = max(self.last_activity_ms, utterance.end_ms)
 
@@ -152,6 +153,15 @@ class SessionState:
         vision = self.vision_user(event.user_id)
         vision.latest_metric = event
         vision.vision_available = event.payload.quality.usable
+        interval = event.payload.observation_interval
+        vision.metric_snapshot_count += 1
+        vision.observation_window_ms += (
+            interval.ended_at_session_elapsed_ms
+            - interval.started_at_session_elapsed_ms
+        )
+        if event.payload.quality.usable:
+            vision.usable_snapshot_count += 1
+            vision.usable_observed_ms += interval.observed_duration_ms
 
     def speaking_ratio(self, speaker_id: str) -> float | None:
         """화자 발화시간 / 두 화자 발화시간 합. 1명뿐이면 None(비율 무의미)."""

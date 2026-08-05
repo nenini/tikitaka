@@ -1,11 +1,13 @@
 import { apiClient } from '@/shared/api/client'
+import { errorCodeOf, unwrap, type ApiEnvelope } from '@/shared/api/envelope'
 import type { ReportStatusResponse, SessionReport } from './types'
 
 /**
  * AI 세션 리포트(REPORT) REST.
  *
- * 백엔드 미가동 시 데모 폴백을 돌려준다(매칭·챗봇과 동일 방침).
+ * **데모 폴백을 두지 않는다.** 없으면 없다고 말한다(아래 getReportStatus 주석 참고).
  * apiClient.baseURL 이 `/api` 이므로 여기서는 `/v1/...` 부터 적는다.
+ * 성공 응답은 `{ success, data }` 래퍼 → `unwrap()` (규칙 SSOT: `@/shared/api/envelope`).
  *
  *   GET  /api/v1/sessions/{id}/reports/status     생성 상태(PENDING·GENERATING·COMPLETED·FAILED)
  *   GET  /api/v1/sessions/{id}/reports/me         내 세션 리포트 (W-16 본체)
@@ -20,88 +22,46 @@ import type { ReportStatusResponse, SessionReport } from './types'
 
 const reportBase = (sessionId: string) => `/v1/sessions/${sessionId}/reports`
 
-export async function getReportStatus(sessionId: string): Promise<ReportStatusResponse> {
+/**
+ * 리포트 생성 상태. **아직 서버에 없는 기능이면 `null`** 을 돌려준다.
+ *
+ * ⚠️ 예전에는 catch 에서 `{ reportStatus: 'COMPLETED' }` 를 지어냈다. 그러면
+ *    "리포트가 완성됐다"고 화면에 말한 뒤 가짜 점수를 보여주게 된다 —
+ *    서버 장애와 정상 동작이 구분되지 않는 것보다 나쁘다. 상호 평가에서 이미
+ *    같은 이유로 폴백을 걷어냈고(1151bd0) 여기도 맞춘다.
+ *
+ * 백엔드에 리포트 엔드포인트가 아직 없어 `404 RESOURCE_NOT_FOUND` 가 온다
+ * (2026-08-04 실측, BACKEND_DEPENDENCIES.md A38). 그건 오류가 아니라
+ * '기능 없음'이라 null 로 정규화하고, 그 밖의 오류는 그대로 던진다.
+ */
+export async function getReportStatus(sessionId: string): Promise<ReportStatusResponse | null> {
   try {
-    const { data } = await apiClient.get<ReportStatusResponse>(`${reportBase(sessionId)}/status`)
-    return data
-  } catch {
-    return { reportStatus: 'COMPLETED', generatedAt: new Date().toISOString() }
+    return unwrap(
+      await apiClient.get<ApiEnvelope<ReportStatusResponse>>(`${reportBase(sessionId)}/status`),
+    )
+  } catch (error) {
+    if (isReportUnavailable(error)) return null
+    throw error
   }
 }
 
-export async function getSessionReport(sessionId: string): Promise<SessionReport> {
+/** 리포트 본체. 없으면 `null`. */
+export async function getSessionReport(sessionId: string): Promise<SessionReport | null> {
   try {
-    const { data } = await apiClient.get<SessionReport>(`${reportBase(sessionId)}/me`)
-    return data
-  } catch {
-    return demoReport(sessionId)
+    return unwrap(await apiClient.get<ApiEnvelope<SessionReport>>(`${reportBase(sessionId)}/me`))
+  } catch (error) {
+    if (isReportUnavailable(error)) return null
+    throw error
   }
+}
+
+/** 엔드포인트 부재(404)인가. 서버 장애(5xx)와 구분해야 화면 문구가 달라진다. */
+function isReportUnavailable(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } })?.response?.status
+  return status === 404 || errorCodeOf(error) === 'RESOURCE_NOT_FOUND'
 }
 
 /** 생성 실패 시 재요청. 성공하면 상태가 GENERATING 으로 돌아간다. */
 export async function requestReportGeneration(sessionId: string): Promise<void> {
   await apiClient.post(reportBase(sessionId))
-}
-
-/* ── 데모 폴백 ─────────────────────────────────────────── */
-
-function demoReport(sessionId: string): SessionReport {
-  return {
-    sessionId,
-    reportStatus: 'COMPLETED',
-    sessionRoundNo: 6,
-    sessionAt: new Date(Date.now() - 3 * 3600_000).toISOString(),
-    opponentNickname: '유월',
-    durationMin: 30,
-    themeName: '저녁 식당',
-    peerReviewIncluded: true,
-    radar: [
-      { key: 'flow', label: '대화 흐름', aiScore: 72, peerScore: 80 },
-      { key: 'question', label: '질문 균형', aiScore: 58, peerScore: 68 },
-      { key: 'listening', label: '경청', aiScore: 66, peerScore: 78 },
-      { key: 'reaction', label: '리액션', aiScore: 84, peerScore: 92 },
-      { key: 'manner', label: '매너', aiScore: 90, peerScore: 96 },
-      { key: 'nonverbal', label: '비언어', aiScore: 74, peerScore: null },
-    ],
-    issues: [
-      {
-        issueId: 'demo-issue-1',
-        categoryLabel: '결혼·출산 압박 표현',
-        eventTimeSec: 754,
-        contextSummary: '상대가 직장 이야기를 하던 중 결혼 계획으로 화제를 전환하셨어요.',
-        evidenceExcerpt: '"…그럼 결혼은 언제쯤 하고 싶으세요?"',
-        alternativeExpression: '앞으로 어떤 삶을 살고 싶은지 궁금해요',
-      },
-    ],
-    metrics: [
-      { key: 'speakingRatio', label: '본인 발화 비율', display: '68%' },
-      { key: 'selfTopicShift', label: '자기 이야기 전환', display: '3회' },
-      { key: 'openQuestionRatio', label: '확장 질문 비율', display: '35%' },
-      { key: 'interruption', label: '말 끊기', display: '2회' },
-      { key: 'fillerWordCount', label: '필러워드', display: '14' },
-    ],
-    strengths: [
-      '상대 말을 요약해 되묻는 패턴이 4회 있었어요.',
-      '미소 비율 42%로 안정적인 표정이 이어졌어요.',
-      '매너 관련 감지 이슈가 없었어요.',
-    ],
-    improvements: [
-      '발화 비율이 68%였어요. 조금 더 들어주면 균형에 가까워져요.',
-      '취미 화제에서 자기 이야기로 전환한 구간이 3회 있었어요.',
-    ],
-    topics: [
-      { label: '취미', minutes: 8 },
-      { label: '일', minutes: 6 },
-      { label: '여행', minutes: 4 },
-      { label: '음식', minutes: 3 },
-      { label: '가족', minutes: 2 },
-    ],
-    nextMissions: [
-      { missionId: 'm1', label: '확장 질문 3회' },
-      { missionId: 'm2', label: '발화 비율 55% 이하' },
-    ],
-    temperature: { before: 36.5, after: 38.2, delta: 1.7, reason: '세션 완료 · 상대 평가 반영' },
-    summaryText: null,
-    generatedAt: new Date().toISOString(),
-  }
 }

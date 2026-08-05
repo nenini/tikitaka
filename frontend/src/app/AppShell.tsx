@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Avatar, BottomNav, IconButton } from '@/components'
 import type { IconName } from '@/components'
+import { faceTypeImage } from '@/features/face/faceImage'
+import { useMyFaceAnalysis } from '@/features/face/useMyFaceAnalysis'
 import { NotificationPanel } from '@/features/notifications/NotificationPanel'
 import { useNotifications } from '@/features/notifications/useNotifications'
+import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
 /*  AppShell — 앱 전체가 공유하는 셸(chrome).                                   */
@@ -13,16 +16,31 @@ import { useNotifications } from '@/features/notifications/useNotifications'
 /*  (세션 등 몰입형 화면은 이 셸 밖에 둔다 — router 참고)                        */
 /* -------------------------------------------------------------------------- */
 
-const NAV: readonly { to: string; label: string; icon: IconName; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
+
+/** 데스크탑 상단 탭. 마이페이지는 우측 아바타가 맡으므로 여기 넣지 않는다. */
+const NAV: readonly NavItem[] = [
   { to: '/', label: '홈', icon: 'home', end: true },
   { to: '/matching', label: '매칭', icon: 'heart' },
   { to: '/reports', label: '리포트', icon: 'report' },
   { to: '/growth', label: '성장', icon: 'sparkle' },
 ]
 
+/**
+ * 모바일 하단 네비. 상단 헤더가 `md:block` 이라 **모바일에는 아바타 진입점이 아예 없다** —
+ * 마이페이지로 갈 길이 없어서 여기에 항목을 더한다.
+ *
+ * 라벨을 '마이페이지'가 아니라 '마이'로 둔 이유: `.bt-nav__item` 이 `min-width: 56px` 이고
+ * 나머지 라벨이 전부 2~3자라, 5자를 넣으면 이 칸만 넓어져 간격이 어긋난다.
+ */
+const MOBILE_NAV: readonly NavItem[] = [...NAV, { to: '/me', label: '마이', icon: 'user' }]
+
 export function AppShell() {
   const [notiOpen, setNotiOpen] = useState(false)
   const noti = useNotifications()
+  const user = useAuthStore((s) => s.user)
+  // 얼굴상 진단을 마쳤으면 그 동물 이미지가 프로필 사진이 된다. 없으면 닉네임 이니셜.
+  const faceImage = faceTypeImage(useMyFaceAnalysis()?.primaryType)
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       {/* ── 데스크탑 상단 네비 (모바일 숨김) ───────────────────────── */}
@@ -50,11 +68,16 @@ export function AppShell() {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-2">
+          {/* 벨과 마이페이지 진입 버튼을 같은 규격으로 맞춘다 — 둘 다 36px 원형·평면.
+              기본 IconButton 은 44px 에 흰 배경 + 그림자라, 흰 헤더 위에서는 혼자 떠 보이고
+              옆의 36px 아바타와 높이도 어긋났다. */}
+          <div className="flex items-center gap-1.5">
             {/* 알림 벨 — 드롭다운 토글 + 안읽음 카운트 배지 (바깥클릭 미닫힘: onClose=벨 재클릭·X·Esc) */}
             <div className="relative">
               <IconButton
                 icon="bell"
+                small
+                flat
                 aria-label={noti.unread > 0 ? `알림 (안읽음 ${noti.unread}개)` : '알림'}
                 aria-expanded={notiOpen}
                 onClick={() => setNotiOpen((v) => !v)}
@@ -77,10 +100,18 @@ export function AppShell() {
                 markAll={noti.markAll}
                 loadMore={noti.loadMore}
                 hasMore={noti.hasMore}
+                loading={noti.loading}
+                streamDisconnected={noti.streamDisconnected}
               />
             </div>
-            <NavLink to="/me" aria-label="내 정보" className="rounded-full">
-              <Avatar size="sm" name="유월" />
+            {/* 아바타를 round 로 둬 옆의 원형 벨과 형태를 맞춘다. 기본 sm 은 12px 라운드라
+                포커스 링(rounded-full)과 실제 도형이 어긋났다. */}
+            <NavLink
+              to="/me"
+              aria-label="내 정보"
+              className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--bt-color-focus)]"
+            >
+              <Avatar size="sm" round name={user?.nickname ?? '내 정보'} src={faceImage} />
             </NavLink>
           </div>
         </div>
@@ -97,7 +128,7 @@ export function AppShell() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--bt-color-border)] bg-surface md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <BottomNav items={NAV.map(({ to, label, icon, end }) => ({ to, label, icon, end }))} />
+        <BottomNav items={MOBILE_NAV.map(({ to, label, icon, end }) => ({ to, label, icon, end }))} />
       </div>
     </div>
   )

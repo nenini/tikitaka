@@ -1,24 +1,107 @@
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, CardHeader, ListRow, Stack, TagChip } from '@/components'
-import { AuthPlaceholder } from '@/features/auth/AuthPlaceholder'
+import { Button, Callout, Card, CardHeader, ListRow, Spinner, Stack, TagChip } from '@/components'
+import { errorMessageOf } from '@/shared/api/envelope'
+import { getMyFaceAnalysis } from '@/features/face/api'
+import type { FaceAnalysisResult } from '@/features/face/types'
+import { getMyProfile } from '@/features/profile/api'
+import type { ProfileResponse } from '@/features/profile/types'
+import { getMySurvey } from '@/features/survey/api'
+import type { SurveyAnswer } from '@/features/survey/types'
 
 /* -------------------------------------------------------------------------- */
-/*  W-19b · 개인정보 수정·관리 (FE-ACCOUNT-02)                                  */
+/*  W-19b · 개인정보 수정·관리 (FE-ACCOUNT-02 / PROFILE-01)                     */
 /*  1차 확정 옵션:                                                            */
 /*   ① 편집 진입 = 항목별 별도 편집 화면(라우트)                                */
-/*   ② 이번 차수 = 편집 화면 전부 스텁(허브만 실구현)                           */
-/*   ③ 프로필·지역 2단 카드(+모바일 자동 1단)   ④ 현재값 요약 표시              */
-/*  - 데이터는 데모 고정. TODO(ACCOUNT): GET /api/v1/users/me/profile·survey    */
+/*   ② 프로필·지역 2단 카드(+모바일 자동 1단)   ③ 현재값 요약 표시              */
+/*                                                                            */
+/*  요약값은 전부 서버에서 읽는다 — 고정 데이터를 두지 않는다.                  */
+/*    GET /v1/users/me/profile        닉네임 · 성별 · 시·도                     */
+/*    GET /v1/users/me/survey         선호 얼굴상 · 성격 · 연령 · 개선 목표      */
+/*    GET /v1/users/me/face-analysis  분석된 얼굴상                             */
+/*                                                                            */
+/*  설문·얼굴상은 **아직 없을 수 있다**(각각 null). 프로필만 필수다 — 이 화면은  */
+/*  온보딩 게이트 뒤에 있어 프로필 없이는 도달할 수 없고, 없다면 진짜 오류다.    */
 /* -------------------------------------------------------------------------- */
+
+/** 값이 아직 없을 때 쓰는 문구. 빈 칸으로 두면 불러오기 실패와 구분되지 않는다. */
+const NOT_SET = '아직 없어요'
 
 /** 현재값 요약 한 줄. (label — value) */
 function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   return <ListRow title={label} trailing={<span className="bt-body-sm font-semibold">{value}</span>} />
 }
 
+/** 이름 목록을 요약 한 줄로. 비어 있으면 미설정 문구. */
+function nameList(items: readonly { name: string }[] | undefined): string {
+  if (!items?.length) return NOT_SET
+  return items.map((item) => item.name).join(' · ')
+}
+
+interface HubData {
+  profile: ProfileResponse
+  survey: SurveyAnswer | null
+  face: FaceAnalysisResult | null
+}
+
 export function AccountEditPage() {
   const navigate = useNavigate()
+
+  const [data, setData] = useState<HubData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      // 셋을 동시에 읽는다. 설문·얼굴상은 미등록이면 api 계층에서 null 로 정규화된다.
+      const [profile, survey, face] = await Promise.all([
+        getMyProfile(),
+        getMySurvey(),
+        getMyFaceAnalysis(),
+      ])
+      setData({ profile, survey, face })
+    } catch (error) {
+      setLoadError(errorMessageOf(error, '내 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  if (loading) {
+    return (
+      <main className="mx-auto grid w-full max-w-[860px] place-items-center px-4 py-20" aria-busy="true">
+        <Spinner size={28} />
+      </main>
+    )
+  }
+
+  if (loadError || !data) {
+    return (
+      <main className="mx-auto w-full max-w-[860px] px-4 py-10 sm:px-6">
+        <Stack gap={12}>
+          <Callout tone="danger" icon="report">
+            {loadError ?? '내 정보를 불러오지 못했어요.'}
+          </Callout>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => void load()}>
+              다시 시도
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/me')}>
+              마이페이지로
+            </Button>
+          </div>
+        </Stack>
+      </main>
+    )
+  }
+
+  const { profile, survey, face } = data
 
   return (
     <main className="mx-auto w-full max-w-[860px] px-4 pt-6 sm:px-6">
@@ -44,9 +127,13 @@ export function AccountEditPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <TagChip>🐰 토끼상</TagChip>
+              {face ? (
+                <TagChip>{face.primaryTypeDisplayName}</TagChip>
+              ) : (
+                <span className="bt-body-sm bt-muted">{NOT_SET}</span>
+              )}
               <Button variant="secondary" size="sm" onClick={() => navigate('/me/edit/face')}>
-                얼굴 다시 찍기
+                {face ? '얼굴 다시 찍기' : '얼굴 촬영하기'}
               </Button>
             </div>
           </div>
@@ -62,13 +149,18 @@ export function AccountEditPage() {
               </p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => navigate('/me/edit/survey')}>
-              설문 다시 하기
+              {survey ? '설문 다시 하기' : '설문 응답하기'}
             </Button>
           </div>
           <div>
-            <SummaryRow label="원하는 상대의 모습" value="다정 · 느긋 · 친근" />
-            <SummaryRow label="선호 얼굴상" value="🐰 🐱" />
-            <SummaryRow label="개선 목표" value="발화량 줄이기 · 성량 키우기" />
+            <SummaryRow label="원하는 상대의 모습" value={nameList(survey?.preferredTraits)} />
+            <SummaryRow label="선호 얼굴상" value={survey?.preferredFaceTag.name ?? NOT_SET} />
+            {/* 선호 연령은 프로필이 아니라 설문에서 받는다(W-06) — 그래서 이 카드에 둔다 */}
+            <SummaryRow
+              label="선호 연령"
+              value={survey ? `${survey.minPreferredAge}–${survey.maxPreferredAge}세` : NOT_SET}
+            />
+            <SummaryRow label="개선 목표" value={nameList(survey?.practiceGoals)} />
           </div>
         </Card>
 
@@ -82,9 +174,8 @@ export function AccountEditPage() {
               </Button>
             </div>
             <div>
-              <SummaryRow label="닉네임" value="유월" />
-              <SummaryRow label="성별" value="여성" />
-              <SummaryRow label="선호 연령" value="27–33세" />
+              <SummaryRow label="닉네임" value={profile.nickname} />
+              <SummaryRow label="성별" value={profile.gender === 'FEMALE' ? '여성' : '남성'} />
             </div>
           </Card>
 
@@ -96,7 +187,7 @@ export function AccountEditPage() {
               </Button>
             </div>
             <div>
-              <SummaryRow label="시·도" value="서울특별시" />
+              <SummaryRow label="시·도" value={profile.regionCity || NOT_SET} />
             </div>
             <p className="bt-caption">챗봇 대화 주제·장소 추천에만 쓰이고 상대에게 공개되지 않아요.</p>
           </Card>
@@ -111,50 +202,6 @@ export function AccountEditPage() {
   )
 }
 
-/* -------------------------------------------------------------------------- */
-/*  항목별 편집 화면 — 이번 차수 전부 스텁(별도 스토리). backTo = 허브(/me/edit)  */
-/* -------------------------------------------------------------------------- */
-
-export function FaceRecapturePage() {
-  return (
-    <AuthPlaceholder
-      title="얼굴 재촬영 (W-19b)"
-      note="카메라로 얼굴을 다시 촬영해 얼굴상을 재분석합니다. 원본은 분석 후 즉시 삭제 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
-
-export function SurveyEditPage() {
-  return (
-    <AuthPlaceholder
-      title="이상형 · 개선 목표 설문 재응답 (W-19b)"
-      note="온보딩 설문(W-06)을 다시 응답합니다 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
-
-export function ProfileEditPage() {
-  return (
-    <AuthPlaceholder
-      title="기본 프로필 수정 (W-19b)"
-      note="닉네임 · 성별 · 선호 연령을 수정합니다 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
-
-export function RegionEditPage() {
-  return (
-    <AuthPlaceholder
-      title="지역(시·도) 수정 (W-19b)"
-      note="챗봇 추천에 쓰이는 시·도를 수정합니다 — 다음 차수에서 구현합니다."
-      backTo="/me/edit"
-      backLabel="개인정보 관리로 돌아가기"
-    />
-  )
-}
+/* 얼굴 재촬영은 온보딩 촬영 화면을 모드로 재사용한다 — features/face/FaceCapturePage */
+/* 설문 재응답은 온보딩 설문 화면을 모드로 재사용한다 — features/survey/SurveyPage */
+/* 기본 프로필·지역 수정은 각각 ProfileEditPage · RegionEditPage 로 분리했다 */

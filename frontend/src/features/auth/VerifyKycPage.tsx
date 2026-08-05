@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, CardButton, Icon, Stack, Steps } from '@/components'
 import { cn } from '@/shared/lib/cn'
+import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02b · 본인 인증 (KYC · Mock) — 온보딩 2/4                                  */
@@ -10,7 +11,6 @@ import { cn } from '@/shared/lib/cn'
 /*  - 공통 컴포넌트 규약 준수: Steps / Card / CardButton / Callout / Button 등    */
 /* -------------------------------------------------------------------------- */
 
-const STEP_LABELS = ['계정', '본인인증', '동의', '프로필', '설문'] as const
 
 /** 본인확인 수단. 신분증 인증은 제외(사용자 지시) — 통신사 PASS 단일. */
 interface KycProvider {
@@ -55,7 +55,11 @@ export function VerifyKycPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
       <header>
-        <Steps count={5} current={2} labels={STEP_LABELS} />
+        <Steps
+          count={ONBOARDING_STEP_COUNT}
+          current={ONBOARDING_STEP.verify}
+          labels={ONBOARDING_STEP_LABELS}
+        />
         <h1 className="bt-h2 mt-4">본인 인증</h1>
         <p className="bt-body-sm bt-muted mt-1">성인 여부만 확인해요. 오래 걸리지 않아요.</p>
       </header>
