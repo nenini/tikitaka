@@ -40,3 +40,7 @@ out/
 .env
 .env.*
 !.env.example
+
+### Performance test outputs ###
+performance/results/*
+!performance/results/.gitkeep
