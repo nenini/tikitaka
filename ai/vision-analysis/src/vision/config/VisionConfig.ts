@@ -152,6 +152,8 @@ export const visionConfigSchema = z
         minimumUsableDurationMs: z.number().int().positive(),
         targetUsableDurationMs: z.number().int().positive(),
         maximumWallDurationMs: z.number().int().positive(),
+        /** Upper bound measured from setup start, so a never-stabilizing camera still exits. */
+        setupHardTimeoutMs: z.number().int().positive().default(30_000),
         minimumUsableFrames: z.number().int().positive(),
         partialMinimumUsableFrames: z.number().int().positive(),
         readyMinimumConfidence: unitScoreSchema,
@@ -187,6 +189,16 @@ export const visionConfigSchema = z
             code: "custom",
             path: ["maximumWallDurationMs"],
             message: "maximum wall duration cannot be shorter than target duration",
+          });
+        }
+        if (
+          calibration.setupHardTimeoutMs <= calibration.maximumWallDurationMs
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["setupHardTimeoutMs"],
+            message:
+              "setup hard timeout must exceed the collecting wall duration",
           });
         }
         if (calibration.partialMinimumUsableFrames >= calibration.minimumUsableFrames) {
@@ -287,6 +299,8 @@ export const visionConfigSchema = z
         attentionAwayScore: z.number().min(0).max(100),
         attentionRecoveryScore: z.number().min(0).max(100),
         meaningfulDepartureScore: unitScoreSchema.default(0.6),
+        /** Reliability floor for treating the iris as evidence at all. */
+        minimumIrisEvidenceReliability: unitScoreSchema.default(0.35),
         minimumEventConfidence: unitScoreSchema,
         coachingMinimumConfidence: unitScoreSchema.default(0.75),
         minimumRecoveryConfidence: unitScoreSchema,
@@ -300,6 +314,9 @@ export const visionConfigSchema = z
         suspendedConfidenceThreshold: unitScoreSchema,
         fallbackYawDegrees: z.number().positive(),
         fallbackPitchDegrees: z.number().positive(),
+        fallbackRecoveryYawDegrees: z.number().positive(),
+        fallbackRecoveryPitchDegrees: z.number().positive(),
+        fallbackRecoveryDurationMs: durationSchema,
         fallbackMinimumDurationMs: durationSchema,
         fallbackMinimumMeasurementConfidence: unitScoreSchema,
         awayMinimumDurationMs: z.number().int().positive(),
@@ -317,6 +334,8 @@ export const visionConfigSchema = z
           [attention.centerYEntryDelta, attention.centerYRecoveryDelta, "centerYRecoveryDelta"],
           [attention.gazeHorizontalEntryDelta, attention.gazeHorizontalRecoveryDelta, "gazeHorizontalRecoveryDelta"],
           [attention.gazeVerticalEntryDelta, attention.gazeVerticalRecoveryDelta, "gazeVerticalRecoveryDelta"],
+          [attention.fallbackYawDegrees, attention.fallbackRecoveryYawDegrees, "fallbackRecoveryYawDegrees"],
+          [attention.fallbackPitchDegrees, attention.fallbackRecoveryPitchDegrees, "fallbackRecoveryPitchDegrees"],
         ];
 
         for (const [entry, recovery, path] of comparisons) {
@@ -342,6 +361,18 @@ export const visionConfigSchema = z
             code: "custom",
             path: ["prolongedDurationMs"],
             message: "prolonged duration must exceed initial away duration",
+          });
+        }
+
+        if (
+          attention.minimumIrisEvidenceReliability >
+          attention.irisOnlyMinimumReliability
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["minimumIrisEvidenceReliability"],
+            message:
+              "iris evidence floor must not exceed the iris-only entry threshold",
           });
         }
       }),

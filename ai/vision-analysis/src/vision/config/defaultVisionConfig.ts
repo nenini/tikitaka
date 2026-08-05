@@ -85,6 +85,9 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     minimumUsableDurationMs: 3_000,
     targetUsableDurationMs: 5_000,
     maximumWallDurationMs: 12_000,
+    // Escape hatch anchored on setup start: COLLECTING may never begin, and
+    // maximumWallDurationMs only runs once it does.
+    setupHardTimeoutMs: 30_000,
     minimumUsableFrames: 15,
     partialMinimumUsableFrames: 8,
     readyMinimumConfidence: 0.75,
@@ -210,6 +213,9 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     // closing an episode around the same score.
     attentionRecoveryScore: 80,
     meaningfulDepartureScore: 0.6,
+    // Score and reliability are separate axes; a one-sample eye baseline must
+    // not qualify as iris evidence. Initial candidate value, not yet tuned.
+    minimumIrisEvidenceReliability: 0.35,
     minimumEventConfidence: 0.65,
     coachingMinimumConfidence: 0.75,
     minimumRecoveryConfidence: 0.6,
@@ -223,6 +229,11 @@ export const defaultVisionConfig: VisionConfig = visionConfigSchema.parse({
     suspendedConfidenceThreshold: 0.45,
     fallbackYawDegrees: 40,
     fallbackPitchDegrees: 30,
+    // Angle hysteresis: entry 40/30, recovery 35/25, so a face resting on the
+    // boundary cannot flip the episode open and closed.
+    fallbackRecoveryYawDegrees: 35,
+    fallbackRecoveryPitchDegrees: 25,
+    fallbackRecoveryDurationMs: 500,
     fallbackMinimumDurationMs: 2_000,
     fallbackMinimumMeasurementConfidence: 0.7,
     awayMinimumDurationMs: 1_000,

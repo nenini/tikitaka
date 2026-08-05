@@ -374,4 +374,21 @@ describe("VisionPipeline", () => {
     });
     expect(snapshot?.payload.capabilities.activeDetectors).toEqual([]);
   });
+
+  it("exposes an explicit global-baseline fallback entry point", () => {
+    const pipeline = new VisionPipeline(defaultVisionConfig, createFactory());
+    const before = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 0, brightnessScore: 0.05 }),
+    );
+    expect(before.calibration.status).not.toBe("GLOBAL_FALLBACK");
+
+    const state = pipeline.useGlobalBaselineFallback(1_000);
+    expect(state.status).toBe("GLOBAL_FALLBACK");
+    expect(state.baseline.calibratedAtSessionElapsedMs).toBe(1_000);
+
+    const after = pipeline.process(
+      createNormalizedFaceFrame({ timestampMs: 1_200 }),
+    );
+    expect(after.calibration.status).toBe("GLOBAL_FALLBACK");
+  });
 });
