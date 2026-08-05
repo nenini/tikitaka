@@ -269,13 +269,17 @@ class FlywayMigrationTests {
 				"CONTENTTEXT"
 		);
 		Integer growthMetricSnapshotTableCount = tableCount("GROWTH_METRIC_SNAPSHOTS");
+		Integer userTemperatureTableCount = tableCount("USER_TEMPERATURES");
+		Integer temperatureHistoryTableCount = tableCount("TEMPERATURE_CHANGE_HISTORIES");
 
-		assertThat(migrationCount).isEqualTo(39);
+		assertThat(migrationCount).isEqualTo(40);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
 		assertThat(reportTranscriptColumnCount).isEqualTo(1);
 		assertThat(growthMetricSnapshotTableCount).isEqualTo(1);
+		assertThat(userTemperatureTableCount).isEqualTo(1);
+		assertThat(temperatureHistoryTableCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);

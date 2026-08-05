@@ -28,4 +28,7 @@ public interface GrowthSwaggerDocs {
             @Parameter(hidden = true) AuthUser authUser,
             @Parameter(description = "현재 비교 기간 시작일(포함)", example = "2026-07-01") LocalDate from,
             @Parameter(description = "현재 비교 기간 종료일(포함)", example = "2026-07-30") LocalDate to);
+
+    @Operation(summary = "내 매너 온도 조회", description = "기본 36.5°C에서 시작하는 현재 매너 온도와 최근 변경 이력 10건을 조회합니다. 평가와 노쇼는 정책 버전별로 한 번만 반영되며, 온도는 20.0~50.0°C 범위로 제한됩니다. 최근 변경에는 변경 전·후 온도, 실제 증감값, 세션·평가 또는 노쇼 원본 ID와 사유가 포함됩니다.")
+    ApiResponse<UserTemperatureResponse> getTemperature(@Parameter(hidden = true) AuthUser authUser);
 }

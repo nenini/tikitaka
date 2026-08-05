@@ -2,9 +2,11 @@ package com.date.backend.domain.growth.api;
 
 import com.date.backend.domain.growth.application.GrowthSessionQueryService;
 import com.date.backend.domain.growth.application.GrowthMetricAggregationService;
+import com.date.backend.domain.growth.application.MannerTemperatureService;
 import com.date.backend.domain.growth.domain.GrowthSessionStatus;
 import com.date.backend.domain.growth.dto.response.GrowthSessionHistoryResponse;
 import com.date.backend.domain.growth.dto.response.GrowthMetricsResponse;
+import com.date.backend.domain.growth.dto.response.UserTemperatureResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.constraints.*;
@@ -21,9 +23,12 @@ import java.time.LocalDate;
 public class GrowthController implements GrowthSwaggerDocs {
 	private final GrowthSessionQueryService service;
 	private final GrowthMetricAggregationService metricService;
-	public GrowthController(GrowthSessionQueryService service, GrowthMetricAggregationService metricService) {
+	private final MannerTemperatureService temperatureService;
+	public GrowthController(GrowthSessionQueryService service, GrowthMetricAggregationService metricService,
+			MannerTemperatureService temperatureService) {
 		this.service = service;
 		this.metricService = metricService;
+		this.temperatureService = temperatureService;
 	}
 
 	@GetMapping("/sessions")
@@ -43,5 +48,10 @@ public class GrowthController implements GrowthSwaggerDocs {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 		return ApiResponse.success(metricService.getMetrics(authUser.userId(), from, to));
+	}
+
+	@GetMapping("/temperature")
+	public ApiResponse<UserTemperatureResponse> getTemperature(@AuthenticationPrincipal AuthUser authUser) {
+		return ApiResponse.success(temperatureService.getTemperature(authUser.userId()));
 	}
 }

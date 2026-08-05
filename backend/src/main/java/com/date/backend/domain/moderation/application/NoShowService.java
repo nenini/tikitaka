@@ -6,6 +6,7 @@ import com.date.backend.domain.moderation.domain.UserSanction;
 import com.date.backend.domain.moderation.dto.response.NoShowResponse;
 import com.date.backend.domain.moderation.repository.AttendancePenaltyRepository;
 import com.date.backend.domain.moderation.repository.UserSanctionRepository;
+import com.date.backend.domain.growth.event.NoShowConfirmedEvent;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
@@ -13,6 +14,7 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.ModerationErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -26,15 +28,16 @@ public class NoShowService {
 	private final UserSanctionRepository sanctionRepository;
 	private final NoShowPolicyProperties properties;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public NoShowService(WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
 			AttendancePenaltyRepository penaltyRepository,
 			UserSanctionRepository sanctionRepository,
-			NoShowPolicyProperties properties, Clock clock) {
+			NoShowPolicyProperties properties, Clock clock, ApplicationEventPublisher eventPublisher) {
 		this.sessionRepository = sessionRepository; this.participantRepository = participantRepository;
 		this.penaltyRepository = penaltyRepository; this.sanctionRepository = sanctionRepository;
-		this.properties = properties; this.clock = clock;
+		this.properties = properties; this.clock = clock; this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -56,6 +59,8 @@ public class NoShowService {
 		var existing = penaltyRepository.findBySessionIdAndUserIdAndPenaltyType(sessionId, absent.getUserId(), "NO_SHOW");
 		if (existing.isPresent()) return existingResponse(existing.get(), true);
 		AttendancePenalty penalty = penaltyRepository.save(new AttendancePenalty(absent.getUserId(), sessionId, now));
+		penaltyRepository.flush();
+		eventPublisher.publishEvent(new NoShowConfirmedEvent(penalty.getId(), sessionId, absent.getUserId(), now));
 		long count = penaltyRepository.countByUserIdAndPenaltyType(absent.getUserId(), "NO_SHOW");
 		LocalDateTime endsAt = now.plus(properties.restrictionFor((int) count));
 		UserSanction sanction = sanctionRepository.save(new UserSanction(absent.getUserId(),
