@@ -41,6 +41,8 @@ public class SecurityConfig {
 			"/internal/ai/silence-events",
 			"/internal/ai/question-recommendations",
 			"/internal/ai/safety-events",
+			"/internal/v1/session-analyses",
+			"/internal/v1/session-reports/results",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",
@@ -81,6 +83,7 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/matches/**").authenticated()
 						.requestMatchers("/api/v1/rooms/**").authenticated()
 						.requestMatchers("/api/v1/sessions/**").authenticated()
+						.requestMatchers("/api/v1/reports/**").authenticated()
 						.requestMatchers("/api/v1/notifications/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
 						.anyRequest().permitAll()
