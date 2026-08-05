@@ -166,28 +166,31 @@ _OUTPUT_SPEC = """
 
 {
   "summary": "편안한 분위기로 대화가 이어졌어요.",
-  "strengths": ["되묻기가 자연스러웠어요", "취미로 공통점을 찾았어요", "말하는 리듬이 편안했어요"],
-  "improvements": ["한 주제에 오래 머물렀어요", "질문이 조금 적었어요"],
-  "missions": ["상대에게 한 번 더 되물어 보기"],
+  "strengths": ["취미로 공통점을 찾았어요", "말하는 리듬이 편안했어요", "상대 말을 끝까지 들었어요"],
+  "improvements": ["한 주제에 오래 머물렀어요", "말수가 조금 많은 편이었어요"],
+  "missions": ["상대 이야기에 내 경험을 한마디 얹어 보기"],
   "cards": [
     {
       "kind": "issue",
       "title": "개인사 질문",
-      "context": "직장 이야기를 나누다 가족 관련 질문으로 옮겨갔어요.",
+      "context": "직장 이야기를 나누다 가족 관련 화제로 옮겨갔어요.",
       "quoteRef": null,
       "suggestion": "어떤 일 하실 때 제일 재밌으세요?",
       "patternCode": "PROBING_STATUS"
     },
     {
       "kind": "positive",
-      "title": "되묻기",
-      "context": "상대 이야기를 받아 자연스럽게 되물었어요.",
+      "title": "공통점 찾기",
+      "context": "취미 이야기를 받아 자연스럽게 이어갔어요.",
       "quoteRef": null,
       "suggestion": null,
       "patternCode": null
     }
   ]
 }
+※ 위 예시 문장은 형식만 보여준다. 그대로 베끼지 말고 측정 결과에 맞춰 새로 써라.
+   '6축 점수'에서 **측정 부족**으로 표시된 축은 세 배열 어디에도 쓰지 마라.
+   그 축을 가리키는 문장은 시스템이 지우고, 다 지워지면 배열이 비어 버린다.
 
 필드 규칙:
 - "kind": 정확히 다음 넷 중 **하나의 단어**만 쓴다 → issue / behavior / positive / filler
@@ -521,6 +524,48 @@ def _drop_goal_strengths(items: tuple[str, ...], axes: tuple[str, ...]) -> tuple
     return kept or items
 
 
+DEFAULT_STRENGTH = "대화를 끝까지 이어간 점이 좋았어요."
+DEFAULT_MISSION = "상대 이야기에 내 경험을 한마디 얹어 보세요."
+"""세 배열이 비었을 때 채우는 최저선.
+
+측정 부족 축(질문균형)을 가리키는 단어가 들어가면 `_drop_unfounded`가 도로 지운다.
+'되묻기'류를 쓰지 않는 이유다.
+"""
+
+
+def _ensure_floor(
+    narrative: ReportNarrative, axes: tuple[AxisScore, ...]
+) -> ReportNarrative:
+    """필터를 다 통과하고 나니 배열이 비는 경우를 막는다.
+
+    LLM이 미측정 축(질문균형) 표현으로만 채우면 `_drop_unfounded`가 전부 지워
+    강점·개선점·미션이 0개인 리포트가 나간다(2026-08-05 실측 — 미션 0개).
+    프롬프트 예시를 고쳐 확률은 낮췄지만 LLM은 확률적이라 바닥은 코드가 잡는다.
+    """
+    strengths = narrative.strengths or (DEFAULT_STRENGTH,)
+    missions = narrative.missions or (DEFAULT_MISSION,)
+    improvements = narrative.improvements
+    if not improvements:
+        measured = [a for a in axes if a.measured and a.score is not None]
+        if measured:
+            worst = min(measured, key=lambda a: a.score or 0.0)
+            improvements = (f"{worst.axis}을(를) 다음 세션에서 조금 더 신경 써 보세요.",)
+    if (strengths, improvements, missions) == (
+        narrative.strengths,
+        narrative.improvements,
+        narrative.missions,
+    ):
+        return narrative
+    return ReportNarrative(
+        summary=narrative.summary,
+        strengths=strengths,
+        improvements=improvements,
+        missions=missions,
+        cards=narrative.cards,
+        generated_by_llm=narrative.generated_by_llm,
+    )
+
+
 def _goal_missions(missions: tuple[str, ...], goals: tuple[str, ...]) -> tuple[str, ...]:
     """목표에 맞는 사전 미션을 앞에 세운다.
 
@@ -643,7 +688,7 @@ def parse_narrative(
         cards=tuple(cards[:MAX_CARDS]),
         generated_by_llm=True,
     )
-    return _ensure_positive_card(_apply_goals(narrative, goals))
+    return _ensure_positive_card(_ensure_floor(_apply_goals(narrative, goals), axes))
 
 
 def _ensure_positive_card(narrative: ReportNarrative) -> ReportNarrative:
@@ -692,14 +737,14 @@ def fallback_narrative(
     if metrics and metrics.backchannel_count > 0:
         strengths.append("상대 말에 맞장구로 반응한 구간이 있었어요.")
     if not strengths:
-        strengths.append("대화를 끝까지 이어간 점이 좋았어요.")
+        strengths.append(DEFAULT_STRENGTH)
     return _ensure_positive_card(
         _apply_goals(
             ReportNarrative(
                 summary="이번 세션의 지표를 정리했어요. 자세한 설명은 잠시 후 다시 시도해 주세요.",
                 strengths=tuple(strengths[:3]),
                 improvements=tuple(improvements[:2]),
-                missions=("다음 세션에서는 상대에게 한 번 더 되물어 보세요.",),
+                missions=(DEFAULT_MISSION,),
                 cards=(),
                 generated_by_llm=False,
             ),

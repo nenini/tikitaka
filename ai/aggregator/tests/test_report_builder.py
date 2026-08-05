@@ -12,6 +12,9 @@ from itertools import count
 import pytest
 
 from aggregator.report.builder import (
+    DEFAULT_MISSION,
+    DEFAULT_STRENGTH,
+    _AXIS_KEYWORDS,
     MAX_CARDS,
     ReportLlmError,
     build_narrative,
@@ -664,3 +667,36 @@ def test_empty_summary_falls_back_instead_of_sending_blank() -> None:
     narrative = build_narrative(report, score_report(report), A, _FakeLlm(payload))
     assert not narrative.generated_by_llm
     assert narrative.summary.strip()
+
+
+def test_filters_never_leave_arrays_empty() -> None:
+    """미측정 축 표현만으로 채워 와도 세 배열이 비지 않는다.
+
+    질문균형은 항상 측정 부족이라 '질문·되묻·물어'가 든 문장은 전부 지워진다.
+    LLM이 그런 문장만 보내면 강점·개선점·미션이 0개로 나갔다(2026-08-05 실측).
+    """
+    payload = _good_payload()
+    payload["strengths"] = ["되묻기가 자연스러웠어요"]
+    payload["improvements"] = ["질문이 조금 적었어요"]
+    payload["missions"] = ["상대에게 한 번 더 되물어 보기"]
+    report = _report()
+    narrative = build_narrative(report, score_report(report), A, _FakeLlm(payload))
+    assert narrative.strengths
+    assert narrative.improvements
+    assert narrative.missions
+
+
+def test_floor_text_survives_its_own_filter() -> None:
+    """바닥 문구가 미측정 축 단어를 쓰면 도로 지워져 무의미해진다."""
+    forbidden = _AXIS_KEYWORDS["질문균형"]
+    assert not any(word in DEFAULT_STRENGTH for word in forbidden)
+    assert not any(word in DEFAULT_MISSION for word in forbidden)
+
+
+def test_prompt_example_does_not_teach_filtered_wording() -> None:
+    """예시가 지워질 표현을 가르치면 LLM이 그대로 베껴 배열이 빈다."""
+    report = _report()
+    spec = build_prompt(report, score_report(report), A, include_quotes=False)
+    example = spec.split("## 출력 형식")[1].split("필드 규칙")[0]
+    assert "되묻" not in example
+    assert "되물" not in example
