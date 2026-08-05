@@ -509,3 +509,158 @@ def test_build_narrative_happy_path() -> None:
     narrative = build_narrative(report, score_report(report), A, llm, include_quotes=True)
     assert narrative.generated_by_llm
     assert llm.prompts and "측정 결과" in llm.prompts[0]
+
+
+# ── 설문 목표 개인화 (S15P11A307-488) ────────────────────────────────
+# 점수는 절대 안 바뀐다. 바뀌는 건 어느 축을 먼저 보여주고 어떻게 부르느냐뿐이다.
+
+def _report_with_goals(*goals: str) -> ReportInput:
+    """A에게만 설문 목표를 붙인 리포트 입력."""
+    base = _report()
+    speakers = tuple(
+        SpeakerInput(
+            s.speaker_id,
+            s.utterances,
+            s.speaking_ms,
+            s.question_count,
+            s.filler_count,
+            s.filler_breakdown,
+            goals if s.speaker_id == A else (),
+        )
+        for s in base.speakers
+    )
+    return ReportInput(
+        session_id=base.session_id,
+        session_duration_ms=base.session_duration_ms,
+        speakers=speakers,
+        vision=base.vision,
+        vision_enabled=base.vision_enabled,
+    )
+
+
+def test_goal_axis_moves_to_front_of_improvements() -> None:
+    """'말이 너무 많아요'를 고르면 대화균형 문장이 개선점 1번으로 온다."""
+    payload = _good_payload()
+    payload["improvements"] = ["한 주제에 오래 머물렀어요", "발화 비율이 조금 높았어요"]
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False),
+        include_quotes=False,
+        goals=("TALK_TOO_MUCH",),
+    )
+    assert narrative.improvements[0] == "발화 비율이 조금 높았어요"
+
+
+def test_goal_axis_dropped_from_strengths() -> None:
+    """고민이라고 답한 축은 점수가 좋아도 강점으로 내세우지 않는다."""
+    payload = _good_payload()
+    payload["strengths"] = ["발화 비율이 균형 잡혔어요", "리듬이 편안했어요"]
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False),
+        include_quotes=False,
+        goals=("TALK_TOO_LITTLE",),
+    )
+    assert "발화 비율이 균형 잡혔어요" not in narrative.strengths
+    assert "리듬이 편안했어요" in narrative.strengths
+
+
+def test_goal_never_empties_strengths() -> None:
+    """전부 목표 축 문장이면 지우지 않는다 — 강점 0개가 더 나쁘다."""
+    payload = _good_payload()
+    payload["strengths"] = ["발화 비율이 좋았어요"]
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False),
+        include_quotes=False,
+        goals=("TALK_TOO_MUCH",),
+    )
+    assert narrative.strengths == ("발화 비율이 좋았어요",)
+
+
+def test_unmeasurable_goal_is_ignored() -> None:
+    """음량은 측정 지표가 없다. 목표로 받아도 아무것도 바꾸지 않는다."""
+    payload = _good_payload()
+    payload["strengths"] = ["발화 비율이 균형 잡혔어요", "리듬이 편안했어요"]
+    with_voice = parse_narrative(
+        json.dumps(payload, ensure_ascii=False),
+        include_quotes=False,
+        goals=("VOICE_TOO_LOUD", "VOICE_TOO_QUIET", "OTHER"),
+    )
+    without = parse_narrative(
+        json.dumps(payload, ensure_ascii=False), include_quotes=False
+    )
+    assert with_voice.strengths == without.strengths
+    assert with_voice.improvements == without.improvements
+
+
+def test_prompt_carries_goal_and_hides_unmeasurable() -> None:
+    report = _report_with_goals("TALK_TOO_MUCH", "VOICE_TOO_LOUD")
+    prompt = build_prompt(report, score_report(report), A, include_quotes=False)
+    section = prompt.split("## 사용자가 미리 고민이라고 답한 것")[1].split("##")[0]
+    assert "말이 너무 많다고 느낀다" in section
+    # 못 재는 목표는 섹션에 안 넣는다 — 알려주면 LLM이 목소리 크기를 지어낸다
+    assert "목소리" not in section
+
+
+def test_prompt_without_goal_has_no_goal_section() -> None:
+    report = _report()
+    prompt = build_prompt(report, score_report(report), A, include_quotes=False)
+    assert "고민이라고 답한 것" not in prompt
+
+
+def test_fallback_personalizes_mission_and_improvement() -> None:
+    """LLM이 죽어도 개인화는 남는다 — 폴백은 규칙 기반이라 더 확실하다."""
+    report = _report_with_goals("TALK_TOO_MUCH")
+    narrative = build_narrative(report, score_report(report), A, _BrokenLlm())
+    assert not narrative.generated_by_llm
+    assert "셋을 세고" in narrative.missions[0]
+    assert "대화균형" in narrative.improvements[0]
+
+
+def test_scores_are_untouched_by_goals() -> None:
+    """개인화는 문장만 건드린다. 축 점수가 달라지면 성장추이가 무너진다."""
+    plain = score_report(_report())
+    goaled = score_report(_report_with_goals("TALK_TOO_MUCH"))
+    assert [(a.axis, a.score) for a in plain.for_speaker(A)] == [
+        (a.axis, a.score) for a in goaled.for_speaker(A)
+    ]
+
+
+def test_conflicting_goals_cancel_out() -> None:
+    """'많다'와 '적다'를 함께 고르면 개인화를 포기한다 — 다중선택이라 가능한 조합이다.
+
+    그대로 두면 "말을 줄이세요"와 "더 말하세요"가 한 리포트에 같이 실린다(2026-08-05 실측).
+    """
+    both = ("TALK_TOO_MUCH", "TALK_TOO_LITTLE")
+    report = _report_with_goals(*both)
+    narrative = build_narrative(report, score_report(report), A, _BrokenLlm())
+    plain = build_narrative(_report(), score_report(_report()), A, _BrokenLlm())
+    assert narrative.missions == plain.missions
+    assert narrative.improvements == plain.improvements
+
+
+def test_llm_missions_get_goal_mission_first() -> None:
+    """LLM 경로에서도 미션이 개인화된다. 첫 자리는 사전이 가져간다."""
+    payload = _good_payload()
+    payload["missions"] = ["상대에게 한 번 더 되묻기", "발화량을 줄여보기"]
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False),
+        include_quotes=False,
+        goals=("TALK_TOO_MUCH",),
+    )
+    assert narrative.missions[0] == "상대가 말을 마친 뒤 속으로 셋을 세고 입을 여세요."
+    assert "상대에게 한 번 더 되묻기" in narrative.missions
+    assert len(narrative.missions) <= 3
+
+
+def test_empty_summary_falls_back_instead_of_sending_blank() -> None:
+    """요약이 비면 COMPLETED로 내보내지 않는다.
+
+    BE는 COMPLETED인데 summaryText가 blank면 REPORT_RESULT_CONTRACT_INVALID(400)를 낸다.
+    4xx는 재시도가 없어 그 세션 리포트가 통째로 사라진다. 문장만 못 받은 것이므로
+    규칙 기반 FALLBACK으로 내리는 게 맞다.
+    """
+    payload = _good_payload()
+    payload["summary"] = "   "
+    report = _report()
+    narrative = build_narrative(report, score_report(report), A, _FakeLlm(payload))
+    assert not narrative.generated_by_llm
+    assert narrative.summary.strip()

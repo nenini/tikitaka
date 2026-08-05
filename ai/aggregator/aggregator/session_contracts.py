@@ -18,6 +18,13 @@ class SessionParticipant(_CamelModel):
     participant_identity: str
     stt_enabled: bool
     vision_enabled: bool
+    practice_goals: list[str] = Field(default_factory=list)
+    """온보딩 설문 '대화에서 고치고 싶은 점' 코드(`practice_goal_catalog.code`).
+
+    선택 필드다 — BE가 아직 안 보내며, 없으면 리포트가 개인화 없이 그대로 나간다.
+    값은 리포트 문장 순서·표현에만 쓰고 **점수 계산에는 쓰지 않는다**(축 점수는
+    세션 간 비교 대상이라 사람마다 기준이 달라지면 성장추이가 무너진다).
+    """
 
 
 class SessionFeatures(_CamelModel):

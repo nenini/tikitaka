@@ -29,7 +29,12 @@ from aggregator.report.dictionary import (
     favor_catalog_for_prompt,
 )
 from aggregator.report.input import ReportInput
-from aggregator.report.scoring import AxisScore, ReportScores, SpeakerMetrics
+from aggregator.report.scoring import (
+    AXIS_BALANCE,
+    AxisScore,
+    ReportScores,
+    SpeakerMetrics,
+)
 from aggregator.settings import IntegrationSettings
 
 MAX_CARDS = 6
@@ -220,6 +225,7 @@ def build_prompt(
             "",
             "## 6축 점수",
             _format_axes(axes),
+            _format_goals(speaker_goals(report, speaker_id)),
             "",
             "## 피해야 할 유형 (이 목록에 있는 것만 지적)",
             avoid_catalog_for_prompt(),
@@ -433,6 +439,134 @@ def _drop_unfounded(items: tuple[str, ...], forbidden: tuple[str, ...]) -> tuple
     return tuple(item for item in items if not any(word in item for word in forbidden))
 
 
+# ── 설문 목표 개인화 ──────────────────────────────────────────────────
+# 점수는 건드리지 않는다. 어느 축을 먼저 보여주고 어떻게 표현할지만 바꾼다.
+# 축 점수는 세션 간·사람 간 비교에 쓰이므로(BE 성장추이) 기준이 사람마다
+# 달라지면 안 된다.
+
+_GOAL_AXIS = {
+    "TALK_TOO_MUCH": AXIS_BALANCE,
+    "TALK_TOO_LITTLE": AXIS_BALANCE,
+}
+"""설문 코드(`practice_goal_catalog.code`) → 대응 축. **측정 가능한 것만** 넣는다.
+
+VOICE_TOO_LOUD·VOICE_TOO_QUIET은 뺐다 — 음량 지표가 파이프라인에 없다.
+넣으면 LLM이 재지도 않은 목소리 크기를 지어낸다. OTHER는 자유 텍스트라 축이 없다.
+"""
+
+_GOAL_LABEL = {
+    "TALK_TOO_MUCH": "말이 너무 많다고 느낀다",
+    "TALK_TOO_LITTLE": "말이 너무 적다고 느낀다",
+}
+
+_GOAL_MISSION = {
+    "TALK_TOO_MUCH": "상대가 말을 마친 뒤 속으로 셋을 세고 입을 여세요.",
+    "TALK_TOO_LITTLE": "상대 이야기에 내 경험을 한 문장씩 덧붙여 보세요.",
+}
+
+
+_CONFLICTING = (("TALK_TOO_MUCH", "TALK_TOO_LITTLE"),)
+
+
+def speaker_goals(report: ReportInput, speaker_id: str) -> tuple[str, ...]:
+    speaker = report.speaker(speaker_id)
+    return speaker.practice_goals if speaker else ()
+
+
+def resolve_goals(goals: tuple[str, ...]) -> tuple[str, ...]:
+    """서로 어긋나는 선택은 양쪽 다 버린다.
+
+    설문이 다중선택이라 '말이 너무 많다'와 '너무 적다'를 함께 고를 수 있다. 그대로
+    두면 "말을 줄이세요"와 "더 말하세요"가 한 리포트에 같이 실린다(실측). 어느 쪽이
+    진심인지 알 방법이 없으므로 개인화를 포기하고 일반 리포트로 돌린다.
+    """
+    picked = tuple(dict.fromkeys(goals))
+    for left, right in _CONFLICTING:
+        if left in picked and right in picked:
+            picked = tuple(code for code in picked if code not in (left, right))
+    return picked
+
+
+def goal_axes(goals: tuple[str, ...]) -> tuple[str, ...]:
+    """설문 코드 중 측정 가능한 축으로 이어지는 것만 축 이름으로 바꾼다."""
+    mapped = (_GOAL_AXIS.get(code) for code in resolve_goals(goals))
+    return tuple(dict.fromkeys(axis for axis in mapped if axis is not None))
+
+
+def _goal_keywords(axes: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(word for axis in axes for word in _AXIS_KEYWORDS.get(axis, ()))
+
+
+def _prioritize(items: tuple[str, ...], axes: tuple[str, ...]) -> tuple[str, ...]:
+    """목표 축을 가리키는 문장을 앞으로 당긴다. 순서만 바꾸고 내용은 그대로 둔다."""
+    words = _goal_keywords(axes)
+    if not words:
+        return items
+    hit = tuple(item for item in items if any(word in item for word in words))
+    rest = tuple(item for item in items if item not in hit)
+    return hit + rest
+
+
+def _drop_goal_strengths(items: tuple[str, ...], axes: tuple[str, ...]) -> tuple[str, ...]:
+    """본인이 고민이라고 한 축은 점수가 높아도 강점 목록에 올리지 않는다.
+
+    고치고 싶다고 답한 걸 "잘하고 있어요"로 마무리하면 리포트를 안 믿는다.
+    대신 그 사실은 요약 문장에서 대조로 다룬다(프롬프트 지시).
+    강점이 하나도 없어지는 건 막는다 — 그건 더 나쁘다.
+    """
+    words = _goal_keywords(axes)
+    if not words:
+        return items
+    kept = tuple(item for item in items if not any(word in item for word in words))
+    return kept or items
+
+
+def _goal_missions(missions: tuple[str, ...], goals: tuple[str, ...]) -> tuple[str, ...]:
+    """목표에 맞는 사전 미션을 앞에 세운다.
+
+    LLM이 낸 미션도 남기지만 첫 자리는 사전이 가져간다 — 이슈 카드의 순화 문구와
+    같은 이유다. LLM은 같은 목표에 매번 다른 문장을 내서 달성 판정이 안 된다.
+    """
+    fixed = tuple(_GOAL_MISSION[code] for code in goals if code in _GOAL_MISSION)
+    if not fixed:
+        return missions
+    return tuple(dict.fromkeys(fixed + missions))[:3]
+
+
+def _apply_goals(narrative: ReportNarrative, goals: tuple[str, ...]) -> ReportNarrative:
+    picked = resolve_goals(goals)
+    axes = goal_axes(picked)
+    if not axes:
+        return narrative
+    return ReportNarrative(
+        summary=narrative.summary,
+        strengths=_drop_goal_strengths(narrative.strengths, axes),
+        improvements=_prioritize(narrative.improvements, axes),
+        missions=_goal_missions(narrative.missions, picked),
+        cards=narrative.cards,
+        generated_by_llm=narrative.generated_by_llm,
+    )
+
+
+def _format_goals(goals: tuple[str, ...]) -> str:
+    """프롬프트용. 측정 불가한 목표는 아예 빼서 LLM이 언급하지 못하게 한다."""
+    known = tuple(
+        _GOAL_LABEL[code] for code in resolve_goals(goals) if code in _GOAL_LABEL
+    )
+    if not known:
+        return ""
+    return "\n".join(
+        (
+            "",
+            "## 사용자가 미리 고민이라고 답한 것",
+            *(f"- {label}" for label in known),
+            "지시: 요약 첫 문장에서 이 고민을 **측정값과 견줘** 다뤄라.",
+            "고민과 측정이 어긋나면(많다고 했는데 비율이 낮다 등) 그 사실을 그대로 알려라.",
+            "개선점에서도 이 축을 가장 먼저 다뤄라.",
+        )
+    )
+
+
 def parse_narrative(
     raw: str,
     *,
@@ -440,6 +574,7 @@ def parse_narrative(
     own_utterances: tuple[str, ...] = (),
     quotable: dict[int, str] | None = None,
     axes: tuple[AxisScore, ...] = (),
+    goals: tuple[str, ...] = (),
 ) -> ReportNarrative:
     """LLM 응답 → ReportNarrative. 규칙 위반 항목은 조용히 버린다.
 
@@ -448,6 +583,8 @@ def parse_narrative(
     무관하게 전부 떼어낸다 — 검증 없는 인용은 내보내지 않는다.
 
     axes를 주면 **측정 부족인 축을 언급한 문장을 버린다.** 안 주면 검사하지 않는다.
+    goals(설문 코드)를 주면 그 축을 개선점 앞으로 당기고 강점에서 뺀다 — 프롬프트로만
+    시키면 확률적으로 새므로 여기서 코드로 강제한다.
     """
     lookup = quotable or {}
     try:
@@ -490,16 +627,23 @@ def parse_narrative(
             )
         )
 
+    summary = str(data.get("summary", "")).strip()
+    if not summary:
+        # 요약이 비면 BE가 REPORT_RESULT_CONTRACT_INVALID(400)를 낸다 — COMPLETED인데
+        # summaryText가 blank인 조합을 거부한다. 4xx는 재시도도 안 되므로 그 세션
+        # 리포트가 통째로 사라진다. 문장을 못 받은 것뿐이니 FALLBACK으로 내린다.
+        raise ReportLlmError("리포트 LLM이 요약 문장을 만들지 못했습니다")
+
     forbidden = _unmeasured_keywords(axes)
     narrative = ReportNarrative(
-        summary=str(data.get("summary", "")).strip(),
+        summary=summary,
         strengths=_drop_unfounded(_as_str_tuple(data.get("strengths"), 3), forbidden),
         improvements=_drop_unfounded(_as_str_tuple(data.get("improvements"), 2), forbidden),
         missions=_drop_unfounded(_as_str_tuple(data.get("missions"), 3), forbidden),
         cards=tuple(cards[:MAX_CARDS]),
         generated_by_llm=True,
     )
-    return _ensure_positive_card(narrative)
+    return _ensure_positive_card(_apply_goals(narrative, goals))
 
 
 def _ensure_positive_card(narrative: ReportNarrative) -> ReportNarrative:
@@ -526,10 +670,13 @@ def _ensure_positive_card(narrative: ReportNarrative) -> ReportNarrative:
     )
 
 
-def fallback_narrative(scores: ReportScores, speaker_id: str) -> ReportNarrative:
+def fallback_narrative(
+    scores: ReportScores, speaker_id: str, *, goals: tuple[str, ...] = ()
+) -> ReportNarrative:
     """LLM을 못 쓸 때의 규칙 기반 리포트. 수치만 담백하게 전달한다."""
     metrics = next((m for m in scores.metrics if m.speaker_id == speaker_id), None)
     measured = [a for a in scores.for_speaker(speaker_id) if a.measured and a.score is not None]
+    axes = goal_axes(goals)
     strengths: list[str] = []
     improvements: list[str] = []
     if measured:
@@ -537,18 +684,26 @@ def fallback_narrative(scores: ReportScores, speaker_id: str) -> ReportNarrative
         worst = min(measured, key=lambda a: a.score or 0.0)
         strengths.append(f"{best.axis}이(가) 이번 세션에서 가장 안정적이었어요.")
         improvements.append(f"{worst.axis}을(를) 다음 세션에서 조금 더 신경 써 보세요.")
+    for axis in axes:
+        # 목표 축이 최저점이 아니어서 개선점에 안 잡혔으면 여기서 넣어 준다.
+        note = next((a.note for a in measured if a.axis == axis), None)
+        if note is not None and not any(axis in item for item in improvements):
+            improvements.insert(0, f"{axis}을(를) 고치고 싶다고 하셨어요. 이번엔 {note}였어요.")
     if metrics and metrics.backchannel_count > 0:
         strengths.append("상대 말에 맞장구로 반응한 구간이 있었어요.")
     if not strengths:
         strengths.append("대화를 끝까지 이어간 점이 좋았어요.")
     return _ensure_positive_card(
-        ReportNarrative(
-            summary="이번 세션의 지표를 정리했어요. 자세한 설명은 잠시 후 다시 시도해 주세요.",
-            strengths=tuple(strengths[:3]),
-            improvements=tuple(improvements[:2]),
-            missions=("다음 세션에서는 상대에게 한 번 더 되물어 보세요.",),
-            cards=(),
-            generated_by_llm=False,
+        _apply_goals(
+            ReportNarrative(
+                summary="이번 세션의 지표를 정리했어요. 자세한 설명은 잠시 후 다시 시도해 주세요.",
+                strengths=tuple(strengths[:3]),
+                improvements=tuple(improvements[:2]),
+                missions=("다음 세션에서는 상대에게 한 번 더 되물어 보세요.",),
+                cards=(),
+                generated_by_llm=False,
+            ),
+            goals,
         )
     )
 
@@ -569,6 +724,7 @@ def build_narrative(
     prompt = build_prompt(report, scores, speaker_id, include_quotes=include_quotes)
     speaker = report.speaker(speaker_id)
     own_utterances = tuple(u.text for u in speaker.utterances) if speaker else ()
+    goals = speaker_goals(report, speaker_id)
     try:
         raw = generator.generate(prompt)
         return parse_narrative(
@@ -577,6 +733,7 @@ def build_narrative(
             own_utterances=own_utterances,
             quotable=quotable_index(report, speaker_id),
             axes=scores.for_speaker(speaker_id),
+            goals=goals,
         )
     except ReportLlmError:
-        return fallback_narrative(scores, speaker_id)
+        return fallback_narrative(scores, speaker_id, goals=goals)

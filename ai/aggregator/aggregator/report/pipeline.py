@@ -20,6 +20,7 @@ import logging
 
 from aggregator.report.builder import (
     ReportLlmError,
+    ReportNarrative,
     TextGenerator,
     build_narrative,
     fallback_narrative,
@@ -38,8 +39,10 @@ from aggregator.report.scoring import ReportScores, score_report
 
 logger = logging.getLogger(__name__)
 
-# BE에 보내는 실패 코드. LLM 실패는 여기 없다 — 문장 생성이 실패하면 규칙 기반으로
-# 내려가서 FALLBACK이 되지 FAILED가 되지 않는다(수치는 이미 다 나와 있으므로).
+# BE 확정 목록(2026-08-04): INSUFFICIENT_ANALYSIS_DATA · LLM_UNAVAILABLE · NO_UTTERANCE
+# · SESSION_TOO_SHORT · INTERNAL_ERROR · ANALYSIS_FAILED.
+# 그중 AI가 실제로 내보내는 건 아래 둘뿐이다. LLM_UNAVAILABLE은 쓰지 않는다 —
+# 문장 생성이 실패하면 규칙 기반으로 내려가 FALLBACK이 되지 FAILED가 되지 않는다.
 FAILURE_NO_UTTERANCE = "NO_UTTERANCE"
 FAILURE_UNEXPECTED = "ANALYSIS_FAILED"
 
@@ -104,68 +107,71 @@ async def run_report_job(
         # 수치 저장에 실패해도 문장은 계속 만든다 — 사용자 화면이 우선이다.
         logger.exception("분석 발행 실패 session=%s", session_id)
 
-    # ② 유저별 문장 생성 + 발행
+    # ② 참가자 전원의 문장을 만들어 **한 번에** 보낸다(BE 계약 2026-08-04).
+    narratives: list[tuple[int, ReportNarrative]] = []
     for speaker_id, user_id in user_ids.items():
         if report.speaker(speaker_id) is None:
             continue
-        await _publish_one(
-            report,
-            scores,
-            speaker_id=speaker_id,
-            user_id=user_id,
-            session_id=session_id,
-            generated_at=analyzed_at,
-            publisher=publisher,
-            generator=generator,
-            include_quotes=include_quotes,
+        narratives.append(
+            (
+                user_id,
+                await _narrate(
+                    report,
+                    scores,
+                    speaker_id=speaker_id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    generator=generator,
+                    include_quotes=include_quotes,
+                ),
+            )
         )
+    if not narratives:
+        logger.warning("리포트 생략 session=%s reason=대상 화자 없음", session_id)
+        return
+
+    payload = build_report_payload(
+        narratives, session_id=session_id, generated_at=analyzed_at
+    )
+    try:
+        accepted = await publisher.publish_report(
+            payload, idempotency_key=report_idempotency_key(session_id)
+        )
+        logger.info(
+            "리포트 발행 session=%s accepted=%d users=%s",
+            session_id,
+            accepted,
+            [user_id for user_id, _ in narratives],
+        )
+    except ReportPublishError:
+        logger.exception("리포트 발행 실패 session=%s", session_id)
 
 
-async def _publish_one(
+async def _narrate(
     report: ReportInput,
     scores: ReportScores,
     *,
     speaker_id: str,
     user_id: int,
     session_id: int,
-    generated_at: str,
-    publisher: ReportPublisher,
     generator: TextGenerator | None,
     include_quotes: bool,
-) -> None:
+) -> ReportNarrative:
     try:
         if generator is None:
-            narrative = fallback_narrative(scores, speaker_id)
-        else:
-            # build_narrative는 LLM 실패를 스스로 폴백으로 흡수한다
-            narrative = await asyncio.to_thread(
-                build_narrative,
-                report,
-                scores,
-                speaker_id,
-                generator,
-                include_quotes=include_quotes,
-            )
+            return fallback_narrative(scores, speaker_id)
+        # build_narrative는 LLM 실패를 스스로 폴백으로 흡수한다
+        return await asyncio.to_thread(
+            build_narrative,
+            report,
+            scores,
+            speaker_id,
+            generator,
+            include_quotes=include_quotes,
+        )
     except ReportLlmError:
         logger.exception("문장 생성 실패 session=%s user=%s", session_id, user_id)
-        narrative = fallback_narrative(scores, speaker_id)
-
-    payload = build_report_payload(
-        narrative, session_id=session_id, user_id=user_id, generated_at=generated_at
-    )
-    try:
-        accepted = await publisher.publish_report(
-            payload, idempotency_key=report_idempotency_key(session_id, user_id)
-        )
-        logger.info(
-            "리포트 발행 session=%s user=%s accepted=%d llm=%s",
-            session_id,
-            user_id,
-            accepted,
-            narrative.generated_by_llm,
-        )
-    except ReportPublishError:
-        logger.exception("리포트 발행 실패 session=%s user=%s", session_id, user_id)
+        return fallback_narrative(scores, speaker_id)
 
 
 async def _notify_failure(
@@ -192,17 +198,16 @@ async def _notify_failure(
     except ReportPublishError:
         logger.exception("분석 FAILED 통지 실패 session=%s", session_id)
 
-    for user_id in user_ids:
-        payload = report_failure_payload(
-            session_id=session_id,
-            user_id=user_id,
-            generated_at=generated_at,
-            failure_code=code,
-            failure_reason=reason,
+    payload = report_failure_payload(
+        session_id=session_id,
+        user_ids=user_ids,
+        generated_at=generated_at,
+        failure_code=code,
+        failure_reason=reason,
+    )
+    try:
+        await publisher.publish_report(
+            payload, idempotency_key=report_idempotency_key(session_id)
         )
-        try:
-            await publisher.publish_report(
-                payload, idempotency_key=report_idempotency_key(session_id, user_id)
-            )
-        except ReportPublishError:
-            logger.exception("FAILED 통지 실패 session=%s user=%s", session_id, user_id)
+    except ReportPublishError:
+        logger.exception("FAILED 통지 실패 session=%s", session_id)

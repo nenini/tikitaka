@@ -549,7 +549,11 @@ def test_transcript_is_retained_after_end_and_expires_from_memory(
         assert manager.retained_transcript_count == 0
         await manager.close()
         assert len(report_publisher.analyses) == 1
-        assert len(report_publisher.reports) == 2
+        # 리포트는 세션당 한 번만 보낸다(BE 계약 2026-08-04). 참가자는 배열에 담긴다.
+        assert len(report_publisher.reports) == 1
+        entries = report_publisher.reports[0]["reports"]
+        assert isinstance(entries, list)
+        assert len(entries) == 2
 
     caplog.set_level(logging.INFO)
     asyncio.run(scenario())

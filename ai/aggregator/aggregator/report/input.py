@@ -28,6 +28,8 @@ class VisionInput:
     available: bool
     behavior_counts: dict[str, int] = field(default_factory=dict)
     coverage: float | None = None
+    observation_window_ms: float = 0.0
+    """브라우저 비전이 관측을 시도한 총 시간. 세션 길이로 나누면 카메라 가동 비율이다."""
 
     def count(self, event_type: str) -> int:
         return self.behavior_counts.get(event_type, 0)
@@ -41,6 +43,8 @@ class SpeakerInput:
     question_count: int
     filler_count: int
     filler_breakdown: dict[str, int] = field(default_factory=dict)
+    practice_goals: tuple[str, ...] = ()
+    """세션 시작 이벤트가 실어 준 '고치고 싶은 점' 코드. 비어 있으면 개인화 없음."""
 
 
 @dataclass(frozen=True)
@@ -78,12 +82,16 @@ def build_report_input(
     *,
     session_duration_ms: int | None = None,
     vision_enabled: bool = True,
+    practice_goals: dict[str, tuple[str, ...]] | None = None,
 ) -> ReportInput:
     """SessionState를 얼려서 스냅샷으로 만든다.
 
     session_duration_ms를 안 주면 마지막 발화 종료 시각으로 대신한다
     (BE가 actualStartAt~endedAt을 주면 그 값을 쓰는 편이 정확하다).
+
+    practice_goals는 userId → 설문 코드. SessionState에 없는 값이라 호출자가 넣는다.
     """
+    goals = practice_goals or {}
     speaker_ids = tuple(
         dict.fromkeys((*state.participant_user_ids, *state.speakers))
     )
@@ -115,6 +123,7 @@ def build_report_input(
                 if speaker_id in state.speakers
                 else {}
             ),
+            practice_goals=goals.get(speaker_id, ()),
         )
         for speaker_id in speaker_ids
     )
@@ -124,6 +133,7 @@ def build_report_input(
             available=user.vision_available,
             behavior_counts=dict(user.behavior_event_counts),
             coverage=_vision_coverage(user),
+            observation_window_ms=user.observation_window_ms,
         )
         for user in state.vision_users.values()
     )
