@@ -16,8 +16,14 @@ services:
       - "8000:8000"                                 # 챗봇 스트리밍 API
     environment:
       OLLAMA_HOST: "http://host.docker.internal:11434"
-      # BE의 ai.chat.request-timeout(60s)보다 짧아야 AI 쪽이 먼저 스레드를 놓아준다.
-      OLLAMA_TIMEOUT_SECONDS: "45"
+      # 시간 예산 (BE 합의 2026-08-05):
+      #   대기 120 + 생성 120 = 240  <  BE 요청 270  <  BE SSE 300  <  nginx 3600
+      # 이 순서가 깨지면 AI가 error 이벤트를 내기 전에 BE가 먼저 끊는다.
+      OLLAMA_TIMEOUT_SECONDS: "120"          # 생성 최대
+      AI_CHAT_QUEUE_TIMEOUT_SECONDS: "120"   # 대기 최대 → AI_QUEUE_TIMEOUT
+      # GPU가 한 번에 몇 개를 감당하는지에 맞춘다.
+      AI_CHAT_MAX_CONCURRENT: "1"
+      AI_CHAT_MAX_WAITING: "10"
       # OLLAMA_MODEL: "exaone3.5:2.4b"              # GPU 여유 부족 시 경량 모델
       # AI_CHAT_INTERNAL_TOKEN: "change-me"         # ⚠️ 미설정이면 토큰 검사를 건너뛴다(fail-open).
       #                                             #    운영에서는 반드시 지정할 것.

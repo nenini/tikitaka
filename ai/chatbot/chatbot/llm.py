@@ -62,7 +62,7 @@ class OllamaAdapter:
         temperature: float = 0.8,
         num_predict: int | None = 64,   # 응답 최대 토큰(길이 하드캡). None=제한없음
         think: bool | None = None,      # 하이브리드 추론 모델(Qwen3 등) 사고 on/off. None=미전송
-        timeout_seconds: float = 45.0,
+        timeout_seconds: float = 120.0,
     ) -> None:
         self.model = model
         self.host = host.rstrip("/")
@@ -72,10 +72,11 @@ class OllamaAdapter:
         self.timeout_seconds = timeout_seconds
         """소켓 타임아웃. **없으면 무한 대기다.**
 
-        Ollama가 멎거나 모델을 다시 올리는 동안 응답이 끊기면, 타임아웃이 없을 때
-        그 요청은 영원히 스레드를 붙잡는다. BE는 60초에 포기하는데(ai.chat.request-timeout)
-        AI 쪽은 계속 물려 있어, 이런 요청이 쌓이면 스레드풀이 말라 새 요청을 아예 못 받는다.
-        BE보다 짧게 잡아 AI가 먼저 정리되게 한다.
+        타임아웃이 없으면 Ollama가 멎었을 때 그 요청이 영원히 스레드를 붙잡는다.
+        쌓이면 스레드풀이 말라 새 요청을 아예 못 받는다.
+
+        120초는 BE와 합의한 '생성 최대 시간'이다(계약 2026-08-05). 전체 시간 예산:
+        대기 120 + 생성 120 = 240 < BE 요청 270 < BE SSE 300 < nginx 3600.
         """
 
     def stream(
