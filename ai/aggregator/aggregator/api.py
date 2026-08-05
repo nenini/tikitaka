@@ -65,6 +65,40 @@ def create_app(
             "pendingReportCount": manager.pending_report_count,
         }
 
+    @app.get("/api/v1/sessions/{session_id}/transcript")
+    async def get_transcript(
+        session_id: str,
+        x_internal_token: str | None = Header(
+            default=None,
+            alias="X-Internal-Token",
+        ),
+    ) -> dict[str, object]:
+        """신고 처리용 전사 조회 (BE moderation 모듈).
+
+        BE는 `{"transcript": "...", "generatedAt": "..."}`만 읽는다. 본문이 비면
+        AI_TRANSCRIPT_EMPTY로 처리하므로, 보관 기간이 지났거나 발화가 없으면
+        404로 명확히 알린다 — 빈 문자열을 200으로 주면 원인 구분이 안 된다.
+
+        보관은 세션 종료 후 `transcript_retention_seconds`(기본 30분)뿐이다.
+        그 뒤 요청은 404다.
+        """
+        _verify_token(resolved_settings.internal_token, x_internal_token)
+        retained = manager.retained_transcript(session_id)
+        if retained is None or not retained.segments:
+            raise HTTPException(
+                status_code=404,
+                detail="retained transcript not found or expired",
+            )
+        return {
+            "sessionId": session_id,
+            "transcript": "\n".join(
+                f"[{s.start_ms // 1000}s] {s.user_id}: {s.text}" for s in retained.segments
+            ),
+            "generatedAt": retained.ended_at.isoformat(),
+            "segmentCount": retained.segment_count,
+            "expiresAt": retained.expires_at.isoformat(),
+        }
+
     @app.post(
         "/api/v1/sessions/events",
         response_model=SessionEventResponse,
