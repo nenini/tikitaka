@@ -46,9 +46,17 @@ export type AttentionEntryBlockReason =
   | "SCORE_ABOVE_THRESHOLD"
   | "NO_MEANINGFUL_HEAD_OR_IRIS_CHANGE"
   | "EVENT_CONFIDENCE_TOO_LOW"
+  | "IRIS_SCORE_ABOVE_THRESHOLD"
   | "IRIS_RELIABILITY_TOO_LOW"
+  | "IRIS_CONFIDENCE_TOO_LOW"
   | "FALLBACK_SIGNAL_TOO_WEAK"
   | "ANALYSIS_UNAVAILABLE";
+
+/** Which rule opened the current entry candidate. Entry only; recovery uses `fallback`. */
+export type AttentionEntryCandidateKind =
+  | "AGGREGATE"
+  | "IRIS_ONLY"
+  | "GLOBAL_FALLBACK";
 
 export interface ScreenAttentionDetectorState {
   readonly state: ScreenAttentionStateName;
@@ -83,6 +91,8 @@ export interface ScreenAttentionDetectorState {
   readonly attentionEvidenceMode: AttentionEvidenceMode;
   /** Local diagnostic only; it is not part of the Vision event contract. */
   readonly entryBlockReason: AttentionEntryBlockReason;
+  /** Local diagnostic only; which rule currently holds the entry candidate open. */
+  readonly entryCandidateKind: AttentionEntryCandidateKind | null;
   readonly headDirectionSign: -1 | 0 | 1;
   readonly irisDirectionSign: -1 | 0 | 1;
   readonly measurementConfidence: number;
@@ -136,6 +146,7 @@ export class ScreenAttentionDetector
   private prolongedEmitted = false;
   private cooldownUntilMs = 0;
   private candidateObservations = 0;
+  private entryCandidateKind: AttentionEntryCandidateKind | null = null;
   private recoveryObservations = 0;
   private lastFrameAtMs: number | null = null;
   private suspensionWarmupUntilMs: number | null = null;
@@ -207,6 +218,7 @@ export class ScreenAttentionDetector
         this.transition("SUSPENDED", this.lastFrameAtMs);
       } else {
         this.candidateObservations = 0;
+        this.entryCandidateKind = null;
         this.transition("NORMAL", now);
       }
       this.resetFilters();
@@ -472,8 +484,12 @@ export class ScreenAttentionDetector
       (face.yaw !== null && face.pitch !== null ? 0.95 : 0.5);
     const headDeparture =
       (headPoseScore ?? 1) <= this.config.meaningfulDepartureScore;
+    // A single-sample eye baseline is not evidence. Reliability and score are
+    // separate axes, so both have to clear their own floor.
+    const irisEvidenceUsable =
+      irisFusionReliability >= this.config.minimumIrisEvidenceReliability;
     const irisDeparture =
-      irisFusionReliability > 0 &&
+      irisEvidenceUsable &&
       (irisProxyScore ?? 1) <= this.config.meaningfulDepartureScore;
     const headDirectionSign = Math.sign(yaw ?? 0) as -1 | 0 | 1;
     const irisDirectionSign = Math.sign(gazeHorizontal ?? 0) as -1 | 0 | 1;
@@ -548,10 +564,12 @@ export class ScreenAttentionDetector
       ((yaw !== null && Math.abs(yaw) >= this.config.fallbackYawDegrees) ||
         (pitch !== null &&
           Math.abs(pitch) >= this.config.fallbackPitchDegrees));
+    // Iris-only departures must go through the strict irisOnly path below, so
+    // the aggregate path requires an actual head departure.
     const aggregateEntry =
       !fallback &&
       screenAttentionScore <= this.config.attentionAwayScore &&
-      (headDeparture || irisDeparture) &&
+      headDeparture &&
       screenAttentionConfidence >= this.config.minimumEventConfidence;
     const irisOnlyCandidate =
       !fallback &&
@@ -566,33 +584,48 @@ export class ScreenAttentionDetector
     const entry =
       (context.quality.canStartBehavior ?? context.quality.usable) &&
       (fallbackEntry || aggregateEntry || irisOnlyEntry);
+    const irisOnlyPath = !fallback && !headDeparture && irisDeparture;
     const entryBlockReason: AttentionEntryBlockReason = entry
       ? "NONE"
       : !(context.quality.canStartBehavior ?? context.quality.usable)
         ? "QUALITY_BLOCKED"
         : fallback
           ? "FALLBACK_SIGNAL_TOO_WEAK"
-          : screenAttentionScore > this.config.attentionAwayScore
-            ? "SCORE_ABOVE_THRESHOLD"
-            : !headDeparture && !irisDeparture
-              ? "NO_MEANINGFUL_HEAD_OR_IRIS_CHANGE"
-              : screenAttentionConfidence < this.config.minimumEventConfidence
-                ? "EVENT_CONFIDENCE_TOO_LOW"
-                : irisOnlyCandidate &&
-                    gazeReliability < this.config.irisOnlyMinimumReliability
+          : !headDeparture && !irisDeparture
+            ? "NO_MEANINGFUL_HEAD_OR_IRIS_CHANGE"
+            : irisOnlyPath
+              ? !irisOnlyCandidate
+                ? "IRIS_SCORE_ABOVE_THRESHOLD"
+                : gazeReliability < this.config.irisOnlyMinimumReliability
                   ? "IRIS_RELIABILITY_TOO_LOW"
-                  : "EVENT_CONFIDENCE_TOO_LOW";
-    const entryDuration = fallback
-      ? this.config.fallbackMinimumDurationMs
-      : irisOnlyEntry
-        ? this.config.irisOnlyMinimumDurationMs
-        : this.config.awayMinimumDurationMs;
-    const entryObservations = irisOnlyEntry
-      ? this.config.irisOnlyMinimumObservations
-      : this.config.minimumAwayObservations;
-    const recovered =
-      screenAttentionScore >= this.config.attentionRecoveryScore &&
-      screenAttentionConfidence >= this.config.minimumRecoveryConfidence;
+                  : "IRIS_CONFIDENCE_TOO_LOW"
+              : screenAttentionScore > this.config.attentionAwayScore
+                ? "SCORE_ABOVE_THRESHOLD"
+                : "EVENT_CONFIDENCE_TOO_LOW";
+    const frameCandidateKind: AttentionEntryCandidateKind | null = !entry
+      ? null
+      : fallbackEntry
+        ? "GLOBAL_FALLBACK"
+        : irisOnlyEntry
+          ? "IRIS_ONLY"
+          : "AGGREGATE";
+    // Recovery angles are checked against the fallback hysteresis band because a
+    // fallback episode is capped below minimumRecoveryConfidence by design.
+    const fallbackRecovered =
+      (yaw !== null || pitch !== null) &&
+      (yaw === null ||
+        Math.abs(yaw) < this.config.fallbackRecoveryYawDegrees) &&
+      (pitch === null ||
+        Math.abs(pitch) < this.config.fallbackRecoveryPitchDegrees) &&
+      measurementConfidence >=
+        this.config.fallbackMinimumMeasurementConfidence;
+    const recovered = fallback
+      ? fallbackRecovered
+      : screenAttentionScore >= this.config.attentionRecoveryScore &&
+        screenAttentionConfidence >= this.config.minimumRecoveryConfidence;
+    const recoveryDuration = fallback
+      ? this.config.fallbackRecoveryDurationMs
+      : this.config.recoveryMinimumDurationMs;
     const events: VisionBehaviorEvent[] = [];
 
     if (this.state === "SUSPENDED") {
@@ -626,16 +659,25 @@ export class ScreenAttentionDetector
     }
     if (this.state === "NORMAL" && entry) {
       this.candidateObservations = 1;
+      this.entryCandidateKind = frameCandidateKind;
       this.transition("CANDIDATE", now);
     } else if (this.state === "CANDIDATE") {
       if (!entry) {
         this.candidateObservations = 0;
+        this.entryCandidateKind = null;
         this.transition("NORMAL", now);
+      } else if (frameCandidateKind !== this.entryCandidateKind) {
+        // A different rule now holds the candidate open, so its own duration and
+        // observation budget starts from zero.
+        this.candidateObservations = 1;
+        this.entryCandidateKind = frameCandidateKind;
+        this.transition("CANDIDATE", now);
       } else {
+        const requirements = this.entryRequirements(this.entryCandidateKind);
         this.candidateObservations += 1;
         if (
-          now - (this.stateSinceMs ?? now) >= entryDuration &&
-          this.candidateObservations >= entryObservations
+          now - (this.stateSinceMs ?? now) >= requirements.durationMs &&
+          this.candidateObservations >= requirements.observations
         ) {
           this.activeSinceMs = this.stateSinceMs;
           this.episodeId = this.eventFactory.createEpisodeId();
@@ -729,8 +771,7 @@ export class ScreenAttentionDetector
         this.episodeClock.observe(now, maximumFrameGapMs);
         this.recoveryObservations += 1;
         if (
-          now - (this.stateSinceMs ?? now) >=
-            this.config.recoveryMinimumDurationMs &&
+          now - (this.stateSinceMs ?? now) >= recoveryDuration &&
           this.recoveryObservations >=
             this.config.minimumRecoveryObservations
         ) {
@@ -805,6 +846,7 @@ export class ScreenAttentionDetector
     this.state = immediate ? "WAITING_FOR_BASELINE" : "SUSPENDED";
     this.stateSinceMs = context.sessionElapsedMs;
     this.candidateObservations = 0;
+    this.entryCandidateKind = null;
     this.recoveryObservations = 0;
     this.suspensionWarmupUntilMs = null;
     this.snapshot = this.emptyState();
@@ -825,6 +867,7 @@ export class ScreenAttentionDetector
     this.prolongedEmitted = false;
     this.cooldownUntilMs = 0;
     this.candidateObservations = 0;
+    this.entryCandidateKind = null;
     this.recoveryObservations = 0;
     this.lastFrameAtMs = null;
     this.suspensionWarmupUntilMs = null;
@@ -855,6 +898,27 @@ export class ScreenAttentionDetector
     }
     if (eye === "LEFT") this.leftBlinkActive = next;
     else this.rightBlinkActive = next;
+  }
+
+  private entryRequirements(
+    kind: AttentionEntryCandidateKind | null,
+  ): { readonly durationMs: number; readonly observations: number } {
+    if (kind === "GLOBAL_FALLBACK") {
+      return {
+        durationMs: this.config.fallbackMinimumDurationMs,
+        observations: this.config.minimumAwayObservations,
+      };
+    }
+    if (kind === "IRIS_ONLY") {
+      return {
+        durationMs: this.config.irisOnlyMinimumDurationMs,
+        observations: this.config.irisOnlyMinimumObservations,
+      };
+    }
+    return {
+      durationMs: this.config.awayMinimumDurationMs,
+      observations: this.config.minimumAwayObservations,
+    };
   }
 
   private transition(state: ScreenAttentionStateName, now: number): void {
@@ -960,6 +1024,7 @@ export class ScreenAttentionDetector
       attentionMode: values.attentionMode,
       attentionEvidenceMode: values.attentionEvidenceMode,
       entryBlockReason: values.entryBlockReason,
+      entryCandidateKind: this.entryCandidateKind,
       headDirectionSign: values.headDirectionSign,
       irisDirectionSign: values.irisDirectionSign,
       measurementConfidence: values.measurementConfidence,
@@ -1003,6 +1068,7 @@ export class ScreenAttentionDetector
       attentionMode: "UNRELIABLE",
       attentionEvidenceMode: "UNRELIABLE",
       entryBlockReason: "ANALYSIS_UNAVAILABLE",
+      entryCandidateKind: null,
       headDirectionSign: 0,
       irisDirectionSign: 0,
       measurementConfidence: 0,

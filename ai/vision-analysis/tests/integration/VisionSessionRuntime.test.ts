@@ -176,4 +176,29 @@ describe("VisionSessionRuntime", () => {
     });
     expect(publisher.closeOptions).toEqual({ flush: true });
   });
+
+  it("delegates the global baseline fallback down to the pipeline", async () => {
+    const clock = new MutableClock();
+    const runtime = new VisionSessionRuntime(
+      createPipeline(clock),
+      new RecordingPublisher(),
+      new PerformanceGovernor(defaultVisionConfig),
+      new RecordingSampler(),
+      [],
+    );
+
+    const before = await runtime.process(
+      createNormalizedFaceFrame({ timestampMs: 0, brightnessScore: 0.05 }),
+    );
+    expect(before.pipeline.calibration.status).not.toBe("GLOBAL_FALLBACK");
+
+    const state = runtime.useGlobalBaselineFallback(1_000);
+    expect(state.status).toBe("GLOBAL_FALLBACK");
+    expect(state.baseline.calibratedAtSessionElapsedMs).toBe(1_000);
+
+    const after = await runtime.process(
+      createNormalizedFaceFrame({ timestampMs: 1_200 }),
+    );
+    expect(after.pipeline.calibration.status).toBe("GLOBAL_FALLBACK");
+  });
 });

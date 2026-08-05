@@ -147,4 +147,116 @@ describe("BaselineCalibrator", () => {
       "MONOCULAR_RIGHT",
     );
   });
+
+  describe("setup hard timeout", () => {
+    const unusable = {
+      usable: false,
+      confidence: 0.9,
+      reasons: ["LOW_LIGHT"],
+    } as const;
+
+    function createCalibrator(): BaselineCalibrator {
+      return new BaselineCalibrator(
+        defaultVisionConfig.calibration,
+        defaultVisionConfig.expressionActivity,
+        defaultVisionConfig.screenAttention,
+      );
+    }
+
+    it("falls back after 30s even when the face is never usable", () => {
+      const calibrator = createCalibrator();
+      let state = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 0 }),
+        unusable,
+      );
+      expect(state.status).toBe("PRECHECK");
+
+      state = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 29_800 }),
+        unusable,
+      );
+      expect(state.status).toBe("PRECHECK");
+
+      state = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 30_000 }),
+        unusable,
+      );
+      expect(state.status).toBe("GLOBAL_FALLBACK");
+    });
+
+    it("transitions only once when both timers expire on the same frame", () => {
+      const calibrator = createCalibrator();
+      // setup starts at 0, COLLECTING starts at 18_000, so the 12s collecting
+      // budget and the 30s setup budget both expire at 30_000.
+      calibrator.update(createNormalizedFaceFrame({ timestampMs: 0 }), unusable);
+      for (const timestampMs of [17_000, 17_500, 18_000]) {
+        calibrator.update(
+          createNormalizedFaceFrame({ timestampMs }),
+          usable,
+        );
+      }
+      expect(calibrator.getState(18_000).status).toBe("COLLECTING");
+
+      let state = calibrator.getState(18_000);
+      for (let timestampMs = 19_000; timestampMs <= 29_000; timestampMs += 1_000) {
+        state = calibrator.update(
+          createNormalizedFaceFrame({ timestampMs }),
+          usable,
+        );
+      }
+      expect(state.status).toBe("COLLECTING");
+      expect(state.calibrationWallTimeMs).toBe(11_000);
+      expect(state.setupWallTimeMs).toBe(29_000);
+
+      const atBoundary = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 30_000 }),
+        usable,
+      );
+      expect(["PARTIAL", "GLOBAL_FALLBACK"]).toContain(atBoundary.status);
+      const settledAt = atBoundary.baseline.calibratedAtSessionElapsedMs;
+
+      const afterBoundary = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 30_500 }),
+        usable,
+      );
+      expect(afterBoundary.status).toBe(atBoundary.status);
+      expect(afterBoundary.baseline.calibratedAtSessionElapsedMs).toBe(
+        settledAt,
+      );
+    });
+
+    it("never downgrades a baseline that already reached READY", () => {
+      const calibrator = createCalibrator();
+      for (let timestampMs = 0; timestampMs <= 6_200; timestampMs += 200) {
+        calibrator.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            blendshapes: { eyeBlinkLeft: 0, eyeBlinkRight: 0 },
+          }),
+          usable,
+        );
+      }
+      expect(calibrator.getState(6_200).status).toBe("READY");
+
+      const late = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 40_000 }),
+        unusable,
+      );
+      expect(late.status).toBe("READY");
+    });
+
+    it("does not re-run the timeout after an explicit fallback", () => {
+      const calibrator = createCalibrator();
+      calibrator.update(createNormalizedFaceFrame({ timestampMs: 0 }), unusable);
+      const explicit = calibrator.useGlobalFallback(5_000);
+      expect(explicit.baseline.calibratedAtSessionElapsedMs).toBe(5_000);
+
+      const late = calibrator.update(
+        createNormalizedFaceFrame({ timestampMs: 40_000 }),
+        unusable,
+      );
+      expect(late.status).toBe("GLOBAL_FALLBACK");
+      expect(late.baseline.calibratedAtSessionElapsedMs).toBe(5_000);
+    });
+  });
 });

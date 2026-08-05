@@ -220,4 +220,53 @@ describe("FaceQualityDetector", () => {
     expect(clipped.decision.confidence).toBeLessThanOrEqual(0.4);
     expect(clipped.decision.components?.inFrame).toBe(0.5);
   });
+
+  describe("trackingStability", () => {
+    it("uses the neutral seed value on the first frame of a session", () => {
+      const detector = createDetector(new MutableClock());
+      const first = detector.update(
+        createNormalizedFaceFrame({ timestampMs: 0 }),
+      );
+
+      expect(first.decision.components?.trackingStability).toBe(0.75);
+    });
+
+    it("does not collapse to the stale-sample value while the face holds still", () => {
+      const detector = createDetector(new MutableClock());
+      detector.update(createNormalizedFaceFrame({ timestampMs: 0 }));
+      const second = detector.update(
+        createNormalizedFaceFrame({ timestampMs: 200 }),
+      );
+      const third = detector.update(
+        createNormalizedFaceFrame({ timestampMs: 400 }),
+      );
+
+      expect(second.decision.components?.trackingStability).toBe(1);
+      expect(third.decision.components?.trackingStability).toBe(1);
+    });
+
+    it("drops when the face jumps between frames", () => {
+      const detector = createDetector(new MutableClock());
+      detector.update(createNormalizedFaceFrame({ timestampMs: 0 }));
+      const moved = detector.update(
+        createNormalizedFaceFrame({
+          timestampMs: 200,
+          centerX: 0.62,
+          centerY: 0.58,
+        }),
+      );
+
+      expect(moved.decision.components?.trackingStability).toBeLessThan(1);
+    });
+
+    it("falls back to the stale-sample value after a frame gap over 1500ms", () => {
+      const detector = createDetector(new MutableClock());
+      detector.update(createNormalizedFaceFrame({ timestampMs: 0 }));
+      const afterGap = detector.update(
+        createNormalizedFaceFrame({ timestampMs: 1_800 }),
+      );
+
+      expect(afterGap.decision.components?.trackingStability).toBe(0.5);
+    });
+  });
 });

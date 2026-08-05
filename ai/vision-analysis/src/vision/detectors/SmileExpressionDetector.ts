@@ -53,6 +53,9 @@ export interface SmileExpressionDetectorState {
   readonly smileChangeLevel: SmileChangeLevel | null;
   readonly mouthAsymmetry: number | null;
   readonly measurementConfidence: number;
+  /** Left/right balance of the smile signal. Separate axis from measurement quality. */
+  readonly signalClarity: number;
+  readonly requiredMeasurementConfidence: number;
   readonly personalizationConfidence: number;
   readonly coachingEligible: boolean;
   readonly maintainedSmileConfiguration: boolean;
@@ -172,14 +175,18 @@ export class SmileExpressionDetector
       base !== null &&
       base >= this.config.baselinePromptSuppressionScore;
     const asymmetry = Math.abs(left - right);
-    const asymmetryFactor =
+    // Asymmetry describes the signal, not the camera. It limits event entry and
+    // event confidence, never measurement availability.
+    const signalClarity =
       asymmetry <= this.config.asymmetryConfidenceStart
         ? 1
         : asymmetry >= this.config.asymmetryHigh
           ? 0.75
           : 0.9;
-    const measurementConfidence =
-      context.quality.confidence * asymmetryFactor;
+    const measurementConfidence = context.quality.confidence;
+    const requiredMeasurementConfidence = personalized
+      ? this.config.minimumMeasurementConfidence
+      : this.config.fallbackMinimumMeasurementConfidence;
     const personalizationConfidence = personalized
       ? context.baseline.confidenceBySignal.smile
       : 0;
@@ -189,7 +196,7 @@ export class SmileExpressionDetector
       base === null ? null : this.configurationLevel(base);
     const configurationMaintained =
       score >= this.config.subtleAbsoluteScore &&
-      measurementConfidence >= this.config.minimumMeasurementConfidence;
+      measurementConfidence >= requiredMeasurementConfidence;
     if (configurationMaintained) {
       this.maintainedSinceMs ??= now;
     } else {
@@ -198,9 +205,7 @@ export class SmileExpressionDetector
     const maintainedDurationMs =
       this.maintainedSinceMs === null ? 0 : now - this.maintainedSinceMs;
 
-    if (
-      measurementConfidence < this.config.minimumMeasurementConfidence
-    ) {
+    if (measurementConfidence < requiredMeasurementConfidence) {
       const events = this.suspend({
         sessionElapsedMs: now,
         clientMonotonicMs: frame.clientMonotonicMs,
@@ -226,6 +231,8 @@ export class SmileExpressionDetector
         smileChangeLevel: changeLevel,
         mouthAsymmetry: asymmetry,
         measurementConfidence,
+        signalClarity,
+        requiredMeasurementConfidence,
         personalizationConfidence,
         coachingEligible: false,
         maintainedSmileConfiguration: false,
@@ -244,15 +251,19 @@ export class SmileExpressionDetector
       left >= this.config.fallbackMinimumSideScore &&
       right >= this.config.fallbackMinimumSideScore &&
       asymmetry <= this.config.fallbackMaximumAsymmetry &&
-      measurementConfidence >=
-        this.config.fallbackMinimumMeasurementConfidence;
+      measurementConfidence >= requiredMeasurementConfidence;
+    // A STRONG configuration is allowed through a high asymmetry; weaker grades
+    // are held back because the left/right imbalance dominates the evidence.
+    const asymmetryPermitsEntry =
+      asymmetry <= this.config.asymmetryHold ||
+      configurationLevel === "STRONG_SMILE_CONFIGURATION";
     const personalizedEntry =
       personalized &&
       delta !== null &&
       score >= this.config.smileAbsoluteScore &&
       delta >= this.config.smileDelta &&
-      asymmetry <= this.config.asymmetryHold &&
-      measurementConfidence >= this.config.minimumMeasurementConfidence;
+      asymmetryPermitsEntry &&
+      measurementConfidence >= requiredMeasurementConfidence;
     const entry =
       (context.quality.canStartBehavior ?? context.quality.usable) &&
       (personalizedEntry || fallbackEntry);
@@ -314,10 +325,10 @@ export class SmileExpressionDetector
           this.episodeId = this.eventFactory.createEpisodeId();
           this.episodeConfidenceDetails = {
             measurementConfidence,
-            signalClarity: measurementConfidence,
+            signalClarity,
             personalizationConfidence,
             evidenceStrength: Math.min(
-              measurementConfidence,
+              measurementConfidence * signalClarity,
               personalized ? personalizationConfidence : 0.55,
             ),
             baselineMode: personalized
@@ -336,6 +347,7 @@ export class SmileExpressionDetector
             this.eventFactory.createBehaviorEvent("SMILE_STARTED", {
               confidence: this.eventConfidence(
                 measurementConfidence,
+                signalClarity,
                 personalizationConfidence,
                 personalized,
               ),
@@ -399,6 +411,8 @@ export class SmileExpressionDetector
       smileChangeLevel: changeLevel,
       mouthAsymmetry: asymmetry,
       measurementConfidence,
+      signalClarity,
+      requiredMeasurementConfidence,
       personalizationConfidence,
       coachingEligible: personalized,
       maintainedSmileConfiguration:
@@ -495,6 +509,7 @@ export class SmileExpressionDetector
 
   private eventConfidence(
     measurement: number,
+    signalClarity: number,
     personalization: number,
     personalized: boolean,
   ): number {
@@ -503,6 +518,7 @@ export class SmileExpressionDetector
       Math.min(
         1,
         Math.min(measurement, personalized ? personalization : measurement) *
+          signalClarity *
           (personalized ? 1 : 0.55),
       ),
     );
@@ -587,6 +603,9 @@ export class SmileExpressionDetector
       smileChangeLevel: null,
       mouthAsymmetry: null,
       measurementConfidence: 0,
+      signalClarity: 0,
+      requiredMeasurementConfidence:
+        this.config.minimumMeasurementConfidence,
       personalizationConfidence: 0,
       coachingEligible: false,
       maintainedSmileConfiguration: false,
