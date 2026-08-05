@@ -26,23 +26,23 @@ def _fixture() -> list[KoreaPersona]:
     ]
 
 
-def test_sample_filters_sex_and_age():
+def test_sample_filters_sex_and_age() -> None:
     p = sample_persona(_fixture(), sex="여자", min_age=25, max_age=30, rng=random.Random(0))
     assert p.sex == "여자"
     assert 25 <= p.age <= 30
 
 
-def test_sample_hobby_keyword():
+def test_sample_hobby_keyword() -> None:
     p = sample_persona(_fixture(), hobby_keyword="전시")
     assert "전시" in p.hobbies_and_interests
 
 
-def test_sample_no_match_raises():
+def test_sample_no_match_raises() -> None:
     with pytest.raises(ValueError):
         sample_persona(_fixture(), sex="남자", min_age=40, max_age=50)
 
 
-def test_build_prompt_from_persona_contains_fields():
+def test_build_prompt_from_persona_contains_fields() -> None:
     prompt = build_system_prompt_from_persona(_fixture()[0], stage="before")
     assert "27세" in prompt
     assert "여자" in prompt
@@ -50,7 +50,7 @@ def test_build_prompt_from_persona_contains_fields():
     assert "소개팅 전" in prompt
 
 
-def test_korea_persona_camel_contract():
+def test_korea_persona_camel_contract() -> None:
     c = _fixture()[0].to_contract()
     assert c["hobbiesAndInterests"] == "전시 관람, 카페 투어"
     assert c["age"] == 27

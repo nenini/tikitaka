@@ -39,6 +39,9 @@ testpaths = ["tests"]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
+# files 가 없으면 인자 없는 `uv run mypy` 가 "Missing target" 으로 실패한다 — CI에서
+# 타입 검사가 통째로 안 돌게 된다. aggregator·tts 와 같은 형태로 맞춘다.
+files = ["stt", "tests"]
 
 [[tool.mypy.overrides]]
 module = ["faster_whisper.*", "sounddevice.*"]
