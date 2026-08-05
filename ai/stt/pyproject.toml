@@ -20,8 +20,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["stt"]
 
-[tool.uv]
-package = false
+# `[tool.uv] package = false`를 두면 안 된다. aggregator가 이 프로젝트를
+# `stt-pipeline = { path = "../stt" }`로 의존하는데, false면 uv가 휠을 만들지 않아
+# aggregator venv에 `stt` 모듈이 들어오지 않는다(`python -m aggregator`가 ImportError).
+# 지금까지 드러나지 않은 건 pytest가 pythonpath로 우회했기 때문이다.
 
 [dependency-groups]
 dev = [

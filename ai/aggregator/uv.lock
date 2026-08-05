@@ -31,7 +31,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "python-dotenv", specifier = ">=1.1" },
-    { name = "stt-pipeline", directory = "../stt" },
+    { name = "stt-pipeline", editable = "../stt" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.35" },
 ]
 
@@ -706,7 +706,7 @@ wheels = [
 [[package]]
 name = "stt-pipeline"
 version = "0.1.0"
-source = { directory = "../stt" }
+source = { editable = "../stt" }
 dependencies = [
     { name = "faster-whisper" },
     { name = "numpy" },
