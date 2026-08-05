@@ -35,7 +35,7 @@ class PersonaSpec(_CamelModel):
     difficulty: str = "편안함"                # 편안함 | 보통 | 실전
     reaction_level: str = "호의적"            # 호의적 | 중립 | 반응 적음
 
-    def to_contract(self) -> dict:
+    def to_contract(self) -> dict[str, object]:
         return self.model_dump(by_alias=True)
 
 
@@ -47,7 +47,7 @@ class ChatMessage(_CamelModel):
     is_proactive: bool = False              # 챗봇이 먼저 보낸 선톡인지
     created_at: str = Field(default_factory=_utcnow_iso)
 
-    def to_contract(self) -> dict:
+    def to_contract(self) -> dict[str, object]:
         """camelCase dict — BE/FE 계약 형식으로 직렬화."""
         return self.model_dump(by_alias=True)
 
@@ -68,5 +68,5 @@ class KoreaPersona(_CamelModel):
     cultural_background: str = ""
     career_goals_and_ambitions: str = ""
 
-    def to_contract(self) -> dict:
+    def to_contract(self) -> dict[str, object]:
         return self.model_dump(by_alias=True)

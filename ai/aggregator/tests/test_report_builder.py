@@ -26,7 +26,7 @@ from aggregator.report.builder import (
 )
 from aggregator.report.dictionary import avoid_pattern
 from aggregator.report.input import ReportInput, SpeakerInput, VisionInput
-from aggregator.report.scoring import score_report
+from aggregator.report.scoring import SILENCE_THRESHOLD_MS, score_report
 from aggregator.state import Utterance
 
 A = "user-a"
@@ -700,3 +700,15 @@ def test_prompt_example_does_not_teach_filtered_wording() -> None:
     example = spec.split("## 출력 형식")[1].split("필드 규칙")[0]
     assert "되묻" not in example
     assert "되물" not in example
+
+
+def test_prompt_silence_label_matches_the_threshold() -> None:
+    """프롬프트가 말하는 초와 실제로 센 기준이 같아야 한다.
+
+    임계값을 15초→10초로 내린 뒤에도 프롬프트 라벨만 '15초 이상 침묵'으로 남아
+    LLM에게 틀린 기준을 알려주고 있었다. 문장에 "15초 넘게 침묵하셨어요"가 섞여 나간다.
+    """
+    report = _report()
+    prompt = build_prompt(report, score_report(report), A, include_quotes=False)
+    assert f"{SILENCE_THRESHOLD_MS // 1000}초 이상 침묵" in prompt
+    assert "15초 이상 침묵" not in prompt

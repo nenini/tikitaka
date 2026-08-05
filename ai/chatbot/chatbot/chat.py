@@ -26,7 +26,7 @@ from chatbot.schemas import ChatMessage
 
 def main() -> None:
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     except (AttributeError, ValueError):
         pass
 
@@ -45,7 +45,9 @@ def main() -> None:
         print(e)
         return
 
-    rng = random.Random(args.seed) if args.seed is not None else random
+    # else 에 `random`(모듈)을 두면 Random 인스턴스가 아니라 모듈이 넘어간다.
+    # 런타임엔 모듈에도 choice가 있어 돌지만 시그니처(Random | None)와 어긋난다.
+    rng = random.Random(args.seed) if args.seed is not None else random.Random()
     try:
         p = sample_persona(
             personas, sex=args.sex, min_age=args.min_age, max_age=args.max_age, rng=rng
