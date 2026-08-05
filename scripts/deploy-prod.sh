@@ -235,14 +235,27 @@ compose exec -T chatbot python -c \
 compose exec -T face-analysis python -c \
     "import json, urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8000/internal/v1/face-analysis/health', timeout=5)); assert data['analysisReady']"
 
-curl --fail --silent --show-error \
-    https://i15a307.p.ssafy.io/ai/face/internal/v1/face-analysis/health >/dev/null
+echo "Waiting for the production HTTPS health checks."
+for attempt in $(seq 1 30); do
+    if curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+        https://i15a307.p.ssafy.io/ai/face/internal/v1/face-analysis/health >/dev/null \
+        && curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+        https://i15a307.p.ssafy.io/actuator/health >/dev/null \
+        && curl --fail --silent --show-error --connect-timeout 3 --max-time 10 \
+        https://i15a307.p.ssafy.io/ >/dev/null; then
+        echo "Production HTTPS health checks succeeded."
+        break
+    fi
 
-curl --fail --silent --show-error \
-    https://i15a307.p.ssafy.io/actuator/health >/dev/null
+    if [[ "${attempt}" -eq 30 ]]; then
+        echo "Production HTTPS health checks failed."
+        compose logs --tail=100 nginx || true
+        false
+    fi
 
-curl --fail --silent --show-error \
-    https://i15a307.p.ssafy.io/ >/dev/null
+    echo "Production HTTPS is not ready yet. attempt=${attempt}/30"
+    sleep 2
+done
 
 compose ps
 DEPLOY_STARTED=false
