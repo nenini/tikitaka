@@ -707,6 +707,10 @@ class SessionManager:
             runtime.aggregator.state,
             session_duration_ms=max(0, duration_ms),
             vision_enabled=vision_enabled,
+            practice_goals={
+                user_id: tuple(participant.practice_goals)
+                for user_id, participant in runtime.participants.items()
+            },
         )
         task = asyncio.create_task(
             self._run_report(snapshot, session_id, user_ids, ended_at),

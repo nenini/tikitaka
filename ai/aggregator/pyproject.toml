@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-stt-pipeline = { path = "../stt" }
+# editable — 안 붙이면 휠 복사본이 설치돼 ../stt 수정이 여기 반영되지 않는다
+stt-pipeline = { path = "../stt", editable = true }
 
 [tool.uv]
 package = false

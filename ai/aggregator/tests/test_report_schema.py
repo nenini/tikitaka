@@ -199,6 +199,31 @@ def test_silence_segment_matches_the_gap() -> None:
     assert (silences[0]["startMs"], silences[0]["endMs"]) == (20_000, 40_000)
 
 
+def test_coverage_is_a_ratio_block() -> None:
+    """계약 2026-08-04: 비율은 0~1, 측정 불가는 0이 아니라 null."""
+    metrics = _first(_analysis())["metrics"]
+    assert isinstance(metrics, dict)
+    coverage = metrics["coverage"]
+    assert isinstance(coverage, dict)
+    assert set(coverage) == {"faceDetectionRate", "speechRecognitionRate", "cameraUptimeRate"}
+    for value in coverage.values():
+        assert value is None or 0.0 <= value <= 1.0
+
+
+def test_speech_recognition_rate_is_null_until_stt_reports_drops() -> None:
+    """신뢰도 미달로 버려진 발화 수를 SessionState가 모른다 — 0이 아니라 null."""
+    metrics = _first(_analysis())["metrics"]
+    assert isinstance(metrics, dict)
+    assert metrics["coverage"]["speechRecognitionRate"] is None
+
+
+def test_filler_breakdown_is_sent() -> None:
+    """#140 필러워드 분석 화면에 단어별 횟수가 필요하다."""
+    metrics = _first(_analysis())["metrics"]
+    assert isinstance(metrics, dict)
+    assert isinstance(metrics["fillerBreakdown"], dict)
+
+
 def test_cards_are_not_sent() -> None:
     """근거 카드는 이번 계약에서 보류 — 인용·유형코드도 함께 빠진다."""
     serialized = repr(_analysis())
@@ -229,7 +254,7 @@ def _narrative(*, by_llm: bool = True) -> ReportNarrative:
 
 def _report_payload(*, by_llm: bool = True) -> dict[str, object]:
     reports = build_report_payload(
-        _narrative(by_llm=by_llm), session_id=12345, user_id=1001, generated_at=AT
+        [(1001, _narrative(by_llm=by_llm))], session_id=12345, generated_at=AT
     )["reports"]
     assert isinstance(reports, list)
     first = reports[0]
@@ -257,7 +282,7 @@ def test_report_payload_omits_cards() -> None:
 def test_report_failure_payload_shape() -> None:
     """계약: FAILED는 빈 배열 + 실패 사유를 담아 반드시 보낸다."""
     payload = report_failure_payload(
-        session_id=12345, user_id=1001, generated_at=AT,
+        session_id=12345, user_ids=[1001], generated_at=AT,
         failure_code="NO_UTTERANCE", failure_reason="발화가 없어 리포트를 만들지 못했습니다.",
     )
     reports = payload["reports"]
@@ -273,7 +298,7 @@ def test_report_failure_payload_shape() -> None:
 
 def test_report_versions_present() -> None:
     payload = build_report_payload(
-        _narrative(), session_id=12345, user_id=1001, generated_at=AT
+        [(1001, _narrative())], session_id=12345, generated_at=AT
     )
     assert payload["analysisVersion"] == ANALYSIS_VERSION
     assert payload["reportVersion"] == REPORT_VERSION
@@ -281,12 +306,48 @@ def test_report_versions_present() -> None:
 
 # ── 멱등키 ───────────────────────────────────────────────────────────
 def test_analysis_key_has_no_user() -> None:
-    assert analysis_idempotency_key(12345) == "session-12345-analysis-v1"
+    assert analysis_idempotency_key(12345) == "session-12345-analysis-v1.0.0"
 
 
-def test_report_key_is_per_user() -> None:
-    assert report_idempotency_key(12345, 1001) == "session-12345-report-v1-user-1001"
+def test_report_key_is_per_session() -> None:
+    """계약 2026-08-04: 리포트는 세션당 한 번 전송이라 키에 userId를 넣지 않는다."""
+    assert report_idempotency_key(12345) == "session-12345-report-v1.0.0"
 
 
-def test_report_key_differs_per_user() -> None:
-    assert report_idempotency_key(12345, 1001) != report_idempotency_key(12345, 1002)
+def test_keys_keep_full_version() -> None:
+    """patch가 달라지면 키도 달라져야 한다.
+
+    BE는 `sessionId + 전체 버전 문자열`로 중복을 판정하고, 계산 로직을 고쳐 patch를
+    올린 재분석은 새 결과로 저장한다. 키를 메이저까지만 줄이면 patch가 달라도 같은
+    키가 나와 BE 규칙과 어긋난 값을 보내게 된다.
+    """
+    assert analysis_idempotency_key(1, "analysis-v1.0.1") != analysis_idempotency_key(
+        1, "analysis-v1.0.0"
+    )
+    assert report_idempotency_key(1, "report-v1.2.0") == "session-1-report-v1.2.0"
+
+
+def test_report_payload_holds_every_participant() -> None:
+    """유저별 POST가 아니라 배열에 참가자 전원을 담는다."""
+    payload = build_report_payload(
+        [(1001, _narrative()), (1002, _narrative())], session_id=12345, generated_at=AT
+    )
+    reports = payload["reports"]
+    assert isinstance(reports, list)
+    assert [r["userId"] for r in reports] == [1001, 1002]
+
+
+def test_failure_payload_sends_null_not_empty_objects() -> None:
+    """FAILED이면 axes·metrics는 **null**이어야 한다.
+
+    `{}`를 보내면 BE가 전 필드 null인 MetricsRequest로 역직렬화하고 @Valid 캐스케이드가
+    @NotNull 6건을 한꺼번에 터뜨려 400이 된다. 4xx는 재시도도 안 되므로 실패 통지가
+    영구 유실되고 BE는 분석 대기 상태로 남는다.
+    """
+    payload = analysis_failure_payload(
+        session_id=1, user_ids=[1001], analyzed_at=AT
+    )
+    participant = payload["participants"][0]  # type: ignore[index]
+    assert participant["axes"] is None
+    assert participant["metrics"] is None
+    assert participant["evidenceSegments"] == []
