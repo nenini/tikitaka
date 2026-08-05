@@ -39,4 +39,37 @@ services:
       - ./face-analysis/data:/app/data:ro
     restart: unless-stopped
 
+  # 관제실 — BE가 세션 라이프사이클을 보내는 대상(AI_SESSION_BASE_URL).
+  # ⚠️ 빌드 컨텍스트가 여기(ai/)다. aggregator/ 가 아니다 —
+  #    pyproject 의 `stt-pipeline = { path = "../stt" }` 때문에 형제 폴더가 필요하다.
+  # ⚠️ GPU: Whisper 가 프로세스 안에서 돈다. 아래 deploy 블록은 GPU 있는 호스트에서만
+  #    유효하므로, CPU 로 띄우려면 지우고 STT_DEVICE=cpu 로 바꾼다.
+  # LLM(코칭·리포트)은 컨테이너 밖에 붙는다. 비우면 규칙 기반 폴백만 나간다.
+  aggregator:
+    build:
+      context: ./
+      dockerfile: aggregator/Dockerfile
+    image: ssafy-ai-aggregator:latest
+    container_name: ai-aggregator
+    ports:
+      - "8002:8000"                                   # 관제실 API · GET /health
+    environment:
+      STT_DEVICE: "cuda:0"                            # CUDA_VISIBLE_DEVICES 적용 후 논리번호
+      CUDA_VISIBLE_DEVICES: "3"                       # 공유 서버 에티켓 — 3번만 사용
+      COACHING_LLM_BASE_URL: "http://host.docker.internal:11500"
+      REPORT_LLM_BASE_URL: "http://host.docker.internal:11500"
+      REPORT_LLM_MODEL: "exaone3.5:7.8b"
+      # BACKEND_BASE_URL: "http://host.docker.internal:8080"
+      # AI_SESSION_INTERNAL_TOKEN: "change-me"        # BE와 같은 값. 비면 401
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
   # vision-analysis는 브라우저용 TS 라이브러리라 도커 대상이 아님(FE 번들에 포함).
