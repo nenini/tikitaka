@@ -1,8 +1,10 @@
 package com.date.backend.domain.growth.api;
 
 import com.date.backend.domain.growth.application.GrowthSessionQueryService;
+import com.date.backend.domain.growth.application.GrowthMetricAggregationService;
 import com.date.backend.domain.growth.domain.GrowthSessionStatus;
 import com.date.backend.domain.growth.dto.response.GrowthSessionHistoryResponse;
+import com.date.backend.domain.growth.dto.response.GrowthMetricsResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.constraints.*;
@@ -18,7 +20,11 @@ import java.time.LocalDate;
 @RequestMapping("/api/v1/growth")
 public class GrowthController implements GrowthSwaggerDocs {
 	private final GrowthSessionQueryService service;
-	public GrowthController(GrowthSessionQueryService service) { this.service = service; }
+	private final GrowthMetricAggregationService metricService;
+	public GrowthController(GrowthSessionQueryService service, GrowthMetricAggregationService metricService) {
+		this.service = service;
+		this.metricService = metricService;
+	}
 
 	@GetMapping("/sessions")
 	public ApiResponse<GrowthSessionHistoryResponse> getSessions(
@@ -29,5 +35,13 @@ public class GrowthController implements GrowthSwaggerDocs {
 			@RequestParam(required = false) @Positive Long cursor,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		return ApiResponse.success(service.getHistory(authUser.userId(), from, to, status, cursor, size));
+	}
+
+	@GetMapping("/metrics")
+	public ApiResponse<GrowthMetricsResponse> getMetrics(
+			@AuthenticationPrincipal AuthUser authUser,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+		return ApiResponse.success(metricService.getMetrics(authUser.userId(), from, to));
 	}
 }

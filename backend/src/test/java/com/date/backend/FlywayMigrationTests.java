@@ -268,12 +268,14 @@ class FlywayMigrationTests {
 				"REPORT_EVIDENCES",
 				"CONTENTTEXT"
 		);
+		Integer growthMetricSnapshotTableCount = tableCount("GROWTH_METRIC_SNAPSHOTS");
 
-		assertThat(migrationCount).isEqualTo(38);
+		assertThat(migrationCount).isEqualTo(39);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
 		assertThat(reportTranscriptColumnCount).isEqualTo(1);
+		assertThat(growthMetricSnapshotTableCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
