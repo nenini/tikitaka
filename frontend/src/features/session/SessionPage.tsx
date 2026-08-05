@@ -17,6 +17,7 @@ import { SilenceHint } from './components/SilenceHint'
 import type { SilenceTopic } from './components/SilenceHint'
 import type { ExtensionChoice } from './components/ExtensionOfferCard'
 import {
+  decideSessionExtension,
   getSessionDetail,
   getSessionMissions,
   getSessionStatus,
@@ -24,7 +25,13 @@ import {
   terminateSession,
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
-import type { SessionDetail, SessionMission, SessionStatusSnapshot } from './types'
+import { EXTENSION_WINDOW_MINUTES } from './types'
+import type {
+  SessionDetail,
+  SessionExtensionDecision,
+  SessionMission,
+  SessionStatusSnapshot,
+} from './types'
 
 /** 세션 시작 조건 확인 폴링 주기. 진행 중이 되면 멈춘다. */
 const STATUS_POLL_MS = 3_000
@@ -238,11 +245,39 @@ export function SessionPage() {
     }))
   }, [realtime.contextualQuestions, realtime.silence])
 
-  /* ── 5분 연장 ── ⚠️ 서버 API 없음(CONTACT 도메인 미구현) → 로컬 토글만 */
+  /* ── 5분 연장 (CONTACT-01) ──────────────────────────────
+     서버가 제출을 받는 창이 종료 **5분 전**부터라(`EXTENSION_WINDOW_MINUTES`)
+     카드도 같은 시점에 띄운다. 더 일찍 띄우면 눌러도 SESSION_EXTENSION_WINDOW_NOT_OPEN 이고,
+     더 늦게 띄우면 답할 시간이 부족하다. */
   const [extensionChoice, setExtensionChoice] = useState<ExtensionChoice>('pending')
+  const [extensionError, setExtensionError] = useState<string | null>(null)
   const extensionVisible =
-    realtime.timerEvent?.eventType === 'SESSION_ENDING_IMMINENT' ||
-    (remainingSec != null && remainingSec <= 60 && remainingSec > 0)
+    remainingSec != null && remainingSec > 0 && remainingSec <= EXTENSION_WINDOW_MINUTES * 60
+
+  /**
+   * 연장 의사 제출. 낙관적으로 화면을 먼저 바꾸고, 실패하면 되돌린다 —
+   * 답할 시간이 짧아 왕복을 기다리게 하면 놓친다.
+   *
+   * 🔒 성공해도 "상대가 수락했는지" 는 표시하지 않는다. 응답에 `targetDecision` 이 들어 있지만
+   *    쓰지 않는다(W-15). 연장되면 타이머가 늘어나는 것으로 알 수 있고, 안 되면 그냥 끝난다.
+   */
+  const submitExtension = useCallback(
+    async (decision: SessionExtensionDecision) => {
+      if (!validSession) return
+      const previous = extensionChoice
+      setExtensionChoice(decision === 'AGREE' ? 'accepted' : 'declined')
+      setExtensionError(null)
+      try {
+        await decideSessionExtension(sessionId, decision)
+      } catch (error) {
+        setExtensionChoice(previous)
+        setExtensionError(
+          errorMessageOf(error, '연장 의사를 전달하지 못했어요. 다시 눌러주세요.'),
+        )
+      }
+    },
+    [extensionChoice, sessionId, validSession],
+  )
 
   /* ── 종료 ── */
   const [endConfirmOpen, setEndConfirmOpen] = useState(false)
@@ -385,8 +420,9 @@ export function SessionPage() {
               missions={missions}
               extensionVisible={extensionVisible}
               extensionChoice={extensionChoice}
-              onAcceptExtension={() => setExtensionChoice('accepted')}
-              onDeclineExtension={() => setExtensionChoice('declined')}
+              extensionError={extensionError}
+              onAcceptExtension={() => void submitExtension('AGREE')}
+              onDeclineExtension={() => void submitExtension('DECLINE')}
             />
           </aside>
         </div>
@@ -423,7 +459,9 @@ export function SessionPage() {
             onEnd={() => setEndConfirmOpen(true)}
             beforeEnd={
               <>
-                <IconButton icon="help" aria-label="도움 요청" />
+                {/* 도움 요청(SILENCE-02)은 서버 API 가 없어 화면에서 내렸다.
+                    눌러도 아무 일이 없는 버튼을 통화 화면에 두지 않는다.
+                    엔드포인트가 생기면 여기 다시 넣는다. */}
                 {/* 신고는 파괴적이지만 빨강 아이콘 버튼은 통화 종료 전용이다(§3.3).
                     실제 경고는 열리는 모달에서 라벨과 함께 전달한다. */}
                 {/* TODO(FE-A): 신고 화면(W-13)은 FE-A 담당이며 라우트·API 가 아직 없다 */}

@@ -37,9 +37,11 @@ export interface CoachRailProps {
   speakingRatio?: number | null
   /** 서버가 배정한 세션 미션. 없으면 카드를 그리지 않는다 */
   missions?: SessionMission[]
-  /** 종료 1분 전부터 true */
+  /** 종료 5분 전(서버 제출 창)부터 true */
   extensionVisible: boolean
   extensionChoice: ExtensionChoice
+  /** 제출 실패 사유 */
+  extensionError?: string | null
   onAcceptExtension: () => void
   onDeclineExtension: () => void
 }
@@ -68,6 +70,7 @@ export function CoachRail({
   missions = [],
   extensionVisible,
   extensionChoice,
+  extensionError,
   onAcceptExtension,
   onDeclineExtension,
 }: CoachRailProps) {
@@ -78,12 +81,13 @@ export function CoachRail({
         코치 · 나에게만 보여요
       </div>
 
-      {/* 연장 제안은 남은 1분 안에 답해야 하는 유일한 요청이라 레일 **맨 위에 고정**한다.
+      {/* 연장 제안은 시한부 요청이라 레일 **맨 위에 고정**한다.
           아래에 두면 레일이 스크롤될 때 화면 밖으로 밀려 응답 기회 자체가 사라진다. */}
       {extensionVisible && (
         <div className="bt-rail-sticky">
           <ExtensionOfferCard
             choice={extensionChoice}
+            error={extensionError}
             onAccept={onAcceptExtension}
             onDecline={onDeclineExtension}
           />

@@ -258,6 +258,42 @@ export type SafetyCategory =
 /** `SafetySeverity` (backend). */
 export type SafetySeverity = 'LOW' | 'MEDIUM' | 'HIGH'
 
+/* ── 5분 연장(CONTACT-01) ──────────────────────────────── */
+
+/** 내 의사. 서버 `ContactDecision`. */
+export type SessionExtensionDecision = 'AGREE' | 'DECLINE'
+
+/** 양측 합산 결과. 서버 `ContactDecisionStatus`. */
+export type SessionExtensionStatus = 'PENDING' | 'AGREED' | 'DECLINED'
+
+/**
+ * `POST /sessions/{id}/extensions` 응답이자 `/topic/sessions/{id}/extensions` 이벤트
+ * (`SessionExtensionDecisionResponse`).
+ *
+ * ⚠️ 응답에 **상대의 결정(`targetDecision`)이 들어 있지만 화면에 쓰지 않는다.**
+ *    "상대가 거절했다"를 알리지 않는 것이 W-15 규칙이다 — 내가 수락했는데 연장되지 않으면
+ *    그냥 세션이 끝날 뿐이고, 사용자는 이유를 구분할 수 없어야 한다.
+ */
+export interface SessionExtensionEvent {
+  eventType: string
+  sessionId: number
+  status: SessionExtensionStatus
+  requesterUserId: number | null
+  requesterDecision: SessionExtensionDecision | null
+  targetUserId: number | null
+  targetDecision: SessionExtensionDecision | null
+  sessionStatus: string
+  scheduledEndAt: string | null
+  actualEndAt: string | null
+  occurredAt: string
+}
+
+/**
+ * 서버가 제출을 받아 주는 창(분). `SessionExtensionDecisionService.DECISION_WINDOW_MINUTES`.
+ * 이보다 이르면 `SESSION_EXTENSION_WINDOW_NOT_OPEN` 으로 거절된다.
+ */
+export const EXTENSION_WINDOW_MINUTES = 5
+
 /** `/user/queue/sessions/{id}/safety` — `SafetyWarningResponse`. */
 export interface SafetyWarningEvent {
   /** 'SAFETY_WARNING' */
@@ -309,6 +345,7 @@ export const sessionTopics = (sessionId: number) => ({
   participants: `/topic/sessions/${sessionId}/participants`,
   lifecycle: `/topic/sessions/${sessionId}/lifecycle`,
   silence: `/topic/sessions/${sessionId}/silence`,
+  extensions: `/topic/sessions/${sessionId}/extensions`,
   coaching: `/user/queue/sessions/${sessionId}/coaching`,
   questions: `/user/queue/sessions/${sessionId}/questions`,
   safety: `/user/queue/sessions/${sessionId}/safety`,
