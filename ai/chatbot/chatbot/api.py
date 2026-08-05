@@ -68,7 +68,8 @@ def get_llm() -> ChatLLM:
     # (GPU 여유에 따라 7.8B ↔ 2.4B 전환 등). 미설정 시 로컬 기본값.
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
     model = os.environ.get("OLLAMA_MODEL", "exaone3.5:7.8b")
-    return OllamaAdapter(model=model, host=host)
+    timeout = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "45"))
+    return OllamaAdapter(model=model, host=host, timeout_seconds=timeout)
 
 
 LLMDep = Annotated[ChatLLM, Depends(get_llm)]
