@@ -1,25 +1,40 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, EmptyState, Icon, Skeleton } from '@/components'
-import { getReportStatus, getSessionReport, requestReportGeneration } from './api'
-import { FeedbackList, IssueCard, MetricStat, RadarChart, RadarLegend, TemperatureCard, TopicCloud } from './parts'
-import type { ReportStatus, SessionReport } from './types'
+import { Button, Card, Cluster, EmptyState, Icon, Skeleton } from '@/components'
+import { getReportDetail, getReportStatus, requestReportGeneration } from './api'
+import { EvidenceList, FeedbackList, MetricStat, NotMeasuredNote, RadarChart } from './parts'
+import type { MetricView, RadarPoint } from './parts'
+import {
+  axisPercent,
+  formatRaw,
+  REPORT_AXIS_LABEL,
+  REPORT_AXIS_ORDER,
+  REPORT_NOT_CONFIGURED,
+} from './types'
+import type { ReportMetrics, ReportStatus, SessionReportDetail } from './types'
+
+/* -------------------------------------------------------------------------- */
+/*  W-16 · AI 세션 리포트                                                       */
+/*                                                                            */
+/*  조회는 2단계다 — `status` 로 reportId 를 얻고 그 id 로 상세를 읽는다.        */
+/*  **생성은 프론트가 걸지 않는다.** 세션 종료 이벤트가 서버에서 자동으로 건다.  */
+/*  POST(재요청)는 FAILED 일 때만 유효하다.                                     */
+/* -------------------------------------------------------------------------- */
 
 /** PENDING/GENERATING 동안 상태를 다시 물어보는 주기. */
 const POLL_MS = 15_000
 
-
 export function SessionReportPage() {
-  const { sessionId = 'demo' } = useParams()
+  const { sessionId = '' } = useParams()
   const navigate = useNavigate()
 
   const [status, setStatus] = useState<ReportStatus | null>(null)
-  const [deadlineAt, setDeadlineAt] = useState<string | null>(null)
-  const [report, setReport] = useState<SessionReport | null>(null)
+  const [failureCode, setFailureCode] = useState<string | null>(null)
+  const [report, setReport] = useState<SessionReportDetail | null>(null)
   const [retrying, setRetrying] = useState(false)
   const aliveRef = useRef(true)
 
-  /** 서버에 리포트 기능 자체가 없는가(404). 생성 실패와 구분해 다른 문구를 쓴다. */
+  /** 서버에 아직 리포트 행이 없는가(404). 생성 실패와 구분해 다른 문구를 쓴다. */
   const [unavailable, setUnavailable] = useState(false)
 
   const load = useCallback(async () => {
@@ -27,16 +42,16 @@ export function SessionReportPage() {
       const s = await getReportStatus(sessionId)
       if (!aliveRef.current) return
       if (s == null) {
-        // 엔드포인트 부재 — 만들다 실패한 게 아니라 아직 없는 기능이다.
+        // 아직 생성 요청 자체가 없다 — 만들다 실패한 게 아니다.
         setUnavailable(true)
         return
       }
       setUnavailable(false)
-      setStatus(s.reportStatus)
-      setDeadlineAt(s.peerReviewDeadlineAt ?? null)
-      if (s.reportStatus === 'COMPLETED') {
-        const r = await getSessionReport(sessionId)
-        if (aliveRef.current) setReport(r)
+      setStatus(s.status)
+      setFailureCode(s.failureCode)
+      if (s.status === 'COMPLETED' && s.reportId != null) {
+        const detail = await getReportDetail(s.reportId)
+        if (aliveRef.current) setReport(detail)
       }
     } catch {
       // 네트워크·5xx — 상태를 세우지 않고 다음 시도에 맡긴다(가짜 완료를 만들지 않는다)
@@ -46,7 +61,7 @@ export function SessionReportPage() {
 
   useEffect(() => {
     aliveRef.current = true
-    load()
+    void load()
     return () => {
       aliveRef.current = false
     }
@@ -55,7 +70,7 @@ export function SessionReportPage() {
   // 생성 중에는 주기적으로 다시 확인한다. 완료·실패면 폴링을 멈춘다.
   useEffect(() => {
     if (status !== 'PENDING' && status !== 'GENERATING') return
-    const id = setInterval(load, POLL_MS)
+    const id = setInterval(() => void load(), POLL_MS)
     return () => clearInterval(id)
   }, [status, load])
 
@@ -63,7 +78,7 @@ export function SessionReportPage() {
     setRetrying(true)
     try {
       await requestReportGeneration(sessionId)
-      setStatus('GENERATING')
+      setStatus('PENDING')
     } catch {
       /* 상태는 그대로 두고 다음 폴링에 맡긴다 */
     } finally {
@@ -71,23 +86,25 @@ export function SessionReportPage() {
     }
   }
 
-  // 아직 서버에 없는 기능이다. '실패'로 보여주면 다시 시도하면 될 것처럼 오해시킨다.
-  if (unavailable) {
+  /**
+   * AI 리포트 서버가 붙지 않은 상태. **재시도해도 같은 결과**라 버튼을 주지 않는다.
+   * 서버가 `ai.report.base-url` 미설정이면 즉시 이 코드로 FAILED 처리한다.
+   */
+  const notConfigured = status === 'FAILED' && failureCode === REPORT_NOT_CONFIGURED
+
+  if (unavailable || notConfigured) {
     return (
-      <main className="mx-auto w-full max-w-[560px] px-5 py-16">
-        <Card>
-          <EmptyState
-            icon={<Icon name="sparkle" size={28} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
-            title="AI 리포트는 준비 중이에요"
-            text="세션 분석 리포트는 아직 제공되지 않아요. 준비되면 알려드릴게요."
-            action={
-              <Button variant="primary" onClick={() => navigate(`/session/${sessionId}/review`)}>
-                평가 결과 보기
-              </Button>
-            }
-          />
-        </Card>
-      </main>
+      <ReportNotice
+        icon="sparkle"
+        title="AI 리포트는 준비 중이에요"
+        text={
+          notConfigured
+            ? '분석 서버가 아직 연결되지 않았어요. 준비되면 이 세션의 리포트를 만들어 드릴게요.'
+            : '이 세션의 리포트가 아직 만들어지지 않았어요. 세션이 끝나면 자동으로 생성돼요.'
+        }
+        actionLabel="평가 결과 보기"
+        onAction={() => navigate(`/session/${sessionId}/review`)}
+      />
     )
   }
 
@@ -101,12 +118,11 @@ export function SessionReportPage() {
           <b className="bt-h3">리포트를 준비하고 있어요</b>
           <p className="bt-body-sm bt-muted">
             {status === 'PENDING'
-              ? '상대의 평가를 기다리는 중이에요. 리포트는 평가가 도착하거나 48시간이 지나면 한 번에 만들어져요.'
+              ? '세션 분석을 시작하는 중이에요. 잠시만 기다려 주세요.'
               : '분석 결과를 정리하는 중이에요. 잠시만 기다려 주세요.'}
           </p>
-          {deadlineAt && <p className="bt-caption bt-muted">대기 마감 {formatDateTime(deadlineAt)}</p>}
-          <Button variant="ghost" onClick={() => navigate('/growth')}>
-            성장 대시보드 보기
+          <Button variant="ghost" onClick={() => navigate(`/session/${sessionId}/review`)}>
+            평가 결과 보기
           </Button>
         </Card>
       </main>
@@ -115,101 +131,93 @@ export function SessionReportPage() {
 
   if (status === 'FAILED' || !report) {
     return (
-      <main className="mx-auto w-full max-w-[560px] px-5 py-16">
-        <Card>
-          <EmptyState
-            icon={<Icon name="wrench" size={28} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
-            title="리포트를 만들지 못했어요"
-            text="분석에 문제가 있었어요. 다시 시도하면 저장된 세션 지표로 새로 만들어 드려요."
-            action={
-              <Button variant="primary" loading={retrying} onClick={retry}>
-                다시 시도
-              </Button>
-            }
-          />
-        </Card>
-      </main>
+      <ReportNotice
+        icon="wrench"
+        title="리포트를 만들지 못했어요"
+        text="분석에 문제가 있었어요. 다시 시도하면 저장된 세션 지표로 새로 만들어 드려요."
+        actionLabel="다시 시도"
+        actionLoading={retrying}
+        onAction={() => void retry()}
+      />
     )
   }
 
-  const hasPeer = report.radar.some((a) => a.peerScore != null)
-  const temp = report.temperature
+  const radar = toRadarPoints(report)
+  const voiceMetrics = toVoiceMetrics(report.metrics)
+  const visionMetrics = toVisionMetrics(report.metrics)
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
-      {/* 헤더 */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="bt-h1">
-            <span className="bt-numeric">{report.sessionRoundNo}</span>회차 세션 리포트
-          </h1>
+          <h1 className="bt-h1">세션 리포트</h1>
           <p className="bt-body-sm bt-muted mt-1">
-            {formatDate(report.sessionAt)} · {report.opponentNickname}님과{' '}
-            <span className="bt-numeric">{report.durationMin}</span>분
-            {report.themeName ? ` · ${report.themeName} 테마` : ''}
+            {report.generatedAt ? `${formatDate(report.generatedAt)} 생성` : '생성 완료'}
+            {report.analysisVersion ? ` · 분석 ${report.analysisVersion}` : ''}
           </p>
         </div>
-        <Badge tone={report.peerReviewIncluded ? 'success' : 'neutral'}>
-          {report.peerReviewIncluded ? '상대 평가 반영됨' : 'AI 분석만으로 확정'}
-        </Badge>
       </div>
-
-      {/* 온도 변화는 이 리포트의 한 줄 결론이다 — 스크롤 맨 아래가 아니라 헤더 바로 아래에 둔다 */}
-      {temp && <TemperatureCard temp={temp} className="mb-4" />}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 레이더 */}
         <Card className="flex w-full flex-col gap-3 lg:w-[340px] lg:shrink-0">
-          <div className="bt-h3">AI 분석 & 상대 평가</div>
-          <RadarChart axes={report.radar} />
-          <RadarLegend hasPeer={hasPeer} />
+          <div className="bt-h3">대화 행동 6축</div>
+          <RadarChart axes={radar} />
           <p className="bt-caption bt-muted">
-            {hasPeer
-              ? '두 점수가 다를 때는 상대가 실제로 느낀 쪽을 먼저 보세요.'
-              : '상대 평가가 도착하지 않아 AI 분석만으로 확정됐어요. 이후 제출분은 반영되지 않아요.'}
+            점수는 대화 <b className="text-ink">행동</b>에만 붙어요. 매력도나 등수가 아니에요.
           </p>
         </Card>
 
-        {/* 우: 이슈 · 지표 · 잘한 점/개선점 · 주제 · 미션 */}
+        {/* 우: 요약 · 지표 · 잘한 점/개선점 · 근거 · 미션 */}
         <div className="flex w-full flex-col gap-4 lg:flex-1">
-          {report.issues.length > 0 ? (
-            report.issues.map((issue) => <IssueCard key={issue.issueId} issue={issue} />)
-          ) : (
-            // D-14: 이슈 0건이어도 리포트가 비지 않게 긍정 피드백을 기본 포함한다
-            <Callout tone="success" icon="check">
-              이번 세션에서는 주의가 필요한 표현이 감지되지 않았어요. 아래 행동 지표를 보며 다음 세션
-              목표를 잡아보세요.
-            </Callout>
+          {report.summaryText && (
+            <Card>
+              <div className="bt-h3 mb-2">한 줄 요약</div>
+              <p className="bt-body-sm">{report.summaryText}</p>
+            </Card>
           )}
 
           <Card>
             <div className="bt-h3 mb-3">행동 근거</div>
-            <div className="flex flex-wrap gap-x-8 gap-y-4">
-              {report.metrics.map((m) => (
-                <MetricStat key={m.key} metric={m} />
-              ))}
+            {voiceMetrics.length > 0 ? (
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                {voiceMetrics.map((m) => (
+                  <MetricStat key={m.key} metric={m} />
+                ))}
+              </div>
+            ) : (
+              <NotMeasuredNote text="음성 지표가 기록되지 않았어요." />
+            )}
+
+            {/* 비전 미측정이면 0 으로 그리지 않고 사유를 적는다 — "한 번도 웃지 않았다"가 아니다 */}
+            <div className="mt-4 border-t border-[var(--bt-color-border)] pt-4">
+              {report.metrics?.visionMeasured && visionMetrics.length > 0 ? (
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                  {visionMetrics.map((m) => (
+                    <MetricStat key={m.key} metric={m} />
+                  ))}
+                </div>
+              ) : (
+                <NotMeasuredNote text="표정·시선 분석은 이 세션에서 측정되지 않았어요." />
+              )}
             </div>
           </Card>
 
           <div className="flex flex-col gap-4 sm:flex-row">
             <Card className="sm:flex-1">
-              <div className="bt-h3 mb-2">
-                잘한 점
-              </div>
+              <div className="bt-h3 mb-2">잘한 점</div>
               <FeedbackList items={report.strengths} />
             </Card>
             <Card className="sm:flex-1">
-              <div className="bt-h3 mb-2">
-                개선점
-              </div>
+              <div className="bt-h3 mb-2">개선점</div>
               <FeedbackList items={report.improvements} />
             </Card>
           </div>
 
-          {report.topics.length > 0 && (
+          {report.evidenceSegments.length > 0 && (
             <Card>
-              <div className="bt-h3 mb-3">대화 주제</div>
-              <TopicCloud topics={report.topics} />
+              <div className="bt-h3 mb-3">언제 그랬나요</div>
+              <EvidenceList items={report.evidenceSegments} />
             </Card>
           )}
 
@@ -219,17 +227,109 @@ export function SessionReportPage() {
               {/* TagChip 은 브랜드색+링크색이라 누를 수 있는 것처럼 보인다 — 미션은
                   그냥 정보 라벨이라 중립 톤의 정적 칩(.bt-mission-chip)으로 그린다. */}
               <Cluster gap={6}>
-                {report.nextMissions.map((m) => (
-                  <span key={m.missionId} className="bt-mission-chip">
-                    {m.label}
+                {report.nextMissions.map((mission) => (
+                  <span key={mission} className="bt-mission-chip">
+                    {mission}
                   </span>
                 ))}
               </Cluster>
             </Card>
           )}
-
         </div>
       </div>
+    </main>
+  )
+}
+
+/* ── 응답 → 표시 형태 ───────────────────────────────────── */
+
+/** 축 맵을 고정 순서로 펼친다. 서버가 주지 않은 축도 '측정 안 됨'으로 자리를 지킨다. */
+function toRadarPoints(report: SessionReportDetail): RadarPoint[] {
+  return REPORT_AXIS_ORDER.map((code) => {
+    const axis = report.axes[code]
+    return {
+      code,
+      label: REPORT_AXIS_LABEL[code],
+      percent: axisPercent(axis),
+      score: axis?.score ?? null,
+      measured: Boolean(axis?.measured),
+      note: axis?.note ?? null,
+      rawText: formatRaw(axis?.raw ?? null, axis?.rawUnit ?? null),
+    }
+  })
+}
+
+/** 서버는 원시 수치를 준다 — 표시 문구는 여기서 만든다. 값이 없는 지표는 아예 넣지 않는다. */
+function toVoiceMetrics(metrics: ReportMetrics | null): MetricView[] {
+  if (!metrics) return []
+  const out: MetricView[] = []
+  if (metrics.speakingRatio != null) {
+    out.push({ key: 'speakingRatio', label: '발화 비율', display: `${Math.round(metrics.speakingRatio * 100)}%` })
+  }
+  if (metrics.questionCount != null) {
+    out.push({ key: 'questionCount', label: '질문', display: `${metrics.questionCount}회` })
+  }
+  if (metrics.backchannelCount != null) {
+    out.push({ key: 'backchannelCount', label: '맞장구', display: `${metrics.backchannelCount}회` })
+  }
+  if (metrics.interruptionCount != null) {
+    out.push({ key: 'interruptionCount', label: '말 끊기', display: `${metrics.interruptionCount}회` })
+  }
+  if (metrics.longSilenceCount != null) {
+    out.push({ key: 'longSilenceCount', label: '긴 침묵', display: `${metrics.longSilenceCount}회` })
+  }
+  if (metrics.fillerCount != null) {
+    out.push({ key: 'fillerCount', label: '군말', display: `${metrics.fillerCount}회` })
+  }
+  return out
+}
+
+function toVisionMetrics(metrics: ReportMetrics | null): MetricView[] {
+  if (!metrics) return []
+  const out: MetricView[] = []
+  if (metrics.smileEpisodeCount != null) {
+    out.push({ key: 'smileEpisodeCount', label: '미소', display: `${metrics.smileEpisodeCount}회` })
+  }
+  if (metrics.gazeAwayCount != null) {
+    out.push({ key: 'gazeAwayCount', label: '시선 이탈', display: `${metrics.gazeAwayCount}회` })
+  }
+  if (metrics.faceMissingCount != null) {
+    out.push({ key: 'faceMissingCount', label: '화면 벗어남', display: `${metrics.faceMissingCount}회` })
+  }
+  return out
+}
+
+/* ── 상태 화면 ──────────────────────────────────────────── */
+
+function ReportNotice({
+  icon,
+  title,
+  text,
+  actionLabel,
+  actionLoading,
+  onAction,
+}: {
+  icon: 'sparkle' | 'wrench'
+  title: string
+  text: string
+  actionLabel: string
+  actionLoading?: boolean
+  onAction: () => void
+}) {
+  return (
+    <main className="mx-auto w-full max-w-[560px] px-5 py-16">
+      <Card>
+        <EmptyState
+          icon={<Icon name={icon} size={28} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
+          title={title}
+          text={text}
+          action={
+            <Button variant="primary" loading={actionLoading} onClick={onAction}>
+              {actionLabel}
+            </Button>
+          }
+        />
+      </Card>
     </main>
   )
 }
@@ -261,8 +361,4 @@ function ReportSkeleton() {
  */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('ko-KR', { dateStyle: 'long' })
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short' })
 }

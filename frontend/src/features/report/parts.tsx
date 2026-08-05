@@ -1,96 +1,38 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Badge, Card, Icon } from '@/components'
-import type { IssueSeverity, RadarAxis, ReportIssue, ReportMetric, ReportTopic, TemperatureDelta } from './types'
-
-/* ── 온도 변화 카드 ─────────────────────────────────────── */
-
-/**
- * 온도 척도의 최댓값. 성장 대시보드(`features/growth/types.ts` 의 `TEMPERATURE_MAX`)와 같은
- * 척도다 — 두 화면이 같은 0~100 위에서 같은 위치를 가리켜야 한다.
- */
-const TEMPERATURE_SCALE_MAX = 100
-
-/** 온도 → 척도상 위치(%). 서버 값이 범위를 벗어나도 트랙 밖으로 삐져나가지 않게 자른다. */
-function scalePct(value: number): number {
-  return Math.max(0, Math.min(100, (value / TEMPERATURE_SCALE_MAX) * 100))
-}
-
-/**
- * 세션 전후 사랑의 온도 변화 (`REPORT-02`).
- *
- * 이 카드는 리포트의 한 줄 결론이라 헤더 바로 아래에 온다. 그래서 묻는 건 딱 둘이다 —
- * **지금 몇 도이고, 이번 세션이 어디로 얼마나 움직였나.**
- *
- * - 큰 활자는 현재 온도 하나뿐이다. 전·후를 같은 크기로 나란히 놓으면 어느 쪽이 지금인지
- *   매번 읽어서 판단해야 한다. 세션 전 값은 캡션으로 내려 참조값 자리에 둔다.
- * - 변화는 숫자만으로는 크기를 알 수 없어(2.1 이 큰가?) 0~100 **척도 트랙** 위에 그린다.
- *   움직인 폭이 트랙에서 차지하는 길이가 곧 이번 세션의 폭이다.
- * - 증감 표기는 `.bt-delta` 를 그대로 재사용해 성장 대시보드와 같은 시각 언어를 유지한다.
- */
-export function TemperatureCard({ temp, className }: { temp: TemperatureDelta; className?: string }) {
-  // 0.05 미만은 소수 첫째 자리 표기에서 "0.0" 으로 보이므로 변화 없음으로 취급한다
-  const flat = Math.abs(temp.delta) < 0.05
-  const up = temp.delta > 0
-  const lo = Math.min(temp.before, temp.after)
-  const hi = Math.max(temp.before, temp.after)
-
-  return (
-    <section className={`bt-temp-card ${className ?? ''}`} aria-label="사랑의 온도 변화">
-      <div className="bt-temp-card__head">
-        <span className="bt-overline">사랑의 온도</span>
-        <Link className="bt-temp-card__cta" to="/growth">
-          추이 보기
-          <Icon name="chevron-right" size={14} />
-        </Link>
-      </div>
-
-      <div className="bt-temp-card__figures">
-        <span className="bt-temp-card__value bt-numeric">
-          {temp.after.toFixed(1)}
-          <span className="bt-temp-card__unit">°</span>
-        </span>
-        {flat ? (
-          <span className="bt-temp-card__flat">변화 없음</span>
-        ) : (
-          <span className={`bt-delta ${up ? 'bt-delta--up' : 'bt-delta--down'}`}>
-            <Icon name={up ? 'arrow-up' : 'arrow-down'} size={15} />
-            {Math.abs(temp.delta).toFixed(1)}
-          </span>
-        )}
-        <span className="bt-temp-card__from bt-caption bt-muted">
-          세션 전 <span className="bt-numeric">{temp.before.toFixed(1)}°</span>
-        </span>
-      </div>
-
-      <div className="bt-temp-card__scale" aria-hidden="true">
-        <div className="bt-temp-card__track">
-          <span className="bt-temp-card__base" style={{ width: `${scalePct(lo)}%` }} />
-          {!flat && (
-            <span
-              className={`bt-temp-card__move ${up ? '' : 'bt-temp-card__move--down'}`}
-              style={{ left: `${scalePct(lo)}%`, width: `${scalePct(hi) - scalePct(lo)}%` }}
-            />
-          )}
-        </div>
-        <div className="bt-temp-card__ticks bt-numeric">
-          <span>0°</span>
-          <span>{TEMPERATURE_SCALE_MAX}°</span>
-        </div>
-      </div>
-
-      {temp.reason && <p className="bt-temp-card__reason bt-caption">{temp.reason}</p>}
-    </section>
-  )
-}
+import { Icon } from '@/components'
+import type { AnalysisEvidenceType, ReportEvidence } from './types'
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
 /**
- * AI 분석 vs 상대 평가 레이더 (`REPORT-01`).
- * 좌표계 주의: 라벨은 도형 바깥(반지름 ×1.26)에 놓이므로 viewBox 는 **도형 크기 + 라벨 여백**이다.
+ * 레이더에 그릴 축 1개. 서버 응답(`axes` 맵)을 화면이 표시용으로 펼친 형태다.
+ *
+ * ⚠️ 계열이 **하나**다. 예전에는 'AI 분석 + 상대 평가' 두 계열을 겹쳐 그렸는데,
+ *    서버 리포트에는 상대 평가 점수가 없다(상호 평가는 `/evaluations` 별개 도메인).
  */
-export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?: string }) {
+export interface RadarPoint {
+  code: string
+  label: string
+  /** 0~100 비율. **미측정이면 null** */
+  percent: number | null
+  /** 1~5 원점수 */
+  score: number | null
+  measured: boolean
+  /** 근거 한 줄 */
+  note: string | null
+  /** 원시값 표시 문구 (예: "30분당 2.5회") */
+  rawText: string | null
+}
+
+/**
+ * 대화 행동 6축 레이더 (`REPORT-01`).
+ *
+ * 좌표계 주의: 라벨은 도형 바깥(반지름 ×1.26)에 놓이므로 viewBox 는 **도형 크기 + 라벨 여백**이다.
+ *
+ * **미측정 축은 도형에서 뺀다.** 0 으로 이어 붙이면 "최하점"으로 읽히는데,
+ * 측정하지 못한 것과 못한 것은 다른 말이다. 라벨만 흐리게 남기고 아래에 개수를 알린다.
+ */
+export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?: string }) {
   /** 도형 반지름 */
   const r = 74
   /** 라벨이 차지하는 바깥 여백. 5~6글자 축 이름이 잘리지 않을 만큼 잡는다 */
@@ -107,11 +49,15 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
     return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)] as const
   }
 
-  const polygon = (values: number[]) => values.map((v, i) => point(i, v / 100).join(',')).join(' ')
+  const gridPolygon = (ratio: number) =>
+    axes.map((_, i) => point(i, ratio).join(',')).join(' ')
 
-  const hasPeer = axes.some((a) => a.peerScore != null)
-  // 상대 평가가 없는 축(비언어 등)은 AI 값으로 이어 붙여 도형이 원점으로 꺾이지 않게 한다
-  const peerValues = axes.map((a) => a.peerScore ?? a.aiScore)
+  // 측정된 축만 이어 붙인다. 3점 미만이면 도형이 성립하지 않아 점으로만 표시한다.
+  const measured = axes
+    .map((axis, index) => ({ axis, index }))
+    .filter(({ axis }) => axis.percent != null)
+  const shape = measured.map(({ axis, index }) => point(index, (axis.percent ?? 0) / 100).join(',')).join(' ')
+  const unmeasuredCount = axes.length - measured.length
 
   return (
     <div className={className}>
@@ -121,13 +67,13 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
         // role="img" 로 두면 그래프가 **잎 노드**가 되어 안의 축 요소들이 접근성 트리에서 사라진다.
         // 축마다 점수를 읽히려면 컨테이너 역할이어야 한다.
         role="group"
-        aria-label="AI 분석과 상대 평가 비교 레이더 차트"
+        aria-label="대화 행동 6축 분석 레이더 차트"
       >
         {/* 눈금 링 */}
         {[0.25, 0.5, 0.75, 1].map((ratio) => (
           <polygon
             key={ratio}
-            points={polygon(axes.map(() => ratio * 100))}
+            points={gridPolygon(ratio)}
             fill="none"
             stroke="var(--bt-color-border)"
             strokeWidth={1}
@@ -137,43 +83,43 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1)
           return (
-            <line key={axis.key} x1={cx} y1={cy} x2={x} y2={y} stroke="var(--bt-color-border)" strokeWidth={1} />
+            <line key={axis.code} x1={cx} y1={cy} x2={x} y2={y} stroke="var(--bt-color-border)" strokeWidth={1} />
           )
         })}
 
-        {/* AI 계열 — 참고선이라 얇고 옅게 */}
-        <polygon
-          points={polygon(axes.map((a) => a.aiScore))}
-          fill="var(--bt-color-brand)"
-          fillOpacity={0.1}
-          stroke="var(--bt-color-brand)"
-          strokeWidth={1.5}
-          strokeDasharray="4 3"
-        />
-        {/* 상대 평가 계열 — 위에, 더 진하게(D-13 시각 우선) */}
-        {hasPeer && (
+        {measured.length >= 3 && (
           <polygon
-            points={polygon(peerValues)}
-            fill="var(--bt-color-success-marker)"
-            fillOpacity={0.2}
-            stroke="var(--bt-color-success-marker)"
+            points={shape}
+            fill="var(--bt-color-brand)"
+            fillOpacity={0.18}
+            stroke="var(--bt-color-brand)"
             strokeWidth={2.5}
           />
         )}
+        {/* 측정된 축의 꼭짓점. 도형이 안 그려지는 경우에도 값 위치는 보여야 한다 */}
+        {measured.map(({ axis, index }) => {
+          const [x, y] = point(index, (axis.percent ?? 0) / 100)
+          return <circle key={`dot-${axis.code}`} cx={x} cy={y} r={3} fill="var(--bt-color-brand)" />
+        })}
 
-        {/* 축 라벨. 점수는 여기 적지 않는다 — 아래 툴팁 슬롯이 hover/focus 시 정확한 값을
-            보여주므로, 기본 상태에서까지 숫자를 박아두면 도형 위가 시끄러워진다. */}
+        {/* 축 라벨. 점수는 여기 적지 않는다 — 아래 슬롯이 hover/focus 시 정확한 값을 보여준다. */}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1.26)
           const dx = x - cx
           const anchor = Math.abs(dx) < 4 ? 'middle' : dx > 0 ? 'start' : 'end'
-          const active = hovered === axis.key
+          const active = hovered === axis.code
           return (
             <text
-              key={axis.key}
+              key={axis.code}
               x={x}
               y={y}
-              fill={active ? 'var(--bt-color-text)' : 'var(--bt-color-text-secondary)'}
+              fill={
+                !axis.measured
+                  ? 'var(--bt-color-text-tertiary)'
+                  : active
+                    ? 'var(--bt-color-text)'
+                    : 'var(--bt-color-text-secondary)'
+              }
               fontSize={11}
               fontWeight={active ? 700 : 600}
               textAnchor={anchor}
@@ -187,24 +133,27 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
 
         {/* 축별 hover/focus 히트 영역. 마우스와 키보드가 같은 정보를 얻게 한다.
             outline 을 명시적으로 지운다 — 지우지 않으면 이 원의 사각 바운딩 박스에
-            브라우저 기본 포커스 사각형이 그대로 그려져 클릭할 때마다 "검정 네모"가 나타난다.
-            대신 위 라벨의 굵기·색·주변 축 옅어짐으로 포커스 상태를 표시한다. */}
+            브라우저 기본 포커스 사각형이 그려져 클릭할 때마다 "검정 네모"가 나타난다. */}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1)
           return (
             <circle
-              key={`hit-${axis.key}`}
+              key={`hit-${axis.code}`}
               cx={x}
               cy={y}
               r={18}
               fill="transparent"
               tabIndex={0}
               role="img"
-              aria-label={`${axis.label}. ${axis.peerScore != null ? `상대 평가 ${axis.peerScore}점, ` : ''}AI 분석 ${axis.aiScore}점`}
+              aria-label={
+                axis.measured && axis.score != null
+                  ? `${axis.label}. 5점 만점에 ${axis.score}점${axis.note ? `. ${axis.note}` : ''}`
+                  : `${axis.label}. 측정되지 않았어요`
+              }
               style={{ cursor: 'pointer', outline: 'none' }}
-              onMouseEnter={() => setHovered(axis.key)}
+              onMouseEnter={() => setHovered(axis.code)}
               onMouseLeave={() => setHovered(null)}
-              onFocus={() => setHovered(axis.key)}
+              onFocus={() => setHovered(axis.code)}
               onBlur={() => setHovered(null)}
             />
           )
@@ -212,27 +161,30 @@ export function RadarChart({ axes, className }: { axes: RadarAxis[]; className?:
       </svg>
 
       {/* 강조된 축의 상세. 툴팁을 SVG 안에 그리면 잘리므로 차트 아래 고정 슬롯에 둔다 */}
-      <div className="bt-caption mt-1 min-h-[1.4em] text-center" aria-hidden="true">
+      <div className="bt-caption mt-1 min-h-[2.6em] text-center" aria-hidden="true">
         {hovered
           ? (() => {
-            const axis = axes.find((a) => a.key === hovered)
-            if (!axis) return null
-            return axis.peerScore != null
-              ? `${axis.label} · 상대 평가 ${axis.peerScore} / AI 분석 ${axis.aiScore}`
-              : `${axis.label} · AI 분석 ${axis.aiScore}`
-          })()
-          : '축을 짚으면 점수를 볼 수 있어요'}
+              const axis = axes.find((a) => a.code === hovered)
+              if (!axis) return null
+              if (!axis.measured || axis.score == null) return `${axis.label} · 측정되지 않았어요`
+              return (
+                <>
+                  <b>
+                    {axis.label} · <span className="bt-numeric">{axis.score}</span> / 5
+                  </b>
+                  {axis.note && <span className="bt-muted block">{axis.note}</span>}
+                  {!axis.note && axis.rawText && <span className="bt-muted block">{axis.rawText}</span>}
+                </>
+              )
+            })()
+          : '축을 짚으면 점수와 근거를 볼 수 있어요'}
       </div>
-    </div>
-  )
-}
 
-/** 레이더 범례. 상대 평가를 먼저 적는다(우선 표시 원칙). */
-export function RadarLegend({ hasPeer }: { hasPeer: boolean }) {
-  return (
-    <div className="flex flex-wrap gap-4">
-      {hasPeer && <LegendDot color="var(--bt-color-success-marker)" label="상대 평가" />}
-      <LegendDot color="var(--bt-color-brand)" label="AI 분석" />
+      {unmeasuredCount > 0 && (
+        <p className="bt-caption bt-muted mt-1 text-center">
+          <span className="bt-numeric">{unmeasuredCount}</span>개 축은 측정되지 않아 도형에서 제외했어요.
+        </p>
+      )}
     </div>
   )
 }
@@ -250,71 +202,16 @@ export function LegendDot({ color, label }: { color: string; label: string }) {
   )
 }
 
-/* ── 이슈 맥락 카드 ─────────────────────────────────────── */
-
-/**
- * 심각도별 표시. 색만으로 구분하지 않고 **아이콘과 배지 문구**를 함께 바꾼다
- * — 색각 이상에서도 "참고"와 "주의"가 구분돼야 한다.
- */
-const SEVERITY_STYLE = {
-  info: { tone: 'neutral', icon: 'info-circle', label: '참고', color: 'var(--bt-color-border-strong)' },
-  warning: { tone: 'warning', icon: 'warning', label: '주의', color: 'var(--bt-color-warning-marker)' },
-  critical: { tone: 'danger', icon: 'error-circle', label: '집중 확인', color: 'var(--bt-color-danger-marker)' },
-} as const satisfies Record<IssueSeverity, { tone: 'neutral' | 'warning' | 'danger'; icon: 'info-circle' | 'warning' | 'error-circle'; label: string; color: string }>
-
-/**
- * 부적절 이슈 1건 (`REPORT-01-1`).
- * 형식은 **맥락 요약 + 전후 근거 + 대체 제안** 고정 — 발언만 나열하지 않는다.
- */
-export function IssueCard({ issue }: { issue: ReportIssue }) {
-  const severity = SEVERITY_STYLE[issue.severity ?? 'warning']
-
-  return (
-    // <Card style={{ borderColor: severity.color, borderLeftWidth: 3 }}>
-    <Card><div className="mb-2 flex flex-wrap items-center gap-2">
-      <Badge tone={severity.tone}>
-        <Icon name={severity.icon} size={12} />
-        {severity.label}
-      </Badge>
-      <b className="bt-body-sm">
-        {issue.categoryLabel} · <span className="bt-numeric">{formatClock(issue.eventTimeSec)}</span>
-      </b>
-    </div>
-
-      <div className="flex flex-col gap-2.5">
-        <div>
-          <span className="bt-overline">맥락 요약</span>
-          <p className="bt-body-sm mt-1">{issue.contextSummary}</p>
-        </div>
-
-        {issue.evidenceExcerpt ? (
-          <blockquote
-            className="bt-body-sm rounded-[var(--bt-radius-lg)] px-3 py-2.5"
-            style={{ background: 'var(--bt-color-surface-sunken)' }}
-          >
-            {issue.evidenceExcerpt}
-            <span className="bt-caption bt-muted"> (전후 3~4문장 근거)</span>
-          </blockquote>
-        ) : (
-          <p className="bt-caption bt-muted">
-            발언 발췌 저장에 동의하지 않아 근거 문장은 표시되지 않아요. 맥락 요약과 지표로만 안내합니다.
-          </p>
-        )}
-
-        {issue.alternativeExpression && (
-          <p className="bt-body-sm flex items-start gap-2" style={{ color: 'var(--bt-color-success)' }}>
-            <Icon name="bulb" size={16} className="mt-0.5 shrink-0" />
-            <span>대체 제안 — “{issue.alternativeExpression}”</span>
-          </p>
-        )}
-      </div>
-    </Card>
-  )
-}
-
 /* ── 행동 근거 지표 ─────────────────────────────────────── */
 
-export function MetricStat({ metric }: { metric: ReportMetric }) {
+/** 표시용 지표 1개. 서버는 원시 수치를 주므로 문구는 화면이 만든다. */
+export interface MetricView {
+  key: string
+  label: string
+  display: string
+}
+
+export function MetricStat({ metric }: { metric: MetricView }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="bt-numeric" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
@@ -344,35 +241,51 @@ export function FeedbackList({ items }: { items: readonly string[] }) {
   )
 }
 
-/* ── 대화 주제 ──────────────────────────────────────────── */
+/* ── 근거 구간 ──────────────────────────────────────────── */
+
+const EVIDENCE_LABEL: Readonly<Record<AnalysisEvidenceType, string>> = {
+  LONG_SILENCE: '긴 침묵',
+  INTERRUPTION: '말 끊기',
+  BACKCHANNEL: '맞장구',
+  GAZE_AWAY: '시선 이탈',
+  FACE_MISSING: '얼굴 벗어남',
+  SMILE: '미소',
+}
 
 /**
- * 주제별 점유 시간.
- *
- * 예전에는 글자 크기(11~17px)로 비중을 표현했는데, 11px 는 본문 하한(12px)보다 작고 6px 차이는
- * 눈으로 구분되지 않아 "작아서 못 읽는 워드 클라우드"만 남았다. 길이로 비교하는 막대로 바꾼다.
+ * 언제 무슨 일이 있었는지 (`REPORT-02` 설명가능성).
+ * 점수만 보여주면 "왜 이 점수인지" 물어볼 근거가 없다. 구간과 시각을 함께 적는다.
  */
-export function TopicCloud({ topics }: { topics: ReportTopic[] }) {
-  const max = Math.max(1, ...topics.map((t) => t.minutes))
+export function EvidenceList({ items }: { items: readonly ReportEvidence[] }) {
+  if (items.length === 0) {
+    return <p className="bt-body-sm bt-muted">기록된 근거 구간이 없어요.</p>
+  }
   return (
-    <ul className="flex flex-col gap-2" aria-label="주제별 대화 시간">
-      {topics.map((t) => (
-        <li key={t.label} className="flex items-center gap-3">
-          <span className="bt-body-sm w-[7.5rem] shrink-0 truncate">{t.label}</span>
-          <span
-            className="h-2.5 flex-1 overflow-hidden rounded-full"
-            style={{ background: 'var(--bt-color-surface-sunken)' }}
-            aria-hidden="true"
-          >
-            <span
-              className="block h-full rounded-full"
-              style={{ width: `${(t.minutes / max) * 100}%`, background: 'var(--bt-color-action)' }}
-            />
+    <ul className="flex flex-col gap-2" aria-label="분석 근거 구간">
+      {items.map((item) => (
+        <li key={item.evidenceId} className="flex items-start gap-2.5">
+          <span className="bt-caption bt-numeric bt-muted mt-0.5 w-11 shrink-0 text-right">
+            {formatClock(item.startMs / 1000)}
           </span>
-          <span className="bt-caption bt-muted bt-numeric w-9 shrink-0 text-right">{t.minutes}분</span>
+          <span className="bt-body-sm">
+            <b>{EVIDENCE_LABEL[item.eventType]}</b>
+            {item.description ? ` · ${item.description}` : ''}
+          </span>
         </li>
       ))}
     </ul>
+  )
+}
+
+/* ── 미측정 안내 ────────────────────────────────────────── */
+
+/** 비전 분석이 없을 때 지표 묶음 대신 보여주는 줄. 0 으로 그리면 사실과 달라진다. */
+export function NotMeasuredNote({ text }: { text: string }) {
+  return (
+    <p className="bt-caption bt-muted flex items-center gap-1.5">
+      <Icon name="info-circle" size={14} />
+      {text}
+    </p>
   )
 }
 
