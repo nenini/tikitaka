@@ -1,6 +1,11 @@
 import { apiClient } from '@/shared/api/client'
 import { errorCodeOf, unwrap, type ApiEnvelope } from '@/shared/api/envelope'
-import type { ReportStatusResponse, SessionReportDetail } from './types'
+import type {
+  ReportAxisDetail,
+  ReportStatusResponse,
+  SessionHistoryPage,
+  SessionReportDetail,
+} from './types'
 
 /**
  * AI 세션 리포트(REPORT) REST.
@@ -58,4 +63,52 @@ function isReportUnavailable(error: unknown): boolean {
  */
 export async function requestReportGeneration(sessionId: string): Promise<void> {
   await apiClient.post(`/v1/sessions/${sessionId}/report`)
+}
+
+/**
+ * 축 하나의 근거(`GET /v1/reports/{id}/analyses/{axisCode}`).
+ *
+ * 리포트 본체의 `evidenceSegments` 는 세션 전체라 "왜 이 축이 이 점수인가"를 답하지 못한다.
+ * 미측정 축은 서버가 줄 게 없어 404 가 오므로 `null` 로 정규화한다 — 오류 화면을 띄우면
+ * 사용자는 자기가 뭘 잘못 눌렀다고 생각한다.
+ */
+export async function getAxisDetail(
+  reportId: number,
+  axisCode: string,
+): Promise<ReportAxisDetail | null> {
+  try {
+    return unwrap(
+      await apiClient.get<ApiEnvelope<ReportAxisDetail>>(
+        `/v1/reports/${reportId}/analyses/${axisCode}`,
+      ),
+    )
+  } catch (error) {
+    if (isReportUnavailable(error)) return null
+    throw error
+  }
+}
+
+/**
+ * 지난 세션 목록(`GET /v1/growth/sessions`).
+ *
+ * ⚠️ 경로가 **growth** 다. 리포트 전용 목록 엔드포인트가 없고, 세션 이력에
+ *    `report: { exists, reportId, status }` 가 함께 오므로 이걸 목록의 원천으로 쓴다.
+ *    리포트가 없는 세션도 함께 오는 게 오히려 맞다 — "왜 이 세션은 리포트가 없지"를
+ *    화면에서 설명할 수 있다.
+ *
+ * 커서 페이지네이션이다. 첫 장은 `cursor` 없이 부르고, 다음 장은 `nextCursor` 를 넘긴다.
+ */
+export async function getSessionHistory(params?: {
+  cursor?: number | null
+  size?: number
+}): Promise<SessionHistoryPage> {
+  const search = new URLSearchParams()
+  if (params?.cursor != null) search.set('cursor', String(params.cursor))
+  if (params?.size != null) search.set('size', String(params.size))
+  const query = search.toString()
+  return unwrap(
+    await apiClient.get<ApiEnvelope<SessionHistoryPage>>(
+      `/v1/growth/sessions${query ? `?${query}` : ''}`,
+    ),
+  )
 }
