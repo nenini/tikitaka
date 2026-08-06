@@ -28,6 +28,22 @@ class MvpCoachingConfig:
     face_too_small_guidance_ms: int = 3_000
     low_light_guidance_ms: int = 10_000
 
+    voice_quiet_dbfs: float = -42.0
+    """이보다 조용한 발화가 이어지면 "조금 크게" 안내. float32 [-1,1] 기준이다.
+
+    보수적으로 잡았다. 실측 기준 보통 발화가 -22, 또렷하게 작은 목소리가 -44 정도라
+    -42 는 "마이크가 멀거나 정말 작게 말하는" 구간만 잡는다. 마이크 게인·거리·OS AGC 로
+    절대값이 흔들리므로 한 발화로 판정하지 않고 연속 발화를 요구한다.
+    """
+    voice_loud_dbfs: float = -9.0
+    """이보다 큰 발화가 이어지면 "낮춰 보세요" 안내. 클리핑 직전 구간이다."""
+    voice_sample_utterances: int = 3
+    """판정에 필요한 연속 발화 수. 한 번 웅얼거린 걸로 코칭하면 안 된다."""
+    voice_min_utterance_ms: int = 700
+    """이보다 짧은 발화는 음량 판정에서 뺀다 — 추임새("네")는 원래 작다."""
+    voice_cooldown_ms: int = 120_000
+    voice_max_per_user: int = 2
+
     def __post_init__(self) -> None:
         duration_values = (
             self.coaching_ttl_ms,
@@ -41,6 +57,7 @@ class MvpCoachingConfig:
             self.face_missing_guidance_ms,
             self.face_too_small_guidance_ms,
             self.low_light_guidance_ms,
+            self.voice_cooldown_ms,
         )
         if any(value < 0 for value in duration_values):
             raise ValueError("MVP coaching durations must be non-negative")
@@ -62,4 +79,18 @@ class MvpCoachingConfig:
             return self.vision_setup_cooldown_ms
         if coaching_type == "EXPRESSION_GUIDANCE":
             return self.low_smile_cooldown_ms
+        if coaching_type == "VOLUME_GUIDANCE":
+            return self.voice_cooldown_ms
         return self.default_cooldown_ms
+
+    def max_per_type_for(self, coaching_type: str) -> int | None:
+        """타입별 세션 상한. None 이면 타입 상한 없이 max_per_user 만 본다.
+
+        같은 잔소리를 반복하면 안 되는 축이 있다 — 표정과 성량이 그렇다. 사용자가
+        고치기 어려운 것을 매번 지적하면 코칭이 아니라 압박이 된다.
+        """
+        if coaching_type == "EXPRESSION_GUIDANCE":
+            return self.low_smile_max_per_user
+        if coaching_type == "VOLUME_GUIDANCE":
+            return self.voice_max_per_user
+        return None

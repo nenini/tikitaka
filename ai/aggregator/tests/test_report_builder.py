@@ -286,13 +286,14 @@ def test_build_narrative_verifies_against_own_utterances() -> None:
 def test_unmeasured_axis_mentions_are_dropped() -> None:
     """측정하지 않은 걸 좋다/나쁘다고 쓰면 거짓이다.
 
-    실측: 질문 축이 측정 부족인데 LLM이 "질문의 다양성이 조금 부족했어요"를 냈다.
+    실측: 축이 측정 부족인데 LLM이 그 축을 평가하는 문장을 냈다. (원래 사례는 질문
+    축이었으나 2026-08-06부터 질문은 측정된다 — vision 미수신 축으로 옮겼다.)
     """
-    report = _report()
+    report = _report(vision=False)
     axes = score_report(report).for_speaker(A)
     payload = _good_payload()
-    payload["improvements"] = ["질문의 다양성이 조금 부족했어요", "한 주제에 오래 머물렀어요"]
-    payload["missions"] = ["질문을 더 던져 보기", "새 주제를 꺼내 보기"]
+    payload["improvements"] = ["표정이 조금 굳어 있었어요", "한 주제에 오래 머물렀어요"]
+    payload["missions"] = ["미소를 더 지어 보기", "새 주제를 꺼내 보기"]
     narrative = parse_narrative(
         json.dumps(payload, ensure_ascii=False), include_quotes=False, axes=axes
     )

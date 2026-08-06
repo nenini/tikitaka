@@ -10,6 +10,7 @@ seq는 이벤트 종류 무관 (sessionId, userId, clientInstanceId) 범위에�
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
@@ -20,7 +21,9 @@ from typing import Protocol
 import numpy as np
 
 from stt.events import TranscriptFinalizedEvent, TranscriptPayload
-from stt.pipeline import TranscriptPiece
+from stt.pipeline import SAMPLE_RATE, TranscriptPiece
+
+logger = logging.getLogger(__name__)
 
 
 class Transcriber(Protocol):
@@ -78,6 +81,7 @@ class TranscriptionWorker:
         self._pending = 0  # 제출~완료(발행/폐기) 사이 job 수 — idle 판정용
         self._busy = False
         self.dropped_count = 0
+        self.empty_transcript_count = 0
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -122,7 +126,26 @@ class TranscriptionWorker:
                     job.audio, base_ms=job.observed_start_ms, min_confidence=job.min_confidence
                 )
                 if not pieces:
-                    continue  # 환각 필터로 비면 미발행(seq 미소비)
+                    # 환각 필터로 비면 미발행(seq 미소비).
+                    #
+                    # **여기가 유일한 판별 지점이다.** VAD 는 발화를 열었는데 전사가
+                    # 하나도 안 나온 경우인데, 원인이 둘이고 처방이 정반대다:
+                    #   (i) 잡음에 VAD 가 열렸다 → VAD 를 조여야 한다
+                    #   (ii) 진짜 말을 신뢰도 필터가 버렸다 → 필터를 풀어야 한다
+                    # 길이가 갈라 준다. 잡음 블립은 250ms~1초, 진짜 말은 2초 이상이다.
+                    # 지금까지 이 발화들은 흔적 없이 사라져서 어느 쪽인지 알 수 없었다.
+                    self.empty_transcript_count += 1
+                    logger.info(
+                        "transcript empty after filters user=%s utterance=%s "
+                        "audioMs=%d observedMs=%d-%d total=%d",
+                        job.user_id,
+                        job.utterance_id,
+                        int(len(job.audio) / SAMPLE_RATE * 1000),
+                        job.observed_start_ms,
+                        job.observed_end_ms,
+                        self.empty_transcript_count,
+                    )
+                    continue
                 # 철회 재검사 + seq 발행 + 완료시각 + out.put 을 한 임계구역에서(원자적)
                 with self._lock:
                     if job.user_id not in self._withdrawn:

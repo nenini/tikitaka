@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from aggregator.report.builder import ReportNarrative
 from aggregator.report.input import ReportInput, VisionInput
+from aggregator.report.topics import build_topic_breakdown
 from aggregator.report.scoring import (
     AXIS_BALANCE,
     AXIS_FLOW,
@@ -33,8 +34,25 @@ from aggregator.report.scoring import (
 )
 
 SCHEMA_VERSION = 1
-ANALYSIS_VERSION = "analysis-v1.0.0"
-REPORT_VERSION = "report-v1.0.0"
+ANALYSIS_VERSION = "analysis-v1.1.0"
+"""2026-08-06 v1.0.0 → v1.1.0.
+
+BE는 이 값을 `(sessionId, analysisVersion)` 멱등 키로 쓰고, **성장 지표 스냅샷에
+그대로 기록한다**(`GrowthMetricSnapshot.analysisVersion`). 산출물이 달라졌는데 버전을
+그대로 두면 같은 라벨 아래 서로 다른 두 종류의 점수가 섞여 추이가 무의미해진다.
+
+바뀐 것:
+  - `question` 축이 상시 미측정 → **측정됨.** 성장 지표의 questionScore 가 null 에서
+    실제 점수로 바뀐다. 이게 버전을 올리는 주된 이유다.
+  - `metrics.questionCount` 가 null → 실제 집계값.
+  - `topicBreakdown` 필드 신설.
+"""
+REPORT_VERSION = "report-v1.1.0"
+"""분석 버전과 같이 올린다.
+
+질문 축이 측정되면서 미측정 축 문장 필터가 더 이상 질문 관련 문장을 버리지 않는다.
+즉 같은 세션이라도 생성되는 문장 집합이 달라진다. 리포트 본문 스키마 자체는 그대로다.
+"""
 
 _AXIS_KEY = {
     AXIS_FLOW: "flow",
@@ -174,8 +192,9 @@ def build_analysis_payload(
                     "interruptionCount": metrics.interruption_count,
                     "backchannelCount": metrics.backchannel_count,
                     "fillerCount": metrics.filler_count,
-                    # 질문은 STT 문장부호 미제공으로 집계를 신뢰할 수 없다(scoring 참고)
-                    "questionCount": None,
+                    # 2026-08-06부터 집계한다. STT가 initial_prompt로 문장부호를
+                    # 복원하면서 '?' 기반 질문 판정이 성립하게 됐다(scoring 참고).
+                    "questionCount": metrics.question_count,
                     # 계약: visionMeasured=false면 비전 횟수도 null
                     "smileEpisodeCount": metrics.smile_episode_count if vision_ok else None,
                     "gazeAwayCount": metrics.gaze_away_count if vision_ok else None,
@@ -187,6 +206,18 @@ def build_analysis_payload(
                     ),
                     "fillerBreakdown": dict(metrics.filler_breakdown),
                 },
+                # 주제별 발화 비중 — 결정적 계산이라 LLM 이 개입하지 않는다.
+                # 화면에서 "무슨 얘기를 많이 했나" 막대로 그린다.
+                "topicBreakdown": [
+                    {
+                        "topic": share.topic,
+                        "label": share.label,
+                        "utteranceCount": share.utterance_count,
+                        "speakingMs": share.speaking_ms,
+                        "ratio": share.ratio,
+                    }
+                    for share in build_topic_breakdown(speaker.utterances)
+                ],
                 "evidenceSegments": _evidence_segments(report, speaker.speaker_id),
             }
         )

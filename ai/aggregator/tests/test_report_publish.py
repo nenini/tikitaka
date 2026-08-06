@@ -138,6 +138,43 @@ def test_does_not_retry_client_error() -> None:
     asyncio.run(scenario())
 
 
+def test_retries_on_conflict_while_backend_prepares_the_row() -> None:
+    """409(REPORT_NOT_PREPARED)는 요청이 틀린 게 아니라 순서가 이른 것이다.
+
+    BE 는 세션 종료 이벤트를 받고 리포트 행을 먼저 만든다. 그 준비 전에 우리 POST 가
+    도착하면 409 다. 재시도하지 않으면 그 세션의 리포트 문장이 영구히 사라진다.
+    """
+    async def scenario() -> None:
+        recorder = _Recorder(
+            httpx.Response(409, json={"success": False, "code": "REPORT_NOT_PREPARED"}),
+            _ok(duplicate=False),
+        )
+        publisher = _publisher(recorder)
+        await publisher.publish_report({}, idempotency_key="same-key")
+        assert len(recorder.requests) == 2
+        assert {r.headers["Idempotency-Key"] for r in recorder.requests} == {"same-key"}
+        await publisher.close()
+
+    asyncio.run(scenario())
+
+
+def test_does_not_retry_permanent_conflicts() -> None:
+    """같은 버전에 다른 내용이 저장돼 있다는 409는 다시 보내도 같은 답이다.
+
+    전부 재시도하면 영구 실패가 지연 실패로 바뀔 뿐이다.
+    """
+    async def scenario() -> None:
+        for code in ("ANALYSIS_IDEMPOTENCY_CONFLICT", "REPORT_RESULT_CONFLICT"):
+            recorder = _Recorder(httpx.Response(409, json={"success": False, "code": code}))
+            publisher = _publisher(recorder)
+            with pytest.raises(ReportPublishError):
+                await publisher.publish_analysis({}, idempotency_key="k")
+            assert len(recorder.requests) == 1, code
+            await publisher.close()
+
+    asyncio.run(scenario())
+
+
 def test_gives_up_after_max_attempts() -> None:
     async def scenario() -> None:
         recorder = _Recorder(httpx.Response(500))

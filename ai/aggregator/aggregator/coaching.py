@@ -134,10 +134,8 @@ class CoachingPolicy:
         target_type_count = self._count_by_target_and_type.get(
             target_type_key, 0
         )
-        if (
-            candidate.coaching_type == "EXPRESSION_GUIDANCE"
-            and target_type_count >= self.config.low_smile_max_per_user
-        ):
+        max_per_type = self.config.max_per_type_for(candidate.coaching_type)
+        if max_per_type is not None and target_type_count >= max_per_type:
             return None
 
         trigger_key = (target, candidate.coaching_type, candidate.trigger_id)

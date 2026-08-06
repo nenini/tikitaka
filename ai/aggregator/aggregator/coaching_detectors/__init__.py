@@ -6,10 +6,12 @@ from aggregator.coaching_detectors.conversation import (
 )
 from aggregator.coaching_detectors.vision_setup import VisionSetupCoachingDetector
 from aggregator.coaching_detectors.smile import SmileCoachingDetector
+from aggregator.coaching_detectors.volume import VolumeCoachingDetector
 
 __all__ = [
     "AttentionCoachingDetector",
     "ConversationCoachingDetector",
     "VisionSetupCoachingDetector",
     "SmileCoachingDetector",
+    "VolumeCoachingDetector",
 ]

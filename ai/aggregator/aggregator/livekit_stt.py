@@ -23,6 +23,7 @@ from aggregator.audio_adapter import (
 from aggregator.livekit_vision import LiveKitVisionAdapter
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.settings import IntegrationSettings
+from aggregator.task_guard import log_task_failure
 
 if TYPE_CHECKING:
     from livekit.rtc import AudioTrack, RemoteParticipant, RemoteTrackPublication
@@ -132,6 +133,7 @@ class LiveKitSttAdapter:
             and (event.features is None or event.features.stt_enabled)
         }
         self._track_tasks: dict[str, asyncio.Task[None]] = {}
+        self._flush_tasks: set[asyncio.Task[None]] = set()
         self._main_task: asyncio.Task[None] | None = None
         self._stopping = asyncio.Event()
         self._connected = asyncio.Event()
@@ -154,6 +156,11 @@ class LiveKitSttAdapter:
                 return_exceptions=True,
             )
         self._track_tasks.clear()
+
+        # 마감 중인 발화는 기다린다. 취소하면 그 발화가 통째로 사라진다.
+        if self._flush_tasks:
+            await asyncio.gather(*self._flush_tasks, return_exceptions=True)
+            self._flush_tasks.clear()
 
         if self._connected.is_set():
             await self._room.disconnect()
@@ -180,11 +187,48 @@ class LiveKitSttAdapter:
         def on_track_unsubscribed(
             _track: AudioTrack,
             publication: RemoteTrackPublication,
-            _participant: RemoteParticipant,
+            participant: RemoteParticipant,
         ) -> None:
             task = self._track_tasks.pop(publication.sid, None)
             if task is not None:
                 task.cancel()
+            self._schedule_flush(participant.identity, "unsubscribed")
+
+        @self._room.on("track_muted")
+        def on_track_muted(
+            participant: RemoteParticipant,
+            publication: RemoteTrackPublication,
+        ) -> None:
+            # 음소거는 구독을 끊지 않는다. 프레임만 멈추므로 VAD 가 발화 끝을 볼
+            # 기회 자체가 없고, SPEECH_ENDED 없이 is_speaking 이 고착된다.
+            if publication.kind != rtc.TrackKind.KIND_AUDIO:
+                return
+            self._schedule_flush(participant.identity, "muted")
+
+        @self._room.on("track_unmuted")
+        def on_track_unmuted(
+            participant: RemoteParticipant,
+            publication: RemoteTrackPublication,
+        ) -> None:
+            # 음소거 동안 오디오 스트림이 끝나버리면 태스크가 완료 상태로 남고,
+            # 해제해도 오디오가 영영 안 돌아온다. 죽어 있으면 다시 띄운다.
+            if publication.kind != rtc.TrackKind.KIND_AUDIO:
+                return
+            existing = self._track_tasks.get(publication.sid)
+            if existing is not None and not existing.done():
+                return
+            self._track_tasks.pop(publication.sid, None)
+            track = publication.track
+            if track is None:
+                return
+            logger.info(
+                "restarting audio track after unmute session=%s identity=%s",
+                self._event.session_id,
+                participant.identity,
+            )
+            self._start_audio_track(
+                cast("AudioTrack", track), publication, participant
+            )
 
         @self._room.on("disconnected")
         def on_disconnected(reason: object) -> None:
@@ -255,6 +299,36 @@ class LiveKitSttAdapter:
                 != rtc.ConnectionState.CONN_DISCONNECTED
             ):
                 await self._room.disconnect()
+
+    def _schedule_flush(self, identity: str, cause: str) -> None:
+        """진행 중 발화를 마감해 SPEECH_ENDED 를 내보낸다.
+
+        LiveKit 콜백은 동기 함수인데 flush 는 VAD 를 한 번 더 돈다(25초 버퍼면 100ms
+        안팎). 이벤트 루프에서 직접 부르면 안 되므로 스레드로 넘긴다.
+        """
+        participant = self._participants.get(identity)
+        if participant is None:
+            return
+        task = asyncio.create_task(
+            self._flush_speaker(participant.user_id, cause),
+            name=f"stt-flush-{self._event.session_id}-{participant.user_id}",
+        )
+        self._flush_tasks.add(task)
+        task.add_done_callback(self._flush_tasks.discard)
+        task.add_done_callback(log_task_failure)
+
+    async def _flush_speaker(self, user_id: str, cause: str) -> None:
+        events = await asyncio.to_thread(self._runner.flush_speaker, user_id)
+        if not events:
+            return
+        logger.info(
+            "flushed in-flight speech session=%s user=%s cause=%s events=%d",
+            self._event.session_id,
+            user_id,
+            cause,
+            len(events),
+        )
+        await self._forward(events)
 
     def _start_audio_track(
         self,
@@ -400,9 +474,11 @@ class LiveKitSttAdapter:
 
     async def _forward(self, events: Sequence[SttEvent]) -> None:
         for event in events:
+            # SPEECH_ENDED 가 안 보이면 is_speaking 고착을 사후에 판별할 수 없다.
+            # (SPEECH_STARTED 는 양이 많아 DEBUG 로 둔다)
             log = (
                 logger.info
-                if event.event_type == "TRANSCRIPT_FINALIZED"
+                if event.event_type in ("TRANSCRIPT_FINALIZED", "SPEECH_ENDED")
                 else logger.debug
             )
             log(

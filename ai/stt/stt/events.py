@@ -126,6 +126,13 @@ class SpeechEndedPayload(_CamelModel):
     observed_end_elapsed_ms: int = Field(ge=0)
     speech_duration_ms: int = Field(ge=0)
     termination_reason: TerminationReason
+    rms_dbfs: float | None = None
+    """이 발화의 실효 음량(dBFS). VAD가 잘라낸 음성 구간만 재므로 무음이 안 섞인다.
+
+    관제실이 "목소리를 조금 크게" 코칭을 낼 유일한 근거다. 선택 필드라 기존 fixture와
+    다른 생산자(파일 재생 등)는 그대로 통과한다 — 값이 없으면 음량 코칭만 안 나간다.
+    float32 [-1,1] 기준이라 일반 발화는 대략 -30 ~ -15 dBFS 다.
+    """
 
     @model_validator(mode="after")
     def _check(self) -> Self:

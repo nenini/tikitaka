@@ -7,9 +7,12 @@ GPU(cuda) 우선, 초기화 실패 시 CPU로 자동 폴백.
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 
 def _add_cuda_dll_dirs() -> None:
@@ -68,6 +71,22 @@ _FOREIGN_SCRIPT = re.compile(r"[Ѐ-ӿ؀-ۿ぀-ヿ一-鿿]")
 # (SPEECH_STARTED/ENDED만 뜨고 전사 안 뜸). 환경별 튜닝 필요. 현재 0.5 (실험서 0.6과 동일, 환각 컷만 소폭 강화, #39).
 NO_SPEECH_THRESHOLD = 0.5
 
+# whisper 는 짧은 발화(2~4초)에 문장부호를 안 붙인다. 부호가 없으면 한국어 의문문은
+# 평서문과 텍스트가 같아서("커피 자주 드세요"), 리포트의 질문균형 축이 통째로 측정
+# 불가였다. initial_prompt 로 디코더를 부호 쪽으로 유도하면 복원된다.
+#
+# 실측 2026-08-06 (fixtures/audio 6개, large-v3 float16 cuda):
+#   프롬프트 없음  물음표 3 · 마침표 3    ("취미가 어떻게 되세요" ← 부호 없음)
+#   이 프롬프트    물음표 4 · 마침표 16   ("취미가 어떻게 되세요?" ← 복원됨)
+#
+# **어휘가 중립이어야 한다.** 소개팅 어휘("저는 주말에 등산을…")를 넣은 후보는 부호는
+# 같이 얻으면서 전사 내용을 오염시켰다 — 화자가 "나는"이라 한 걸 "저는"으로 바꾸고
+# 영화 제목 하나를 통째로 떨어뜨렸다. 부호만 나열한 후보("?. ?.")는 최악이라
+# 프롬프트를 그대로 출력하고 무음 클립에 환각("자막은 설정에서…")을 만들었다.
+PUNCTUATION_PROMPT = (
+    "네, 그렇습니다. 정말요? 알겠습니다. 어떻게 될까요? 그럼 이만 줄이겠습니다."
+)
+
 
 @dataclass(frozen=True)
 class TranscriptPiece:
@@ -110,6 +129,7 @@ class SttEngine:
         vad_filter: bool = False,
         min_confidence: float = 0.5,
         no_speech_threshold: float = NO_SPEECH_THRESHOLD,
+        initial_prompt: str | None = PUNCTUATION_PROMPT,
     ) -> list[TranscriptPiece]:
         """오디오 청크(float32 mono 16kHz) → 전사 조각 리스트.
 
@@ -125,6 +145,8 @@ class SttEngine:
             no_speech_threshold=no_speech_threshold,
             log_prob_threshold=-1.0,
             condition_on_previous_text=False,  # 청크 간 환각 전파 방지
+            # 문장부호 복원 — 리포트의 질문균형 축이 '?'에 의존한다(PUNCTUATION_PROMPT 참조).
+            initial_prompt=initial_prompt,
             # 반복은 후처리(collapse+반복억제)로 잡는다. 디코딩 강제(no_repeat_ngram/penalty)는
             # 정확도를 깎아서 제거함. compression_ratio는 기본값(2.4)만 유지 = 반복 세그먼트 드롭.
             compression_ratio_threshold=2.4,
@@ -132,16 +154,31 @@ class SttEngine:
 
         pieces: list[TranscriptPiece] = []
         for seg in segments:
+            # 어느 필터가 얼마나 잘라내는지 남긴다. 임계값 두 개(no_speech_prob,
+            # min_confidence)가 모두 0.5 인데 실측 분포를 본 적이 없어서, 진짜 말이
+            # 걸리는지 잡음만 걸리는지 판단할 근거가 없었다.
             text = seg.text.strip()
             if not text:
+                logger.debug("segment dropped reason=EMPTY_TEXT")
                 continue
             if _FOREIGN_SCRIPT.search(text):
-                continue  # 한국어에 없는 외국 문자(키릴/한자 등) = 환각 드롭
+                # 한국어에 없는 외국 문자(키릴/한자 등) = 환각 드롭
+                logger.debug("segment dropped reason=FOREIGN_SCRIPT text=%r", text)
+                continue
             # 무음 확률이 높거나(환각 의심) 신뢰도가 낮으면 버린다
-            if getattr(seg, "no_speech_prob", 0.0) > no_speech_threshold:
+            no_speech_prob = float(getattr(seg, "no_speech_prob", 0.0))
+            if no_speech_prob > no_speech_threshold:
+                logger.debug(
+                    "segment dropped reason=NO_SPEECH_PROB value=%.3f threshold=%.2f text=%r",
+                    no_speech_prob, no_speech_threshold, text,
+                )
                 continue
             confidence = round(min(max(math.exp(seg.avg_logprob), 0.0), 1.0), 2)
             if confidence < min_confidence:
+                logger.debug(
+                    "segment dropped reason=LOW_CONFIDENCE value=%.2f threshold=%.2f text=%r",
+                    confidence, min_confidence, text,
+                )
                 continue
             pieces.append(
                 TranscriptPiece(

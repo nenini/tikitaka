@@ -12,6 +12,7 @@ seq는 종류 무관 (sessionId, userId, clientInstanceId)에서 단조 증가(w
 
 from __future__ import annotations
 
+import math
 import re
 import threading
 import time
@@ -43,6 +44,24 @@ from stt.transcription import (
 # 관제실로 나가는 TRANSCRIPT 이벤트를 깨끗하게 만든다.
 _REPEAT_GUARD_MAX_CHARS = 6
 _NORMALIZE = re.compile(r"[^\w가-힣]+")
+
+
+_SILENT_DBFS = -100.0
+"""사실상 무음. log(0) 을 피하려고 바닥을 둔다."""
+
+
+def rms_dbfs(audio: np.ndarray | None) -> float | None:
+    """발화 구간의 실효 음량(dBFS). 관제실 음량 코칭의 유일한 근거다.
+
+    VAD 가 이미 잘라낸 음성 구간만 받으므로 앞뒤 무음이 평균을 끌어내리지 않는다.
+    float32 [-1,1] 기준이라 일반 발화는 대략 -30 ~ -15 dBFS 다.
+    """
+    if audio is None or audio.size == 0:
+        return None
+    rms = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64))))
+    if rms <= 0.0:
+        return _SILENT_DBFS
+    return round(max(20.0 * math.log10(rms), _SILENT_DBFS), 2)
 
 
 def _normalize_text(text: str) -> str:
@@ -156,7 +175,11 @@ class SpeakerStream:
         )
 
     def _speech_ended(
-        self, created_ms: int, observed_end_ms: int, reason: TerminationReason
+        self,
+        created_ms: int,
+        observed_end_ms: int,
+        reason: TerminationReason,
+        utterance: np.ndarray | None = None,
     ) -> SpeechEndedEvent:
         return SpeechEndedEvent(
             **self._ids(),
@@ -168,6 +191,7 @@ class SpeakerStream:
                 observed_end_elapsed_ms=observed_end_ms,
                 speech_duration_ms=observed_end_ms - self._observed_start_ms,
                 termination_reason=reason,
+                rms_dbfs=rms_dbfs(utterance),
             ),
         )
 
@@ -248,8 +272,10 @@ class SpeakerStream:
         # 발화 종료
         observed_end_ms = self._elapsed_ms(self._offset + last_end)
         reason: TerminationReason = "MAX_DURATION" if force else "SILENCE"
-        events.append(self._speech_ended(self._now_pos_ms(), observed_end_ms, reason))
         utterance = self._buffer[first:last_end].copy()
+        events.append(
+            self._speech_ended(self._now_pos_ms(), observed_end_ms, reason, utterance)
+        )
         self._emit_transcript(events, utterance, observed_end_ms)
 
         self._buffer = self._buffer[last_end:]
@@ -258,8 +284,13 @@ class SpeakerStream:
         self._utterance_id = ""
         return events
 
-    def flush(self) -> List[StreamEvent]:
-        """정상 종료 시 진행 중 발화를 강제 종료·전사(terminationReason=SESSION_ENDED)."""
+    def flush(
+        self, reason: TerminationReason = "SESSION_ENDED"
+    ) -> List[StreamEvent]:
+        """진행 중 발화를 강제 종료·전사한다.
+
+        세션 종료면 SESSION_ENDED, 트랙이 끊기거나 음소거되면 TRACK_ENDED 다.
+        """
         events: List[StreamEvent] = []
         if self._withdrawn or not self._speaking:
             self._speaking = False
@@ -269,8 +300,12 @@ class SpeakerStream:
         if segments:
             last_end = int(segments[-1]["end"])
             observed_end_ms = self._elapsed_ms(self._offset + last_end)
-            events.append(self._speech_ended(self._now_pos_ms(), observed_end_ms, "SESSION_ENDED"))
             utterance = self._buffer[int(segments[0]["start"]) : last_end].copy()
+            events.append(
+                self._speech_ended(
+                    self._now_pos_ms(), observed_end_ms, reason, utterance
+                )
+            )
             self._emit_transcript(events, utterance, observed_end_ms)
         self._buffer = np.empty(0, dtype=np.float32)
         self._speaking = False
@@ -362,6 +397,22 @@ class SessionSttRunner:
     @property
     def dropped_count(self) -> int:
         return self._worker.dropped_count
+
+    def flush_speaker(self, user_id: str) -> List[StreamEvent]:
+        """트랙이 끊기거나 음소거된 화자의 진행 중 발화를 마감한다.
+
+        마감하지 않으면 SPEECH_ENDED 가 영영 안 나가고, 관제실의 `is_speaking` 이
+        True 로 고착된다. 침묵 감지는 "아무도 말하고 있지 않을 때"만 도는데 그 게이트가
+        `any()` 라, 한 명만 고착돼도 **세션 내내 침묵 코칭이 죽는다**.
+
+        음소거는 트랙 구독이 끊기지 않아 `close()` 를 기다릴 수도 없다. 프레임만 멈추므로
+        VAD 는 뒤따르는 침묵을 볼 기회 자체가 없다.
+        """
+        with self._streams_lock:
+            stream = self._streams.get(user_id)
+        if stream is None:
+            return []
+        return stream.flush("TRACK_ENDED")
 
     def withdraw(self, user_id: str) -> None:
         if user_id in self._streams:

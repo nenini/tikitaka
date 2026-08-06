@@ -114,6 +114,12 @@ class UserRuntimeState:
     last_question_ended_at_ms: int | None = None
     last_question_trigger_id: str | None = None
     last_verbal_reaction_at_ms: int | None = None
+    recent_utterance_dbfs: list[float] = field(default_factory=list)
+    """최근 발화들의 실효 음량(dBFS). VolumeCoachingDetector 가 소비한다.
+
+    한 발화로 판정하면 안 된다 — 웅얼거림 한 번, 마이크를 스친 한 번으로 코칭이 나간다.
+    최근 N개가 모두 같은 방향일 때만 안내한다. 길이는 감지기가 잘라 준다.
+    """
 
 
 @dataclass

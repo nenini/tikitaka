@@ -21,6 +21,8 @@ COACHING_MESSAGES: dict[str, str] = {
     "RESPONSE_PROMPT_01": "짧게라도 자신의 생각을 이야기해 보세요.",
     "RESPONSE_PROMPT_02": "떠오르는 생각부터 편하게 답해 보세요.",
     "RESPONSE_PROMPT_03": "상대방의 질문에 자신의 경험을 덧붙여 보세요.",
+    "VOLUME_GUIDANCE_UP_01": "목소리가 조금 작아요. 조금만 크게 말해 보세요.",
+    "VOLUME_GUIDANCE_DOWN_01": "목소리가 조금 커요. 편안한 크기로 낮춰 보세요.",
 }
 
 # Backward-compatible public name used by the existing demo.
@@ -41,3 +43,8 @@ COACHING_KEYS_BY_TYPE: dict[str, tuple[str, ...]] = {
     ),
     "EXPRESSION_GUIDANCE": ("EXPRESSION_GUIDANCE_01",),
 }
+"""타입 → 로테이션할 메시지 키. **여기 없는 타입은 후보의 message_key 를 그대로 쓴다.**
+
+VOLUME_GUIDANCE 와 VISION_SETUP_GUIDANCE 를 일부러 뺐다. 둘 다 상황에 따라 정반대
+문구가 필요해서(크게/작게, 얼굴/조명/거리) 로테이션을 걸면 엉뚱한 안내가 나간다.
+"""
