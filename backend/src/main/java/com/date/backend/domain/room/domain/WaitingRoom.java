@@ -21,8 +21,8 @@ import java.util.Objects;
 @Entity
 @Table(name = "sessions")
 public class WaitingRoom {
-	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 35 * 60;
-	public static final int BASE_DURATION_SECONDS = 30 * 60;
+	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 13 * 60;
+	public static final int BASE_DURATION_SECONDS = 8 * 60;
 	public static final int EXTENSION_DURATION_SECONDS = 5 * 60;
 	public static final int AI_VIDEO_DURATION_SECONDS = 5 * 60;
 
