@@ -21,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import jakarta.servlet.DispatcherType;
 
 import java.util.List;
 
@@ -41,6 +42,10 @@ public class SecurityConfig {
 			"/internal/ai/silence-events",
 			"/internal/ai/question-recommendations",
 			"/internal/ai/safety-events",
+			"/internal/v1/session-analyses",
+			"/internal/v1/session-reports/results",
+			"/internal/v1/voice-sessions/analyses",
+			"/internal/v1/voice-sessions/reports",
 			"/actuator/health/**",
 			"/v3/api-docs/**",
 			"/swagger-ui.html",
@@ -65,6 +70,10 @@ public class SecurityConfig {
 						.accessDeniedHandler(accessDeniedHandler)
 				)
 				.authorizeHttpRequests(authorize -> authorize
+						.dispatcherTypeMatchers(
+								DispatcherType.ASYNC,
+								DispatcherType.ERROR
+						).permitAll()
 						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 						.requestMatchers(
@@ -81,9 +90,11 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/matches/**").authenticated()
 						.requestMatchers("/api/v1/rooms/**").authenticated()
 						.requestMatchers("/api/v1/sessions/**").authenticated()
+						.requestMatchers("/api/v1/reports/**").authenticated()
 						.requestMatchers("/api/v1/notifications/**").authenticated()
 						.requestMatchers("/api/v1/growth/**").authenticated()
 						.requestMatchers("/api/v1/users/**").authenticated()
+						.requestMatchers("/api/v1/moderation/reports/**").authenticated()
 						.anyRequest().permitAll()
 				)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
