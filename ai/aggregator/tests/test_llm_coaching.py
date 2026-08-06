@@ -213,3 +213,71 @@ def test_rejects_model_instruction_leakage(response: str) -> None:
 
     with pytest.raises(ContextualCoachingError):
         client._validate_sentence(response)
+
+
+# ── 콜드스타트 워밍업 (2026-08-06 실측 대응) ─────────────────────────
+def test_warmup_uses_native_endpoint_with_keep_alive() -> None:
+    """keep_alive 는 네이티브 /api/chat 에만 먹는다.
+
+    OpenAI 호환 /v1/chat/completions 는 이 필드를 조용히 무시한다(실측: expires_at 이
+    그대로 5분 뒤였다). 그러면 5분 유휴 뒤 첫 코칭이 4.7초 걸려 3초 타임아웃을 넘긴다.
+    """
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"message": {"content": "."}})
+
+    settings = IntegrationSettings(
+        internal_token="t",
+        backend_base_url="http://be",
+        coaching_llm_enabled=True,
+        coaching_llm_base_url="http://ollama:11500/v1",
+        coaching_llm_model="exaone3.5:7.8b",
+    )
+    client = ExaoneCoachingClient(
+        settings,
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    asyncio.run(client.warmup())
+
+    assert seen["url"] == "http://ollama:11500/api/chat", "네이티브 경로여야 한다"
+    body = seen["body"]
+    assert isinstance(body, dict)
+    assert body["keep_alive"] == "1h"
+    assert body["model"] == "exaone3.5:7.8b"
+
+
+def test_warmup_survives_a_non_ollama_backend() -> None:
+    """exaone_server 등 네이티브 경로가 없는 백엔드에서는 404다. 죽으면 안 된다."""
+    client = ExaoneCoachingClient(
+        IntegrationSettings(
+            internal_token="t",
+            backend_base_url="http://be",
+            coaching_llm_enabled=True,
+            coaching_llm_base_url="http://exaone:8100",
+            coaching_llm_model="m",
+        ),
+        http_client=httpx.AsyncClient(
+            transport=httpx.MockTransport(
+                lambda _r: (_ for _ in ()).throw(httpx.ConnectError("no route"))
+            )
+        ),
+    )
+    asyncio.run(client.warmup())  # 예외가 새어 나오면 세션 시작이 깨진다
+
+
+def test_warmup_is_skipped_when_llm_disabled() -> None:
+    calls: list[str] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(200, json={})
+
+    client = ExaoneCoachingClient(
+        IntegrationSettings(internal_token="t", backend_base_url="http://be"),
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(record)),
+    )
+    asyncio.run(client.warmup())
+    assert calls == []

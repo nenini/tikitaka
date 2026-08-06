@@ -76,6 +76,13 @@ class IntegrationSettings:
         "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct"
     )
     coaching_llm_timeout_seconds: float = 3.0
+    coaching_llm_keep_alive: str = "1h"
+    """세션 시작 워밍업 때 Ollama에 넘기는 모델 상주 시간.
+
+    기본 5분 유휴면 모델이 내려가고, 그 뒤 첫 요청이 4.7초 걸려 3초 타임아웃을
+    넘긴다(실측 2026-08-06). 세션이 길어도 코칭이 끊기지 않게 넉넉히 잡는다.
+    `-1`이면 영구 상주. Ollama가 아닌 백엔드에서는 무시된다.
+    """
     coaching_llm_max_context_utterances: int = 10
     coaching_llm_max_message_characters: int = 100
 
@@ -178,6 +185,10 @@ class IntegrationSettings:
                 "COACHING_LLM_TIMEOUT_SECONDS",
                 3.0,
             ),
+            coaching_llm_keep_alive=os.getenv(
+                "COACHING_LLM_KEEP_ALIVE",
+                "1h",
+            ).strip(),
             coaching_llm_max_context_utterances=_positive_int(
                 "COACHING_LLM_MAX_CONTEXT_UTTERANCES",
                 10,

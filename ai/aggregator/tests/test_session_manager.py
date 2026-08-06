@@ -55,6 +55,10 @@ class FakeMessageGenerator:
         self.message = message
         self.calls: list[tuple[tuple[TranscriptSegment, ...], str]] = []
         self.closed = False
+        self.warmups = 0
+
+    async def warmup(self) -> None:
+        self.warmups += 1
 
     async def generate(
         self,

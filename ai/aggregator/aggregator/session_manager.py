@@ -520,6 +520,7 @@ class SessionManager:
         self._retention_task: asyncio.Task[None] | None = None
         self._report_publisher = report_publisher
         self._report_tasks: set[asyncio.Task[None]] = set()
+        self._warmup_tasks: set[asyncio.Task[None]] = set()
         self._report_semaphore = asyncio.Semaphore(
             settings.report_max_concurrency
         )
@@ -650,7 +651,23 @@ class SessionManager:
         )
         self._sessions[event.session_id] = runtime
         runtime.start()
+        self._warm_coaching_llm()
         return "PROCESSED"
+
+    def _warm_coaching_llm(self) -> None:
+        """코칭 모델을 미리 올려 둔다. 세션 시작을 막지 않게 백그라운드로.
+
+        Ollama가 5분 유휴면 모델을 내리고, 그 뒤 첫 요청은 4.7초가 걸려 코칭
+        타임아웃(3초)을 넘긴다(실측). 하필 **세션 시작 직후 첫 코칭**이 그 경우라
+        가장 눈에 띄는 자리에서 폴백이 난다.
+        """
+        if self._message_generator is None:
+            return
+        task = asyncio.create_task(
+            self._message_generator.warmup(), name="coaching-warmup"
+        )
+        self._warmup_tasks.add(task)
+        task.add_done_callback(self._warmup_tasks.discard)
 
     async def _end(
         self,
@@ -861,6 +878,13 @@ class SessionManager:
                 len(self._retained_transcripts),
             )
             self._retained_transcripts.clear()
+        if self._warmup_tasks:
+            # 워밍업은 결과를 안 쓰므로 기다리지 않고 끊는다. 남겨 두면 종료 후
+            # "Task was destroyed but it is pending" 경고가 뜬다.
+            for task in tuple(self._warmup_tasks):
+                task.cancel()
+            await asyncio.gather(*self._warmup_tasks, return_exceptions=True)
+            self._warmup_tasks.clear()
         await self._finish_report_tasks()
         if self._report_publisher is not None:
             await self._report_publisher.close()
