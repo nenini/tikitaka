@@ -5,7 +5,7 @@ import type { QuestionOption } from '@/components'
 import { useAuthStore } from '@/stores/auth.store'
 import { countPendingMessages, selectVisibleMessage, useCoachingStore } from '@/stores/coaching.store'
 import { useSessionStore } from '@/stores/session.store'
-import { errorMessageOf } from '@/shared/api/envelope'
+import { errorCodeOf, errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
 import { useSessionMedia } from './useSessionMedia'
@@ -251,21 +251,37 @@ export function SessionPage() {
   }, [realtime.contextualQuestions, realtime.silence])
 
   /* ── 5분 연장 (CONTACT-01) ──────────────────────────────
-     서버가 제출을 받는 창이 종료 **5분 전**부터라(`EXTENSION_WINDOW_MINUTES`)
-     카드도 같은 시점에 띄운다. 더 일찍 띄우면 눌러도 SESSION_EXTENSION_WINDOW_NOT_OPEN 이고,
-     더 늦게 띄우면 답할 시간이 부족하다.
+     서버가 제출을 받는 창이 `extensionDecisionDeadlineAt` 기준 **5분 전**부터다
+     (`SessionExtensionDecisionService.DECISION_WINDOW_MINUTES`).
 
-     ⚠️ `IN_PROGRESS` 확인이 반드시 필요하다. 서버의 `remainingSeconds` 는 세션이 시작하기
-        전에는 **종료까지가 아니라 예정 시작 시각까지**를 센다(`SessionLifecycleService.
-        remainingSeconds` — IN_PROGRESS 가 아니면 deadline 이 scheduledStartAt). 그래서 시작
-        직전에 입장하면 이 값이 5분 이하로 내려와, 세션이 열리자마자 연장 카드가 떴다. */
+     ⚠️ 카드 노출은 **STOMP 타이머 값만** 본다(`realtime.remainingSeconds`).
+        아래 `remainingSec` 은 REST 씨앗과 STOMP 틱을 한 숫자에 섞는데, 둘의 기준이 다르다.
+
+          STOMP 틱   → extensionDecisionDeadlineAt        (합의 전: 시작 + BASE)
+          REST 조회  → plannedDurationSec + extension     (시작 + PLANNED)
+
+        BASE 와 PLANNED 는 연장 시간만큼 차이가 나므로 두 값은 **정확히 5분** 어긋난다.
+        REST 값으로 카드를 띄우면 서버 창이 이미 닫힌 뒤라 누르는 족족
+        SESSION_STATE_CONFLICT 로 거절된다. 실제로 그 증상이 보고됐다.
+
+     ⚠️ `IN_PROGRESS` 확인도 필요하다. 세션 시작 전에는 서버의 `remainingSeconds` 가
+        종료까지가 아니라 **예정 시작 시각까지**를 센다(`SessionLifecycleService`). */
   const [extensionChoice, setExtensionChoice] = useState<ExtensionChoice>('pending')
   const [extensionError, setExtensionError] = useState<string | null>(null)
+  const [extensionClosed, setExtensionClosed] = useState(false)
+  const extensionRemainingSec = realtime.remainingSeconds
   const extensionVisible =
+    !extensionClosed &&
     sessionPhase === 'IN_PROGRESS' &&
-    remainingSec != null &&
-    remainingSec > 0 &&
-    remainingSec <= EXTENSION_WINDOW_MINUTES * 60
+    extensionRemainingSec != null &&
+    extensionRemainingSec > 0 &&
+    extensionRemainingSec <= EXTENSION_WINDOW_MINUTES * 60
+
+  // 양측 합의가 성립하면 카드를 닫는다. 상대의 결정은 여전히 보여주지 않는다(W-15) —
+  // 닫는 이유는 "이미 정해진 일에 다시 답하게 하지 않기" 위해서다.
+  useEffect(() => {
+    if (realtime.extension?.status === 'AGREED') setExtensionClosed(true)
+  }, [realtime.extension?.status])
 
   /**
    * 연장 의사 제출. 낙관적으로 화면을 먼저 바꾸고, 실패하면 되돌린다 —
@@ -284,6 +300,13 @@ export function SessionPage() {
         await decideSessionExtension(sessionId, decision)
       } catch (error) {
         setExtensionChoice(previous)
+        // 창이 닫혔거나 아직 안 열렸으면 **다시 눌러도 똑같이 실패한다.**
+        // 카드를 접어 헛되이 누르게 두지 않는다.
+        const code = errorCodeOf(error)
+        if (code === 'SESSION_EXTENSION_WINDOW_NOT_OPEN' || code === 'SESSION_STATE_CONFLICT') {
+          setExtensionClosed(true)
+          return
+        }
         setExtensionError(
           errorMessageOf(error, '연장 의사를 전달하지 못했어요. 다시 눌러주세요.'),
         )
@@ -561,6 +584,15 @@ function SafetyWarningCard({
  *  - 그 사이는 로컬에서 1초씩 깎아 표시만 매끄럽게 한다.
  *
  * 예전 구현은 30분을 하드코딩해 두 참가자의 타이머가 서로 어긋났다.
+ *
+ * ⚠️ 두 출처의 **기준 시각이 다르다.**
+ *      STOMP 틱  → `extensionDecisionDeadlineAt`  (합의 전: actualStartAt + BASE)
+ *      REST 조회 → `plannedDurationSec + extensionDurationSec` (actualStartAt + PLANNED)
+ *    PLANNED 가 BASE + 연장시간이라 **정확히 연장 시간(5분)만큼** 어긋나고, 첫 틱이 도착하는
+ *    순간 표시가 그만큼 점프한다. STOMP 가 끊기면 REST 값(5분 더 넉넉한 값)이 남는다.
+ *
+ *    연장 카드는 이 값을 쓰지 않고 STOMP 값만 본다 — 섞인 값으로 띄우면 서버 창이 닫힌 뒤에
+ *    카드가 떠서 누르는 족족 거절된다. TODO(SESSION-TIME): 백엔드에 기준 통일을 요청해 둔 상태다.
  */
 function useServerTimer(sessionId: number | null, pushedRemaining: number | null): number | null {
   const [remaining, setRemaining] = useState<number | null>(null)
