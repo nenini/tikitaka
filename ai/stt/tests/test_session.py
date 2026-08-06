@@ -188,3 +188,52 @@ def test_close_returns_events_in_ascending_seq(monkeypatch: pytest.MonkeyPatch) 
     seqs = [e.seq for e in final]
     assert seqs == sorted(seqs), f"seq 역행: {[(e.seq, e.event_type) for e in final]}"
     assert runner.poll_transcripts() == []
+
+
+# ── 트랙 종료·음소거 시 화자별 flush (2026-08-06 운영: is_speaking 고착) ──
+
+def test_flush_speaker_closes_in_flight_speech(monkeypatch: pytest.MonkeyPatch) -> None:
+    """음소거는 구독을 끊지 않는다. 프레임만 멈추므로 VAD 는 발화 끝을 볼 기회가 없다.
+
+    마감하지 않으면 SPEECH_ENDED 가 영영 안 나가고, 관제실의 is_speaking 이 True 로
+    고착돼 세션 내내 침묵 코칭이 죽는다.
+    """
+    _patch_vad(monkeypatch, start=0, end=8000)
+    runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+
+    events = runner.flush_speaker("42")
+    assert runner.wait_idle()
+    transcripts = runner.poll_transcripts()
+    runner.close()
+
+    assert [e.event_type for e in events] == ["SPEECH_ENDED"]
+    ended = events[0]
+    assert isinstance(ended, SpeechEndedEvent)
+    assert ended.payload.termination_reason == "TRACK_ENDED"
+    assert [t.event_type for t in transcripts] == ["TRANSCRIPT_FINALIZED"]
+
+
+def test_flush_speaker_is_idle_when_nobody_is_speaking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """음소거 이벤트는 발화 중이 아닐 때도 온다 — 빈 이벤트를 만들면 안 된다."""
+    _patch_vad(monkeypatch, start=0, end=8000)
+    runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
+    assert runner.flush_speaker("42") == []       # 스트림 자체가 없는 경우
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(12000, dtype=np.float32))
+    assert runner.flush_speaker("42") == []       # 이미 정상 종료된 경우
+    runner.close()
+
+
+def test_session_end_flush_still_says_session_ended(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """reason 인자를 추가하면서 기존 종료 경로가 바뀌지 않았는지."""
+    _patch_vad(monkeypatch, start=0, end=8000)
+    s = _stream()
+    s.feed(np.zeros(8000, dtype=np.float32))
+    events = s.flush()
+    assert isinstance(events[0], SpeechEndedEvent)
+    assert events[0].payload.termination_reason == "SESSION_ENDED"
