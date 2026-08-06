@@ -1,6 +1,7 @@
 package com.date.backend.domain.room.config;
 
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
+import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.domain.UserRole;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
@@ -34,6 +35,36 @@ class RoomStompAuthInterceptorTest {
 				mock(UserRepository.class),
 				participantRepository
 		);
+	}
+
+	@Test
+	void connectStoresAuthenticatedUserOnOriginalStompMessage() {
+		JwtTokenProvider tokenProvider = mock(JwtTokenProvider.class);
+		UserRepository userRepository = mock(UserRepository.class);
+		RoomStompAuthInterceptor connectInterceptor = new RoomStompAuthInterceptor(
+				tokenProvider,
+				userRepository,
+				participantRepository
+		);
+		AuthUser tokenUser = new AuthUser(101L, "session@example.com", UserRole.USER);
+		User user = mock(User.class);
+		when(tokenProvider.parseAccessToken("access-token")).thenReturn(tokenUser);
+		when(userRepository.findById(101L)).thenReturn(java.util.Optional.of(user));
+		when(user.isActive()).thenReturn(true);
+		when(user.getId()).thenReturn(101L);
+		when(user.getEmail()).thenReturn("session@example.com");
+		when(user.getRole()).thenReturn(UserRole.USER);
+
+		StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+		accessor.setNativeHeader("Authorization", "Bearer access-token");
+		accessor.setLeaveMutable(true);
+		Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+		connectInterceptor.preSend(message, null);
+
+		StompHeaderAccessor stored = StompHeaderAccessor.wrap(message);
+		assertThat(stored.getUser()).isInstanceOf(UsernamePasswordAuthenticationToken.class);
+		assertThat(stored.getUser().getName()).isEqualTo("101");
 	}
 
 	@Test
