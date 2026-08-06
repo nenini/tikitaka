@@ -66,29 +66,39 @@ public class SecurityConfig {
 						.authenticationEntryPoint(authenticationEntryPoint)
 						.accessDeniedHandler(accessDeniedHandler)
 				)
-				.authorizeHttpRequests(authorize -> authorize
-						.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
-						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
-						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-						.requestMatchers(
-								"/api/v1/auth/logout",
-								"/api/v1/auth/account"
-						).authenticated()
-						.requestMatchers(
-								"/api/v1/face-analyses",
-								"/api/v1/face-analyses/**"
-						).authenticated()
-						.requestMatchers("/api/v1/surveys/**").authenticated()
-						.requestMatchers("/api/v1/ai-chat/**").authenticated()
-						.requestMatchers("/api/v1/match-requests/**").authenticated()
-						.requestMatchers("/api/v1/matches/**").authenticated()
-						.requestMatchers("/api/v1/rooms/**").authenticated()
-						.requestMatchers("/api/v1/sessions/**").authenticated()
-						.requestMatchers("/api/v1/reports/**").authenticated()
-						.requestMatchers("/api/v1/notifications/**").authenticated()
-						.requestMatchers("/api/v1/users/**").authenticated()
-						.anyRequest().permitAll()
-				)
+			.authorizeHttpRequests(authorize -> authorize
+				.dispatcherTypeMatchers(
+					DispatcherType.ASYNC,
+					DispatcherType.ERROR
+				).permitAll()
+
+				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+
+				.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
+				.requestMatchers(
+					"/api/v1/auth/logout",
+					"/api/v1/auth/account"
+				).authenticated()
+
+				.requestMatchers(
+					"/api/v1/face-analyses",
+					"/api/v1/face-analyses/**"
+				).authenticated()
+
+				.requestMatchers("/api/v1/surveys/**").authenticated()
+				.requestMatchers("/api/v1/ai-chat/**").authenticated()
+				.requestMatchers("/api/v1/match-requests/**").authenticated()
+				.requestMatchers("/api/v1/matches/**").authenticated()
+				.requestMatchers("/api/v1/rooms/**").authenticated()
+				.requestMatchers("/api/v1/sessions/**").authenticated()
+				.requestMatchers("/api/v1/reports/**").authenticated()
+				.requestMatchers("/api/v1/notifications/**").authenticated()
+				.requestMatchers("/api/v1/users/**").authenticated()
+				.requestMatchers("/api/v1/moderation/reports/**").authenticated()
+
+				.anyRequest().authenticated()
+			)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
 		return http.build();
