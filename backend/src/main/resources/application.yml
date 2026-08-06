@@ -73,6 +73,9 @@ springdoc:
 app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  local-seed:
+    match-test-users-enabled: ${LOCAL_MATCH_TEST_USERS_ENABLED:false}
+    result-test-session-enabled: ${LOCAL_RESULT_TEST_SESSION_ENABLED:false}
 
 auth:
   jwt:
