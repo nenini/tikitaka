@@ -87,12 +87,42 @@ export class FaceAnalysisServiceError extends Error {
   }
 }
 
+/**
+ * 응답이 JSON 이 아니었다. 프론트가 만든 코드로, AI 서비스가 보낸 코드가 아니다.
+ *
+ * 배포에서 `/ai/face/` 프록시가 없거나 죽으면 요청이 SPA 로 흘러 **index.html 이 200 으로**
+ * 돌아온다. 그대로 `response.json()` 을 부르면 `SyntaxError: Unexpected token '<'` 이 나고,
+ * 화면에는 분석 실패가 아니라 정체불명의 오류가 뜬다. 상태 코드만 보면 성공이라 더 헷갈린다.
+ */
+export const FACE_SERVICE_UNREACHABLE = 'SERVICE_UNREACHABLE'
+
+/** JSON 응답으로 볼 수 있는지. `application/json`·`application/problem+json` 등을 받는다. */
+function looksLikeJson(response: Response): boolean {
+  const contentType = response.headers.get('content-type') ?? ''
+  return /\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(contentType)
+}
+
+/**
+ * 본문을 JSON 으로 읽되 **던지지 않는다.** 못 읽으면 `null`.
+ * content-type 이 맞아도 본문이 잘렸을 수 있어 파싱까지 해봐야 안다.
+ */
+async function readJsonSafely(response: Response): Promise<unknown> {
+  if (!looksLikeJson(response)) return null
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
 /** AI 오류 코드 → 사용자 문구. */
 export function describeFaceServiceError(error: unknown): string {
   if (!(error instanceof FaceAnalysisServiceError)) {
     return '분석 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.'
   }
   switch (error.errorCode) {
+    case FACE_SERVICE_UNREACHABLE:
+      return '분석 서버에 연결하지 못했어요. 잠시 후 다시 시도하거나 건너뛸 수 있어요.'
     case 'INVALID_IMAGE':
       return '사진을 읽지 못했어요. 다시 촬영해 주세요.'
     case 'PAYLOAD_TOO_LARGE':
@@ -129,8 +159,17 @@ export async function analyzeFace(
   )
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { errorCode?: string } | null
-    throw new FaceAnalysisServiceError(body?.errorCode ?? 'UNKNOWN', response.status)
+    const body = (await readJsonSafely(response)) as { errorCode?: string } | null
+    // 502·504 처럼 프록시가 만든 HTML 오류 페이지면 errorCode 가 없다 → 연결 실패로 본다.
+    const code = body?.errorCode ?? (looksLikeJson(response) ? 'UNKNOWN' : FACE_SERVICE_UNREACHABLE)
+    throw new FaceAnalysisServiceError(code, response.status)
   }
-  return (await response.json()) as AiFaceAnalysis
+
+  // ⚠️ 200 이어도 우리 응답이라는 보장이 없다. SPA 폴백(index.html)·프록시 오류 페이지가
+  //    200 으로 오면 여기서 걸러야 SyntaxError 대신 안내 문구가 뜬다.
+  const payload = await readJsonSafely(response)
+  if (payload === null || typeof payload !== 'object' || !('status' in payload)) {
+    throw new FaceAnalysisServiceError(FACE_SERVICE_UNREACHABLE, response.status)
+  }
+  return payload as AiFaceAnalysis
 }

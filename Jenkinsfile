@@ -58,10 +58,14 @@ pipeline {
 
         stage('Frontend Check') {
             steps {
+                // BT_REQUIRE_VISION_MODEL=1 — MediaPipe 모델(.task)은 저장소에 없고 npm ci 의
+                // postinstall 이 내려받는다. 하나라도 빠지면 Vision Worker 초기화가 통째로
+                // 실패해 표정·시선 분석이 죽은 채로 배포되므로, 여기서 빌드를 멈춘다.
                 sh '''
                     docker run --rm \
                       --user "$(id -u):$(id -g)" \
                       -e HOME=/tmp \
+                      -e BT_REQUIRE_VISION_MODEL=1 \
                       -v "$WORKSPACE:/workspace" \
                       -w /workspace/frontend \
                       "$NODE_IMAGE" \
