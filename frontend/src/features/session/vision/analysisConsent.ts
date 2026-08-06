@@ -1,4 +1,24 @@
+import { getMyConsents } from '@/features/consent/api'
 import { updateAnalysisSettings } from '../api'
+
+/**
+ * 얼굴 촬영·분석 동의 여부.
+ *
+ * ⚠️ **이 값은 세션 입장을 막지 않는다.** 표정 분석을 켤지 말지만 정한다 —
+ *    미동의 사용자도 화상 세션은 그대로 이용할 수 있어야 한다(선택 동의라서).
+ *    예전에는 이 값을 보지 않고 `expressionAnalysisEnabled: true` 를 고정으로 보내,
+ *    **동의하지 않은 사용자의 얼굴까지 분석**하고 있었다.
+ *
+ * 조회에 실패하면 `false` 다 — 모를 때 분석하는 쪽이 더 나쁜 실패다.
+ */
+async function hasFaceConsent(): Promise<boolean> {
+  try {
+    const consents = await getMyConsents()
+    return consents.some((consent) => consent.code === 'FACE_CAPTURE_CONSENT' && consent.consented)
+  } catch {
+    return false
+  }
+}
 
 /**
  * 세션별 표정·음성 분석 플래그 스냅샷.
@@ -55,9 +75,10 @@ export async function snapshotAnalysisSettings(
   sessionId: number,
 ): Promise<AnalysisSnapshot | null> {
   try {
+    const expressionAnalysisEnabled = await hasFaceConsent()
     const settings = await updateAnalysisSettings(sessionId, {
       voiceAnalysisEnabled: true,
-      expressionAnalysisEnabled: true,
+      expressionAnalysisEnabled,
     })
     const snapshot: AnalysisSnapshot = {
       voiceAnalysisEnabled: settings.voiceAnalysisEnabled,

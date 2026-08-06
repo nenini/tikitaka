@@ -36,6 +36,7 @@ import { ChatReportPage } from '@/features/chatbot/ChatReportPage'
 import { PersonaSetupPage } from '@/features/chatbot/PersonaSetupPage'
 // 세션 후 F4
 import { PeerReviewPage } from '@/features/result/PeerReviewPage'
+import { MyFeedbackPage } from '@/features/result/MyFeedbackPage'
 import { ReportListPage } from '@/features/report/ReportListPage'
 import { SessionReportPage } from '@/features/report/SessionReportPage'
 import { GrowthDashboardPage } from '@/features/growth/GrowthDashboardPage'
@@ -120,6 +121,8 @@ export const router = createBrowserRouter([
       },
       // 세션 후 F4: 상호 평가 W-14 → AI 세션 리포트 W-16
       { path: '/session/:sessionId/review', element: <PeerReviewPage /> },
+      // 상대 평가 제출 뒤 내가 받은 피드백을 읽는 화면. 설문과 성격이 달라 분리했다.
+      { path: '/session/:sessionId/feedback', element: <MyFeedbackPage /> },
       { path: '/session/:sessionId/report', element: <SessionReportPage /> },
       // AI 챗봇 F5: 페르소나 설정 W-10 → 대화 W-10b → 종료 시 종합 피드백.
       // `/chatbot` 은 진행 중 세션으로 해석된다.
