@@ -10,7 +10,7 @@ import {
   CardHeader,
   EmptyState,
   Icon,
-  ListRow,
+  ListRowButton,
   Skeleton,
   Stack,
   TagChip,
@@ -18,7 +18,13 @@ import {
 import { getCurrentMatch } from '@/features/matching/api'
 import { isMatchClosed } from '@/features/matching/types'
 import type { MatchPair } from '@/features/matching/types'
+import { getSessionHistory } from '@/features/report/api'
+import type { SessionHistoryItem } from '@/features/report/types'
 import { useAuthStore } from '@/stores/auth.store'
+
+/** 최근 리포트로 몇 건까지 걸지. 완성된 것만 걸러야 해서 받아오는 수는 더 크다. */
+const RECENT_SHOW_COUNT = 2
+const RECENT_FETCH_SIZE = 10
 
 /* -------------------------------------------------------------------------- */
 /*  W-08 · 메인 홈 (대시보드)                                                   */
@@ -95,6 +101,14 @@ function formatWhen(iso: string): string {
   return `${date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ${time}`
 }
 
+/** 리포트 날짜. 확정 문서라 상대 시간("2일 전")을 쓰지 않는다 — 목록 화면과 같은 규칙이다. */
+function formatReportDate(iso: string | null): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+}
+
 /** "2시간 12분 뒤". 이미 지났으면 '곧 시작'. */
 function formatStartsIn(iso: string): string {
   const diffMs = new Date(iso).getTime() - Date.now()
@@ -148,6 +162,34 @@ export function HomePage() {
 
   const [upcoming, setUpcoming] = useState<UpcomingView | null>(null)
   const [upcomingLoading, setUpcomingLoading] = useState(true)
+
+  const [recent, setRecent] = useState<SessionHistoryItem[]>([])
+  const [recentLoading, setRecentLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    // 홈에는 **완성된 리포트만** 건다. 생성 중·실패까지 요약에 섞으면 무엇을 눌러야 할지
+    // 판단할 정보가 부족해진다 — 그 사유는 '/reports' 목록이 설명한다.
+    getSessionHistory({ size: RECENT_FETCH_SIZE })
+      .then((page) => {
+        if (!alive) return
+        setRecent(
+          page.sessions
+            .filter((s) => s.report?.exists === true && s.report.status === 'COMPLETED')
+            .slice(0, RECENT_SHOW_COUNT),
+        )
+      })
+      .catch(() => {
+        // 리포트가 없는 것은 정상 상태다 — 실패해도 홈을 막지 않는다.
+        if (alive) setRecent([])
+      })
+      .finally(() => {
+        if (alive) setRecentLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -375,23 +417,43 @@ export function HomePage() {
           </Stack>
         </Card>
 
-        {/* 최근 리포트 */}
+        {/* 최근 리포트 — 완성된 것만 최대 2건. 목록 전체는 '/reports' 가 맡는다 */}
         <Card>
-          <CardHeader title="최근 리포트" />
-          <div>
-            <ListRow
-              leading={<Avatar size="sm" name="서준" />}
-              title="6회차 · 서준"
-              meta="대화 흐름 4.2 · 경청 4.5"
-              trailing={<span className="bt-caption">2일 전</span>}
+          <CardHeader
+            title="최근 리포트"
+            action={
+              recent.length > 0 ? (
+                <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
+                  전체 보기
+                </Button>
+              ) : undefined
+            }
+          />
+          {recentLoading ? (
+            <div className="flex flex-col gap-3">
+              <Skeleton height={44} />
+              <Skeleton height={44} />
+            </div>
+          ) : recent.length === 0 ? (
+            /* 생성 중·실패까지 여기서 설명하지 않는다 — 홈은 요약이고, 사유는 목록이 말한다 */
+            <EmptyState
+              icon={<Icon name="sparkle" size={24} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
+              title="아직 리포트가 없어요"
+              text="세션을 마치면 여기에 쌓여요."
             />
-            <ListRow
-              leading={<Avatar size="sm" name="AI" fallback="🤖" />}
-              title="AI 화상 연습"
-              meta="AI 분석 단독 · 상대 평가 없음"
-              trailing={<span className="bt-caption">4일 전</span>}
-            />
-          </div>
+          ) : (
+            <div>
+              {recent.map((item) => (
+                <ListRowButton
+                  key={item.sessionId}
+                  leading={<Avatar size="sm" name={item.partnerAlias ?? 'AI'} />}
+                  title={item.partnerAlias ? `${item.partnerAlias} 님과의 세션` : '세션'}
+                  meta={formatReportDate(item.endedAt ?? item.startedAt)}
+                  onClick={() => navigate(`/session/${item.sessionId}/report`)}
+                />
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </main>

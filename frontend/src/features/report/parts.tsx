@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { Icon } from '@/components'
-import type { AnalysisEvidenceType, NarrativeItem, ReportEvidence } from './types'
+import type {
+  AnalysisEvidenceType,
+  NarrativeItem,
+  ReportAxisDetail,
+  ReportEvidence,
+} from './types'
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
@@ -34,7 +39,18 @@ export interface RadarPoint {
  * **미측정 축은 도형에서 뺀다.** 0 으로 이어 붙이면 "최하점"으로 읽히는데,
  * 측정하지 못한 것과 못한 것은 다른 말이다. 라벨만 흐리게 남기고 아래에 개수를 알린다.
  */
-export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?: string }) {
+export function RadarChart({
+  axes,
+  className,
+  onSelect,
+  selected,
+}: {
+  axes: RadarPoint[]
+  className?: string
+  /** 축을 눌렀을 때. 없으면 차트는 읽기 전용이다 */
+  onSelect?: (code: string) => void
+  selected?: string | null
+}) {
   /** 도형 반지름 */
   const r = 74
   /** 라벨이 차지하는 바깥 여백. 5~6글자 축 이름이 잘리지 않을 만큼 잡는다 */
@@ -101,7 +117,18 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
         {/* 측정된 축의 꼭짓점. 도형이 안 그려지는 경우에도 값 위치는 보여야 한다 */}
         {measured.map(({ axis, index }) => {
           const [x, y] = point(index, (axis.percent ?? 0) / 100)
-          return <circle key={`dot-${axis.code}`} cx={x} cy={y} r={3} fill="var(--bt-color-brand)" />
+          const active = selected === axis.code
+          return (
+            <circle
+              key={`dot-${axis.code}`}
+              cx={x}
+              cy={y}
+              r={active ? 5 : 3}
+              fill="var(--bt-color-brand)"
+              stroke={active ? 'var(--bt-color-surface)' : undefined}
+              strokeWidth={active ? 2 : undefined}
+            />
+          )
         })}
 
         {/* 축 라벨. 점수는 여기 적지 않는다 — 아래 슬롯이 hover/focus 시 정확한 값을 보여준다. */}
@@ -138,6 +165,12 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
             브라우저 기본 포커스 사각형이 그려져 클릭할 때마다 "검정 네모"가 나타난다. */}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1)
+          // 미측정 축은 열어봐야 근거가 없다. 눌리게 두면 빈 패널만 나온다.
+          const selectable = onSelect != null && axis.measured
+          const label =
+            axis.measured && axis.score != null
+              ? `${axis.label}. 5점 만점에 ${axis.score}점${axis.note ? `. ${axis.note}` : ''}`
+              : `${axis.label}. 측정되지 않았어요${axis.unmeasuredReason ? `. ${axis.unmeasuredReason}` : ''}`
           return (
             <circle
               key={`hit-${axis.code}`}
@@ -146,17 +179,26 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
               r={18}
               fill="transparent"
               tabIndex={0}
-              role="img"
-              aria-label={
-                axis.measured && axis.score != null
-                  ? `${axis.label}. 5점 만점에 ${axis.score}점${axis.note ? `. ${axis.note}` : ''}`
-                  : `${axis.label}. 측정되지 않았어요${axis.unmeasuredReason ? `. ${axis.unmeasuredReason}` : ''}`
-              }
-              style={{ cursor: 'pointer', outline: 'none' }}
+              // 누를 수 있으면 button 이어야 스크린리더가 '누를 수 있음'을 알린다.
+              role={selectable ? 'button' : 'img'}
+              aria-label={selectable ? `${label}. 근거 보기` : label}
+              aria-pressed={selectable ? selected === axis.code : undefined}
+              style={{ cursor: selectable ? 'pointer' : 'default', outline: 'none' }}
               onMouseEnter={() => setHovered(axis.code)}
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(axis.code)}
               onBlur={() => setHovered(null)}
+              onClick={selectable ? () => onSelect(axis.code) : undefined}
+              // SVG 요소는 Enter/Space 로 click 이 발생하지 않는다 — 직접 처리한다.
+              onKeyDown={
+                selectable
+                  ? (event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      onSelect(axis.code)
+                    }
+                  : undefined
+              }
             />
           )
         })}
@@ -309,6 +351,109 @@ export function EvidenceList({ items }: { items: readonly ReportEvidence[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/* ── 축 드릴다운 ────────────────────────────────────────── */
+
+/**
+ * 지표 코드 → 사람이 읽는 이름. 서버는 `code`(예: `INTERRUPTION_COUNT`)만 준다.
+ * 모르는 코드는 코드를 그대로 쓰지 않고 **행을 감춘다** — 대문자 영문 코드가 화면에 뜨면
+ * 사용자는 오류로 읽는다.
+ */
+const METRIC_CODE_LABEL: Readonly<Record<string, string>> = {
+  SPEAKING_MS: '발화 시간',
+  SPEAKING_RATIO: '발화 비율',
+  LONG_SILENCE_COUNT: '긴 침묵',
+  INTERRUPTION_COUNT: '말 끊기',
+  BACKCHANNEL_COUNT: '맞장구',
+  FILLER_COUNT: '군말',
+  QUESTION_COUNT: '질문',
+  SMILE_EPISODE_COUNT: '미소',
+  GAZE_AWAY_COUNT: '시선 이탈',
+  FACE_MISSING_COUNT: '화면 벗어남',
+}
+
+/** 서버 단위 코드 → 표기. 알 수 없으면 값만 적는다. */
+function formatMetricValue(value: number | null, unit: string | null): string | null {
+  if (value == null || !Number.isFinite(value)) return null
+  switch (unit) {
+    case 'RATIO':
+      return `${Math.round(value * 100)}%`
+    case 'MILLISECONDS':
+      return `${Math.round(value / 60_000)}분`
+    case 'COUNT':
+      return `${value}회`
+    case 'COUNT_PER_30_MINUTES':
+      return `30분당 ${Math.round(value * 10) / 10}회`
+    default:
+      return String(Math.round(value * 10) / 10)
+  }
+}
+
+/**
+ * 축 하나의 근거 패널 (`REPORT-02` 설명가능성).
+ *
+ * 리포트 본체의 근거 구간은 세션 전체라 "왜 경청이 3점인가"를 답하지 못한다.
+ * 축을 누르면 **그 축에 쓰인 지표와 구간만** 모아 보여준다.
+ */
+export function AxisDetailPanel({
+  label,
+  detail,
+  loading,
+  error,
+  onClose,
+}: {
+  label: string
+  detail: ReportAxisDetail | null
+  loading: boolean
+  error: string | null
+  onClose: () => void
+}) {
+  const metrics = (detail?.relatedMetrics ?? [])
+    .map((item) => ({
+      code: item.code,
+      label: METRIC_CODE_LABEL[item.code] ?? null,
+      display: formatMetricValue(item.value, item.unit),
+    }))
+    .filter((item) => item.label != null && item.display != null)
+
+  return (
+    <div className="mt-3 rounded-[12px] bg-surface-sunken p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <b className="bt-body-sm">{label} · 근거</b>
+        <button type="button" className="bt-caption bt-muted" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+
+      {loading && <p className="bt-caption bt-muted">근거를 불러오는 중…</p>}
+
+      {!loading && error && <p className="bt-caption bt-muted">{error}</p>}
+
+      {!loading && !error && (
+        <>
+          {detail?.axis.note && <p className="bt-body-sm mb-2">{detail.axis.note}</p>}
+
+          {metrics.length > 0 && (
+            <ul className="mb-2 flex flex-col gap-1">
+              {metrics.map((item) => (
+                <li key={item.code} className="bt-caption flex justify-between gap-3">
+                  <span className="bt-muted">{item.label}</span>
+                  <span className="bt-numeric">{item.display}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {detail && detail.evidenceSegments.length > 0 ? (
+            <EvidenceList items={detail.evidenceSegments} />
+          ) : (
+            <p className="bt-caption bt-muted">이 축에 기록된 구간은 없어요.</p>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

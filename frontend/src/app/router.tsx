@@ -1,7 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AppShell } from './AppShell'
-import { ComingSoon } from './ComingSoon'
 import { HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { SplashPage } from '@/features/auth/SplashPage'
@@ -37,6 +36,7 @@ import { ChatReportPage } from '@/features/chatbot/ChatReportPage'
 import { PersonaSetupPage } from '@/features/chatbot/PersonaSetupPage'
 // 세션 후 F4
 import { PeerReviewPage } from '@/features/result/PeerReviewPage'
+import { ReportListPage } from '@/features/report/ReportListPage'
 import { SessionReportPage } from '@/features/report/SessionReportPage'
 import { GrowthDashboardPage } from '@/features/growth/GrowthDashboardPage'
 // 개발/QA 전용
@@ -84,9 +84,9 @@ export const router = createBrowserRouter([
           { path: '/', element: <HomePage /> },
           // 매칭 F2 진입점 — 트랙 선택. 이후 큐/카드는 몰입 흐름이라 셸 밖.
           { path: '/matching', element: <TrackSelectPage /> },
-          // AppShell 네비의 '리포트' 목적지. 세션별 리포트는 있으나 목록 화면은 아직 없음.
-          // TODO(FE): 리포트 목록 화면 생기면 ComingSoon 교체.
-          { path: '/reports', element: <ComingSoon title="리포트" /> },
+          // AppShell 네비의 '리포트' 목적지. 목록은 `GET /v1/growth/sessions` 를 원천으로 쓴다
+          // — 리포트 전용 목록 엔드포인트가 없고, 세션 이력에 리포트 유무가 함께 온다.
+          { path: '/reports', element: <ReportListPage /> },
           { path: '/growth', element: <GrowthDashboardPage /> },
           // 마이 · 동의 관리(AUTH-03)
           { path: '/me', element: <MyPage /> },
