@@ -15,6 +15,7 @@ public record SessionReportDetailResponse(
 		String reportVersion,
 		Map<String, ReportAxisResponse> axes,
 		ReportMetricsResponse metrics,
+		List<ReportTopicShareResponse> topicBreakdown,
 		String summaryText,
 		List<String> strengths,
 		List<String> improvements,

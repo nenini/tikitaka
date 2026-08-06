@@ -16,18 +16,21 @@ public class SessionParticipantAnalysis {
 	@Column(name = "analysis_status", nullable = false, length = 20) private AnalysisStatus status;
 	@Column(name = "axes_json", columnDefinition = "LONGTEXT") private String axesJson;
 	@Column(name = "metrics_json", columnDefinition = "LONGTEXT") private String metricsJson;
+	@Column(name = "topic_breakdown_json", columnDefinition = "LONGTEXT") private String topicBreakdownJson;
 	@Column(name = "created_at", nullable = false) private LocalDateTime createdAt;
 
 	protected SessionParticipantAnalysis() {}
 
 	public SessionParticipantAnalysis(SessionAnalysisReceipt receipt, Long sessionId, Long userId,
-			AnalysisStatus status, String axesJson, String metricsJson, LocalDateTime createdAt) {
+			AnalysisStatus status, String axesJson, String metricsJson, String topicBreakdownJson,
+			LocalDateTime createdAt) {
 		this.receipt = receipt;
 		this.sessionId = sessionId;
 		this.userId = userId;
 		this.status = status;
 		this.axesJson = axesJson;
 		this.metricsJson = metricsJson;
+		this.topicBreakdownJson = topicBreakdownJson;
 		this.createdAt = createdAt;
 	}
 
@@ -37,4 +40,5 @@ public class SessionParticipantAnalysis {
 	public AnalysisStatus getStatus() { return status; }
 	public String getAxesJson() { return axesJson; }
 	public String getMetricsJson() { return metricsJson; }
+	public String getTopicBreakdownJson() { return topicBreakdownJson; }
 }

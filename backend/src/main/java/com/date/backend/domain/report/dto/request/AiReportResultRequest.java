@@ -14,9 +14,9 @@ public record AiReportResultRequest(
 		@Schema(description = "AI-BE 최종 리포트 계약 버전", example = "1")
 		@Positive int schemaVersion,
 		@Schema(example = "12345") @NotNull @Positive Long sessionId,
-		@Schema(example = "analysis-v1.0.0")
+		@Schema(example = "analysis-v1.1.0")
 		@NotBlank @Pattern(regexp = "analysis-v\\d+\\.\\d+\\.\\d+") String analysisVersion,
-		@Schema(example = "report-v1.0.0")
+		@Schema(example = "report-v1.1.0")
 		@NotBlank @Pattern(regexp = "report-v\\d+\\.\\d+\\.\\d+") String reportVersion,
 		@NotNull OffsetDateTime generatedAt,
 		@NotEmpty List<@Valid ParticipantReportResult> reports

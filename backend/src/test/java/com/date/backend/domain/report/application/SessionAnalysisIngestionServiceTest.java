@@ -89,7 +89,7 @@ class SessionAnalysisIngestionServiceTest {
 				Map.of("뭐", 1));
 		SessionAnalysisRequest.ParticipantAnalysisRequest invalidParticipant =
 				new SessionAnalysisRequest.ParticipantAnalysisRequest(10L, AnalysisStatus.COMPLETED,
-						base.participants().getFirst().axes(), invalidMetrics, List.of());
+						base.participants().getFirst().axes(), invalidMetrics, List.of(), List.of());
 		SessionAnalysisRequest invalid = new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
 				base.analyzedAt(), List.of(invalidParticipant));
 		when(sessions.findWithMatchPairByIdForUpdate(1L))
@@ -114,7 +114,7 @@ class SessionAnalysisIngestionServiceTest {
 				metrics.coverage(), Map.of("뭐", 2));
 		SessionAnalysisRequest.ParticipantAnalysisRequest participant =
 				new SessionAnalysisRequest.ParticipantAnalysisRequest(10L, AnalysisStatus.COMPLETED,
-						base.participants().getFirst().axes(), invalidMetrics, List.of());
+						base.participants().getFirst().axes(), invalidMetrics, List.of(), List.of());
 		SessionAnalysisRequest invalid = new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
 				base.analyzedAt(), List.of(participant));
 		when(sessions.findWithMatchPairByIdForUpdate(1L))
@@ -152,7 +152,7 @@ class SessionAnalysisIngestionServiceTest {
 		return new SessionAnalysisRequest(1, "analysis-v1.0.0", 1L,
 				OffsetDateTime.parse("2026-08-03T09:00:00+09:00"),
 				List.of(new SessionAnalysisRequest.ParticipantAnalysisRequest(
-						10L, AnalysisStatus.COMPLETED, axes, metrics, List.of())));
+						10L, AnalysisStatus.COMPLETED, axes, metrics, List.of(), List.of())));
 	}
 
 	private WaitingRoom endedSession() {

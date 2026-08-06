@@ -18,6 +18,7 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class SessionReportQueryService {
 	private static final TypeReference<Map<String, ReportAxisResponse>> AXES_TYPE = new TypeReference<>() {};
+	private static final TypeReference<List<ReportTopicShareResponse>> TOPICS_TYPE = new TypeReference<>() {};
 	private final WaitingRoomRepository sessionRepository;
 	private final RoomParticipantRepository participantRepository;
 	private final SessionReportRepository reportRepository;
@@ -58,7 +59,8 @@ public class SessionReportQueryService {
 		return new SessionReportDetailResponse(
 				report.getId(), report.getSessionId(), report.getUserId(), report.getStatus(),
 				report.getGenerationMode(), report.getAnalysisVersion(), report.getReportVersion(),
-				analysis.axes(), analysis.metrics(), report.getSummaryText(), list(report.getStrengths()),
+				analysis.axes(), analysis.metrics(), analysis.topics(), report.getSummaryText(),
+				list(report.getStrengths()),
 				list(report.getImprovements()), list(report.getNextMissions()), analysis.evidence(),
 				report.getFailureCode(), report.getFailureReason(), report.getAttemptCount(),
 				report.getRequestedAt(), report.getGenerationStartedAt(), report.getGeneratedAt(),
@@ -153,12 +155,16 @@ public class SessionReportQueryService {
 			Map<String, ReportAxisResponse> axes = objectMapper.readValue(analysis.getAxesJson(), AXES_TYPE);
 			ReportMetricsResponse metrics = objectMapper.readValue(
 					analysis.getMetricsJson(), ReportMetricsResponse.class);
+			// 이 컬럼이 생기기 전 분석과, 전사가 없어 주제를 못 낸 참가자는 null이다.
+			List<ReportTopicShareResponse> topics = analysis.getTopicBreakdownJson() == null
+					? List.of()
+					: objectMapper.readValue(analysis.getTopicBreakdownJson(), TOPICS_TYPE);
 			List<ReportEvidenceResponse> evidence = evidenceRepository
 					.findAllByAnalysis_IdOrderByStartMsAsc(analysis.getId()).stream()
 					.map(item -> new ReportEvidenceResponse(item.getEvidenceKey(), item.getEventType(),
 							item.getStartMs(), item.getEndMs(), item.getDescription()))
 					.toList();
-			return new AnalysisBundle(Collections.unmodifiableMap(axes), metrics, evidence);
+			return new AnalysisBundle(Collections.unmodifiableMap(axes), metrics, topics, evidence);
 		} catch (JsonProcessingException exception) {
 			throw new BusinessException(ReportErrorCode.REPORT_RESPONSE_SERIALIZATION_FAILED);
 		}
@@ -171,8 +177,11 @@ public class SessionReportQueryService {
 	private record AnalysisBundle(
 			Map<String, ReportAxisResponse> axes,
 			ReportMetricsResponse metrics,
+			List<ReportTopicShareResponse> topics,
 			List<ReportEvidenceResponse> evidence
 	) {
-		private static AnalysisBundle empty() { return new AnalysisBundle(Map.of(), null, List.of()); }
+		private static AnalysisBundle empty() {
+			return new AnalysisBundle(Map.of(), null, List.of(), List.of());
+		}
 	}
 }

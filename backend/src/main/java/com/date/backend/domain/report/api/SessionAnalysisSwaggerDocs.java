@@ -26,7 +26,7 @@ public interface SessionAnalysisSwaggerDocs {
 							examples = @ExampleObject(name = "분석 성공 예시", value = """
 								{
 								  "schemaVersion": 1,
-								  "analysisVersion": "analysis-v1.0.0",
+								  "analysisVersion": "analysis-v1.1.0",
 								  "sessionId": 12345,
 								  "analyzedAt": "2026-08-03T17:00:00+09:00",
 								  "participants": [{
@@ -34,7 +34,7 @@ public interface SessionAnalysisSwaggerDocs {
 								    "analysisStatus": "COMPLETED",
 								    "axes": {
 								      "flow": {"score": 3.50, "measured": true, "raw": 8.0, "rawUnit": "COUNT_PER_30_MINUTES", "note": "10초 이상 침묵 8회"},
-								      "question": {"score": null, "measured": false, "raw": null, "rawUnit": null, "note": "측정 불가"},
+								      "question": {"score": 4.10, "measured": true, "raw": 14.5, "rawUnit": "COUNT_PER_30_MINUTES", "note": "질문 12회"},
 								      "listening": {"score": 4.25, "measured": true, "raw": 2.0, "rawUnit": "COUNT_PER_30_MINUTES", "note": "말 끊기 2회"},
 								      "reaction": {"score": 4.17, "measured": true, "raw": 16.0, "rawUnit": "COUNT_PER_30_MINUTES", "note": "미소와 맞장구 16회"},
 								      "balance": {"score": 4.50, "measured": true, "raw": 0.575, "rawUnit": "RATIO", "note": "발화 비율 57.5%"},
@@ -44,12 +44,17 @@ public interface SessionAnalysisSwaggerDocs {
 								      "speakingMs": 529509, "speakingRatio": 0.575,
 								      "longSilenceCount": 8, "silenceThresholdMs": 10000,
 								      "interruptionCount": 2, "backchannelCount": 9,
-								      "fillerCount": 32, "questionCount": null,
+								      "fillerCount": 32, "questionCount": 12,
 								      "smileEpisodeCount": 7, "gazeAwayCount": 9,
 								      "faceMissingCount": 1, "visionMeasured": true,
 								      "coverage": {"faceDetectionRate": 0.82, "speechRecognitionRate": null, "cameraUptimeRate": 0.76},
 								      "fillerBreakdown": {"뭐": 16, "그니까": 6, "약간": 10}
 								    },
+								    "topicBreakdown": [
+								      {"topic": "HOBBY", "label": "취미·여가", "utteranceCount": 12, "speakingMs": 184000, "ratio": 0.35},
+								      {"topic": "FOOD", "label": "음식", "utteranceCount": 7, "speakingMs": 92000, "ratio": 0.17},
+								      {"topic": "OTHER", "label": "기타", "utteranceCount": 20, "speakingMs": 253509, "ratio": 0.48}
+								    ],
 								    "evidenceSegments": []
 								  }]
 								}
