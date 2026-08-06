@@ -4,17 +4,25 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
-import { serverMessageOf } from '@/shared/api/envelope'
+import { errorCodeOf, serverMessageOf } from '@/shared/api/envelope'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 import { useAuthStore } from '@/stores/auth.store'
 import { signup } from './api'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
-/*  - 이메일(중복확인) · 비밀번호(강도)·확인                                     */
+/*  - 이메일 · 비밀번호(강도)·확인                                              */
 /*  - 실명·전화번호는 비공개(운영 목적) 수집 — 상대에게 공개되지 않는다.          */
 /*  - 개인정보 동의는 별도 목적별 동의 화면(W-03)에서 받는다.                     */
 /*  - 공통 컴포넌트 규약 준수: Steps / Field / Input / Progress / Badge / Callout */
+/*                                                                            */
+/*  ⚠️ 이메일 중복 확인 버튼을 두지 않는다. 확인용 API 가 없어서 예전에는 화면에서   */
+/*     'taken@example.com' 하나만 걸러내는 스텁을 돌렸는데, 어떤 주소든 "사용     */
+/*     가능" 이라고 해놓고 가입할 때 서버가 `DUPLICATE_EMAIL` 을 돌려줬다.       */
+/*     확인할 수 없는 것을 확인해 준 것처럼 보이는 편이 확인 버튼이 없는 것보다    */
+/*     나쁘다. 지금은 가입 시점의 서버 판정 하나만 쓴다 — 온보딩 프로필 화면      */
+/*     (`ProfilePage`)의 닉네임과 같은 방식이다.                                */
+/*     TODO(AUTH): 중복 확인 API 가 생기면 두 화면에 함께 붙인다.                 */
 /* -------------------------------------------------------------------------- */
 
 
@@ -64,14 +72,6 @@ const signupSchema = z
 
 type SignupForm = z.infer<typeof signupSchema>
 
-type EmailStatus = 'idle' | 'checking' | 'available' | 'taken'
-
-/** 데모용 이메일 중복 확인 스텁. TODO(AUTH): GET /api/auth/check-email 로 교체. */
-async function checkEmailAvailable(email: string): Promise<boolean> {
-  await new Promise((r) => setTimeout(r, 650))
-  return email.trim().toLowerCase() !== 'taken@example.com'
-}
-
 /** 비밀번호 강도 0~4 → 미터/라벨. */
 /**
  * 강도 표시용 점수(0~4).
@@ -93,7 +93,6 @@ const STRENGTH = ['너무 짧아요', '약함', '보통', '강함', '아주 강�
 export function SignupPage() {
   const navigate = useNavigate()
   const signIn = useAuthStore((s) => s.signIn)
-  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle')
   const [formError, setFormError] = useState<string | null>(null)
 
   const {
@@ -101,6 +100,7 @@ export function SignupPage() {
     handleSubmit,
     watch,
     setError,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
@@ -114,26 +114,10 @@ export function SignupPage() {
     },
   })
 
-  const email = watch('email')
   const password = watch('password')
   const score = passwordScore(password)
 
-  const onCheckEmail = async () => {
-    const value = email?.trim()
-    if (!value || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
-      setError('email', { message: '먼저 올바른 이메일을 입력하세요' })
-      return
-    }
-    setEmailStatus('checking')
-    const ok = await checkEmailAvailable(value)
-    setEmailStatus(ok ? 'available' : 'taken')
-  }
-
   const onSubmit = async (data: SignupForm) => {
-    if (emailStatus !== 'available') {
-      setError('email', { message: '이메일 중복 확인을 해주세요' })
-      return
-    }
     setFormError(null)
     try {
       // 가입 → 토큰 발급(가입 즉시 로그인 상태). 이후 온보딩은 인증된 상태로 진행한다.
@@ -147,26 +131,25 @@ export function SignupPage() {
       await signIn(tokens) // 토큰 저장 + GET /v1/users/me 하이드레이션
       navigate('/signup/verify')
     } catch (error) {
-      // 메시지 유무로 분기하므로 폴백을 받지 않는 serverMessageOf 를 쓴다
-      const message = serverMessageOf(error)
-      if (message && /이메일|email/i.test(message)) {
-        setError('email', { message })
-        setEmailStatus('taken')
-      } else {
-        setFormError(message ?? '가입에 실패했어요. 잠시 후 다시 시도해주세요.')
+      // 이메일 중복은 **이메일 필드**에 붙인다. 화면 아래 공용 오류로 띄우면 어느 칸을
+      // 고쳐야 하는지 알 수 없어, 사용자가 비밀번호·생년월일을 의심하며 헤맨다.
+      //
+      // 문구가 아니라 **에러 코드**로 판정한다. 예전에는 서버 메시지에 '이메일' 이
+      // 들어 있는지 정규식으로 봤는데, 서버가 문구를 다듬으면 조용히 어긋난다.
+      if (errorCodeOf(error) === 'DUPLICATE_EMAIL') {
+        setError('email', {
+          message: serverMessageOf(error) ?? '이미 가입된 이메일이에요. 로그인하거나 다른 주소를 써주세요.',
+        })
+        setFocus('email')
+        return
       }
+      // 메시지 유무로 분기하므로 폴백을 받지 않는 serverMessageOf 를 쓴다
+      setFormError(serverMessageOf(error) ?? '가입에 실패했어요. 잠시 후 다시 시도해주세요.')
     }
   }
 
-  // 이메일이 바뀌면 중복확인 상태를 초기화한다(오래된 확인 결과 방지).
-  const emailReg = register('email', {
-    onChange: () => emailStatus !== 'idle' && setEmailStatus('idle'),
-  })
-
-  const emailHelp =
-    emailStatus === 'available' ? '중복 확인 완료 · 로그인 ID로 사용돼요' : '로그인 ID로 사용돼요'
-  const emailError =
-    errors.email?.message ?? (emailStatus === 'taken' ? '이미 가입된 이메일이에요' : undefined)
+  const emailHelp = '로그인 ID로 사용돼요'
+  const emailError = errors.email?.message
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
@@ -185,24 +168,12 @@ export function SignupPage() {
           <Card>
             <Stack gap={16}>
               <Field label="이메일" required error={emailError} help={emailError ? undefined : emailHelp}>
-                <div className="flex items-start gap-2">
-                  <Input
-                    type="email"
-                    autoComplete="email"
-                    placeholder="name@example.com"
-                    className="flex-1"
-                    {...emailReg}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onCheckEmail}
-                    loading={emailStatus === 'checking'}
-                    disabled={!email}
-                  >
-                    중복 확인
-                  </Button>
-                </div>
+                <Input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                  {...register('email')}
+                />
               </Field>
 
               <Field
@@ -289,16 +260,6 @@ export function SignupPage() {
         </Stack>
       </form>
 
-      {/* 접근성: 중복 확인 진행 상태를 스크린리더에 알린다 */}
-      <span className="bt-sr-only" role="status" aria-live="polite">
-        {emailStatus === 'checking'
-          ? '이메일 중복 확인 중'
-          : emailStatus === 'available'
-            ? '사용 가능한 이메일입니다'
-            : emailStatus === 'taken'
-              ? '이미 가입된 이메일입니다'
-              : ''}
-      </span>
     </main>
   )
 }
