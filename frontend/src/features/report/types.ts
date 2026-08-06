@@ -56,6 +56,17 @@ export const REPORT_AXIS_LABEL: Readonly<Record<ReportAxisCode, string>> = {
   nonverbal: '비언어',
 }
 
+/**
+ * 축이 측정되지 않은 이유. 서버가 사유 코드를 주지 않아 화면이 안내 문구를 만든다.
+ *
+ * ⚠️ `question`(질문 균형)은 **데이터가 없어서가 아니라 판별 신뢰도가 부족해서** 미측정이다
+ *    (활용 규약 §4 — STT 문장부호와 질문 의도 판별). "카메라를 껐다" 같은 다른 사유와
+ *    같은 문구로 뭉뚱그리면 사용자가 자기 잘못으로 오해한다.
+ */
+export const AXIS_UNMEASURED_REASON: Readonly<Partial<Record<ReportAxisCode, string>>> = {
+  question: '질문 판별 정확도가 아직 충분하지 않아 이번 리포트에서는 점수를 내지 않았어요.',
+}
+
 /** 축 점수 범위. 서버 검증이 `@DecimalMin("1.00") @DecimalMax("5.00")` 이다. */
 export const AXIS_SCORE_MIN = 1
 export const AXIS_SCORE_MAX = 5
@@ -152,6 +163,65 @@ export interface ReportStatusResponse {
   updatedAt: string | null
 }
 
+/* ── 문장 + 출처 ───────────────────────────────────────── */
+
+/**
+ * 문장의 출처 유형(활용 규약 §5·§6.2).
+ *
+ * 규약은 강점·개선점·미션을 `{ text, sourceType, sourceCode }` 구조로 전환하려 하고,
+ * **문자열 배열은 호환 목적으로만 남긴다**고 못박았다. 서버가 아직 문자열을 주므로
+ * 화면은 `narrativeItems()` 로 **양쪽을 모두 받는다** — 전환 시점에 화면을 다시 손대지 않는다.
+ */
+export type NarrativeSourceType =
+  | 'MEASURED_AXIS'
+  | 'SURVEY_GOAL'
+  | 'MISSION_CATALOG'
+  | 'ISSUE_PATTERN'
+  | 'UTTERANCE_REF'
+
+/** 서버가 줄 수 있는 형태 둘. 문자열은 과도기 호환이다. */
+export type NarrativeInput =
+  | string
+  | { text?: string | null; sourceType?: string | null; sourceCode?: string | null }
+
+/** 화면이 쓰는 정규화 형태. */
+export interface NarrativeItem {
+  text: string
+  sourceType: NarrativeSourceType | null
+  sourceCode: string | null
+}
+
+const SOURCE_TYPES: readonly string[] = [
+  'MEASURED_AXIS',
+  'SURVEY_GOAL',
+  'MISSION_CATALOG',
+  'ISSUE_PATTERN',
+  'UTTERANCE_REF',
+]
+
+/**
+ * 문자열/객체 혼재 배열 → `NarrativeItem[]`.
+ *
+ * 빈 문자열과 문자열 `'null'` 을 걸러낸다 — 규약 §6.1 이 서버 검증 항목으로 명시한 값이라
+ * 새어 나올 수 있고, 화면에 그대로 그리면 "null" 이라는 조언이 뜬다.
+ */
+export function narrativeItems(input: readonly NarrativeInput[] | null | undefined): NarrativeItem[] {
+  if (!input) return []
+  const out: NarrativeItem[] = []
+  for (const entry of input) {
+    const raw = typeof entry === 'string' ? entry : (entry?.text ?? '')
+    const text = raw.trim()
+    if (text === '' || text === 'null' || text === 'undefined') continue
+    const type = typeof entry === 'string' ? null : (entry?.sourceType ?? null)
+    out.push({
+      text,
+      sourceType: type != null && SOURCE_TYPES.includes(type) ? (type as NarrativeSourceType) : null,
+      sourceCode: typeof entry === 'string' ? null : (entry?.sourceCode ?? null),
+    })
+  }
+  return out
+}
+
 /** GET /reports/{reportId} (`SessionReportDetailResponse`) — W-16 이 그리는 본체. */
 export interface SessionReportDetail {
   reportId: number
@@ -164,10 +234,13 @@ export interface SessionReportDetail {
   axes: ReportAxes
   metrics: ReportMetrics | null
   summaryText: string | null
-  strengths: string[]
-  improvements: string[]
-  /** 서버는 문자열 배열로 준다 — 미션 식별자가 없다 */
-  nextMissions: string[]
+  /**
+   * 서버는 아직 **문자열 배열**을 준다. 규약 §5 가 `{ text, sourceType, sourceCode }` 로의
+   * 전환을 예고했으므로 타입은 양쪽을 받고, 화면은 `narrativeItems()` 로 정규화해 쓴다.
+   */
+  strengths: NarrativeInput[]
+  improvements: NarrativeInput[]
+  nextMissions: NarrativeInput[]
   evidenceSegments: ReportEvidence[]
   failureCode: string | null
   failureReason: string | null
@@ -189,6 +262,62 @@ export interface SessionReportDetail {
 export function axisPercent(axis: ReportAxis | undefined): number | null {
   if (!axis || !axis.measured || axis.score == null) return null
   return Math.max(0, Math.min(100, (axis.score / AXIS_SCORE_MAX) * 100))
+}
+
+/**
+ * 측정된 축 개수. 화면 문구가 "6축 점수"라고 단정하지 않도록 여기서 센다.
+ *
+ * 규약 §4: 외부 설명에는 "6축 점수"가 아니라
+ * **"6축 분석 결과 — 현재 N개 축 측정, M개 축 측정 부족"** 을 쓴다.
+ * 현재는 질문 균형이 상시 미측정이라 6축 전부에 점수가 붙는 일이 없다.
+ */
+export function measuredAxisCount(axes: ReportAxes): number {
+  return REPORT_AXIS_ORDER.filter((code) => {
+    const axis = axes[code]
+    return Boolean(axis?.measured) && axis?.score != null
+  }).length
+}
+
+/**
+ * 발화 균형 판정 임곗값(활용 규약 §10 — 55/45 에서 **65/35 로 조정**됐다).
+ *
+ * ⚠️ 이 값을 바꾸면 규약 문서와 백엔드 기준도 함께 바꿔야 한다. 규약 §4 가
+ *    "동일한 지표는 실시간 코칭·배치 리포트·프롬프트·화면 설명에서 같은 기준"을 요구한다.
+ */
+export const SPEAKING_RATIO_HIGH = 0.65
+export const SPEAKING_RATIO_LOW = 0.35
+
+export type SpeakingBalance = 'DOMINANT' | 'BALANCED' | 'QUIET'
+
+/**
+ * 발화 비율 → 균형 상태.
+ *
+ * 문구는 평가가 아니라 **관찰**로 적는다(§5 규칙 5 — 인격이 아닌 관찰 가능한 행동).
+ * "말이 너무 많았어요"가 아니라 "내가 더 많이 말했어요"다.
+ */
+export function speakingBalanceOf(ratio: number | null): SpeakingBalance | null {
+  if (ratio == null) return null
+  if (ratio >= SPEAKING_RATIO_HIGH) return 'DOMINANT'
+  if (ratio <= SPEAKING_RATIO_LOW) return 'QUIET'
+  return 'BALANCED'
+}
+
+export const SPEAKING_BALANCE_LABEL: Readonly<Record<SpeakingBalance, string>> = {
+  DOMINANT: '내가 더 많이',
+  BALANCED: '비슷하게',
+  QUIET: '상대가 더 많이',
+}
+
+/**
+ * 긴 침묵 라벨. **기준 초는 서버 값(`silenceThresholdMs`)에서 읽는다.**
+ *
+ * ⚠️ 하드코딩 금지. 규약 §10 이 "코드는 10초로 통일했으나 레이아웃 문서에 15초가 남아 있어
+ *    FE 가 그 문서를 보고 라벨을 만들면 다시 어긋난다"고 경고한 바로 그 지점이다.
+ *    서버가 값을 주지 않으면 초를 적지 않는다 — 틀린 숫자보다 없는 편이 낫다.
+ */
+export function silenceLabel(thresholdMs: number | null): string {
+  if (thresholdMs == null || thresholdMs <= 0) return '긴 침묵'
+  return `${Math.round(thresholdMs / 1000)}초+ 침묵`
 }
 
 /** 원시값 표시 문구. 단위를 사람이 읽는 말로 바꾼다. */

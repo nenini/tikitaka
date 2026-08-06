@@ -5,11 +5,17 @@ import { getReportDetail, getReportStatus, requestReportGeneration } from './api
 import { EvidenceList, FeedbackList, MetricStat, NotMeasuredNote, RadarChart } from './parts'
 import type { MetricView, RadarPoint } from './parts'
 import {
+  AXIS_UNMEASURED_REASON,
   axisPercent,
   formatRaw,
+  measuredAxisCount,
+  narrativeItems,
   REPORT_AXIS_LABEL,
   REPORT_AXIS_ORDER,
   REPORT_NOT_CONFIGURED,
+  silenceLabel,
+  SPEAKING_BALANCE_LABEL,
+  speakingBalanceOf,
 } from './types'
 import type { ReportMetrics, ReportStatus, SessionReportDetail } from './types'
 
@@ -143,8 +149,13 @@ export function SessionReportPage() {
   }
 
   const radar = toRadarPoints(report)
-  const voiceMetrics = toVoiceMetrics(report.metrics)
+  const questionMeasured = Boolean(report.axes.question?.measured)
+  const voiceMetrics = toVoiceMetrics(report.metrics, questionMeasured)
   const visionMetrics = toVisionMetrics(report.metrics)
+  const strengths = narrativeItems(report.strengths)
+  const improvements = narrativeItems(report.improvements)
+  const missions = narrativeItems(report.nextMissions)
+  const measuredCount = measuredAxisCount(report.axes)
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
@@ -161,7 +172,21 @@ export function SessionReportPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 레이더 */}
         <Card className="flex w-full flex-col gap-3 lg:w-[340px] lg:shrink-0">
-          <div className="bt-h3">대화 행동 6축</div>
+          {/* "6축 점수"라고 쓰지 않는다 — 규약 §4. 항상 6개가 다 측정되는 게 아니라
+              몇 개가 측정됐는지를 제목에서 바로 밝힌다. */}
+          <div>
+            <div className="bt-h3">대화 행동 6축 분석</div>
+            <p className="bt-caption bt-muted mt-0.5">
+              <span className="bt-numeric">{measuredCount}</span>개 축 측정
+              {measuredCount < REPORT_AXIS_ORDER.length && (
+                <>
+                  {' · '}
+                  <span className="bt-numeric">{REPORT_AXIS_ORDER.length - measuredCount}</span>개 축
+                  측정 부족
+                </>
+              )}
+            </p>
+          </div>
           <RadarChart axes={radar} />
           <p className="bt-caption bt-muted">
             점수는 대화 <b className="text-ink">행동</b>에만 붙어요. 매력도나 등수가 아니에요.
@@ -206,11 +231,11 @@ export function SessionReportPage() {
           <div className="flex flex-col gap-4 sm:flex-row">
             <Card className="sm:flex-1">
               <div className="bt-h3 mb-2">잘한 점</div>
-              <FeedbackList items={report.strengths} />
+              <FeedbackList items={strengths} />
             </Card>
             <Card className="sm:flex-1">
               <div className="bt-h3 mb-2">개선점</div>
-              <FeedbackList items={report.improvements} />
+              <FeedbackList items={improvements} />
             </Card>
           </div>
 
@@ -221,15 +246,15 @@ export function SessionReportPage() {
             </Card>
           )}
 
-          {report.nextMissions.length > 0 && (
+          {missions.length > 0 && (
             <Card>
               <div className="bt-h3 mb-3">다음 세션 미션</div>
               {/* TagChip 은 브랜드색+링크색이라 누를 수 있는 것처럼 보인다 — 미션은
                   그냥 정보 라벨이라 중립 톤의 정적 칩(.bt-mission-chip)으로 그린다. */}
               <Cluster gap={6}>
-                {report.nextMissions.map((mission) => (
-                  <span key={mission} className="bt-mission-chip">
-                    {mission}
+                {missions.map((mission, index) => (
+                  <span key={`${mission.sourceCode ?? 'mission'}-${index}`} className="bt-mission-chip">
+                    {mission.text}
                   </span>
                 ))}
               </Cluster>
@@ -255,18 +280,33 @@ function toRadarPoints(report: SessionReportDetail): RadarPoint[] {
       measured: Boolean(axis?.measured),
       note: axis?.note ?? null,
       rawText: formatRaw(axis?.raw ?? null, axis?.rawUnit ?? null),
+      unmeasuredReason: AXIS_UNMEASURED_REASON[code] ?? null,
     }
   })
 }
 
-/** 서버는 원시 수치를 준다 — 표시 문구는 여기서 만든다. 값이 없는 지표는 아예 넣지 않는다. */
-function toVoiceMetrics(metrics: ReportMetrics | null): MetricView[] {
+/**
+ * 서버는 원시 수치를 준다 — 표시 문구는 여기서 만든다. 값이 없는 지표는 아예 넣지 않는다.
+ *
+ * ⚠️ **질문 수는 `question` 축이 측정된 경우에만 낸다.** 규약 §4 가 질문 균형을 미측정으로
+ *    두는 이유가 "질문 의도 판별의 신뢰도가 충분하지 않아서"인데, 같은 화면에서 "질문 12회"를
+ *    단정하면 앞뒤가 맞지 않는다. 못 믿을 판정으로 센 수를 사실처럼 적는 셈이다.
+ */
+function toVoiceMetrics(metrics: ReportMetrics | null, questionMeasured: boolean): MetricView[] {
   if (!metrics) return []
   const out: MetricView[] = []
   if (metrics.speakingRatio != null) {
-    out.push({ key: 'speakingRatio', label: '발화 비율', display: `${Math.round(metrics.speakingRatio * 100)}%` })
+    const balance = speakingBalanceOf(metrics.speakingRatio)
+    out.push({
+      key: 'speakingRatio',
+      label: '발화 비율',
+      display: `${Math.round(metrics.speakingRatio * 100)}%`,
+      // 65/35 기준(§10). 숫자만 두면 "68% 면 많은 건가"를 사용자가 판단해야 한다.
+      badge: balance ? SPEAKING_BALANCE_LABEL[balance] : null,
+      badgeTone: balance === 'BALANCED' ? 'neutral' : 'notice',
+    })
   }
-  if (metrics.questionCount != null) {
+  if (questionMeasured && metrics.questionCount != null) {
     out.push({ key: 'questionCount', label: '질문', display: `${metrics.questionCount}회` })
   }
   if (metrics.backchannelCount != null) {
@@ -276,7 +316,12 @@ function toVoiceMetrics(metrics: ReportMetrics | null): MetricView[] {
     out.push({ key: 'interruptionCount', label: '말 끊기', display: `${metrics.interruptionCount}회` })
   }
   if (metrics.longSilenceCount != null) {
-    out.push({ key: 'longSilenceCount', label: '긴 침묵', display: `${metrics.longSilenceCount}회` })
+    out.push({
+      key: 'longSilenceCount',
+      // 기준 초는 서버 값에서 읽는다 — 문서에 남은 15초를 베끼면 다시 어긋난다(§10).
+      label: silenceLabel(metrics.silenceThresholdMs),
+      display: `${metrics.longSilenceCount}회`,
+    })
   }
   if (metrics.fillerCount != null) {
     out.push({ key: 'fillerCount', label: '군말', display: `${metrics.fillerCount}회` })

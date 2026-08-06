@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Icon } from '@/components'
-import type { AnalysisEvidenceType, ReportEvidence } from './types'
+import type { AnalysisEvidenceType, NarrativeItem, ReportEvidence } from './types'
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
@@ -22,6 +22,8 @@ export interface RadarPoint {
   note: string | null
   /** 원시값 표시 문구 (예: "30분당 2.5회") */
   rawText: string | null
+  /** 미측정 사유. 사유를 아는 축에만 붙는다 — 없으면 일반 문구를 쓴다 */
+  unmeasuredReason?: string | null
 }
 
 /**
@@ -148,7 +150,7 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
               aria-label={
                 axis.measured && axis.score != null
                   ? `${axis.label}. 5점 만점에 ${axis.score}점${axis.note ? `. ${axis.note}` : ''}`
-                  : `${axis.label}. 측정되지 않았어요`
+                  : `${axis.label}. 측정되지 않았어요${axis.unmeasuredReason ? `. ${axis.unmeasuredReason}` : ''}`
               }
               style={{ cursor: 'pointer', outline: 'none' }}
               onMouseEnter={() => setHovered(axis.code)}
@@ -166,7 +168,16 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
           ? (() => {
               const axis = axes.find((a) => a.code === hovered)
               if (!axis) return null
-              if (!axis.measured || axis.score == null) return `${axis.label} · 측정되지 않았어요`
+              if (!axis.measured || axis.score == null) {
+                return (
+                  <>
+                    <b>{axis.label} · 측정되지 않았어요</b>
+                    {axis.unmeasuredReason && (
+                      <span className="bt-muted block">{axis.unmeasuredReason}</span>
+                    )}
+                  </>
+                )
+              }
               return (
                 <>
                   <b>
@@ -209,13 +220,33 @@ export interface MetricView {
   key: string
   label: string
   display: string
+  /** 수치만으로 판단이 안 서는 지표에 붙이는 해석 한 마디 (예: 발화 비율 → '내가 더 많이') */
+  badge?: string | null
+  badgeTone?: 'neutral' | 'notice'
 }
 
 export function MetricStat({ metric }: { metric: MetricView }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="bt-numeric" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
-        {metric.display}
+      <span className="flex items-baseline gap-1.5">
+        <span className="bt-numeric" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          {metric.display}
+        </span>
+        {metric.badge && (
+          // 평가가 아니라 관찰이다(§5 규칙 5) — 색으로 잘잘못을 매기지 않고 톤만 구분한다.
+          <span
+            className="bt-caption"
+            style={{
+              color:
+                metric.badgeTone === 'notice'
+                  ? 'var(--bt-color-text-secondary)'
+                  : 'var(--bt-color-text-tertiary)',
+              fontWeight: 600,
+            }}
+          >
+            {metric.badge}
+          </span>
+        )}
       </span>
       <span className="bt-caption bt-muted">{metric.label}</span>
     </div>
@@ -227,15 +258,19 @@ export function MetricStat({ metric }: { metric: MetricView }) {
 /**
  * 목록은 실제 `<ul><li>` 로 그린다. `<p>· 텍스트</p>` 는 눈에만 목록이고
  * 스크린리더에는 "항목 3개"라는 정보가 전달되지 않는다.
+ *
+ * 서버가 문장별 출처(`sourceType`)를 주기 시작하면 그대로 받는다. 다만 **출처 코드는 화면에
+ * 그리지 않는다** — `MEASURED_AXIS` 같은 내부 코드는 사용자에게 의미가 없고, 근거는 이미
+ * 레이더의 축 note 와 '언제 그랬나요' 구간이 사람 말로 보여준다.
  */
-export function FeedbackList({ items }: { items: readonly string[] }) {
+export function FeedbackList({ items }: { items: readonly NarrativeItem[] }) {
   if (items.length === 0) {
     return <p className="bt-body-sm bt-muted">해당하는 내용이 없어요.</p>
   }
   return (
     <ul className="bt-body-sm flex list-disc flex-col gap-1.5 pl-5">
-      {items.map((text) => (
-        <li key={text}>{text}</li>
+      {items.map((item, index) => (
+        <li key={`${item.sourceCode ?? 'text'}-${index}`}>{item.text}</li>
       ))}
     </ul>
   )
