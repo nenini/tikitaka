@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -43,6 +44,8 @@ from aggregator.vision_events import (
     VisionEventBatch,
     VisionMetricSnapshot,
 )
+
+logger = logging.getLogger(__name__)
 
 AnalysisEmitter = Callable[[AnalysisEvent], None]
 CoachingEmitter = Callable[[CoachingCommand], None]
@@ -148,9 +151,23 @@ class SessionAggregator:
         sequence_key = (parsed.user_id, parsed.client_instance_id)
         previous_seq = self._stt_last_seq.get(sequence_key)
         if previous_seq is not None and parsed.seq <= previous_seq:
-            raise SttSequenceError(
-                "STT seq must increase for one user/client instance: "
-                f"received {parsed.seq}, previous {previous_seq}"
+            # **역행을 예외로 막지 않는다.** seq 발급은 단조지만 전달 순서는 구조적으로
+            # 보장되지 않는다 — SPEECH는 feed() 반환값으로 즉시 나가고 TRANSCRIPT는
+            # worker 큐를 거쳐 poll(50ms)로 나온다. 생산자와 경로가 둘이라 발급 1·2·4·5가
+            # 먼저 가고 3이 나중에 오는 일이 정상적으로 생긴다(실측).
+            #
+            # 예전엔 여기서 예외를 던졌고 그 대가가 너무 컸다: poll 루프가 죽어 전사가
+            # 쌓이고, 종료 처리가 중단돼 전사 보관·리포트·실패통지가 통째로 날아갔다
+            # (2026-08-06 운영 세션 2건). 순서는 신호일 뿐 정합성 게이트가 아니다.
+            # 중복은 event_id 로 이미 막는다.
+            logger.warning(
+                "STT seq out of order session=%s user=%s received=%d previous=%d "
+                "type=%s — 이벤트는 그대로 처리한다",
+                parsed.session_id,
+                parsed.user_id,
+                parsed.seq,
+                previous_seq,
+                parsed.event_type,
             )
 
         user = self.state.user(parsed.user_id)
@@ -181,7 +198,11 @@ class SessionAggregator:
         else:
             self._apply_transcript(parsed)
 
-        self._stt_last_seq[sequence_key] = parsed.seq
+        # 최댓값을 유지한다. 늦게 온 낮은 seq 로 기준을 내리면 그 뒤 정상 이벤트가
+        # 전부 역행으로 보여 로그가 도배된다.
+        self._stt_last_seq[sequence_key] = max(
+            parsed.seq, previous_seq if previous_seq is not None else parsed.seq
+        )
         self._remember_stt_event_id(parsed.event_id)
         return True
 
