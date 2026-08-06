@@ -21,15 +21,45 @@ export interface SessionTimerProps {
    * 빈 배열이면 안내하지 않는다.
    */
   announceAt?: readonly number[]
+  /**
+   * 표기 방식.
+   *
+   * - `clock`(기본) — `mm:ss`. 30분 세션처럼 **한 시간을 넘지 않는** 카운트다운용이다.
+   * - `duration` — 일·시·분. 시작 시각까지처럼 **며칠 뒤일 수도 있는** 값에 쓴다.
+   *
+   * `clock` 은 한 시간을 넘으면 분이 그대로 커진다(32시간 → `1919:00`). 세션 타이머에서는
+   * 일어나지 않는 일이지만 대기방의 '시작까지' 는 실제로 그렇게 나왔다.
+   */
+  variant?: 'clock' | 'duration'
   className?: string
 }
 
 const DEFAULT_THRESHOLDS: SessionTimerThresholds = { warning: 300, critical: 60 }
 const DEFAULT_ANNOUNCE_AT: readonly number[] = [300, 60, 30, 10]
 
-function format(totalSec: number): string {
+/** 초 단위를 보여주기 시작하는 경계. 이보다 길면 초가 바뀌어도 할 일이 달라지지 않는다. */
+const SECONDS_VISIBLE_BELOW = 10 * 60
+
+function formatClock(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec))
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
+/**
+ * 긴 대기용 표기. 큰 단위 두 개까지만 적는다 — `2일 8시간 5분 3초` 는 읽는 데 시간이 걸린다.
+ * 10분 미만은 곧 시작한다는 뜻이라 초까지 보여준다.
+ */
+function formatDuration(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec))
+  if (s < SECONDS_VISIBLE_BELOW) return formatClock(s)
+
+  const days = Math.floor(s / 86_400)
+  const hours = Math.floor((s % 86_400) / 3600)
+  const minutes = Math.floor((s % 3600) / 60)
+
+  if (days > 0) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`
+  if (hours > 0) return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`
+  return `${minutes}분`
 }
 
 /** 300 → "5분", 30 → "30초" */
@@ -52,6 +82,7 @@ export function SessionTimer({
   label,
   thresholds = DEFAULT_THRESHOLDS,
   announceAt = DEFAULT_ANNOUNCE_AT,
+  variant = 'clock',
   className,
 }: SessionTimerProps) {
   const { warning, critical } = thresholds
@@ -93,7 +124,9 @@ export function SessionTimer({
       >
         <span className="bt-timer__dot" aria-hidden="true" />
         {label && <span>{label}</span>}
-        <span className="bt-numeric">{format(remainingSec)}</span>
+        <span className="bt-numeric">
+          {variant === 'duration' ? formatDuration(remainingSec) : formatClock(remainingSec)}
+        </span>
       </span>
       <VisuallyHidden role="status" aria-live="polite">
         {announcement}

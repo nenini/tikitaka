@@ -315,6 +315,8 @@ export function SessionReportPage() {
             </Card>
           )}
 
+          {/* 리포트는 흐름의 끝이라 여기서 갈 곳을 주지 않으면 브라우저 뒤로가기밖에 없다.
+              뒤로 가면 방금 끝난 세션 화면으로 돌아가 혼란스럽다. */}
           {missions.length > 0 && (
             <Card>
               <div className="bt-h3 mb-3">다음 세션 미션</div>
@@ -330,6 +332,17 @@ export function SessionReportPage() {
             </Card>
           )}
         </div>
+      </div>
+
+      {/* 마무리 — 리포트는 흐름의 끝이라 갈 곳을 명시한다.
+          '홈으로'를 주 동작으로 둔다. 지난 리포트 비교는 그다음에 하는 일이다. */}
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <Button variant="primary" size="lg" onClick={() => navigate('/')}>
+          홈으로
+        </Button>
+        <Button variant="secondary" size="lg" onClick={() => navigate('/reports')}>
+          지난 리포트 보기
+        </Button>
       </div>
     </main>
   )

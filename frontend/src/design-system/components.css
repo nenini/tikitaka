@@ -442,6 +442,17 @@
   box-shadow: none;
 }
 
+/**
+ * 아직 처리하지 않은 필수 항목. 테두리와 옅은 배경으로만 알린다.
+ *
+ * 오류(danger)가 아니라 **아직 안 한 일**이라 경고색을 쓴다. 애니메이션은 넣지 않는다 —
+ * 대기방처럼 오래 머무는 화면에서 계속 움직이면 피로하고, 모션 민감 사용자에게도 좋지 않다.
+ */
+.bt-attention {
+  border-color: var(--bt-color-warning-marker);
+  background: var(--bt-color-warning-bg);
+}
+
 .bt-card__head {
   display: flex;
   align-items: center;
