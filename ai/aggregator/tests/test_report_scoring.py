@@ -277,33 +277,40 @@ def test_vision_axes_unmeasured_below_seventy_percent_coverage() -> None:
 
 
 # ── 질문균형 ─────────────────────────────────────────────────────────
-def test_question_axis_is_unmeasured() -> None:
-    """STT가 짧은 발화에 문장부호를 안 붙여 질문 집계를 믿을 수 없다.
+def test_question_axis_is_measured_now() -> None:
+    """STT가 initial_prompt로 문장부호를 복원하면서 질문 집계가 성립하게 됐다.
 
-    질문이 몇 개로 집계됐든 점수를 내지 않는다 — 틀린 점수보다 빈 점수가 낫다.
+    2026-08-06 이전엔 whisper가 짧은 발화에 '?'를 안 붙여 이 축을 통째로 비워 뒀다.
+    `stt.pipeline.PUNCTUATION_PROMPT` 실측으로 그 전제가 깨졌다.
     """
     report = _report([_u(A, 0, 10_000), _u(B, 10_100, 20_000)])
     axes = {a.axis: a for a in score_report(report).for_speaker(A)}
-    assert not axes[AXIS_QUESTION].measured
-    assert axes[AXIS_QUESTION].score is None
-    assert axes[AXIS_QUESTION].display == "측정 부족"
+    assert axes[AXIS_QUESTION].measured
+    assert axes[AXIS_QUESTION].score is not None
 
 
-def test_question_axis_ignores_question_count() -> None:
-    """감지기가 질문을 많이 셌다고 점수가 생기면 안 된다."""
-    report = _report([_u(A, 0, 10_000), _u(B, 10_100, 20_000)])
-    loaded = ReportInput(
-        session_id=report.session_id,
-        session_duration_ms=report.session_duration_ms,
-        speakers=tuple(
-            SpeakerInput(s.speaker_id, s.utterances, s.speaking_ms, 40, s.filler_count)
-            for s in report.speakers
-        ),
-        vision=report.vision,
-        vision_enabled=report.vision_enabled,
-    )
-    axes = {a.axis: a for a in score_report(loaded).for_speaker(A)}
-    assert not axes[AXIS_QUESTION].measured
+def test_question_axis_penalises_both_silence_and_interrogation() -> None:
+    """산 모양이다 — 질문이 없어도, 너무 많아도 감점."""
+
+    def score_for(count: int) -> float:
+        report = _report([_u(A, 0, 10_000), _u(B, 10_100, 20_000)])
+        loaded = ReportInput(
+            session_id=report.session_id,
+            session_duration_ms=30 * 60 * 1000,
+            speakers=tuple(
+                SpeakerInput(s.speaker_id, s.utterances, s.speaking_ms, count, s.filler_count)
+                for s in report.speakers
+            ),
+            vision=report.vision,
+            vision_enabled=report.vision_enabled,
+        )
+        axis = {a.axis: a for a in score_report(loaded).for_speaker(A)}[AXIS_QUESTION]
+        assert axis.score is not None
+        return axis.score
+
+    assert score_for(0) < score_for(16)
+    assert score_for(60) < score_for(16)
+
 
 
 def test_all_six_axes_present_in_order() -> None:

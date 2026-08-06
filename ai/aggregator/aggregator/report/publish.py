@@ -116,14 +116,45 @@ class ReportPublisher:
             await self._http_client.aclose()
 
 
+RETRYABLE_CONFLICT_CODE = "REPORT_NOT_PREPARED"
+"""BE가 아직 리포트 행을 만들지 않았다는 뜻의 409. 이것만 다시 보낼 가치가 있다.
+
+BE는 세션 종료 이벤트를 받고 리포트 행을 먼저 만드는데, 그 준비가 끝나기 전에 우리
+POST가 도착하면 이 코드로 409를 준다. 요청이 틀린 게 아니라 순서가 이른 것뿐이라
+잠시 뒤엔 성공한다. 재시도하지 않으면 그 세션의 리포트 문장이 영구히 유실된다.
+"""
+
+
 def _retryable(error: Exception) -> bool:
-    """일시적 장애만 재시도한다. 4xx는 우리 요청이 틀린 것이라 다시 보내도 같다."""
+    """일시적 장애만 재시도한다. 4xx는 우리 요청이 틀린 것이라 다시 보내도 같다.
+
+    **409는 코드를 봐야 갈린다.** BE가 409로 쓰는 세 가지 중 재시도가 의미 있는 건
+    REPORT_NOT_PREPARED 하나뿐이다. ANALYSIS_IDEMPOTENCY_CONFLICT 와
+    REPORT_RESULT_CONFLICT 는 "같은 버전에 다른 내용이 이미 저장돼 있다"는 뜻이라
+    몇 번을 보내도 같은 답이 온다. 전부 재시도하면 영구 실패를 지연 실패로 바꿀 뿐이다.
+    """
     if isinstance(error, httpx.TransportError):
         return True
-    if isinstance(error, httpx.HTTPStatusError):
-        status = error.response.status_code
-        return status == 429 or status >= 500
-    return False
+    if not isinstance(error, httpx.HTTPStatusError):
+        return False
+    status = error.response.status_code
+    if status == 429 or status >= 500:
+        return True
+    if status != 409:
+        return False
+    return _error_code(error.response) == RETRYABLE_CONFLICT_CODE
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    """BE 공통 오류 응답(`ApiErrorResponse`)의 `code`. 못 읽으면 None."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    code = body.get("code")
+    return code if isinstance(code, str) else None
 
 
 def _parse_envelope(body: object, path: str) -> dict[str, object]:

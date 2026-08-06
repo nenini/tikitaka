@@ -106,16 +106,19 @@ def test_all_six_axis_keys_use_be_names() -> None:
 
 
 def test_unmeasured_axis_nulls_score_raw_and_unit() -> None:
-    """계약: measured=false이면 score와 raw는 반드시 null."""
-    axes = _first(_analysis())["axes"]
+    """계약: measured=false이면 score와 raw는 반드시 null.
+
+    vision 미수신 세션의 리액션 축으로 검증한다(질문 축은 2026-08-06부터 측정된다).
+    """
+    axes = _first(_analysis(vision=False))["axes"]
     assert isinstance(axes, dict)
-    question = axes["question"]
-    assert isinstance(question, dict)
-    assert question["measured"] is False
-    assert question["score"] is None
-    assert question["raw"] is None
-    assert question["rawUnit"] is None
-    assert question["note"]  # 이유는 남긴다
+    reaction = axes["reaction"]
+    assert isinstance(reaction, dict)
+    assert reaction["measured"] is False
+    assert reaction["score"] is None
+    assert reaction["raw"] is None
+    assert reaction["rawUnit"] is None
+    assert reaction["note"]  # 이유는 남긴다
 
 
 def test_balance_uses_ratio_unit_others_use_per_30min() -> None:
@@ -150,10 +153,11 @@ def test_vision_counts_null_when_unmeasured() -> None:
     assert metrics["faceMissingCount"] is None
 
 
-def test_question_count_is_always_null() -> None:
+def test_question_count_is_reported() -> None:
+    """STT 문장부호 복원 뒤로는 실제 집계를 보낸다."""
     metrics = _first(_analysis())["metrics"]
     assert isinstance(metrics, dict)
-    assert metrics["questionCount"] is None
+    assert isinstance(metrics["questionCount"], int)
 
 
 def test_silence_threshold_is_reported() -> None:
@@ -306,12 +310,14 @@ def test_report_versions_present() -> None:
 
 # ── 멱등키 ───────────────────────────────────────────────────────────
 def test_analysis_key_has_no_user() -> None:
-    assert analysis_idempotency_key(12345) == "session-12345-analysis-v1.0.0"
+    # 버전 문자열을 박아 두면 정상적인 버전 인상마다 테스트가 깨진다.
+    # 이 테스트의 의도는 "키 = 세션 + 전체 버전"이지 "버전이 1.0.0"이 아니다.
+    assert analysis_idempotency_key(12345) == f"session-12345-{ANALYSIS_VERSION}"
 
 
 def test_report_key_is_per_session() -> None:
     """계약 2026-08-04: 리포트는 세션당 한 번 전송이라 키에 userId를 넣지 않는다."""
-    assert report_idempotency_key(12345) == "session-12345-report-v1.0.0"
+    assert report_idempotency_key(12345) == f"session-12345-{REPORT_VERSION}"
 
 
 def test_keys_keep_full_version() -> None:
