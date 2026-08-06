@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Avatar, Badge, Button, Callout, Card, Cluster, Progress, Spinner, Stack } from '@/components'
+import { Avatar, Button, Callout, Card, Progress, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getPublicProfile } from '@/features/profile/api'
 import { getReportStatus } from '@/features/report/api'
@@ -8,20 +8,17 @@ import type { ReportStatus } from '@/features/report/types'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
   getEvaluationItems,
-  getEvaluationStatus,
-  getReceivedEvaluation,
+  getEvaluationStatus,
   submitEvaluation,
 } from './api'
 import { canOpenReport, PHASE_NOTICE, resolveSessionEndPhase } from './sessionEndFlow'
 // OverflowMenu 는 아래 '이 세션 관리' 블록을 다시 켤 때 함께 import 한다(현재 주석 처리됨).
 import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
-import type {
-  EvaluationItemKey,
+import type {
   EvaluationItems,
   EvaluationScores,
-  EvaluationStatus,
-  ReceivedEvaluation,
+  EvaluationStatus,
 } from './types'
 
 /** 화면이 다루는 상대 정보. `/items` 는 userId 만 주므로 닉네임은 공개 프로필에서 채운다. */
@@ -41,8 +38,7 @@ export function PeerReviewPage() {
 
   const [items, setItems] = useState<EvaluationItems | null>(null)
   const [status, setStatus] = useState<EvaluationStatus | null>(null)
-  const [opponent, setOpponent] = useState<Opponent | null>(null)
-  const [received, setReceived] = useState<ReceivedEvaluation | null>(null)
+  const [opponent, setOpponent] = useState<Opponent | null>(null)
 
   const [scores, setScores] = useState<Partial<EvaluationScores>>({})
   const [goodText, setGoodText] = useState('')
@@ -82,8 +78,6 @@ export function PeerReviewPage() {
         .catch(() => '상대방')
       setOpponent({ userId: nextItems.partnerUserId, nickname })
 
-      // 열람 가능 판정은 서버 몫이다 — 화면에서 숨기는 것으로 잠금을 대신하지 않는다
-      setReceived(nextStatus.resultAvailable ? await getReceivedEvaluation(sessionId) : null)
 
       // 리포트 상태를 함께 읽어 다음 단계를 정한다. 실패해도 평가 화면은 그대로 떠야 하므로
       // 여기서 예외를 삼킨다(없으면 null = '리포트 기능 없음'과 같은 취급).
@@ -125,10 +119,10 @@ export function PeerReviewPage() {
         goodBehaviorText: goodText.trim() || undefined,
         improvementText: improveText.trim() || undefined,
       })
-      // 제출 직후 게이트 상태를 서버에서 다시 읽는다 — 통과 판정은 서버 몫이다.
-      const next = await getEvaluationStatus(sessionId)
-      setStatus(next)
-      setReceived(next.resultAvailable ? await getReceivedEvaluation(sessionId) : null)
+      // 제출이 끝나면 **받은 피드백 화면으로 넘긴다.** 이 화면은 입력이 끝났고,
+      // 받은 평가는 성격이 달라 별도 화면(`/feedback`)이 맡는다.
+      navigate(`/session/${sessionId}/feedback`, { replace: true })
+      return
     } catch (submitError) {
       setError(errorMessageOf(submitError, '제출에 실패했어요. 잠시 후 다시 시도해 주세요.'))
     } finally {
@@ -282,54 +276,22 @@ export function PeerReviewPage() {
                   제출한 평가는 익명으로 전달돼 다시 볼 수 없어요.
                 </p>
               )}
-              {/* 리포트로 넘어갈 수 있는 단계인지 상태 머신에 묻는다.
-                  서버에 리포트 기능이 없는데 버튼만 열어두면 눌렀다가 빈 화면을 본다. */}
-              {canOpenReport(endPhase) ? (
-                <Button
-                  variant="primary"
-                  block
-                  onClick={() => navigate(`/session/${sessionId}/report`)}
-                >
-                  내 리포트 보기
-                </Button>
-              ) : (
+              {/* 이미 제출했거나 마감이 지난 상태 — 다음 화면(받은 피드백)으로 보낸다.
+                  리포트로 갈 수 있는지는 그 화면이 다시 판정한다. */}
+              <Button
+                variant="primary"
+                block
+                onClick={() => navigate(`/session/${sessionId}/feedback`)}
+              >
+                내가 받은 피드백 보기
+              </Button>
+              {!canOpenReport(endPhase) && (
                 <p className="bt-caption bt-muted">{PHASE_NOTICE[endPhase]}</p>
               )}
             </>
           )}
         </aside>
       </div>
-
-      {/* 상대가 남긴 평가 — 양측 제출이 확인됐을 때만 서버가 내려준다 */}
-      {received && (
-        <Card className="mt-4">
-          <div className="bt-h3 mb-3">{opponentName}님이 남긴 평가</div>
-          <Stack gap={10}>
-            <Cluster gap={8}>
-              {metrics.map((m) => (
-                <Badge key={m.key} tone="neutral">
-                  {m.label} <span className="bt-numeric">{received[m.key as EvaluationItemKey]}</span>
-                </Badge>
-              ))}
-            </Cluster>
-            {received.goodBehaviorText && (
-              <div>
-                <span className="bt-overline">잘했던 행동</span>
-                <p className="bt-body-sm mt-1">{received.goodBehaviorText}</p>
-              </div>
-            )}
-            {received.improvementText && (
-              <div>
-                <span className="bt-overline">개선하면 좋을 행동</span>
-                <p className="bt-body-sm mt-1">{received.improvementText}</p>
-              </div>
-            )}
-            <p className="bt-caption bt-muted">
-              익명으로 전달된 의견이에요. 사실과 다르거나 불쾌한 내용이면 신고할 수 있어요.
-            </p>
-          </Stack>
-        </Card>
-      )}
 
       {opponent && (
         <ReportBlockDialog
