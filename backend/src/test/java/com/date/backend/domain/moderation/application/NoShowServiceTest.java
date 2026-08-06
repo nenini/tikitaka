@@ -111,6 +111,6 @@ class NoShowServiceTest {
 		Clock clock = Clock.fixed(now.atZone(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul"));
 		return new NoShowService(sessionRepository, participantRepository, penaltyRepository,
 				sanctionRepository, new NoShowPolicyProperties(Duration.ofMinutes(5), Duration.ofDays(1),
-				Duration.ofDays(3), Duration.ofDays(7)), clock);
+				Duration.ofDays(3), Duration.ofDays(7)), clock, mock(org.springframework.context.ApplicationEventPublisher.class));
 	}
 }
