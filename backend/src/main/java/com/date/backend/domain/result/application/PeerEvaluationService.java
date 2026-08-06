@@ -9,6 +9,7 @@ import com.date.backend.domain.result.dto.PeerEvaluationSubmitRequest;
 import com.date.backend.domain.result.dto.PeerEvaluationSubmitResponse;
 import com.date.backend.domain.result.domain.PeerEvaluation;
 import com.date.backend.domain.result.event.PeerEvaluationsCompletedEvent;
+import com.date.backend.domain.growth.event.PeerEvaluationSubmittedEvent;
 import com.date.backend.domain.result.repository.PeerEvaluationRepository;
 import com.date.backend.domain.room.domain.RoomParticipant;
 import com.date.backend.domain.room.domain.RoomSessionStatus;
@@ -143,6 +144,11 @@ public class PeerEvaluationService {
 					ResultErrorCode.EVALUATION_ALREADY_SUBMITTED
 			);
 		}
+		eventPublisher.publishEvent(new PeerEvaluationSubmittedEvent(
+				evaluation.getId(), sessionId, context.partnerUserId(), request.comfortScore(),
+				request.questionConnectionScore(), request.listeningScore(), request.reactionScore(),
+				request.balanceScore(), request.mannerScore(), now
+		));
 
 		boolean allSubmitted = evaluationRepository.countBySessionId(sessionId) >= 2;
 		boolean reportRequested = false;

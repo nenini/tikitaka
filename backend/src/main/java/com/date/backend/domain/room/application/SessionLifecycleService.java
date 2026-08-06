@@ -205,12 +205,6 @@ public class SessionLifecycleService {
 		if (participant.isJoined() && session.isInProgress()) {
 			return;
 		}
-		if (session.getStatus() != RoomSessionStatus.READY
-				&& session.getStatus() != RoomSessionStatus.IN_PROGRESS) {
-			throw new BusinessException(
-					SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
-			);
-		}
 		LocalDateTime openAt =
 				session.getScheduledStartAt().minus(entryProperties.entryOpenBefore());
 		LocalDateTime closeAt =

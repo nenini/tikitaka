@@ -268,24 +268,18 @@ class FlywayMigrationTests {
 				"REPORT_EVIDENCES",
 				"CONTENTTEXT"
 		);
-		Integer sessionAnalysisReceiptTableCount = tableCount("SESSION_ANALYSIS_RECEIPTS");
-		Integer sessionParticipantAnalysisTableCount = tableCount("SESSION_PARTICIPANT_ANALYSES");
-		Integer sessionAnalysisEvidenceTableCount = tableCount("SESSION_ANALYSIS_EVIDENCE_SEGMENTS");
-		Integer sessionReportAttemptColumnCount = columnCount("SESSION_REPORTS", "ATTEMPTCOUNT");
-		Integer sessionReportFailureCodeColumnCount = columnCount("SESSION_REPORTS", "FAILURECODE");
-		Integer sessionReportPayloadHashColumnCount = columnCount("SESSION_REPORTS", "RESULTPAYLOADHASH");
+		Integer growthMetricSnapshotTableCount = tableCount("GROWTH_METRIC_SNAPSHOTS");
+		Integer userTemperatureTableCount = tableCount("USER_TEMPERATURES");
+		Integer temperatureHistoryTableCount = tableCount("TEMPERATURE_CHANGE_HISTORIES");
 
-		assertThat(migrationCount).isEqualTo(42);
-		assertThat(sessionAnalysisReceiptTableCount).isEqualTo(1);
-		assertThat(sessionParticipantAnalysisTableCount).isEqualTo(1);
-		assertThat(sessionAnalysisEvidenceTableCount).isEqualTo(1);
-		assertThat(sessionReportAttemptColumnCount).isEqualTo(1);
-		assertThat(sessionReportFailureCodeColumnCount).isEqualTo(1);
-		assertThat(sessionReportPayloadHashColumnCount).isEqualTo(1);
+		assertThat(migrationCount).isEqualTo(41);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
 		assertThat(reportTranscriptColumnCount).isEqualTo(1);
+		assertThat(growthMetricSnapshotTableCount).isEqualTo(1);
+		assertThat(userTemperatureTableCount).isEqualTo(1);
+		assertThat(temperatureHistoryTableCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);

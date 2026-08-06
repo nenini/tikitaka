@@ -377,8 +377,25 @@ class LiveKitSttAdapter:
             await stream.aclose()
 
     async def _poll_transcripts(self) -> None:
+        """전사를 관제실로 흘려보낸다. **어떤 예외에도 죽으면 안 된다.**
+
+        예전엔 try 가 없어서 `_forward` 가 한 번 던지면 태스크가 조용히 끝났다
+        (생성부의 `gather(return_exceptions=True)`가 예외를 삼켜 로그도 안 남았다).
+        그 순간부터 전사가 worker 큐에 쌓여 **실시간 코칭이 문맥을 못 받고**, 종료 때
+        한꺼번에 쏟아지며 세션 결과물이 통째로 날아갔다(2026-08-06 운영 2건).
+
+        한 묶음 실패로 루프를 끝내느니 그 묶음만 잃고 계속 도는 편이 낫다.
+        """
         while not self._stopping.is_set():
-            await self._forward(self._runner.poll_transcripts())
+            try:
+                await self._forward(self._runner.poll_transcripts())
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "transcript poll failed session=%s — 루프는 계속한다",
+                    self._event.session_id,
+                )
             await asyncio.sleep(0.05)
 
     async def _forward(self, events: Sequence[SttEvent]) -> None:

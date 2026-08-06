@@ -36,8 +36,9 @@ import static org.mockito.Mockito.when;
 class SessionExtensionDecisionServiceTest {
 	private static final LocalDateTime STARTED_AT =
 			LocalDateTime.of(2026, 7, 31, 20, 0);
+	// 8분 세션 기준 연장 결정 창 [20:03, 20:08) KST 안쪽 (STARTED_AT + 5분)
 	private static final Clock DECISION_WINDOW_CLOCK = Clock.fixed(
-			Instant.parse("2026-07-31T11:26:00Z"),
+			Instant.parse("2026-07-31T11:05:00Z"),
 			ZoneId.of("Asia/Seoul")
 	);
 
@@ -96,7 +97,8 @@ class SessionExtensionDecisionServiceTest {
 		assertThat(response.requesterUserId()).isEqualTo(1L);
 		assertThat(response.targetUserId()).isEqualTo(2L);
 		assertThat(response.scheduledEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(30));
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.BASE_DURATION_SECONDS));
 		verify(decisionRepository).save(any(ContactExchangeRequest.class));
 		verify(eventPublisher).publishEvent(
 				any(SessionExtensionDecisionChangedEvent.class)
@@ -119,8 +121,10 @@ class SessionExtensionDecisionServiceTest {
 		assertThat(response.sessionStatus())
 				.isEqualTo(RoomSessionStatus.IN_PROGRESS);
 		assertThat(response.scheduledEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(35));
-		assertThat(session.getExtensionDurationSec()).isEqualTo(5 * 60);
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.DEFAULT_PLANNED_DURATION_SECONDS));
+		assertThat(session.getExtensionDurationSec())
+				.isEqualTo(WaitingRoom.EXTENSION_DURATION_SECONDS);
 	}
 
 	@Test
@@ -139,14 +143,16 @@ class SessionExtensionDecisionServiceTest {
 		assertThat(response.sessionStatus())
 				.isEqualTo(RoomSessionStatus.IN_PROGRESS);
 		assertThat(response.scheduledEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(30));
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.BASE_DURATION_SECONDS));
 		assertThat(response.actualEndAt()).isNull();
 	}
 
 	@Test
 	void decisionBeforeLastFiveMinutesIsRejected() {
+		// 창이 열리기 직전 (20:03 KST 이전)
 		Clock tooEarlyClock = Clock.fixed(
-				Instant.parse("2026-07-31T11:24:59Z"),
+				Instant.parse("2026-07-31T11:02:59Z"),
 				ZoneId.of("Asia/Seoul")
 		);
 		SessionExtensionDecisionService service = service(tooEarlyClock);
@@ -178,7 +184,7 @@ class SessionExtensionDecisionServiceTest {
 				1L,
 				2L,
 				ContactDecision.AGREE,
-				STARTED_AT.plusMinutes(30)
+				STARTED_AT.plusMinutes(5)
 		);
 	}
 }

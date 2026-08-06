@@ -36,23 +36,28 @@ class WaitingRoomTimerTest {
 		session.grantExtension();
 
 		assertThat(session.expectedEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(35));
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.DEFAULT_PLANNED_DURATION_SECONDS));
 	}
 
 	@Test
-	void sessionUsesThirtyFiveMinutePlannedDurationByDefault() {
-		assertThat(session.getPlannedDurationSec()).isEqualTo(35 * 60);
+	void sessionUsesPlannedDurationByDefault() {
+		assertThat(session.getPlannedDurationSec())
+				.isEqualTo(WaitingRoom.DEFAULT_PLANNED_DURATION_SECONDS);
 		assertThat(session.expectedEndAt())
-				.isEqualTo(STARTED_AT.plusMinutes(35));
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.DEFAULT_PLANNED_DURATION_SECONDS));
 		assertThat(session.extensionDecisionDeadlineAt())
-				.isEqualTo(STARTED_AT.plusMinutes(30));
+				.isEqualTo(STARTED_AT.plusSeconds(
+						WaitingRoom.BASE_DURATION_SECONDS));
 	}
 
 	@Test
 	void extensionIsGrantedOnlyOnce() {
 		assertThat(session.grantExtension()).isTrue();
 		assertThat(session.grantExtension()).isFalse();
-		assertThat(session.getExtensionDurationSec()).isEqualTo(5 * 60);
+		assertThat(session.getExtensionDurationSec())
+				.isEqualTo(WaitingRoom.EXTENSION_DURATION_SECONDS);
 	}
 
 	@Test

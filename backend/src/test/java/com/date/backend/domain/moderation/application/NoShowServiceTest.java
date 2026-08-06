@@ -69,10 +69,48 @@ class NoShowServiceTest {
 						assertThat(exception.getErrorCode()).isEqualTo(ModerationErrorCode.NO_SHOW_GRACE_PERIOD_NOT_ELAPSED));
 	}
 
+	@Test
+	void automaticallyRecordsParticipantWhoNeverJoined() {
+		when(reporter.getJoinedAt()).thenReturn(SCHEDULED.minusMinutes(1));
+		when(absent.getJoinedAt()).thenReturn(null);
+
+		int recorded = serviceAt(SCHEDULED.plusMinutes(5)).recordAutomatically(1L);
+
+		assertThat(recorded).isEqualTo(1);
+		verify(penaltyRepository).save(any(AttendancePenalty.class));
+		verify(sanctionRepository).save(any(UserSanction.class));
+	}
+
+	@Test
+	void automaticDetectionDoesNotPenalizeWhenNobodyJoined() {
+		when(reporter.getJoinedAt()).thenReturn(null);
+		when(absent.getJoinedAt()).thenReturn(null);
+
+		int recorded = serviceAt(SCHEDULED.plusMinutes(5)).recordAutomatically(1L);
+
+		assertThat(recorded).isZero();
+		verify(penaltyRepository, never()).save(any());
+		verify(sanctionRepository, never()).save(any());
+	}
+
+	@Test
+	void automaticDetectionIsIdempotentWhenPenaltyAlreadyExists() {
+		when(reporter.getJoinedAt()).thenReturn(SCHEDULED.minusMinutes(1));
+		when(absent.getJoinedAt()).thenReturn(null);
+		when(penaltyRepository.findBySessionIdAndUserIdAndPenaltyType(1L, 20L, "NO_SHOW"))
+				.thenReturn(Optional.of(mock(AttendancePenalty.class)));
+
+		int recorded = serviceAt(SCHEDULED.plusMinutes(5)).recordAutomatically(1L);
+
+		assertThat(recorded).isZero();
+		verify(penaltyRepository, never()).save(any());
+		verify(sanctionRepository, never()).save(any());
+	}
+
 	private NoShowService serviceAt(LocalDateTime now) {
 		Clock clock = Clock.fixed(now.atZone(ZoneId.of("Asia/Seoul")).toInstant(), ZoneId.of("Asia/Seoul"));
 		return new NoShowService(sessionRepository, participantRepository, penaltyRepository,
 				sanctionRepository, new NoShowPolicyProperties(Duration.ofMinutes(5), Duration.ofDays(1),
-				Duration.ofDays(3), Duration.ofDays(7)), clock);
+				Duration.ofDays(3), Duration.ofDays(7)), clock, mock(org.springframework.context.ApplicationEventPublisher.class));
 	}
 }

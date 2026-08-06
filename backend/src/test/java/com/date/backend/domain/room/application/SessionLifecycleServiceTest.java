@@ -137,15 +137,16 @@ class SessionLifecycleServiceTest {
 	}
 
 	@Test
-	void joinBeforeBothParticipantsAreReadyIsRejectedWithoutIssuingToken() {
+	void participantCanJoinBeforeOtherParticipantIsReady() {
 		when(session.getStatus()).thenReturn(RoomSessionStatus.WAITING);
+		when(participantA.recordJoin(NOW)).thenReturn(true);
+		when(participantA.getJoinedAt()).thenReturn(NOW);
 
-		assertThatThrownBy(() -> service.join(USER_A_ID, SESSION_ID))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(
-								SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
-						)
-				);
+		var response = service.join(USER_A_ID, SESSION_ID);
+
+		assertThat(response.alreadyJoined()).isFalse();
+		assertThat(response.joinedAt()).isEqualTo(NOW);
+		assertThat(response.liveKitAccessToken()).isEqualTo("token");
 	}
 
 	@Test
@@ -261,6 +262,23 @@ class SessionLifecycleServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(
 								SessionErrorCode.SESSION_PARTICIPANTS_NOT_JOINED
+						)
+				);
+	}
+
+	@Test
+	void startBeforeBothParticipantsAreReadyIsRejected() {
+		when(session.getStatus()).thenReturn(RoomSessionStatus.READY);
+		when(session.isInProgress()).thenReturn(false);
+		when(participantA.isJoined()).thenReturn(true);
+		when(participantB.isJoined()).thenReturn(true);
+		when(participantA.isReady()).thenReturn(true);
+		when(participantB.isReady()).thenReturn(false);
+
+		assertThatThrownBy(() -> service.start(USER_A_ID, SESSION_ID))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(
+								SessionErrorCode.SESSION_PARTICIPANTS_NOT_READY
 						)
 				);
 	}
