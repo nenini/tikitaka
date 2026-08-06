@@ -89,7 +89,7 @@ export function PeerReviewPage() {
       // 여기서 예외를 삼킨다(없으면 null = '리포트 기능 없음'과 같은 취급).
       setReportStatus(
         await getReportStatus(String(sessionId))
-          .then((result) => result?.reportStatus ?? null)
+          .then((result) => result?.status ?? null)
           .catch(() => null),
       )
     } catch (fetchError) {
