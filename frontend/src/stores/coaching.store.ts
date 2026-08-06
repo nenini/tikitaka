@@ -25,6 +25,20 @@ export type CoachIntensity = 'flow' | 'balanced' | 'active'
 /** 서버가 만료 정보를 주지 않았을 때 쓰는 표시 시간. */
 const DEFAULT_TTL_MS = 8_000
 
+/**
+ * 표시 시간 배율.
+ *
+ * 세션이 8분으로 짧아지면서 카드가 화면에 머무는 시간이 상대적으로 길어졌다. 한 장이 오래
+ * 떠 있으면 뒤에 대기하던 코칭이 밀려 **정작 지금 필요한 조언이 늦게 도착한다.**
+ *
+ * 서버 값(`expiresAt - triggeredAt`)과 기본값 **양쪽에 똑같이 적용**한다. 한쪽만 줄이면
+ * 서버가 만료를 주는 코칭과 안 주는 코칭의 체감 길이가 갈린다.
+ */
+const TTL_SCALE = 0.6
+
+/** 배율을 적용해도 읽을 시간은 남겨 둔다. 한 문장을 눈으로 훑는 데 필요한 최소치다. */
+const MIN_TTL_MS = 2_000
+
 const PRIORITY_RANK: Readonly<Record<CoachPriority, number>> = {
   HIGH: 3,
   MEDIUM: 2,
@@ -65,11 +79,16 @@ interface CoachingState {
 function resolveTtlMs(input: CoachMessageInput): number {
   const from = input.triggeredAtSessionElapsedMs
   const to = input.expiresAtSessionElapsedMs
-  if (typeof from !== 'number' || typeof to !== 'number') return DEFAULT_TTL_MS
+  if (typeof from !== 'number' || typeof to !== 'number') return scaleTtl(DEFAULT_TTL_MS)
   const span = to - from
   // 0 이하는 서버 계산 오류이거나 이미 지난 코칭이다. 그래도 기본 시간만큼은 보여준다
   // — 떴다가 즉시 사라져 깜빡이는 편이 안 뜨는 것보다 나쁘다.
-  return span > 0 ? span : DEFAULT_TTL_MS
+  return scaleTtl(span > 0 ? span : DEFAULT_TTL_MS)
+}
+
+/** 배율을 적용하되 하한을 지킨다. */
+export function scaleTtl(ms: number): number {
+  return Math.max(MIN_TTL_MS, Math.round(ms * TTL_SCALE))
 }
 
 /**

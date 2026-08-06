@@ -269,6 +269,61 @@ export interface SessionReportDetail {
   updatedAt: string | null
 }
 
+/* ── 축 드릴다운 ───────────────────────────────────────── */
+
+/** 축 관련 지표 1건(`ReportMetricItemResponse`). 코드와 단위는 서버가 정한다. */
+export interface ReportMetricItem {
+  code: string
+  value: number | null
+  unit: string | null
+}
+
+/**
+ * GET /reports/{reportId}/analyses/{axisCode} (`ReportAxisDetailResponse`).
+ *
+ * 축 하나를 눌렀을 때 **그 축의 근거만** 모아서 준다. 리포트 본체의 `evidenceSegments` 는
+ * 세션 전체 구간이라 "왜 경청이 3점인가"를 답하지 못한다.
+ */
+export interface ReportAxisDetail {
+  reportId: number
+  axisCode: string
+  axis: ReportAxis
+  relatedMetrics: ReportMetricItem[]
+  evidenceSegments: ReportEvidence[]
+}
+
+/* ── 지난 리포트 목록 ──────────────────────────────────── */
+
+/** 목록에 쓰는 세션 상태(백엔드 `GrowthSessionStatus`). */
+export type SessionHistoryStatus = 'COMPLETED' | 'TERMINATED'
+
+/** 항목의 리포트 유무(`GrowthSessionReportResponse`). */
+export interface SessionHistoryReport {
+  exists: boolean
+  reportId: number | null
+  status: ReportStatus | null
+}
+
+/** `GrowthSessionHistoryItemResponse`. */
+export interface SessionHistoryItem {
+  sessionId: number
+  status: SessionHistoryStatus
+  scheduledStartAt: string | null
+  startedAt: string | null
+  endedAt: string | null
+  durationSeconds: number
+  /** 상대 표시명. 실명이 아니라 서버가 만든 별칭이다 */
+  partnerAlias: string | null
+  report: SessionHistoryReport | null
+}
+
+/** `GrowthSessionHistoryResponse` — 커서 페이지네이션. */
+export interface SessionHistoryPage {
+  sessions: SessionHistoryItem[]
+  nextCursor: number | null
+  hasNext: boolean
+}
+
 /* ── 표시 도우미 ───────────────────────────────────────── */
 
 /**

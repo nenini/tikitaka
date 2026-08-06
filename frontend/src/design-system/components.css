@@ -442,6 +442,17 @@
   box-shadow: none;
 }
 
+/**
+ * 아직 처리하지 않은 필수 항목. 테두리와 옅은 배경으로만 알린다.
+ *
+ * 오류(danger)가 아니라 **아직 안 한 일**이라 경고색을 쓴다. 애니메이션은 넣지 않는다 —
+ * 대기방처럼 오래 머무는 화면에서 계속 움직이면 피로하고, 모션 민감 사용자에게도 좋지 않다.
+ */
+.bt-attention {
+  border-color: var(--bt-color-warning-marker);
+  background: var(--bt-color-warning-bg);
+}
+
 .bt-card__head {
   display: flex;
   align-items: center;
@@ -1036,9 +1047,16 @@ textarea.bt-input {
    -------------------------------------------------------------------------- */
 .bt-coach {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--bt-space-3);
-  max-width: 320px;
+  /**
+   * 한 줄로 길게 흐르는 카드.
+   *
+   * 320px 로 묶어 두면 코칭 한 문장이 3~4줄로 접히는데, 세로로 자란 카드는 영상 위에서
+   * 상대 얼굴을 그만큼 더 가린다. 가로로 길게 두면 시선이 **좌우로 한 번만** 움직이고
+   * 가리는 높이는 그대로다. 화면보다 길어지지 않도록 상한만 건다.
+   */
+  max-width: min(760px, calc(100vw - var(--bt-space-8)));
   padding: var(--bt-space-3) var(--bt-space-4);
   border-radius: var(--bt-radius-lg);
   background: var(--bt-color-surface-glass);
@@ -1063,22 +1081,48 @@ textarea.bt-input {
   flex: none;
 }
 
+/**
+ * 제목과 본문을 **한 줄에 나란히** 놓는다. 위아래로 쌓으면 카드가 두 줄이 된다.
+ * 좁은 화면에서는 접히도록 `wrap` 을 허용한다 — 잘라 버리면 조언을 못 읽는다.
+ */
 .bt-coach__body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--bt-space-2);
 }
 
 .bt-coach__title {
   font-weight: var(--bt-weight-semibold);
-  margin-bottom: 2px;
+  flex: none;
 }
 
+/**
+ * 본문은 줄바꿈하지 않는다. 넘치면 말줄임 — 카드가 세로로 자라지 않는 게 이 배치의 요점이다.
+ * 전문은 스크린리더가 읽고(`title` 속성 없이도 `aria-live` 로 전달된다), 화면에서 잘린 문장은
+ * 사용자가 카드를 닫고 다음 코칭을 기다리면 된다.
+ */
 .bt-coach__text {
   color: var(--bt-color-text-secondary);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 좁은 화면에서는 한 줄 고집이 오히려 손해라 말줄임을 푼다. */
+@media (max-width: 640px) {
+  .bt-coach__text {
+    white-space: normal;
+    overflow: visible;
+  }
+}
+
+/* 한 줄 배치에서는 헤지 배지도 같은 줄 끝에 붙는다 */
 .bt-coach__hedge {
-  margin-top: var(--bt-space-2);
+  flex: none;
 }
 
 .bt-coach--urgent {

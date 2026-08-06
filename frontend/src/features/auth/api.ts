@@ -57,6 +57,20 @@ export async function logout(refreshToken: string): Promise<void> {
   await apiClient.post(`${AUTH}/logout`, { refreshToken }, { skipAuthRefresh: true })
 }
 
+/**
+ * 회원 탈퇴 — `DELETE /api/v1/auth/account`.
+ *
+ * ⚠️ **행을 지우지 않는다.** 서버는 `accountStatus=WITHDRAWN` 으로 표시하고 리프레시 토큰을
+ *    무효화한다(소프트 삭제). `users` 를 참조하는 FK 가 60개라, 행을 지우면 함께 세션을 했던
+ *    **상대방의 기록까지** 사라진다. 로그인은 `INACTIVE_ACCOUNT` 로 막힌다.
+ *
+ * ⚠️ 본인 확인용 **비밀번호가 필수**다(`@NotBlank`). 소셜 가입 계정은 `passwordHash` 가 없어
+ *    서버가 `INVALID_CREDENTIALS` 로 거절한다 — 현재 탈퇴할 수단이 없는 상태다.
+ */
+export async function withdrawAccount(password: string): Promise<void> {
+  await apiClient.delete(`${AUTH}/account`, { data: { password } })
+}
+
 /** 현재 로그인 사용자 신원. 토큰 응답엔 유저 정보가 없어 로그인 직후 이걸로 하이드레이션한다. */
 export async function getMe(): Promise<MeResponse> {
   return unwrap(await apiClient.get<ApiEnvelope<MeResponse>>('/v1/users/me'))

@@ -8,6 +8,7 @@ import {
   Cluster,
   DarkScope,
   Icon,
+  Modal,
   SessionTimer,
   Spinner,
   TagChip,
@@ -72,6 +73,7 @@ export function WaitingRoomPage() {
   const [togglingReady, setTogglingReady] = useState(false)
   const [joining, setJoining] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   /* ── LiveKit 프리워밍 ──
      세션 화면에 들어가서 처음 연결하면 ICE·DTLS 협상과 화질 ramp-up 이 그대로 보인다(약 5초).
@@ -227,6 +229,29 @@ export function WaitingRoomPage() {
     }
   }
 
+  /**
+   * 대기방에서 나간다.
+   *
+   * **준비 상태를 먼저 푼다.** 준비한 채로 나가면 서버는 양측 준비로 보고 세션을 시작시키는데,
+   * 정작 한 명은 화면에 없다. 실패해도 이동은 막지 않는다 — 나가려는 사용자를 붙잡는 것보다
+   * 나쁜 상태는 없다(입장하지 않으면 어차피 노쇼로 정리된다).
+   *
+   * 카메라도 여기서 놓는다. 라우팅만으로도 정리되지만, 표시등이 몇 프레임이라도 남으면
+   * "나갔는데 아직 찍고 있나" 하는 의심을 준다.
+   */
+  async function handleLeave() {
+    setLeaveOpen(false)
+    if (validRoom && myReady) {
+      try {
+        await cancelReady(roomId)
+      } catch {
+        /* 준비 해제 실패는 이동을 막지 않는다 */
+      }
+    }
+    device.releaseStream()
+    navigate('/')
+  }
+
   async function handleEnter() {
     if (!validRoom || joining) return
     setJoining(true)
@@ -273,12 +298,22 @@ export function WaitingRoomPage() {
   return (
     <DarkScope fill={false} className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       {/* 앱바 */}
-      <header className="flex shrink-0 items-center justify-between px-5 py-4">
+      <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
         <Cluster gap={8} style={{ alignItems: 'center' }}>
           <Icon name="bloom" size={22} style={{ color: 'var(--bt-color-brand)' }} />
           <span className="bt-body-sm bt-muted">상황형 대기방 · 기기 점검</span>
         </Cluster>
-        {remainingSec != null && <SessionTimer remainingSec={remainingSec} label="시작까지" />}
+        <Cluster gap={10} style={{ alignItems: 'center' }}>
+          {/* 시작까지는 며칠 뒤일 수도 있다 — mm:ss 로 두면 32시간이 '1919:00' 이 된다 */}
+          {remainingSec != null && (
+            <SessionTimer remainingSec={remainingSec} label="시작까지" variant="duration" />
+          )}
+          {/* 나가는 길을 준다. 없으면 브라우저 뒤로가기밖에 없는데, 그건 어디로 가는지
+              예측할 수 없고 기기 점검 스트림도 정리되지 않는다. */}
+          <Button variant="ghost" size="sm" onClick={() => setLeaveOpen(true)}>
+            나가기
+          </Button>
+        </Cluster>
       </header>
 
       <div className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-4 px-5 pb-8 lg:min-h-0 lg:flex-row lg:pb-5">
@@ -354,31 +389,50 @@ export function WaitingRoomPage() {
               원 안에 얼굴이 또렷하게 잡혔는지 확인해요.
             </DeviceCard>
 
-            {/* 스피커 — 사용자가 직접 테스트음으로 확인. 서버가 speakerPassed 를 요구한다 */}
-            <Card>
-              <div className="flex items-center justify-between">
+            {/* 스피커 — 사용자가 직접 테스트음으로 확인. 서버가 speakerPassed 를 요구한다.
+                다른 점검(카메라·마이크)은 자동으로 통과되는데 이것만 **눌러야** 넘어간다.
+                그래서 아직 안 눌렀을 때는 카드째로 눈에 띄게 만든다 — 여기서 막히면
+                준비 완료 버튼이 왜 잠겨 있는지 알 수 없어 대기방에 갇힌다. */}
+            <Card
+              className={device.speakerTested ? undefined : 'bt-attention'}
+              aria-labelledby="speaker-check-title"
+            >
+              <div className="flex items-center justify-between gap-2">
                 <Cluster gap={8} style={{ alignItems: 'center' }}>
                   <Icon name="speaker" size={18} />
-                  <b className="bt-body-sm">스피커</b>
+                  <b className="bt-body-sm" id="speaker-check-title">
+                    스피커
+                  </b>
+                  {!device.speakerTested && <Badge tone="warning">확인 필요</Badge>}
                 </Cluster>
-                <Cluster gap={8} style={{ alignItems: 'center' }}>
-                  {device.speakerTested && <Badge tone="success">확인</Badge>}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leadingIcon="speaker"
-                    onClick={device.playTestTone}
-                    disabled={device.speakerPlaying}
-                  >
-                    {device.speakerPlaying ? '재생 중…' : '테스트음 재생'}
-                  </Button>
-                </Cluster>
+                {device.speakerTested && <Badge tone="success">확인</Badge>}
               </div>
+
               <SpeakerWave playing={device.speakerPlaying} />
-              <p className="bt-caption bt-muted mt-1">
+
+              {/* 아직 안 눌렀으면 버튼을 카드 폭 전체로 키운다. 오른쪽 끝의 작은 secondary
+                  버튼은 '보조 동작' 으로 읽혀서, 필수인 줄 모르고 지나친다. */}
+              <div className="mt-2">
+                <Button
+                  variant={device.speakerTested ? 'secondary' : 'primary'}
+                  size={device.speakerTested ? 'sm' : 'md'}
+                  block={!device.speakerTested}
+                  leadingIcon="speaker"
+                  onClick={device.playTestTone}
+                  disabled={device.speakerPlaying}
+                >
+                  {device.speakerPlaying
+                    ? '재생 중…'
+                    : device.speakerTested
+                      ? '다시 듣기'
+                      : '테스트음 재생하기'}
+                </Button>
+              </div>
+
+              <p className="bt-caption mt-2" style={{ color: device.speakerTested ? undefined : 'var(--bt-color-text)' }}>
                 {device.speakerTested
                   ? '소리가 들렸다면 그대로 진행하세요.'
-                  : '테스트음을 한 번 재생해야 준비 완료할 수 있어요.'}
+                  : '이 버튼을 눌러야 준비 완료할 수 있어요.'}
               </p>
             </Card>
 
@@ -483,6 +537,27 @@ export function WaitingRoomPage() {
           </div>
         </aside>
       </div>
+
+      {/* 나가기 확인 — 상대가 기다리고 있을 수 있어 한 번 묻는다 */}
+      <Modal
+        open={leaveOpen}
+        onClose={() => setLeaveOpen(false)}
+        role="alertdialog"
+        title="대기방에서 나갈까요?"
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => setLeaveOpen(false)}>
+              계속 준비하기
+            </Button>
+            <Button variant="secondary" onClick={handleLeave}>
+              나가기
+            </Button>
+          </>
+        }
+      >
+        상대가 기다리고 있을 수 있어요. 시작 시각까지 다시 들어오면 이어서 진행할 수 있지만,
+        입장하지 않으면 노쇼로 처리될 수 있어요.
+      </Modal>
     </DarkScope>
   )
 }

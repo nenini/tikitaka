@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Cluster, EmptyState, Icon, Skeleton } from '@/components'
-import { getReportDetail, getReportStatus, requestReportGeneration } from './api'
+import { getAxisDetail, getReportDetail, getReportStatus, requestReportGeneration } from './api'
 import {
+  AxisDetailPanel,
   EvidenceList,
   FeedbackList,
   MetricStat,
@@ -24,7 +25,13 @@ import {
   SPEAKING_BALANCE_LABEL,
   speakingBalanceOf,
 } from './types'
-import type { ReportMetrics, ReportStatus, SessionReportDetail } from './types'
+import type {
+  ReportAxisCode,
+  ReportAxisDetail,
+  ReportMetrics,
+  ReportStatus,
+  SessionReportDetail,
+} from './types'
 
 /* -------------------------------------------------------------------------- */
 /*  W-16 · AI 세션 리포트                                                       */
@@ -49,6 +56,53 @@ export function SessionReportPage() {
 
   /** 서버에 아직 리포트 행이 없는가(404). 생성 실패와 구분해 다른 문구를 쓴다. */
   const [unavailable, setUnavailable] = useState(false)
+
+  /* ── 축 드릴다운 ──
+     훅은 아래 이른 반환(로딩·실패 화면)보다 **위**에 있어야 한다. 반환 뒤에 두면
+     상태에 따라 훅 개수가 달라져 React 가 순서를 맞추지 못한다. */
+  const [selectedAxis, setSelectedAxis] = useState<ReportAxisCode | null>(null)
+  const [axisDetail, setAxisDetail] = useState<ReportAxisDetail | null>(null)
+  const [axisLoading, setAxisLoading] = useState(false)
+  const [axisError, setAxisError] = useState<string | null>(null)
+
+  const selectAxis = useCallback(
+    (code: string) => {
+      const axisCode = code as ReportAxisCode
+      // 같은 축을 다시 누르면 접는다 — 닫기 버튼을 찾아가지 않아도 되게.
+      setSelectedAxis((prev) => (prev === axisCode ? null : axisCode))
+    },
+    [],
+  )
+
+  const reportId = report?.reportId ?? null
+
+  useEffect(() => {
+    if (selectedAxis == null || reportId == null) {
+      setAxisDetail(null)
+      setAxisError(null)
+      return
+    }
+    let alive = true
+    setAxisLoading(true)
+    setAxisError(null)
+    setAxisDetail(null)
+    getAxisDetail(reportId, selectedAxis)
+      .then((detail) => {
+        if (!alive) return
+        // null 은 404 — 이 축의 드릴다운이 없다는 뜻이지 오류가 아니다.
+        if (detail == null) setAxisError('이 축의 상세 근거는 아직 없어요.')
+        else setAxisDetail(detail)
+      })
+      .catch(() => {
+        if (alive) setAxisError('근거를 불러오지 못했어요.')
+      })
+      .finally(() => {
+        if (alive) setAxisLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [selectedAxis, reportId])
 
   const load = useCallback(async () => {
     try {
@@ -207,7 +261,21 @@ export function SessionReportPage() {
               </p>
             )}
           </div>
-          <RadarChart axes={radar} analysisMissing={analysisMissing} />
+          <RadarChart
+            axes={radar}
+            analysisMissing={analysisMissing}
+            onSelect={selectAxis}
+            selected={selectedAxis}
+          />
+          {selectedAxis && (
+            <AxisDetailPanel
+              label={REPORT_AXIS_LABEL[selectedAxis]}
+              detail={axisDetail}
+              loading={axisLoading}
+              error={axisError}
+              onClose={() => setSelectedAxis(null)}
+            />
+          )}
           <p className="bt-caption bt-muted">
             점수는 대화 <b className="text-ink">행동</b>에만 붙어요. 매력도나 등수가 아니에요.
           </p>
@@ -277,6 +345,8 @@ export function SessionReportPage() {
             </Card>
           )}
 
+          {/* 리포트는 흐름의 끝이라 여기서 갈 곳을 주지 않으면 브라우저 뒤로가기밖에 없다.
+              뒤로 가면 방금 끝난 세션 화면으로 돌아가 혼란스럽다. */}
           {missions.length > 0 && (
             <Card>
               <div className="bt-h3 mb-3">다음 세션 미션</div>
@@ -292,6 +362,17 @@ export function SessionReportPage() {
             </Card>
           )}
         </div>
+      </div>
+
+      {/* 마무리 — 리포트는 흐름의 끝이라 갈 곳을 명시한다.
+          '홈으로'를 주 동작으로 둔다. 지난 리포트 비교는 그다음에 하는 일이다. */}
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <Button variant="primary" size="lg" onClick={() => navigate('/')}>
+          홈으로
+        </Button>
+        <Button variant="secondary" size="lg" onClick={() => navigate('/reports')}>
+          지난 리포트 보기
+        </Button>
       </div>
     </main>
   )
