@@ -7,6 +7,7 @@ import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.ReportErrorCode;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -27,7 +28,7 @@ public class SessionReportGenerationService {
 		this.reportRepository = reportRepository;
 	}
 
-	@Transactional
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public boolean prepare(Long sessionId, LocalDateTime requestedAt) {
 		var session = sessionRepository.findWithMatchPairByIdForUpdate(sessionId)
 				.orElseThrow(() -> new BusinessException(ReportErrorCode.ANALYSIS_SESSION_NOT_FOUND));
