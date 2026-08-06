@@ -8,13 +8,23 @@ dependencies = [
     "pydantic>=2.13.4",
     "fastapi>=0.115",
     "uvicorn>=0.34",
+    "httpx>=0.28",          # GmsChatAdapter 스트리밍 (프로덕션 경로)
+    "python-dotenv>=1.1",   # ai/tts/.env 공유 — GMS 키를 두 곳에 두지 않는다
     # llama-cpp-python 은 LLM 통합 단계에서 추가 (빌드 무거움 — 모델 확정 후)
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# 명시하지 않으면 setuptools가 flat-layout에서 finetune·personas 까지 패키지로 보고
+# "Multiple top-level packages" 로 빌드를 거부한다. 관제실이 경로 의존으로 쓴다.
+[tool.hatch.build.targets.wheel]
+packages = ["chatbot"]
 
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "httpx>=0.28",   # FastAPI TestClient
     "mypy>=1.13",
 ]
 

@@ -260,7 +260,9 @@ def test_transcript_returns_be_contract_fields() -> None:
     client = _client()
     with client:
         manager = client.app.state.session_manager  # type: ignore[attr-defined]
-        ended = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
+        # 고정 날짜를 쓰면 그 시각이 지난 뒤부터 만료로 처리돼 테스트가 시간에 따라
+        # 통과·실패한다(실제로 겪음). 보관 창은 '지금'을 기준으로 잡는다.
+        ended = datetime.now(timezone.utc)
         manager._retained_transcripts["15"] = RetainedTranscript(
             session_id="15",
             ended_at=ended,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import random
+from dataclasses import dataclass
 from pathlib import Path
 
 from chatbot.schemas import KoreaPersona, PersonaSpec
@@ -20,6 +21,86 @@ _STAGE_SITUATION = {
     "before": "지금은 소개팅 전이라, 상대와 가볍게 사전 대화를 나누는 상황이야.",
     "after": "지금은 소개팅이 끝난 뒤라, 애프터로 대화를 이어가는 상황이야.",
 }
+
+# AI 화상 세션 시나리오 (기능명세서 §9-B.1).
+#
+# 명세는 장소(첫 만남/카페/식사 후)로 잡았지만 **주제로 바꿨다**(팀 결정 2026-08-05).
+# 카페든 식당이든 AI가 묻는 내용이 거의 같아서 연습 상황이 실질적으로 구분되지 않았다.
+# 대화 주제를 바꾸면 AI가 던지는 질문이 실제로 달라진다.
+#
+# 화제 지시는 **AI가 무엇을 물을지 유도하는 용도**다. 사용자 발화를 이 주제로
+# 분류하거나 "주제에서 벗어났다"고 평가하는 근거가 아니다 — 자연스러운 대화는
+# 화제가 흘러가고, 그걸 감점하면 사용자가 대화를 좁힌다.
+
+
+@dataclass(frozen=True)
+class Scenario:
+    code: str
+    label: str
+    situation: str
+    """프롬프트에 들어갈 상황·화제 지시."""
+
+    opening: str
+    """AI가 세션 시작에 먼저 던지는 첫 마디.
+
+    LLM으로 만들지 않는다 — 세션 첫 소리가 API 왕복만큼 늦어지고, 매번 달라지면
+    사용자가 같은 시나리오를 반복 연습할 때 조건이 흔들린다.
+    """
+
+
+_SCENARIOS = (
+    Scenario(
+        "first_meet",
+        "첫 인사",
+        "방금 처음 인사를 나눈 참이야. 서로에 대해 아는 게 거의 없어.\n"
+        "이름·사는 곳·오늘 오는 길처럼 가벼운 것부터 오가는 게 자연스러워.\n"
+        "아직 깊은 질문은 하지 마.",
+        "안녕하세요, 처음 뵙네요. 오시는 길은 괜찮으셨어요?",
+    ),
+    Scenario(
+        "hobby",
+        "취미·관심사",
+        "서로 기본적인 건 안 상태고, 지금은 취미와 관심사로 이야기가 넘어갔어.\n"
+        "주말에 뭐 하는지, 요즘 빠져 있는 게 뭔지를 중심으로 물어봐.\n"
+        "상대가 취미를 말하면 그걸 받아서 네 경험을 한마디 얹어.",
+        "그러고 보니 주말엔 보통 뭐 하면서 지내세요?",
+    ),
+    Scenario(
+        "work",
+        "일·커리어",
+        "일 이야기가 나온 상황이야. 무슨 일을 하는지, 어떻게 시작했는지,\n"
+        "일하면서 재밌는 순간은 언제인지를 중심으로 물어봐.\n"
+        "연봉·직급·회사 규모는 묻지 마 — 소개팅에서 실례다.",
+        "혹시 무슨 일 하시는지 여쭤봐도 될까요?",
+    ),
+    Scenario(
+        "food",
+        "음식·맛집",
+        "음식 이야기 중이야. 좋아하는 음식, 최근에 간 맛집, 못 먹는 것 같은\n"
+        "가벼운 화제를 중심으로 물어봐. 다음에 같이 가볼 만한 곳으로 이어져도 좋아.",
+        "음식은 어떤 거 좋아하세요? 저는 요즘 국물 있는 게 자꾸 당기더라고요.",
+    ),
+    Scenario(
+        "travel",
+        "여행",
+        "여행 이야기 중이야. 최근에 다녀온 곳, 가보고 싶은 곳, 여행 스타일\n"
+        "(계획형인지 즉흥형인지)을 중심으로 물어봐.",
+        "여행 좋아하세요? 최근에 어디 다녀오신 데 있어요?",
+    ),
+)
+
+_BY_CODE = {s.code: s for s in _SCENARIOS}
+SCENARIOS = tuple(_BY_CODE)
+"""FE·BE가 고를 수 있는 시나리오 코드. 이 목록 밖의 값은 무시한다."""
+
+
+def scenario_of(code: str | None) -> Scenario | None:
+    return _BY_CODE.get(code or "")
+
+
+def scenario_labels() -> tuple[tuple[str, str], ...]:
+    """(코드, 한국어 라벨) — FE 선택 화면용."""
+    return tuple((s.code, s.label) for s in _SCENARIOS)
 
 # 대화 스타일 — 실제 소개팅 대화처럼 자연스럽게. 봇은 짧게 반응하고 사용자가 이끈다.
 # 단계별로 말투가 다르다: before(소개팅 전)=존댓말, after(친해진 뒤 애프터)=반말.
@@ -73,11 +154,21 @@ def _chat_style(stage: str) -> str:
     return _CHAT_RULES + fewshot
 
 
-def build_system_prompt(spec: PersonaSpec, *, stage: str = "before") -> str:
-    """PersonaSpec + 대화 단계(before/after) → LLM 시스템 프롬프트."""
+def build_system_prompt(
+    spec: PersonaSpec, *, stage: str = "before", scenario: str | None = None
+) -> str:
+    """PersonaSpec + 대화 단계(before/after) + 상황 시나리오 → 시스템 프롬프트.
+
+    scenario는 AI 화상 세션용이다(`SCENARIOS` 참고). 주면 stage 문장 대신 쓴다 —
+    "소개팅 전"과 "카페에 앉아 있다"를 함께 말하면 시점이 모순된다.
+    모르는 코드는 무시하고 stage로 되돌린다.
+    """
     gender = _GENDER_KO.get(spec.gender, spec.gender)
     hobbies = ", ".join(spec.hobbies) if spec.hobbies else "특별히 없음"
-    situation = _STAGE_SITUATION.get(stage, _STAGE_SITUATION["before"])
+    picked = scenario_of(scenario)
+    situation = picked.situation if picked else _STAGE_SITUATION.get(
+        stage, _STAGE_SITUATION["before"]
+    )
 
     return (
         f"너는 소개팅 상대 역할을 맡은 {spec.age_group} {gender}이야.\n"
@@ -85,7 +176,6 @@ def build_system_prompt(spec: PersonaSpec, *, stage: str = "before") -> str:
         f"- 성향: {spec.personality}\n"
         f"- 말투: {spec.speech_style} 말투로 자연스럽게 대화해.\n"
         f"- 반응: 상대에게 {spec.reaction_level}으로 반응해.\n"
-        f"- 난이도: {spec.difficulty} 수준으로 대화를 이끌어.\n"
         f"{situation}\n"
         + _chat_style(stage)
     )
