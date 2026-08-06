@@ -15,7 +15,7 @@ import java.util.Map;
 public record SessionAnalysisRequest(
 		@Schema(description = "AI-BE 요청 JSON 계약 버전입니다. 현재는 1만 허용하며 필드 구조가 변경될 때 증가합니다.", example = "1")
 		@Positive int schemaVersion,
-		@Schema(description = "분석 결과 버전입니다. 같은 세션의 중복 수신과 재분석 결과를 구분하며 analysis-v{major}.{minor}.{patch} 형식을 사용합니다.", example = "analysis-v1.0.0")
+		@Schema(description = "분석 결과 버전입니다. 같은 세션의 중복 수신과 재분석 결과를 구분하며 analysis-v{major}.{minor}.{patch} 형식을 사용합니다.", example = "analysis-v1.1.0")
 		@NotBlank @Pattern(regexp = "analysis-v\\d+\\.\\d+\\.\\d+") String analysisVersion,
 		@Schema(description = "분석 대상 화상 세션의 DB PK입니다. Backend에 실제 존재하는 종료 세션이어야 합니다.", example = "12345")
 		@NotNull @Positive Long sessionId,
@@ -35,7 +35,22 @@ public record SessionAnalysisRequest(
 			@Schema(description = "점수 산출 전 객관적인 행동 원본 지표입니다.")
 			@Valid MetricsRequest metrics,
 			@Schema(description = "분석 근거 시간 구간입니다. 1차 연동에서는 빈 배열을 전달할 수 있습니다.")
-			@NotNull List<@Valid EvidenceSegmentRequest> evidenceSegments
+			@NotNull List<@Valid EvidenceSegmentRequest> evidenceSegments,
+			@Schema(description = "주제별 발화 비중입니다. AI가 전사를 사전 기반으로 분류해 계산하며 비어 있을 수 있습니다.")
+			List<@Valid TopicShareRequest> topicBreakdown
+	) {}
+
+	public record TopicShareRequest(
+			@Schema(description = "주제 코드입니다.", example = "HOBBY")
+			@NotBlank @Size(max = 30) String topic,
+			@Schema(description = "화면에 그대로 노출할 한국어 라벨입니다.", example = "취미·여가")
+			@NotBlank @Size(max = 50) String label,
+			@Schema(description = "그 주제로 분류된 발화 수입니다.", example = "12")
+			@NotNull @PositiveOrZero Integer utteranceCount,
+			@Schema(description = "그 주제로 말한 누적 시간(ms)입니다.", example = "84000")
+			@NotNull @PositiveOrZero Long speakingMs,
+			@Schema(description = "그 화자 전체 발화 시간 대비 비중입니다. 0.0~1.0.", example = "0.42")
+			@NotNull @DecimalMin("0.0") @DecimalMax("1.0") BigDecimal ratio
 	) {}
 
 	public record AxisMetricRequest(

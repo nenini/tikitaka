@@ -24,8 +24,8 @@ public interface AiReportResultSwaggerDocs {
 						{
 						  "schemaVersion": 1,
 						  "sessionId": 12345,
-						  "analysisVersion": "analysis-v1.0.0",
-						  "reportVersion": "report-v1.0.0",
+						  "analysisVersion": "analysis-v1.1.0",
+						  "reportVersion": "report-v1.1.0",
 						  "generatedAt": "2026-08-04T10:30:00+09:00",
 						  "reports": [{
 						    "userId": 1001,

@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,6 +24,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -97,7 +99,8 @@ public class SessionAnalysisIngestionService {
 		for (SessionAnalysisRequest.ParticipantAnalysisRequest participant : request.participants()) {
 			SessionParticipantAnalysis analysis = analysisRepository.save(new SessionParticipantAnalysis(
 					receipt, request.sessionId(), participant.userId(), participant.analysisStatus(),
-					serialize(participant.axes()), serialize(participant.metrics()), receivedAt
+					serialize(participant.axes()), serialize(participant.metrics()),
+					serialize(participant.topicBreakdown()), receivedAt
 			));
 			for (SessionAnalysisRequest.EvidenceSegmentRequest evidence : participant.evidenceSegments()) {
 				evidenceRepository.save(new SessionAnalysisEvidenceSegment(
@@ -127,9 +130,12 @@ public class SessionAnalysisIngestionService {
 				validateAxes(participant.axes());
 				validateMetrics(participant.metrics());
 			} else if ((participant.axes() != null && !participant.axes().isEmpty())
-					|| participant.metrics() != null || !participant.evidenceSegments().isEmpty()) {
+					|| participant.metrics() != null || !participant.evidenceSegments().isEmpty()
+					|| (participant.topicBreakdown() != null
+							&& !participant.topicBreakdown().isEmpty())) {
 				invalid();
 			}
+			validateTopicBreakdown(participant.topicBreakdown());
 			Set<String> evidenceIds = new HashSet<>();
 			for (SessionAnalysisRequest.EvidenceSegmentRequest evidence : participant.evidenceSegments()) {
 				if (!evidenceIds.add(evidence.evidenceId()) || evidence.endMs() < evidence.startMs()
@@ -167,6 +173,24 @@ public class SessionAnalysisIngestionService {
 					.mapToLong(Integer::longValue).sum();
 			if (detailedCount != metrics.fillerCount()) invalid();
 		}
+	}
+
+	/**
+	 * 주제 비중은 화면에 막대로 그려지므로 합이 깨지면 눈에 바로 띈다.
+	 *
+	 * <p>주제 코드는 AI 사전이 확장되면 늘어나므로 값 자체는 검증하지 않는다.
+	 * 대신 같은 주제가 두 번 오는 것과 비중 합이 1을 넘는 것만 막는다.
+	 * 반올림 오차(주제마다 소수점 셋째 자리)를 감안해 여유를 둔다.
+	 */
+	private void validateTopicBreakdown(List<SessionAnalysisRequest.TopicShareRequest> topics) {
+		if (topics == null || topics.isEmpty()) return;
+		Set<String> seen = new HashSet<>();
+		BigDecimal total = BigDecimal.ZERO;
+		for (SessionAnalysisRequest.TopicShareRequest topic : topics) {
+			if (!seen.add(topic.topic())) invalid();
+			total = total.add(topic.ratio());
+		}
+		if (total.compareTo(new BigDecimal("1.05")) > 0) invalid();
 	}
 
 	private String serialize(Object value) {

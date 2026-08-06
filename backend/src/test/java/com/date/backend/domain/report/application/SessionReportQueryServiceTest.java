@@ -59,7 +59,7 @@ class SessionReportQueryServiceTest {
 				+ "\"coverage\":{\"faceDetectionRate\":0.8,\"speechRecognitionRate\":null,\"cameraUptimeRate\":0.9},"
 				+ "\"fillerBreakdown\":{\"뭐\":4}}";
 		SessionParticipantAnalysis analysis = new SessionParticipantAnalysis(
-				receipt, 1L, 2L, AnalysisStatus.COMPLETED, axesJson, metricsJson, now);
+				receipt, 1L, 2L, AnalysisStatus.COMPLETED, axesJson, metricsJson, null, now);
 		ReflectionTestUtils.setField(analysis, "id", 11L);
 		SessionAnalysisEvidenceSegment segment = new SessionAnalysisEvidenceSegment(
 				analysis, "e1", AnalysisEvidenceType.LONG_SILENCE, 1000, 12000, "긴 침묵");
