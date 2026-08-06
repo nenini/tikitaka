@@ -6,6 +6,8 @@ import type {
   SessionAnalysisSettings,
   SessionDetail,
   SessionEndedPayload,
+  SessionExtensionDecision,
+  SessionExtensionEvent,
   SessionJoinResult,
   SessionMissions,
   SessionStatusSnapshot,
@@ -107,6 +109,27 @@ export async function updateAnalysisSettings(
     await apiClient.patch<ApiEnvelope<SessionAnalysisSettings>>(
       `/v1/sessions/${sessionId}/analysis-settings`,
       settings,
+    ),
+  )
+}
+
+/**
+ * 5분 연장 의사 제출 (`CONTACT-01` · W-15).
+ *
+ * 양측이 모두 `AGREE` 여야 35분까지 유지되고, 한쪽이라도 `DECLINE` 이거나 미응답이면
+ * 30분에 종료된다. 결과는 `/topic/sessions/{id}/extensions` 로 양쪽에 브로드캐스트된다.
+ *
+ * ⚠️ 서버가 **종료 5분 전부터**만 받는다(`EXTENSION_WINDOW_MINUTES`). 그 전에 부르면
+ *    `SESSION_EXTENSION_WINDOW_NOT_OPEN`, 종료 시각을 넘기면 `SESSION_STATE_CONFLICT` 다.
+ */
+export async function decideSessionExtension(
+  sessionId: number,
+  decision: SessionExtensionDecision,
+): Promise<SessionExtensionEvent> {
+  return unwrap(
+    await apiClient.post<ApiEnvelope<SessionExtensionEvent>>(
+      `/v1/sessions/${sessionId}/extensions`,
+      { decision },
     ),
   )
 }
