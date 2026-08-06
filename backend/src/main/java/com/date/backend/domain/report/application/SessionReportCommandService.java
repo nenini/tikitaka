@@ -8,8 +8,6 @@ import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.ReportErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.*;
 
@@ -19,15 +17,13 @@ public class SessionReportCommandService {
 	private final RoomParticipantRepository participants;
 	private final SessionReportRepository reports;
 	private final SessionReportGenerationService generationService;
-	private final SessionReportGenerationRequester requester;
 	private final Clock clock;
 
 	public SessionReportCommandService(WaitingRoomRepository sessions,
 			RoomParticipantRepository participants, SessionReportRepository reports,
-			SessionReportGenerationService generationService,
-			SessionReportGenerationRequester requester, Clock clock) {
+			SessionReportGenerationService generationService, Clock clock) {
 		this.sessions = sessions; this.participants = participants; this.reports = reports;
-		this.generationService = generationService; this.requester = requester; this.clock = clock;
+		this.generationService = generationService; this.clock = clock;
 	}
 
 	@Transactional
@@ -39,15 +35,8 @@ public class SessionReportCommandService {
 		}
 		LocalDateTime requestedAt = LocalDateTime.now(clock);
 		generationService.prepare(sessionId, requestedAt);
-		generationService.resetFailedForRetry(sessionId, requestedAt);
-		boolean dispatch = generationService.claimForDispatch(sessionId, requestedAt);
 		SessionReport report = reports.findBySessionIdAndUserId(sessionId, userId)
 				.orElseThrow(() -> new BusinessException(ReportErrorCode.REPORT_NOT_PREPARED));
-		if (dispatch) {
-			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-				@Override public void afterCommit() { requester.submit(sessionId, requestedAt); }
-			});
-		}
 		return status(report);
 	}
 

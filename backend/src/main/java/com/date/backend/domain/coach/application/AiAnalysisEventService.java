@@ -18,10 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.time.ZoneId;
 
 @Service
 public class AiAnalysisEventService {
+	private static final Duration FINAL_VISION_EVENT_GRACE_PERIOD = Duration.ofSeconds(15);
 	private final WaitingRoomRepository waitingRoomRepository;
 	private final RoomParticipantRepository participantRepository;
 	private final AiSessionAnalysisEventRepository eventRepository;
@@ -57,7 +59,7 @@ public class AiAnalysisEventService {
 				.orElseThrow(() -> new BusinessException(
 						CoachErrorCode.AI_ANALYSIS_INVALID_REFERENCE
 				));
-		if (!session.isInProgress()) {
+		if (!acceptsEvent(session, analysisType, request)) {
 			throw new BusinessException(CoachErrorCode.AI_ANALYSIS_SESSION_NOT_ACTIVE);
 		}
 
@@ -94,6 +96,27 @@ public class AiAnalysisEventService {
 		);
 		eventRepository.saveAndFlush(event);
 		return AiAnalysisEventResponse.stored(request.eventId());
+	}
+
+	private boolean acceptsEvent(
+			WaitingRoom session,
+			AiAnalysisType analysisType,
+			AiAnalysisEventRequest request
+	) {
+		if (session.isInProgress()) {
+			return true;
+		}
+		if (analysisType != AiAnalysisType.VISION
+				|| !session.isEnded()
+				|| session.getActualEndAt() == null) {
+			return false;
+		}
+		LocalDateTime deadline = session.getActualEndAt().plus(FINAL_VISION_EVENT_GRACE_PERIOD);
+		LocalDateTime receivedAt = LocalDateTime.now(clock);
+		LocalDateTime occurredAt = request.occurredAt()
+				.atZoneSameInstant(clock.getZone())
+				.toLocalDateTime();
+		return !receivedAt.isAfter(deadline) && !occurredAt.isAfter(deadline);
 	}
 
 	private void validateParticipant(

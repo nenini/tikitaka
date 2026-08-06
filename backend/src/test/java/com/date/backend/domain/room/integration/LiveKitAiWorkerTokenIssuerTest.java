@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LiveKitAiWorkerTokenIssuerTest {
 
 	@Test
-	void issuesRoomScopedSubscribeOnlyToken() {
+	void issuesRoomScopedSubscribeOnlyTokenForHumanSessionAnalysis() {
 		LiveKitAiWorkerTokenIssuer issuer = new LiveKitAiWorkerTokenIssuer(
 				new LiveKitProperties(
 						"wss://date-project.livekit.cloud",
@@ -36,6 +36,28 @@ class LiveKitAiWorkerTokenIssuerTest {
 				.containsEntry("roomJoin", true)
 				.containsEntry("room", "date-room-30")
 				.containsEntry("canPublish", false)
+				.containsEntry("canSubscribe", true);
+	}
+
+	@Test
+	void issuesPublishAndSubscribeTokenForAiConversation() {
+		LiveKitAiWorkerTokenIssuer issuer = new LiveKitAiWorkerTokenIssuer(
+				new LiveKitProperties(
+						"wss://date-project.livekit.cloud",
+						"api-key",
+						"api-secret-api-secret-api-secret",
+						600,
+						3
+				)
+		);
+
+		var issued = issuer.issueConversationalWorker(15L, "ai-video-room-15");
+		Map<String, Object> video = JWT.decode(issued.accessToken()).getClaim("video").asMap();
+
+		assertThat(video)
+				.containsEntry("roomJoin", true)
+				.containsEntry("room", "ai-video-room-15")
+				.containsEntry("canPublish", true)
 				.containsEntry("canSubscribe", true);
 	}
 

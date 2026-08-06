@@ -121,7 +121,8 @@ ai:
     max-attempts: ${AI_TRANSCRIPT_MAX_ATTEMPTS:5}
     retry-delay: ${AI_TRANSCRIPT_RETRY_DELAY:2s}
   report:
-    base-url: ${AI_REPORT_BASE_URL:${AI_SESSION_BASE_URL:}}
+    # AI가 세션 종료 후 결과를 Backend로 push하므로 기본 outbound generate 호출은 비활성화합니다.
+    base-url: ${AI_REPORT_BASE_URL:}
     generation-path: ${AI_REPORT_GENERATION_PATH:/internal/v1/session-reports/generate}
     connect-timeout: ${AI_REPORT_CONNECT_TIMEOUT:3s}
     request-timeout: ${AI_REPORT_REQUEST_TIMEOUT:10s}
@@ -135,7 +136,8 @@ ai:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
     connect-timeout: ${AI_CHAT_CONNECT_TIMEOUT:3s}
-    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:60s}
+    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:270s}
+    sse-timeout: ${AI_CHAT_SSE_TIMEOUT:300s}
     internal-token: ${AI_CHAT_INTERNAL_TOKEN:}
 
 match:

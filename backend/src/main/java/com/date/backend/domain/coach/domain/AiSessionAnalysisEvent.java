@@ -56,10 +56,10 @@ public class AiSessionAnalysisEvent {
 	@Column(name = "occurred_at", nullable = false)
 	private LocalDateTime occurredAt;
 
-	@Column(name = "model_version", length = 100)
+	@Column(name = "model_version", length = 128)
 	private String modelVersion;
 
-	@Column(name = "rule_version", length = 100)
+	@Column(name = "rule_version", length = 128)
 	private String ruleVersion;
 
 	@Column(name = "payload_json", nullable = false, columnDefinition = "LONGTEXT")

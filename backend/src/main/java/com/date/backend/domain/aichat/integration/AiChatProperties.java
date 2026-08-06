@@ -10,6 +10,7 @@ public record AiChatProperties(
 		String streamPath,
 		Duration connectTimeout,
 		Duration requestTimeout,
+		Duration sseTimeout,
 		String internalToken
 ) {
 	public AiChatProperties {
@@ -18,8 +19,15 @@ public record AiChatProperties(
 				? "/api/v1/chat/stream"
 				: streamPath.trim();
 		connectTimeout = connectTimeout == null ? Duration.ofSeconds(3) : connectTimeout;
-		requestTimeout = requestTimeout == null ? Duration.ofSeconds(60) : requestTimeout;
+		requestTimeout = requestTimeout == null ? Duration.ofSeconds(270) : requestTimeout;
+		sseTimeout = sseTimeout == null ? Duration.ofSeconds(300) : sseTimeout;
 		internalToken = internalToken == null ? "" : internalToken.trim();
+		if (requestTimeout.isZero() || requestTimeout.isNegative()) {
+			throw new IllegalArgumentException("requestTimeout must be positive.");
+		}
+		if (sseTimeout.compareTo(requestTimeout) <= 0) {
+			throw new IllegalArgumentException("sseTimeout must be longer than requestTimeout.");
+		}
 	}
 
 	public boolean configured() {

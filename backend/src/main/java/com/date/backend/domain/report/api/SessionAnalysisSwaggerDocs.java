@@ -4,6 +4,7 @@ import com.date.backend.domain.report.dto.request.SessionAnalysisRequest;
 import com.date.backend.domain.report.dto.response.SessionAnalysisAcceptedResponse;
 import com.date.backend.global.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,8 @@ public interface SessionAnalysisSwaggerDocs {
 					+ "coverage 비율은 0~1이며 speechRecognitionRate는 null일 수 있습니다. fillerBreakdown 합계는 fillerCount와 같아야 합니다."
 	)
 	ApiResponse<SessionAnalysisAcceptedResponse> receive(
+			@Parameter(required = true, description = "AI-BE 내부 인증 토큰")
+			String internalToken,
 			@RequestBody(required = true, description = "AI 서버가 분석 완료 후 전송하는 참여자별 원본 분석 결과",
 					content = @io.swagger.v3.oas.annotations.media.Content(
 							mediaType = "application/json",
