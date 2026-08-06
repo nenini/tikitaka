@@ -5,11 +5,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from uuid import UUID
 
 from aggregator.transcripts import TranscriptBuffer, TranscriptSegment
 from aggregator.vision_events import VisionBehaviorEvent, VisionMetricSnapshot
+
+logger = logging.getLogger(__name__)
 
 # Existing detectors use this domain name in type annotations. Keep the name
 # while the stored object now carries the full STT v2 identity contract.
@@ -82,7 +85,19 @@ class VisionUserState:
         if event.event_type in _VISION_EPISODE_START_TYPES:
             self.active_episodes[event.episode_id] = event
         elif event.event_type in _VISION_EPISODE_END_TYPES:
-            self.active_episodes.pop(event.episode_id, None)
+            # An end with nothing open means its start never landed. Silently
+            # discarding it hides the imbalance, and an episode left open the
+            # other way blocks attention coaching for the rest of the session
+            # (see _ATTENTION_BLOCKING_EPISODES). Session 11 closed six
+            # GAZE_AWAY episodes it had only opened five times.
+            if self.active_episodes.pop(event.episode_id, None) is None:
+                logger.warning(
+                    "vision episode end without open start user=%s type=%s "
+                    "episode=%s",
+                    self.user_id,
+                    event.event_type,
+                    event.episode_id,
+                )
 
 
 @dataclass

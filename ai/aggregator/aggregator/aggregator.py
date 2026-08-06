@@ -53,6 +53,12 @@ CoachingEmitter = Callable[[CoachingCommand], None]
 _VISION_DEDUPE_CAPACITY = 4096
 _STT_DEDUPE_CAPACITY = 4096
 
+# Longest single utterance the watchdog will believe before deciding the
+# SPEECH_ENDED that should have closed it was lost. Deliberately far past any
+# real turn in a dating session — this only has to catch a pinned flag, not
+# police long talkers, and LONG_TALK coaching already owns that job.
+_MAX_UTTERANCE_MS = 120_000
+
 
 @dataclass
 class VisionBatchIngestionResult:
@@ -318,6 +324,19 @@ class SessionAggregator:
             try:
                 accepted = self.push_vision_event(event)
             except VisionSequenceError:
+                # Dropped, not just reordered. If this fires on an episode
+                # START its END arrives unmatched later, and if it fires on an
+                # END the episode stays open and blocks attention coaching for
+                # the rest of the session. Both were invisible before.
+                logger.warning(
+                    "vision event dropped as stale session=%s user=%s "
+                    "type=%s seq=%d episode=%s",
+                    event.session_id,
+                    event.user_id,
+                    event.event_type,
+                    event.seq,
+                    getattr(event, "episode_id", None),
+                )
                 result.stale_event_ids.append(event.event_id)
                 continue
             if accepted:
@@ -333,6 +352,7 @@ class SessionAggregator:
 
     def tick(self, now_ms: int) -> None:
         """시간 기반 감지(침묵 등)를 구동한다. now_ms = 세션 경과 시간."""
+        self._expire_stuck_speaking(now_ms)
         candidates: list[CoachingCandidate] = []
         for detector in self.detectors:
             events = detector.on_tick(self.state, now_ms)
@@ -362,6 +382,36 @@ class SessionAggregator:
         self._dispatch_candidates(
             self._coaching_arbitrator.select(candidates)
         )
+
+    def _expire_stuck_speaking(self, now_ms: int) -> None:
+        """Release a speaking flag that no SPEECH_ENDED ever closed.
+
+        ``is_speaking`` is cleared in exactly one place — the SpeechEndedEvent
+        branch of ``push_stt_event``. A single dropped end event therefore
+        pins the flag for the rest of the session, and every rule that reads
+        it goes quiet with it: SilenceDetector bails on the first line of
+        ``on_tick``, and attention coaching treats the user as mid-utterance.
+        The failure is silent and session-long, so bound it by the longest
+        utterance anyone could plausibly hold.
+        """
+        for user in self.state.users.values():
+            if not user.is_speaking:
+                continue
+            started_at = user.speech_started_at_ms
+            if started_at is None or now_ms - started_at < _MAX_UTTERANCE_MS:
+                continue
+            logger.warning(
+                "speaking flag stuck, releasing session=%s user=%s "
+                "startedAtMs=%d nowMs=%d",
+                self.state.session_id,
+                user.user_id,
+                started_at,
+                now_ms,
+            )
+            user.is_speaking = False
+            user.current_utterance_id = None
+            user.speech_started_at_ms = None
+            user.last_speech_ended_at_ms = now_ms
 
     def _silence_coaching_target(self) -> str | None:
         """Return the counterpart of the most recent finalized speaker.
