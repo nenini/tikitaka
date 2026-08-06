@@ -2,18 +2,21 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Avatar,
-  AlertDialog,
   Button,
   Callout,
   Card,
   CardHeader,
   Chip,
+  Field,
+  Input,
   ListRowButton,
   ListRowLink,
+  Modal,
   Spinner,
   Stack,
 } from '@/components'
-import { errorMessageOf } from '@/shared/api/envelope'
+import { errorCodeOf, errorMessageOf } from '@/shared/api/envelope'
+import { withdrawAccount } from '@/features/auth/api'
 import { faceTypeImage } from '@/features/face/faceImage'
 import { resetMyFaceAnalysis, useMyFaceAnalysis } from '@/features/face/useMyFaceAnalysis'
 import { getMyProfile, getPublicProfile } from '@/features/profile/api'
@@ -80,6 +83,9 @@ export function MyPage() {
   const signOut = useAuthStore((s) => s.signOut)
   const authUser = useAuthStore((s) => s.user)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [withdrawPassword, setWithdrawPassword] = useState('')
+  const [withdrawError, setWithdrawError] = useState<string | null>(null)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const face = useMyFaceAnalysis()
   const [summary, setSummary] = useState<ProfileSummary | null>(null)
@@ -143,12 +149,49 @@ export function MyPage() {
       .filter(Boolean)
       .join(' · ') || '아직 설정하지 않았어요'
 
-  const onWithdraw = () => {
-    // TODO(ACCOUNT): DELETE /api/me — §22 보존·삭제 범위 안내 후 처리
-    console.log('withdraw account')
-    setWithdrawOpen(false)
+  /**
+   * 회원 탈퇴.
+   *
+   * 예전에는 `console.log` 만 찍고 로그아웃했다 — **눌러도 계정이 그대로 살아 있었다.**
+   * 다시 로그인하면 아무 일도 없었던 것처럼 들어와졌다.
+   *
+   * 서버는 본인 확인을 위해 비밀번호를 요구한다. 실패하면 다이얼로그를 **닫지 않는다** —
+   * 닫아 버리면 무엇이 잘못됐는지 모른 채 처음부터 다시 해야 한다.
+   */
+  const onWithdraw = async () => {
+    const password = withdrawPassword.trim()
+    if (password.length === 0) {
+      setWithdrawError('비밀번호를 입력해 주세요.')
+      return
+    }
+    setWithdrawing(true)
+    setWithdrawError(null)
+    try {
+      await withdrawAccount(password)
+    } catch (error) {
+      setWithdrawError(
+        errorCodeOf(error) === 'INVALID_CREDENTIALS'
+          ? '비밀번호가 맞지 않아요.'
+          : errorMessageOf(error, '탈퇴 처리에 실패했어요. 잠시 후 다시 시도해 주세요.'),
+      )
+      return
+    } finally {
+      setWithdrawing(false)
+    }
+
+    // 성공한 뒤에만 로컬 상태를 정리한다. 서버가 거절했는데 로그아웃시키면
+    // 사용자는 탈퇴된 줄 알고 떠난다.
+    closeWithdraw()
+    resetMyFaceAnalysis()
     logout()
-    navigate('/login')
+    navigate('/login', { replace: true })
+  }
+
+  /** 다이얼로그를 닫을 때 입력과 오류를 함께 비운다 — 다시 열었을 때 남아 있으면 안 된다. */
+  const closeWithdraw = () => {
+    setWithdrawOpen(false)
+    setWithdrawPassword('')
+    setWithdrawError(null)
   }
 
   return (
@@ -278,16 +321,56 @@ export function MyPage() {
         </Stack>
       </div>
 
-      <AlertDialog
+      {/* 문구를 실제 동작에 맞춘다. 예전에는 '프로필·리포트·동의 내역이 삭제된다'고 적혀
+          있었지만 서버는 계정을 **비활성 처리**할 뿐이다. 지우지 않는 것을 지운다고 말하면
+          개인정보 안내로서 틀린 말이 된다. */}
+      <Modal
         open={withdrawOpen}
-        onCancel={() => setWithdrawOpen(false)}
-        onConfirm={onWithdraw}
-        tone="danger"
+        onClose={closeWithdraw}
+        role="alertdialog"
+        showClose={false}
+        closeOnBackdrop={false}
         title="정말 탈퇴할까요?"
-        description="탈퇴하면 프로필·리포트·동의 내역이 처리방침(§22)에 따라 삭제돼요. 이 작업은 되돌릴 수 없어요."
-        confirmLabel="탈퇴하기"
-        cancelLabel="취소"
-      />
+        actions={
+          <>
+            <Button variant="ghost" onClick={closeWithdraw} disabled={withdrawing}>
+              취소
+            </Button>
+            <Button
+              variant="danger"
+              leadingIcon="warning"
+              loading={withdrawing}
+              onClick={() => void onWithdraw()}
+            >
+              탈퇴하기
+            </Button>
+          </>
+        }
+      >
+        <Stack gap={12}>
+          <p className="bt-body-sm">
+            탈퇴하면 계정이 즉시 비활성화되어 <b>다시 로그인할 수 없어요.</b> 이 작업은 되돌릴 수
+            없어요.
+          </p>
+          <p className="bt-caption bt-muted">
+            지난 세션·리포트 기록은 상대방의 기록과 얽혀 있어 바로 지워지지 않고, 처리방침(§22)에
+            따라 보관 기간이 지난 뒤 정리돼요.
+          </p>
+          <Field label="본인 확인" required error={withdrawError} help="가입할 때 쓴 비밀번호를 입력해 주세요.">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={withdrawPassword}
+              disabled={withdrawing}
+              onChange={(e) => setWithdrawPassword(e.target.value)}
+              // Enter 로도 진행할 수 있어야 한다 — 비밀번호 칸에서 버튼까지 가는 건 번거롭다.
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !withdrawing) void onWithdraw()
+              }}
+            />
+          </Field>
+        </Stack>
+      </Modal>
     </main>
   )
 }
