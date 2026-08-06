@@ -223,6 +223,7 @@ export type CoachingType =
   | 'ATTENTION_RECOVERY'
   | 'VISION_SETUP_GUIDANCE'
   | 'EXPRESSION_GUIDANCE'
+  | 'VOLUME_GUIDANCE'
 
 /** `CoachingPriority` (backend). */
 export type CoachingPriority = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -379,7 +380,12 @@ export function toSilenceStage(stage: SilenceInterventionStage): 'none' | 'topic
 /** 코칭 유형 → 코칭 토스트 톤. 안전 경고가 아닌 일반 코칭은 대체로 개선 제안이다. */
 export function toCoachTone(type: CoachingType): 'positive' | 'negative' | 'neutral' {
   switch (type) {
+    // 실측 기반 안내는 neutral 이다. tone 은 제목뿐 아니라 **헤지 배지**도 결정하는데
+    // (CoachOverlay 의 `hedge={tone !== 'neutral'}`), negative 로 두면 dBFS 실측값에
+    // "ⓘ AI 추정 · 참고용" 이 붙어 표기가 사실과 어긋난다.
+    // 카메라 안내(VISION_SETUP_GUIDANCE)가 같은 이유로 이미 neutral 이다.
     case 'VISION_SETUP_GUIDANCE':
+    case 'VOLUME_GUIDANCE':
       return 'neutral'
     case 'EXPRESSION_GUIDANCE':
     case 'REACTION_PROMPT':

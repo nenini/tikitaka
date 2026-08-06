@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { Icon } from '@/components'
-import type { AnalysisEvidenceType, NarrativeItem, ReportEvidence } from './types'
+import type {
+  AnalysisEvidenceType,
+  NarrativeItem,
+  ReportEvidence,
+  ReportTopicShare,
+} from './types'
 
 /* ── 레이더 차트 ────────────────────────────────────────── */
 
@@ -34,7 +39,16 @@ export interface RadarPoint {
  * **미측정 축은 도형에서 뺀다.** 0 으로 이어 붙이면 "최하점"으로 읽히는데,
  * 측정하지 못한 것과 못한 것은 다른 말이다. 라벨만 흐리게 남기고 아래에 개수를 알린다.
  */
-export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?: string }) {
+export function RadarChart({
+  axes,
+  className,
+  analysisMissing = false,
+}: {
+  axes: RadarPoint[]
+  className?: string
+  /** 분석 결과가 통째로 없는 경우. '측정 부족'과 원인이 달라 안내 문구를 뺀다. */
+  analysisMissing?: boolean
+}) {
   /** 도형 반지름 */
   const r = 74
   /** 라벨이 차지하는 바깥 여백. 5~6글자 축 이름이 잘리지 않을 만큼 잡는다 */
@@ -54,7 +68,11 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
   const gridPolygon = (ratio: number) =>
     axes.map((_, i) => point(i, ratio).join(',')).join(' ')
 
-  // 측정된 축만 이어 붙인다. 3점 미만이면 도형이 성립하지 않아 점으로만 표시한다.
+  // 측정된 축만 이어 붙인다. 0 으로 채우면 "최하점"으로 읽히는데, 측정하지 못한 것과
+  // 못한 것은 다른 말이다.
+  //
+  // 2점일 때 아무것도 안 그리면 점 두 개만 남아 사용자에겐 '그래프가 깨진' 화면이 된다.
+  // 비전 미수신 세션이 실제로 여기에 자주 걸린다. 면이 안 되면 선으로라도 잇는다.
   const measured = axes
     .map((axis, index) => ({ axis, index }))
     .filter(({ axis }) => axis.percent != null)
@@ -94,6 +112,15 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
             points={shape}
             fill="var(--bt-color-brand)"
             fillOpacity={0.18}
+            stroke="var(--bt-color-brand)"
+            strokeWidth={2.5}
+          />
+        )}
+        {measured.length === 2 && (
+          // 면이 안 되는 두 점. 선으로라도 이어야 '값이 있다'가 보인다.
+          <polyline
+            points={shape}
+            fill="none"
             stroke="var(--bt-color-brand)"
             strokeWidth={2.5}
           />
@@ -191,7 +218,9 @@ export function RadarChart({ axes, className }: { axes: RadarPoint[]; className?
           : '축을 짚으면 점수와 근거를 볼 수 있어요'}
       </div>
 
-      {unmeasuredCount > 0 && (
+      {/* 분석이 통째로 없으면 "측정되지 않아 제외했다"는 틀린 설명이다 —
+          측정을 못 한 게 아니라 결과가 안 온 것이고, 카드 제목이 이미 그걸 말한다. */}
+      {unmeasuredCount > 0 && !analysisMissing && (
         <p className="bt-caption bt-muted mt-1 text-center">
           <span className="bt-numeric">{unmeasuredCount}</span>개 축은 측정되지 않아 도형에서 제외했어요.
         </p>
@@ -251,6 +280,79 @@ export function MetricStat({ metric }: { metric: MetricView }) {
       <span className="bt-caption bt-muted">{metric.label}</span>
     </div>
   )
+}
+
+/* ── 주제별 발화 비중 ──────────────────────────────────── */
+
+/**
+ * "무슨 얘기를 얼마나 했나" 가로 막대.
+ *
+ * 차트 라이브러리를 쓰지 않는다 — 이 프로젝트에 recharts/d3 의존성이 없고, 레이더도
+ * 손으로 그린 SVG 다. 막대 하나에 라이브러리를 들이는 건 번들만 키운다.
+ *
+ * 값은 AI 가 사전 기반으로 계산한 결정값이라 두 번 돌려도 같다. 그래서 "추정" 헤지를
+ * 붙이지 않는다.
+ */
+export function TopicBreakdown({
+  topics,
+  analysisMissing = false,
+}: {
+  topics: readonly ReportTopicShare[]
+  /** 분석 결과 자체가 없는 리포트. '주제가 없다'가 아니라 '지표가 안 왔다'이다. */
+  analysisMissing?: boolean
+}) {
+  if (topics.length === 0) {
+    // 원인을 단정하지 않는다. 빈 배열은 (a) 전사가 없었거나 (b) 이 필드가 생기기 전
+    // 리포트이거나 (c) 분석이 유실된 경우인데, 서버 응답만으로는 (a)와 (b)를 못 가른다.
+    // 같은 화면 위 축 카드가 "지표를 불러오지 못했어요"라고 말하는데 여기서 "전사가
+    // 없어서"라고 단정하면 두 카드가 서로 다른 원인을 주장하게 된다.
+    return (
+      <NotMeasuredNote
+        text={
+          analysisMissing
+            ? '지표를 불러오지 못해 대화 주제도 표시할 수 없어요.'
+            : '대화 주제를 나눌 데이터가 없어요.'
+        }
+      />
+    )
+  }
+  // 가장 긴 주제를 100% 폭으로 잡는다. 비중 자체는 숫자로 따로 보여주므로
+  // 막대는 '무엇이 제일 많았나'를 한눈에 보여주는 역할만 한다.
+  const longest = Math.max(...topics.map((t) => t.speakingMs), 1)
+  return (
+    <ul className="flex flex-col gap-2.5">
+      {topics.map((topic) => (
+        <li key={topic.topic} className="flex flex-col gap-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="bt-body-sm">{topic.label}</span>
+            <span className="bt-caption bt-muted bt-numeric">
+              {Math.round(topic.ratio * 100)}% · {formatSeconds(topic.speakingMs)}
+            </span>
+          </span>
+          <span
+            className="block h-2 w-full overflow-hidden rounded-full"
+            style={{ background: 'var(--bt-color-surface-sunken)' }}
+            role="img"
+            aria-label={`${topic.label} ${Math.round(topic.ratio * 100)}퍼센트, 발화 ${topic.utteranceCount}회`}
+          >
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${Math.max(2, (topic.speakingMs / longest) * 100)}%`,
+                background: 'var(--bt-color-brand)',
+              }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function formatSeconds(ms: number): string {
+  const total = Math.round(ms / 1000)
+  if (total < 60) return `${total}초`
+  return `${Math.floor(total / 60)}분 ${total % 60}초`
 }
 
 /* ── 잘한 점 / 개선점 ───────────────────────────────────── */

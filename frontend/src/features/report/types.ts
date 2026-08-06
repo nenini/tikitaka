@@ -129,6 +129,22 @@ export interface ReportMetrics {
   fillerBreakdown: Record<string, number> | null
 }
 
+/* ── 주제별 발화 비중 ──────────────────────────────────── */
+
+/**
+ * `ReportTopicShareResponse` — "무슨 얘기를 얼마나 했나".
+ *
+ * AI가 전사를 사전 기반으로 분류해 계산한다(LLM 아님). 주제 코드는 AI 사전이 늘어나면
+ * 같이 늘어나므로 유니온으로 닫지 않는다. 화면에는 `label`을 그대로 쓴다.
+ */
+export interface ReportTopicShare {
+  topic: string
+  label: string
+  utteranceCount: number
+  speakingMs: number
+  ratio: number
+}
+
 /* ── 근거 구간 ─────────────────────────────────────────── */
 
 /** 근거 유형(백엔드 `AnalysisEvidenceType`). */
@@ -233,6 +249,8 @@ export interface SessionReportDetail {
   reportVersion: string | null
   axes: ReportAxes
   metrics: ReportMetrics | null
+  /** 이 컬럼이 생기기 전 리포트는 빈 배열이다. */
+  topicBreakdown: ReportTopicShare[]
   summaryText: string | null
   /**
    * 서버는 아직 **문자열 배열**을 준다. 규약 §5 가 `{ text, sourceType, sourceCode }` 로의
