@@ -272,7 +272,7 @@ class FlywayMigrationTests {
 		Integer userTemperatureTableCount = tableCount("USER_TEMPERATURES");
 		Integer temperatureHistoryTableCount = tableCount("TEMPERATURE_CHANGE_HISTORIES");
 
-		assertThat(migrationCount).isEqualTo(41);
+		assertThat(migrationCount).isEqualTo(45);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
