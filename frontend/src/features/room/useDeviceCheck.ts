@@ -38,6 +38,11 @@ export interface UseDeviceCheck {
   retry: () => void
   /** 스피커 테스트음(짧은 비프) 재생 */
   playTestTone: () => void
+  /**
+   * 점검용 카메라·마이크를 놓는다(LiveKit 프리워밍 직전에 호출).
+   * 점검 **결과 표시는 그대로 남고** 미리보기 화면만 빈다.
+   */
+  releaseStream: () => void
 }
 
 /** getUserMedia 예외 → 사용자용 한국어 사유. */
@@ -231,5 +236,13 @@ export function useDeviceCheck(): UseDeviceCheck {
     allPassed: ready && speakerTested && network === 'ready',
     retry,
     playTestTone,
+    /**
+     * 점검용 카메라·마이크를 놓는다.
+     *
+     * LiveKit 프리워밍 직전에 부른다 — 같은 장치를 두 번 잡으면 일부 환경(특히 Windows)에서
+     * 실패하거나 장치가 잠긴다. 점검 **결과 표시는 그대로 남고**(상태 값을 건드리지 않는다)
+     * 미리보기 화면만 비므로, 호출하는 쪽에서 LiveKit 로컬 트랙으로 갈아끼워야 한다.
+     */
+    releaseStream: teardown,
   }
 }

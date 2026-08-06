@@ -8,8 +8,7 @@ import { useSessionStore } from '@/stores/session.store'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
-import { createApiTokenProvider } from './livekit/tokenProvider'
-import { useLiveKitRoom } from './livekit/useLiveKitRoom'
+import { useSessionMedia } from './useSessionMedia'
 import { isVisionEnabled, snapshotAnalysisSettings, useVisionAnalysis } from './vision'
 import { CoachOverlay } from './components/CoachOverlay'
 import { CoachRail } from './components/CoachRail'
@@ -43,16 +42,18 @@ const STATUS_POLL_MS = 3_000
  * 레이아웃: 데스크탑은 [상대 영상 | 코치 레일 322px] 2단, 모바일은 [영상 / 코치 스트립] 세로 적층.
  * 디자인 시스템 §7.3 — 상대 얼굴이 주인공이므로 OS 설정과 무관하게 **항상 다크**(DarkScope).
  *
+ * ⚠️ **LiveKit 연결을 이 화면이 소유하지 않는다.** 공통 레이아웃(`SessionMediaLayout`)이 들고,
+ *    대기방에서 미리 붙여 둔 연결을 그대로 물려받는다. 여기서 처음 연결하면 협상과 화질
+ *    ramp-up 이 입장 직후 화면에 그대로 보인다(약 5초).
+ *
  * 백엔드 연동
  *  - LiveKit 토큰: `POST /api/v1/sessions/{id}/join` 응답 (전용 토큰 엔드포인트는 없다)
  *  - 남은 시간: **서버가 SSOT** — STOMP `/topic/sessions/{id}/timer` + `GET /sessions/{id}/status`
  *  - 세션 시작: `POST /sessions/{id}/start` (2명 입장·준비·LiveKit 연결이 모두 끝나야 통과)
  *  - 코칭/침묵/안전/맥락 질문: STOMP (`useSessionRealtime`)
  *  - 미션: `GET /sessions/{id}/missions`
+ *  - 5분 연장: `POST /sessions/{id}/extensions` + STOMP `/topic/sessions/{id}/extensions`
  *  - 종료: `POST /sessions/{id}/terminate` · 서버 종료는 `/topic/sessions/{id}/lifecycle` 로 통보
- *
- * ⚠️ 5분 연장(W-15)은 백엔드에 CONTACT 도메인이 없어 **아직 로컬 토글**이다.
- *    수락해도 서버 타이머는 늘어나지 않는다.
  */
 export function SessionPage() {
   const { sessionId: sessionIdParam } = useParams()
@@ -64,14 +65,14 @@ export function SessionPage() {
   const setPhase = useSessionStore((s) => s.setPhase)
   const clearCoaching = useCoachingStore((s) => s.clear)
 
-  /* ── LiveKit ── */
-  // getToken 이 매 렌더 새 함수면 훅의 effect 가 재실행되어 재연결된다 — 반드시 고정한다.
-  const getToken = useMemo(
-    () => (validSession ? createApiTokenProvider(sessionId) : notConfiguredProvider),
-    [validSession, sessionId],
-  )
-  // roomName 은 서버 토큰에 이미 들어 있어 쓰이지 않는다(인자 자리만 채운다).
-  const session = useLiveKitRoom(String(sessionId), getToken)
+  /* ── LiveKit ──
+     연결은 공통 레이아웃(SessionMediaLayout)이 들고 있다. 대기방에서 미리 붙여 둔
+     연결을 그대로 물려받아, 입장 직후의 협상·화질 ramp-up 이 화면에 보이지 않게 한다.
+     대기방을 거치지 않은 직접 진입·새로고침을 위해 여기서도 connect() 를 부른다(멱등). */
+  const { session, connect: connectMedia } = useSessionMedia()
+  useEffect(() => {
+    if (validSession) connectMedia()
+  }, [validSession, connectMedia])
 
   /* ── 실시간(STOMP) ── */
   const realtime = useSessionRealtime({
@@ -581,7 +582,3 @@ function useServerTimer(sessionId: number | null, pushedRemaining: number | null
   return remaining
 }
 
-/** sessionId 가 잘못된 경우에만 쓰이는 자리 채우기 — 실제로 연결을 시도하지 않는다. */
-const notConfiguredProvider = async () => {
-  throw new Error('세션 정보가 없어요.')
-}
