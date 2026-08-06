@@ -1,6 +1,5 @@
 package com.date.backend.domain.coach.dto;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -11,6 +10,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Map;
 
 public record AiAnalysisEventRequest(
 		@NotBlank String eventId,
@@ -27,6 +27,6 @@ public record AiAnalysisEventRequest(
 		@NotNull OffsetDateTime occurredAt,
 		@Size(max = 128) String modelVersion,
 		@Size(max = 128) String ruleVersion,
-		@NotNull JsonNode payload
+		@NotNull Map<String, Object> payload
 ) {
 }
