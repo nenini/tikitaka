@@ -27,7 +27,7 @@ _LINE = "=" * 64
 def main() -> None:
     # Windows 콘솔(cp949)에서 한글 깨짐 방지 — 출력 UTF-8 강제
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     except (AttributeError, ValueError):
         pass
 
@@ -84,7 +84,7 @@ def main() -> None:
     print(_LINE)
 
 
-def _dataset_demo(args) -> None:  # noqa: ANN001
+def _dataset_demo(args: argparse.Namespace) -> None:
     """Nemotron-Personas-Korea 에서 실제 한국인 페르소나를 랜덤 추출해 보여준다."""
     try:
         personas = load_personas()

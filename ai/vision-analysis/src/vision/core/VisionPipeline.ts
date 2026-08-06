@@ -210,6 +210,13 @@ export class VisionPipeline {
     );
   }
 
+  /** UI entry point for "continue with default settings". */
+  useGlobalBaselineFallback(
+    sessionElapsedMs: number,
+  ): BaselineCalibrationState {
+    return this.calibrator.useGlobalFallback(sessionElapsedMs);
+  }
+
   recordDroppedFrame(count = 1): void {
     // Frame sampling happens outside this class, so drops are reported without
     // passing frame contents or coupling the pipeline to browser scheduling APIs.

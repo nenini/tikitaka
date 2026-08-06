@@ -9,8 +9,11 @@ import com.date.backend.domain.face.dto.response.FaceAnalysisRequestResponse;
 import com.date.backend.domain.face.repository.UserFaceTagRepository;
 import com.date.backend.domain.match.domain.MatchPair;
 import com.date.backend.domain.match.domain.MatchRequest;
+import com.date.backend.domain.match.domain.MatchResponse;
+import com.date.backend.domain.match.domain.MatchStatus;
 import com.date.backend.domain.match.repository.MatchPairRepository;
 import com.date.backend.domain.match.repository.MatchRequestRepository;
+import com.date.backend.domain.match.repository.MatchResponseRepository;
 import com.date.backend.domain.profile.application.ProfileService;
 import com.date.backend.domain.profile.domain.Gender;
 import com.date.backend.domain.profile.dto.request.ProfileCreateRequest;
@@ -40,7 +43,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,12 +56,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
-@Profile("local")
 @ConditionalOnProperty(
 		prefix = "app.local-seed",
 		name = "match-test-users-enabled",
 		havingValue = "true",
-		matchIfMissing = true
+		matchIfMissing = false
 )
 public class LocalMatchTestDataInitializer implements ApplicationRunner {
 
@@ -113,6 +114,7 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 	private final SurveyService surveyService;
 	private final MatchRequestRepository matchRequestRepository;
 	private final MatchPairRepository matchPairRepository;
+	private final MatchResponseRepository matchResponseRepository;
 	private final WaitingRoomRepository waitingRoomRepository;
 	private final RoomParticipantRepository roomParticipantRepository;
 	private final WaitingRoomProvisioningService waitingRoomProvisioningService;
@@ -133,6 +135,7 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 			SurveyService surveyService,
 			MatchRequestRepository matchRequestRepository,
 			MatchPairRepository matchPairRepository,
+			MatchResponseRepository matchResponseRepository,
 			WaitingRoomRepository waitingRoomRepository,
 			RoomParticipantRepository roomParticipantRepository,
 			WaitingRoomProvisioningService waitingRoomProvisioningService,
@@ -153,6 +156,7 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 		this.surveyService = surveyService;
 		this.matchRequestRepository = matchRequestRepository;
 		this.matchPairRepository = matchPairRepository;
+		this.matchResponseRepository = matchResponseRepository;
 		this.waitingRoomRepository = waitingRoomRepository;
 		this.roomParticipantRepository = roomParticipantRepository;
 		this.waitingRoomProvisioningService = waitingRoomProvisioningService;
@@ -172,6 +176,95 @@ public class LocalMatchTestDataInitializer implements ApplicationRunner {
 				"Local match test users are ready. emails={}",
 				SEED_USERS.stream().map(SeedUser::email).toList()
 		);
+	}
+
+	@Transactional
+	public MatchedSessionFixture createConfirmedSession(int startAfterMinutes) {
+		if (startAfterMinutes < 1 || startAfterMinutes > 10_080) {
+			throw new IllegalArgumentException(
+					"startAfterMinutes must be between 1 and 10080."
+			);
+		}
+		for (SeedUser seed : SEED_USERS) {
+			seed(seed);
+		}
+
+		User woman = userRepository.findByEmail(SEED_USERS.get(0).email())
+				.orElseThrow();
+		User man = userRepository.findByEmail(SEED_USERS.get(1).email())
+				.orElseThrow();
+		List<Long> userIds = List.of(woman.getId(), man.getId());
+		if (!matchPairRepository.findAllActiveByParticipantUserIds(
+				userIds,
+				List.of(MatchStatus.PENDING_ACCEPTANCE, MatchStatus.CONFIRMED)
+		).isEmpty()) {
+			throw new TestFixtureConflictException(
+					"테스트 계정의 진행 중인 매칭 또는 세션을 먼저 종료해 주세요."
+			);
+		}
+
+		Map<String, FaceTagCatalog> faceTags = faceTagCatalogRepository
+				.findAllByActiveTrueOrderByDisplayOrderAsc()
+				.stream()
+				.collect(Collectors.toMap(FaceTagCatalog::getCode, Function.identity()));
+		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime scheduledAt = now.plusMinutes(startAfterMinutes);
+		LocalDateTime acceptDeadlineAt = now.plusSeconds(30);
+
+		MatchRequest womanRequest = matchRequestRepository.saveAndFlush(
+				new MatchRequest(
+						woman.getId(), (short) 24, (short) 28,
+						require(faceTags, "DINOSAUR"), require(faceTags, "DOG"), now
+				)
+		);
+		MatchRequest manRequest = matchRequestRepository.saveAndFlush(
+				new MatchRequest(
+						man.getId(), (short) 25, (short) 30,
+						require(faceTags, "DOG"), require(faceTags, "DINOSAUR"), now
+				)
+		);
+		womanRequest.markMatchFound(now);
+		manRequest.markMatchFound(now);
+
+		MatchPair pair = new MatchPair(
+				womanRequest,
+				manRequest,
+				new BigDecimal("50.000"),
+				new BigDecimal("50.000"),
+				acceptDeadlineAt,
+				scheduledAt,
+				now
+		);
+		MatchResponse womanResponse = new MatchResponse(pair, woman.getId());
+		MatchResponse manResponse = new MatchResponse(pair, man.getId());
+		womanResponse.accept(now);
+		manResponse.accept(now);
+		pair.confirm(now);
+		womanRequest.confirm();
+		manRequest.confirm();
+		pair = matchPairRepository.saveAndFlush(pair);
+		matchResponseRepository.saveAll(List.of(womanResponse, manResponse));
+
+		waitingRoomProvisioningService.provision(pair);
+		WaitingRoom session = waitingRoomRepository.findByMatchPair_Id(pair.getId())
+				.orElseThrow();
+		return new MatchedSessionFixture(
+				woman.getId(), SEED_USERS.get(0).email(),
+				man.getId(), SEED_USERS.get(1).email(),
+				TEST_PASSWORD, pair.getId(), session.getId(), scheduledAt
+		);
+	}
+
+	public record MatchedSessionFixture(
+			Long womanUserId,
+			String womanEmail,
+			Long manUserId,
+			String manEmail,
+			String password,
+			Long matchPairId,
+			Long sessionId,
+			LocalDateTime scheduledStartAt
+	) {
 	}
 
 	private void seedCompletedResultTestSession() {

@@ -89,7 +89,7 @@ export function TrackSelectPage() {
         setBlockReason(onboarding)
         return
       }
-      throw new Error(errorMessageOf(error, '대기 큐에 등록하지 못했어요. 잠시 후 다시 시도해 주세요.'))
+      throw new Error(errorMessageOf(error, '매칭 대기에 등록하지 못했어요. 잠시 후 다시 시도해 주세요.'))
     }
   }
 
@@ -98,7 +98,7 @@ export function TrackSelectPage() {
       <header className="mb-5">
         <h1 className="bt-h1">어떤 상대와 연습할까요?</h1>
         <p className="bt-body bt-muted mt-1">
-          동시에 진행할 수 있는 실사용자 매칭은 1개입니다. AI 화상·챗봇은 대기 큐를 유지한 채 이용할 수
+          동시에 진행할 수 있는 실사용자 매칭은 1개입니다. AI 화상·챗봇은 매칭 대기를 유지한 채 이용할 수
           있어요.
         </p>
       </header>
@@ -120,7 +120,7 @@ export function TrackSelectPage() {
           note="노쇼·직전 취소 시 패널티가 있어요."
           cta={
             <Button variant="primary" block loading={checking} onClick={openSetup}>
-              대기 큐 등록
+              매칭 대기 등록
             </Button>
           }
         />
@@ -153,7 +153,7 @@ export function TrackSelectPage() {
             { icon: 'sparkle', label: '말투 페르소나 · 문장 코칭' },
             { icon: 'close', label: '화상·온도 반영 없음', muted: true },
           ]}
-          note="대기 큐를 유지한 채 이용할 수 있어요."
+          note="매칭 대기를 유지한 채 이용할 수 있어요."
           cta={
             <Button variant="secondary" block onClick={() => navigate('/chatbot/persona')}>
               챗봇 시작

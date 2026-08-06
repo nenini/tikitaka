@@ -12,11 +12,17 @@ dependencies = [
     "numpy>=2.1",
     "python-dotenv>=1.1",
     "stt-pipeline",
+    "chatbot",
+    "tts",
     "uvicorn[standard]>=0.35",
 ]
 
 [tool.uv.sources]
-stt-pipeline = { path = "../stt" }
+# editable — 안 붙이면 휠 복사본이 설치돼 형제 폴더 수정이 여기 반영되지 않는다
+stt-pipeline = { path = "../stt", editable = true }
+# AI 화상 세션이 쓴다. HTTP로 부르지 않고 프롬프트·TTS 함수만 임포트한다.
+chatbot = { path = "../chatbot", editable = true }
+tts = { path = "../tts", editable = true }
 
 [tool.uv]
 package = false
@@ -37,13 +43,15 @@ testpaths = ["tests"]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
-mypy_path = "../stt"
+mypy_path = "../stt:../chatbot:../tts"
 files = ["aggregator", "tests"]
 
 # 서드파티(스텁 없음) — 런타임 전용, 타입체크에서 무시
 [[tool.mypy.overrides]]
 module = [
     "sounddevice",
+    "soundfile",   # tts 가 쓴다(경로 의존이라 그쪽 override 를 물려받지 못한다)
+    "soxr",
     "faster_whisper",
     "faster_whisper.*",
     "livekit",

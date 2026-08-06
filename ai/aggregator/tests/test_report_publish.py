@@ -226,7 +226,7 @@ def test_job_sends_analysis_then_one_report_per_user() -> None:
             _report(), session_id=1, user_ids=IDS, analyzed_at=AT,
             publisher=publisher, generator=_FakeLlm(),
         )
-        assert _paths(recorder) == [ANALYSES_PATH, REPORT_RESULTS_PATH, REPORT_RESULTS_PATH]
+        assert _paths(recorder) == [ANALYSES_PATH, REPORT_RESULTS_PATH]
         await publisher.close()
 
     asyncio.run(scenario())
@@ -243,15 +243,12 @@ def test_job_reports_failed_when_no_utterance() -> None:
         )
         # 두 API 모두에 알려야 한다. reports에만 보내면 analyses 레코드가 안 생겨
         # BE가 "분석 대기 중"으로 남는다.
-        assert _paths(recorder) == [
-            ANALYSES_PATH,
-            REPORT_RESULTS_PATH,
-            REPORT_RESULTS_PATH,
-        ]
-        analysis, *reports = recorder.requests
+        assert _paths(recorder) == [ANALYSES_PATH, REPORT_RESULTS_PATH]
+        analysis, reports = recorder.requests
         assert b"FAILED" in analysis.content
-        for request in reports:
-            assert b"NO_UTTERANCE" in request.content
+        assert b"NO_UTTERANCE" in reports.content
+        # 실패해도 참가자 전원이 배열에 담겨야 한다
+        assert reports.content.count(b'"userId"') == 2
         await publisher.close()
 
     asyncio.run(scenario())

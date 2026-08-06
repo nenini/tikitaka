@@ -21,21 +21,28 @@ import java.util.Objects;
 @Entity
 @Table(name = "sessions")
 public class WaitingRoom {
-	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 35 * 60;
-	public static final int BASE_DURATION_SECONDS = 30 * 60;
+	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 13 * 60;
+	public static final int BASE_DURATION_SECONDS = 8 * 60;
 	public static final int EXTENSION_DURATION_SECONDS = 5 * 60;
+	public static final int AI_VIDEO_DURATION_SECONDS = 5 * 60;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "sessionId")
 	private Long id;
 
-	@OneToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "matchPairId", nullable = false, unique = true)
+	@OneToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "matchPairId", unique = true)
 	private MatchPair matchPair;
 
 	@Column(name = "sessionType", nullable = false, length = 20)
 	private String sessionType;
+
+	@Column(name = "scenario", length = 20)
+	private String scenario;
+
+	@Column(name = "cameraEnabled", nullable = false)
+	private boolean cameraEnabled;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 30)
@@ -92,11 +99,36 @@ public class WaitingRoom {
 			throw new IllegalArgumentException("확정되어 일정이 지정된 매칭만 대기방을 생성할 수 있습니다.");
 		}
 		this.sessionType = "REAL_DATE";
+		this.cameraEnabled = true;
 		this.status = RoomSessionStatus.CREATED;
 		this.scheduledStartAt = matchPair.getScheduledAt();
 		this.plannedDurationSec = DEFAULT_PLANNED_DURATION_SECONDS;
 		this.extensionDurationSec = 0;
 		this.livekitRoomName = "date-room-" + matchPair.getId();
+	}
+
+	public WaitingRoom(
+			LocalDateTime scheduledStartAt,
+			String scenario,
+			boolean cameraEnabled,
+			String livekitRoomName
+	) {
+		this.sessionType = "AI_VIDEO";
+		this.status = RoomSessionStatus.CREATED;
+		this.scheduledStartAt = Objects.requireNonNull(scheduledStartAt);
+		this.scenario = requireAiVideoScenario(scenario);
+		this.cameraEnabled = cameraEnabled;
+		this.plannedDurationSec = AI_VIDEO_DURATION_SECONDS;
+		this.extensionDurationSec = 0;
+		this.livekitRoomName = Objects.requireNonNull(livekitRoomName);
+	}
+
+	private static String requireAiVideoScenario(String scenario) {
+		String value = Objects.requireNonNull(scenario).toLowerCase();
+		if (!java.util.Set.of("first_meet", "hobby", "work", "food", "travel").contains(value)) {
+			throw new IllegalArgumentException("지원하지 않는 AI 화상 세션 주제입니다.");
+		}
+		return value;
 	}
 
 	@PrePersist
@@ -117,6 +149,22 @@ public class WaitingRoom {
 
 	public MatchPair getMatchPair() {
 		return matchPair;
+	}
+
+	public String getSessionType() {
+		return sessionType;
+	}
+
+	public String getScenario() {
+		return scenario;
+	}
+
+	public boolean isCameraEnabled() {
+		return cameraEnabled;
+	}
+
+	public boolean isAiVideo() {
+		return "AI_VIDEO".equals(sessionType);
 	}
 
 	public RoomSessionStatus getStatus() {

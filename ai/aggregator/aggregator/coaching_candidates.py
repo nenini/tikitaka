@@ -12,8 +12,13 @@ CoachingType: TypeAlias = Literal[
     "REACTION_PROMPT",
     "RESPONSE_PROMPT",
     "EXPRESSION_GUIDANCE",
-    "SPEAKING_BALANCE",
 ]
+"""BE `CoachingType` enum과 값 집합이 같아야 한다. BE는 닫힌 enum이라 여기에만 있는
+값을 보내면 역직렬화 단계에서 400이 나고 그 코칭은 유실된다.
+
+`SPEAKING_BALANCE`가 여기 있었지만 이걸 만드는 detector가 없었고 BE enum에도 없다.
+발화균형 코칭을 켤 때 BE에 enum 추가를 먼저 요청하고 되살린다.
+"""
 CoachingPriority: TypeAlias = Literal["LOW", "MEDIUM", "HIGH"]
 
 

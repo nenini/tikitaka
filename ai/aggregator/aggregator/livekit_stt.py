@@ -29,6 +29,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+FEED_BATCH_MS = 100
+"""VAD에 넘기기 전에 모으는 오디오 길이. LiveKit 프레임은 20ms 단위다.
+
+100ms면 VAD 호출이 1/5로 줄고, 발화 시작 감지가 최대 80ms 늦어진다. 코칭·리포트가
+초 단위로 판정하므로 그 지연은 무해하다. 더 키우면 바지인(AI 말 끊기) 반응이 둔해진다.
+"""
+
 
 class LiveKitSttAdapterFactory:
     """Load one Whisper engine and share it across all active sessions."""
@@ -154,9 +161,10 @@ class LiveKitSttAdapter:
             self._main_task.cancel()
             await asyncio.gather(self._main_task, return_exceptions=True)
 
+        # close()가 남은 전사까지 seq 오름차순으로 돌려준다. 여기서 poll을 또 부르면
+        # 안 된다 — 예전에 그렇게 했다가 seq 역행으로 종료 처리가 통째로 끊겼다.
         final_events = await asyncio.to_thread(self._runner.close)
         await self._forward(final_events)
-        await self._forward(self._runner.poll_transcripts())
         await self._vision_adapter.close()
 
     def _register_room_handlers(self) -> None:
@@ -310,6 +318,17 @@ class LiveKitSttAdapter:
             frame_size_ms=20,
             capacity=100,
         )
+        # 프레임을 묶어서 스레드로 넘긴다. `feed()`는 Whisper가 아니라 **VAD**를 돌리는데
+        # (Whisper는 worker 스레드에 있다) 버퍼 전체를 매번 다시 훑기 때문에 발화가
+        # 길어질수록 비싸진다 — 실측 8초 버퍼에서 14.6ms로, 20ms 프레임 예산의 73%다.
+        # 화자 2명이면 예산을 넘겨 이벤트 루프가 밀리고, 코칭 LLM 응답이 도착해도
+        # 집어들 틈이 없어 3초 타임아웃에 걸린다(2026-08-06 운영: 9/9 폴백).
+        #
+        # 묶으면 VAD 호출이 1/5로 줄고, to_thread 로 빼면 남은 비용도 루프 밖으로 나간다.
+        # 스레드 왕복 비용은 5프레임에 한 번이라 상쇄된다.
+        pending: list[np.ndarray] = []
+        pending_samples = 0
+        batch_samples = SAMPLE_RATE * FEED_BATCH_MS // 1000
         try:
             async for frame_event in stream:
                 pcm = np.frombuffer(
@@ -317,12 +336,33 @@ class LiveKitSttAdapter:
                     dtype=np.int16,
                 ).astype(np.float32)
                 pcm /= 32768.0
-                events = self._runner.feed(
+                pending.append(pcm)
+                pending_samples += len(pcm)
+                if pending_samples < batch_samples:
+                    continue
+                chunk = np.concatenate(pending)
+                pending.clear()
+                pending_samples = 0
+                events = await asyncio.to_thread(
+                    self._runner.feed,
                     user_id=user_id,
                     participant_identity=participant_identity,
-                    audio=pcm,
+                    audio=chunk,
                     stream_epoch_ms=stream_epoch_ms,
                 )
+                await self._forward(events)
+
+            # 트랙이 끊기면 배치에 못 찬 꼬리가 남는다. 버리면 마지막 발화의 끝이
+            # 잘린다 — 최대 80ms지만 종결 어미가 날아갈 수 있다.
+            if pending:
+                events = await asyncio.to_thread(
+                    self._runner.feed,
+                    user_id=user_id,
+                    participant_identity=participant_identity,
+                    audio=np.concatenate(pending),
+                    stream_epoch_ms=stream_epoch_ms,
+                )
+                pending.clear()
                 await self._forward(events)
         except asyncio.CancelledError:
             raise
@@ -337,8 +377,25 @@ class LiveKitSttAdapter:
             await stream.aclose()
 
     async def _poll_transcripts(self) -> None:
+        """전사를 관제실로 흘려보낸다. **어떤 예외에도 죽으면 안 된다.**
+
+        예전엔 try 가 없어서 `_forward` 가 한 번 던지면 태스크가 조용히 끝났다
+        (생성부의 `gather(return_exceptions=True)`가 예외를 삼켜 로그도 안 남았다).
+        그 순간부터 전사가 worker 큐에 쌓여 **실시간 코칭이 문맥을 못 받고**, 종료 때
+        한꺼번에 쏟아지며 세션 결과물이 통째로 날아갔다(2026-08-06 운영 2건).
+
+        한 묶음 실패로 루프를 끝내느니 그 묶음만 잃고 계속 도는 편이 낫다.
+        """
         while not self._stopping.is_set():
-            await self._forward(self._runner.poll_transcripts())
+            try:
+                await self._forward(self._runner.poll_transcripts())
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "transcript poll failed session=%s — 루프는 계속한다",
+                    self._event.session_id,
+                )
             await asyncio.sleep(0.05)
 
     async def _forward(self, events: Sequence[SttEvent]) -> None:

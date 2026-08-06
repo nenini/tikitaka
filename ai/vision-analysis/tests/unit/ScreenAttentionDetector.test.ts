@@ -340,4 +340,414 @@ describe("ScreenAttentionDetector", () => {
     );
     expect(detector.getState().coachingEligible).toBe(false);
   });
+
+  describe("iris-only departures cannot bypass the strict path", () => {
+    const openEyes = { eyeBlinkLeft: 0, eyeBlinkRight: 0 } as const;
+    const shiftedGaze = {
+      left: { horizontalRatio: 0.8, verticalRatio: 0.8 },
+      right: { horizontalRatio: 0.8, verticalRatio: 0.8 },
+      horizontalRatio: 0.8,
+      verticalRatio: 0.8,
+      binocularAgreementScore: 1,
+    } as const;
+
+    function createDetector(): ScreenAttentionDetector {
+      return new ScreenAttentionDetector(
+        { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+        createDetectorEventFactory(),
+      );
+    }
+
+    it("emits nothing when the eye baseline reliability is below the evidence floor", () => {
+      const detector = createDetector();
+      const context = {
+        quality,
+        baseline: createVisionBaseline({
+          leftEyeBaselineConfidence: 0.2,
+          rightEyeBaselineConfidence: 0.2,
+        }),
+        performanceProfile: "HIGH" as const,
+      };
+      const events = [0, 500, 1_000, 1_500, 2_000, 2_500].flatMap(
+        (timestampMs) =>
+          detector.update(
+            createNormalizedFaceFrame({
+              timestampMs,
+              eyeGaze: shiftedGaze,
+              blendshapes: openEyes,
+            }),
+            context,
+          ),
+      );
+
+      expect(events).toHaveLength(0);
+      expect(detector.getState().entryBlockReason).toBe(
+        "NO_MEANINGFUL_HEAD_OR_IRIS_CHANGE",
+      );
+    });
+
+    it("blocks a mid-range iris-only departure that used to leak through the aggregate rule", () => {
+      // gaze 0.655 -> irisProxyScore 0.36 (departure, but above irisOnlyScore)
+      // and aggregate score 71 (<= attentionAwayScore) with confidence 0.91.
+      // The old `headDeparture || irisDeparture` rule fired here in 1s.
+      const midGaze = {
+        left: { horizontalRatio: 0.655, verticalRatio: 0.655 },
+        right: { horizontalRatio: 0.655, verticalRatio: 0.655 },
+        horizontalRatio: 0.655,
+        verticalRatio: 0.655,
+        binocularAgreementScore: 1,
+      } as const;
+      const detector = createDetector();
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const events = [0, 500, 1_000, 1_500, 2_000, 2_500, 3_000].flatMap(
+        (timestampMs) =>
+          detector.update(
+            createNormalizedFaceFrame({
+              timestampMs,
+              eyeGaze: midGaze,
+              blendshapes: openEyes,
+            }),
+            context,
+          ),
+      );
+
+      expect(events).toHaveLength(0);
+      expect(detector.getState().attentionEvidenceMode).toBe(
+        "IRIS_ONLY_DEPARTURE",
+      );
+      expect(detector.getState().entryBlockReason).toBe(
+        "IRIS_SCORE_ABOVE_THRESHOLD",
+      );
+    });
+
+    it("reports the reliability gate when the iris clears the evidence floor but not the entry threshold", () => {
+      const detector = createDetector();
+      const context = {
+        quality,
+        baseline: createVisionBaseline({
+          leftEyeBaselineConfidence: 0.5,
+          rightEyeBaselineConfidence: 0.5,
+        }),
+        performanceProfile: "HIGH" as const,
+      };
+      const events = [0, 500, 1_000, 1_500, 2_000, 2_500].flatMap(
+        (timestampMs) =>
+          detector.update(
+            createNormalizedFaceFrame({
+              timestampMs,
+              eyeGaze: shiftedGaze,
+              blendshapes: openEyes,
+            }),
+            context,
+          ),
+      );
+
+      expect(events).toHaveLength(0);
+      expect(detector.getState().entryBlockReason).toBe(
+        "IRIS_RELIABILITY_TOO_LOW",
+      );
+    });
+
+    it("still needs the full 2s iris-only path when every iris gate is satisfied", () => {
+      const detector = createDetector();
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const before = [0, 500, 1_000, 1_500].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            eyeGaze: shiftedGaze,
+            blendshapes: openEyes,
+          }),
+          context,
+        ),
+      );
+      expect(before).toHaveLength(0);
+
+      const after = detector.update(
+        createNormalizedFaceFrame({
+          timestampMs: 2_000,
+          eyeGaze: shiftedGaze,
+          blendshapes: openEyes,
+        }),
+        context,
+      );
+      expect(after.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+      expect(detector.getState().attentionEvidenceMode).toBe(
+        "IRIS_ONLY_DEPARTURE",
+      );
+    });
+
+    it("keeps the 1s aggregate path for a head departure", () => {
+      const detector = createDetector();
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const events = [0, 300, 600, 1_000].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            yaw: 30,
+            pitch: 22,
+            blendshapes: openEyes,
+          }),
+          context,
+        ),
+      );
+
+      expect(events.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+    });
+
+    it("routes a simultaneous head and iris departure through the aggregate path", () => {
+      const detector = createDetector();
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const events = [0, 300, 600, 1_000].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            yaw: 30,
+            pitch: 22,
+            eyeGaze: shiftedGaze,
+            blendshapes: openEyes,
+          }),
+          context,
+        ),
+      );
+
+      expect(detector.getState().attentionEvidenceMode).toBe(
+        "CONSISTENT_DEPARTURE",
+      );
+      expect(events.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+    });
+
+    it("reports the iris confidence gate when reliability passes but confidence does not", () => {
+      // Diagonal gaze drives irisProxyScore to 0 so the strict path is entered,
+      // reliability clears 0.8, and only irisOnlyMinimumConfidence is missing.
+      const diagonal = {
+        left: { horizontalRatio: 0.85, verticalRatio: 0.85 },
+        right: { horizontalRatio: 0.85, verticalRatio: 0.85 },
+        horizontalRatio: 0.85,
+        verticalRatio: 0.85,
+        binocularAgreementScore: 1,
+      } as const;
+      const detector = new ScreenAttentionDetector(
+        {
+          ...defaultVisionConfig.screenAttention,
+          emaAlpha: 1,
+          irisOnlyMinimumConfidence: 0.99,
+        },
+        createDetectorEventFactory(),
+      );
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const events = [0, 500, 1_000, 1_500, 2_000, 2_500].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            eyeGaze: diagonal,
+            blendshapes: openEyes,
+          }),
+          context,
+        ),
+      );
+
+      expect(events).toHaveLength(0);
+      expect(detector.getState().gazeReliability).toBeGreaterThanOrEqual(
+        defaultVisionConfig.screenAttention.irisOnlyMinimumReliability,
+      );
+      expect(detector.getState().entryBlockReason).toBe(
+        "IRIS_CONFIDENCE_TOO_LOW",
+      );
+    });
+
+    it("keeps the aggregate score and confidence reasons for head departures", () => {
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+
+      // Head departs (headPoseScore 0.58 <= 0.6) but the aggregate score is
+      // 83.8, still above attentionAwayScore.
+      const mild = createDetector();
+      mild.update(
+        createNormalizedFaceFrame({
+          timestampMs: 0,
+          yaw: 15.5,
+          pitch: 12.3,
+          blendshapes: openEyes,
+        }),
+        context,
+      );
+      expect(mild.getState().entryBlockReason).toBe("SCORE_ABOVE_THRESHOLD");
+
+      // Head departs, score is low enough, but event confidence is not.
+      const strict = new ScreenAttentionDetector(
+        {
+          ...defaultVisionConfig.screenAttention,
+          emaAlpha: 1,
+          minimumEventConfidence: 0.99,
+        },
+        createDetectorEventFactory(),
+      );
+      strict.update(
+        createNormalizedFaceFrame({
+          timestampMs: 0,
+          yaw: 30,
+          pitch: 22,
+          blendshapes: openEyes,
+        }),
+        context,
+      );
+      expect(strict.getState().entryBlockReason).toBe(
+        "EVENT_CONFIDENCE_TOO_LOW",
+      );
+    });
+
+    it("restarts the candidate timer when the candidate kind changes", () => {
+      const detector = createDetector();
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      // 1.2s of iris-only accumulation, still short of the 2s requirement.
+      for (const timestampMs of [0, 400, 800, 1_200]) {
+        expect(
+          detector.update(
+            createNormalizedFaceFrame({
+              timestampMs,
+              eyeGaze: shiftedGaze,
+              blendshapes: openEyes,
+            }),
+            context,
+          ),
+        ).toHaveLength(0);
+      }
+
+      // Head departure switches the kind to AGGREGATE. The 1s aggregate budget
+      // must start now instead of inheriting the 1.2s already served.
+      const switched = detector.update(
+        createNormalizedFaceFrame({
+          timestampMs: 1_300,
+          yaw: 30,
+          pitch: 22,
+          eyeGaze: shiftedGaze,
+          blendshapes: openEyes,
+        }),
+        context,
+      );
+      expect(switched).toHaveLength(0);
+      expect(detector.getState().stateSinceMs).toBe(1_300);
+
+      const events = [1_700, 2_000, 2_300].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            yaw: 30,
+            pitch: 22,
+            eyeGaze: shiftedGaze,
+            blendshapes: openEyes,
+          }),
+          context,
+        ),
+      );
+      expect(events.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+    });
+  });
+
+  describe("global fallback recovery", () => {
+    const fallbackBaseline = createVisionBaseline({ status: "GLOBAL_FALLBACK" });
+
+    function startFallbackEpisode(): ScreenAttentionDetector {
+      const detector = new ScreenAttentionDetector(
+        { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+        createDetectorEventFactory(),
+      );
+      const context = {
+        quality,
+        baseline: fallbackBaseline,
+        performanceProfile: "HIGH" as const,
+      };
+      const started = [0, 500, 1_000, 1_500, 2_000].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({ timestampMs, yaw: 45 }),
+          context,
+        ),
+      );
+      expect(started.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+      return detector;
+    }
+
+    it("ends the episode as RECOVERED once the face returns inside the recovery band", () => {
+      const detector = startFallbackEpisode();
+      const context = {
+        quality,
+        baseline: fallbackBaseline,
+        performanceProfile: "HIGH" as const,
+      };
+      const events = [2_500, 3_000, 3_500].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({ timestampMs, yaw: 30 }),
+          context,
+        ),
+      );
+      const ended = events.find(
+        (event) => event.eventType === "GAZE_AWAY_ENDED",
+      );
+
+      expect(ended).toBeDefined();
+      expect(
+        ended?.eventType === "GAZE_AWAY_ENDED"
+          ? ended.payload.terminationReason
+          : null,
+      ).toBe("RECOVERED");
+    });
+
+    it("does not flip state for a yaw between the recovery and entry angles", () => {
+      const detector = startFallbackEpisode();
+      const context = {
+        quality,
+        baseline: fallbackBaseline,
+        performanceProfile: "HIGH" as const,
+      };
+      const events = [2_500, 3_000, 3_500, 4_000, 4_500, 5_000].flatMap(
+        (timestampMs) =>
+          detector.update(
+            createNormalizedFaceFrame({ timestampMs, yaw: 37 }),
+            context,
+          ),
+      );
+
+      expect(
+        events.filter((event) => event.eventType === "GAZE_AWAY_ENDED"),
+      ).toHaveLength(0);
+      expect(detector.getState().state).toBe("ACTIVE");
+    });
+
+    it("leaves the non-fallback recovery rule unchanged", () => {
+      const detector = new ScreenAttentionDetector(
+        { ...defaultVisionConfig.screenAttention, emaAlpha: 1 },
+        createDetectorEventFactory(),
+      );
+      const context = { quality, baseline, performanceProfile: "HIGH" as const };
+      const started = [0, 300, 600, 1_000].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({ timestampMs, yaw: 30, pitch: 22 }),
+          context,
+        ),
+      );
+      expect(started.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_STARTED",
+      );
+
+      const events = [1_400, 1_800, 2_200].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({ timestampMs, yaw: 0, pitch: 0 }),
+          context,
+        ),
+      );
+      expect(events.map((event) => event.eventType)).toContain(
+        "GAZE_AWAY_ENDED",
+      );
+    });
+  });
 });

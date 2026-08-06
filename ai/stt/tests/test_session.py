@@ -153,3 +153,38 @@ def test_runner_routes_by_user(monkeypatch: pytest.MonkeyPatch) -> None:
     assert a[0].user_id == "42"
     assert b[0].user_id == "43"
     runner.close()
+
+
+def test_close_returns_events_in_ascending_seq(monkeypatch: pytest.MonkeyPatch) -> None:
+    """close()가 돌려주는 이벤트의 seq는 오름차순이어야 한다.
+
+    관제실이 seq 역행을 SttSequenceError로 거부한다(aggregator.py:151). 종료 처리가
+    거기서 터지면 **전사 보관·리포트 생성이 통째로 스킵된다** —
+    2026-08-06 운영 세션에서 `received 232, previous 682`로 실제 발생했고,
+    30분 세션의 리포트가 아예 안 만들어졌다.
+
+    재현 조건: 완료된 전사가 아직 안 꺼내진 채로(=poll 루프가 취소된 뒤) 진행 중인
+    발화가 남아 종료되는 경우. flush()가 **새** seq를 받고, 그 뒤에 붙는 전사는
+    **먼저 발급된** seq를 갖는다.
+    """
+    # 첫 발화는 끝나게, 두 번째는 진행 중으로 남게 VAD를 바꿔 준다.
+    mode = {"open": False}
+
+    def fake_vad(buf: object, opts: object) -> list[dict[str, int]]:
+        length = len(buf)  # type: ignore[arg-type]
+        return [{"start": 0, "end": length if mode["open"] else 8000}]
+
+    monkeypatch.setattr(session_mod, "get_speech_timestamps", fake_vad)
+    runner = SessionSttRunner(FakeEngine(), session_id="s1", vad_opts=make_vad_options())
+
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(12000, dtype=np.float32))
+    assert runner.wait_idle()  # 전사가 큐에 쌓였지만 poll 하지 않는다
+
+    mode["open"] = True
+    runner.feed(user_id="42", participant_identity="lk-42", audio=np.zeros(8000, dtype=np.float32))
+    final = runner.close()
+
+    seqs = [e.seq for e in final]
+    assert seqs == sorted(seqs), f"seq 역행: {[(e.seq, e.event_type) for e in final]}"
+    assert runner.poll_transcripts() == []

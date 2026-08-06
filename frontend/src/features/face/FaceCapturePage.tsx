@@ -12,6 +12,7 @@ import {
   submitFaceAnalysisFailure,
   submitFaceAnalysisResult,
 } from './api'
+import { resetMyFaceAnalysis } from './useMyFaceAnalysis'
 import { useFaceCamera } from './useFaceCamera'
 import {
   FACE_FAILURE_GUIDE,
@@ -121,6 +122,9 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
         })),
       })
       camera.stop()
+      // 얼굴상이 바뀌면 프로필 사진도 바뀐다. 헤더·마이페이지가 공유하는 캐시를 비워
+      // 다음 조회에서 새 결과(=새 동물 이미지)를 받게 한다.
+      resetMyFaceAnalysis()
       // 결과 표시는 별도 화면(PROFILE-03)이 맡는다. 그 화면이 서버에서 최신 결과를
       // 다시 읽으므로, 저장 직후 PENDING 이어도 거기서 상태를 추적할 수 있다.
       navigate(onboarding ? '/signup/face-result' : '/me/edit/face-result', { replace: true })

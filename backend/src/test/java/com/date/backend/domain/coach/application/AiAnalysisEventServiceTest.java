@@ -17,7 +17,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,7 +91,7 @@ class AiAnalysisEventServiceTest {
 				"15", "101", "user-999", "client-1", 1L, 1000L,
 				new BigDecimal("0.91"), OffsetDateTime.parse("2026-07-30T01:00:01Z"),
 				"whisper-v3", "stt-rule-v1",
-				new ObjectMapper().createObjectNode().put("text", "안녕하세요")
+				Map.of("text", "안녕하세요")
 		);
 
 		assertThatThrownBy(() -> service.receive(AiAnalysisType.VOICE, request))
@@ -114,13 +116,25 @@ class AiAnalysisEventServiceTest {
 		);
 	}
 
+	@Test
+	void acceptsFinalVisionEventImmediatelyAfterSessionEnd() {
+		when(session.isInProgress()).thenReturn(false);
+		when(session.isEnded()).thenReturn(true);
+		when(session.getActualEndAt()).thenReturn(LocalDateTime.of(2026, 7, 30, 10, 0, 25));
+
+		var response = service.receive(AiAnalysisType.VISION, request("event-final-vision"));
+
+		assertThat(response.status()).isEqualTo("STORED");
+		verify(eventRepository).saveAndFlush(any());
+	}
+
 	private AiAnalysisEventRequest request(String eventId) {
 		return new AiAnalysisEventRequest(
 				eventId, 4, "VISION_METRIC_SNAPSHOT", "VISION_PIPELINE",
 				"15", "101", "user-101", "client-1", 1L, 1000L,
 				new BigDecimal("0.91"), OffsetDateTime.parse("2026-07-30T01:00:01Z"),
 				"mediapipe-v1", "vision-rule-v4",
-				new ObjectMapper().createObjectNode().put("attentionScore", 84)
+				Map.of("attentionScore", 84)
 		);
 	}
 }

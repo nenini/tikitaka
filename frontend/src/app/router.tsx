@@ -24,6 +24,7 @@ import { FaceCapturePage, FaceRecapturePage } from '@/features/face/FaceCaptureP
 // 얼굴상 결과(W-05b / PROFILE-03) — 촬영과 분리해 결과만 다시 볼 수 있게 한다
 import { FaceResultPage, FaceResultRecapturePage } from '@/features/face/FaceResultPage'
 // 세션 · 대기방
+import { SessionMediaLayout } from '@/features/session/SessionMediaLayout'
 import { SessionPage } from '@/features/session/SessionPage'
 import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
 // 매칭 F2
@@ -105,8 +106,18 @@ export const router = createBrowserRouter([
       { path: '/matching/queue/:requestId', element: <MatchQueuePage /> },
       { path: '/matching/pair/:pairId', element: <MatchCardPage /> },
       // 대기방(기기 점검) → 세션. 대기방을 거쳐 WebRTC 세션으로 진입한다.
-      { path: '/session/:sessionId/room', element: <WaitingRoomPage /> },
-      { path: '/session/:sessionId', element: <SessionPage /> },
+      //
+      // 두 화면을 **공통 레이아웃 아래 중첩**한다. LiveKit 연결을 대기방에서 미리 붙여 두고
+      // (프리워밍) 세션이 그대로 물려받기 위해서다 — 소유자가 두 화면보다 오래 살아야 한다.
+      // 평가·리포트는 미디어가 필요 없으므로 형제로 남긴다(레이아웃 밖 = 자동 해제).
+      {
+        path: '/session/:sessionId',
+        element: <SessionMediaLayout />,
+        children: [
+          { index: true, element: <SessionPage /> },
+          { path: 'room', element: <WaitingRoomPage /> },
+        ],
+      },
       // 세션 후 F4: 상호 평가 W-14 → AI 세션 리포트 W-16
       { path: '/session/:sessionId/review', element: <PeerReviewPage /> },
       { path: '/session/:sessionId/report', element: <SessionReportPage /> },

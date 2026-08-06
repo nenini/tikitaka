@@ -1,3 +1,4 @@
+import type { BaselineCalibrationState } from "../calibration/BaselineCalibrator.js";
 import type { FaceQualityRuntimeStatus } from "../detectors/FaceQualityDetector.js";
 import type { VisionEvent } from "../events/VisionEvent.js";
 import type {
@@ -101,6 +102,12 @@ export class VisionSessionRuntime {
 
   getState(): VisionSessionRuntimeState {
     return this.state;
+  }
+
+  useGlobalBaselineFallback(
+    sessionElapsedMs: number,
+  ): BaselineCalibrationState {
+    return this.pipeline.useGlobalBaselineFallback(sessionElapsedMs);
   }
 
   private async processFrame(

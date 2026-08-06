@@ -17,6 +17,7 @@ from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
 from aggregator.session_contracts import SessionEventRequest
 from aggregator.session_manager import SessionManager
+from aggregator.task_guard import log_task_failure
 from aggregator.report.input import ReportInput
 from aggregator.settings import IntegrationSettings
 from aggregator.transcripts import TranscriptSegment
@@ -55,6 +56,10 @@ class FakeMessageGenerator:
         self.message = message
         self.calls: list[tuple[tuple[TranscriptSegment, ...], str]] = []
         self.closed = False
+        self.warmups = 0
+
+    async def warmup(self) -> None:
+        self.warmups += 1
 
     async def generate(
         self,
@@ -549,7 +554,11 @@ def test_transcript_is_retained_after_end_and_expires_from_memory(
         assert manager.retained_transcript_count == 0
         await manager.close()
         assert len(report_publisher.analyses) == 1
-        assert len(report_publisher.reports) == 2
+        # 리포트는 세션당 한 번만 보낸다(BE 계약 2026-08-04). 참가자는 배열에 담긴다.
+        assert len(report_publisher.reports) == 1
+        entries = report_publisher.reports[0]["reports"]
+        assert isinstance(entries, list)
+        assert len(entries) == 2
 
     caplog.set_level(logging.INFO)
     asyncio.run(scenario())
@@ -607,3 +616,146 @@ def test_livekit_adapter_routes_important_vision_event_to_backend() -> None:
         assert vision_sender.closed
 
     asyncio.run(scenario())
+
+
+def test_session_end_survives_a_failing_stop() -> None:
+    """stop() 이 터져도 전사 보관·리포트 예약은 반드시 시도한다.
+
+    2026-08-06 운영: stop() 안의 SttSequenceError 가 그대로 올라가 _end() 아래가
+    통째로 스킵됐다. 전사 조회 404, 리포트 로그 0건, 실패 통지도 못 감 →
+    프론트는 무한 PENDING. 세션은 이미 끝났으니 남은 데이터를 건지는 게 먼저다.
+    """
+
+    class ExplodingAdapter(FakeAudioAdapter):
+        async def stop(self) -> None:
+            raise RuntimeError("seq regression during flush")
+
+    class ExplodingFactory(FakeAudioAdapterFactory):
+        def create(
+            self,
+            _event: SessionEventRequest,
+            sink: Callable[[SttEvent], Awaitable[bool]],
+            vision_sink: Callable[[VisionEventBatch], Awaitable[object]],
+            _elapsed_ms: Callable[[], int],
+        ) -> FakeAudioAdapter:
+            assert self.warmed
+            adapter = ExplodingAdapter(sink, vision_sink)
+            self.adapters.append(adapter)
+            return adapter
+
+    async def scenario() -> None:
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=ExplodingFactory(),
+        )
+        await manager.startup()
+        try:
+            await manager.handle(_started())
+            response = await manager.handle(_ended())
+            assert response.status == "PROCESSED", "예외가 새면 BE가 500을 받는다"
+            assert "15" not in manager._sessions, "세션은 정리돼야 한다"
+        finally:
+            await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_tick_loop_keeps_running_after_a_failing_tick() -> None:
+    """tick 이 한 번 터져도 루프는 계속 돈다.
+
+    예전엔 try 가 while 바깥이라 예외 하나에 tick 이 영영 멈췄다. tick 이 멈추면
+    침묵·리액션 감지가 통째로 죽어 세션 내내 코칭이 한 건도 안 나간다.
+    """
+
+    async def scenario() -> None:
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                tick_interval_seconds=0.01,
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=FakeAudioAdapterFactory(),
+        )
+        await manager.startup()
+        try:
+            await manager.handle(_started())
+            ticks = 0
+
+            async def exploding_tick(_elapsed_ms: int | None = None) -> None:
+                nonlocal ticks
+                ticks += 1
+                raise RuntimeError("detector blew up")
+
+            manager.runtime("15").tick = exploding_tick  # type: ignore[assignment]
+            await asyncio.sleep(0.1)
+            assert ticks >= 3, "한 번 실패했다고 tick 이 멈추면 코칭이 죽는다"
+        finally:
+            await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_retention_loop_keeps_running_after_a_failing_sweep() -> None:
+    """보관 만료 청소가 한 번 터져도 루프는 계속 돈다.
+
+    예전엔 CancelledError 만 잡아서 다른 예외가 나면 루프가 조용히 죽었다. 그러면
+    전사가 영원히 안 지워진다 — "종료 후 30분만 보관" 약속이 깨진다.
+    """
+
+    async def scenario() -> None:
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                transcript_cleanup_interval_seconds=0.01,
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=FakeAudioAdapterFactory(),
+        )
+        sweeps = 0
+
+        def exploding_purge() -> None:
+            nonlocal sweeps
+            sweeps += 1
+            raise RuntimeError("clock blew up")
+
+        manager._purge_expired_transcripts = exploding_purge  # type: ignore[method-assign]
+        await manager.startup()
+        try:
+            await asyncio.sleep(0.1)
+            assert sweeps >= 3, "청소가 죽으면 전사가 영영 안 지워진다"
+        finally:
+            await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_failed_background_task_is_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """던지고 잊는 태스크의 예외는 반드시 로그로 남는다.
+
+    2026-08-06 장애의 핵심은 "예외가 났는데 로그가 없었다" 였다.
+    """
+
+    async def scenario() -> None:
+        async def boom() -> None:
+            raise RuntimeError("silent death")
+
+        task = asyncio.create_task(boom(), name="probe")
+        task.add_done_callback(log_task_failure)
+        await asyncio.gather(task, return_exceptions=True)
+        await asyncio.sleep(0)
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(scenario())
+
+    assert any(
+        "background task failed name=probe" in record.getMessage()
+        for record in caplog.records
+    )

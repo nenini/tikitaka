@@ -32,9 +32,17 @@ from chatbot.conversation import Conversation
 from chatbot.llm import ChatLLM, OllamaAdapter
 from chatbot.persona import build_system_prompt
 from chatbot.persona_catalog import PersonaNotFound, get_persona, select_persona
+from chatbot.queue_gate import LlmGate, QueueFull, QueueTimeout, gate_from_env
 from chatbot.schemas import ChatMessage
 
 _TOKEN_ENV = "AI_CHAT_INTERNAL_TOKEN"
+
+HEARTBEAT_SECONDS = 10.0
+"""대기 중 heartbeat 간격.
+
+아무것도 안 보내면 nginx가 죽은 연결로 보고 끊는다(BE 계약 2026-08-05).
+BE의 전체 제한 시간을 무한 연장하는 용도가 아니라, 살아 있음만 알린다.
+"""
 
 
 class _CamelModel(BaseModel):
@@ -68,12 +76,22 @@ def get_llm() -> ChatLLM:
     # (GPU 여유에 따라 7.8B ↔ 2.4B 전환 등). 미설정 시 로컬 기본값.
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
     model = os.environ.get("OLLAMA_MODEL", "exaone3.5:7.8b")
-    return OllamaAdapter(model=model, host=host)
+    timeout = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
+    return OllamaAdapter(model=model, host=host, timeout_seconds=timeout)
 
 
 LLMDep = Annotated[ChatLLM, Depends(get_llm)]
 
-app = FastAPI(title="소개팅 AI 챗봇 API", version="0.3.0")
+_gate = gate_from_env()
+
+
+def get_gate() -> LlmGate:
+    return _gate
+
+
+GateDep = Annotated[LlmGate, Depends(get_gate)]
+
+app = FastAPI(title="소개팅 AI 챗봇 API", version="0.4.0")
 
 
 @app.exception_handler(RequestValidationError)
@@ -114,51 +132,88 @@ def health() -> dict[str, str]:
 def stream_chat(
     request: ChatStreamRequest,
     llm: LLMDep,
+    gate: GateDep,
     x_internal_token: Annotated[str | None, Header()] = None,
 ) -> Response:
     _check_token(x_internal_token)
 
+    # 대기열 자리는 **스트림을 열기 전에** 잡는다. 200을 내보낸 뒤에는 503을 못 준다.
+    try:
+        ticket = gate.enter()
+    except QueueFull:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": "AI_QUEUE_FULL",
+                "message": "AI 응답 대기열이 가득 찼습니다. 잠시 후 다시 시도해 주세요.",
+            },
+            headers={"Retry-After": "10"},
+        )
+
     def generate() -> Iterator[bytes]:
-        # 1) 페르소나 결정 (키 있으면 재사용, 없으면 조건으로 선택)
         try:
-            if request.selected_persona_key:
-                entry = get_persona(request.selected_persona_key)
-                emit_persona = False
-            else:
-                condition = request.persona_condition or PersonaCondition()
-                entry = select_persona(
-                    gender=condition.preferred_gender,
-                    age=condition.preferred_age,
-                    min_age=condition.min_preferred_age,
-                    max_age=condition.max_preferred_age,
-                )
-                emit_persona = True
-        except PersonaNotFound:
-            yield _sse("error", {
-                "code": "PERSONA_NOT_FOUND",
-                "message": "조건에 맞는 페르소나를 찾을 수 없습니다.",
-            })
-            return
+            # 1) 페르소나 결정 — GPU를 안 쓰므로 대기 전에 끝낸다.
+            #    조건이 틀렸으면 자리를 붙잡고 기다릴 이유가 없다.
+            try:
+                if request.selected_persona_key:
+                    entry = get_persona(request.selected_persona_key)
+                    emit_persona = False
+                else:
+                    condition = request.persona_condition or PersonaCondition()
+                    entry = select_persona(
+                        gender=condition.preferred_gender,
+                        age=condition.preferred_age,
+                        min_age=condition.min_preferred_age,
+                        max_age=condition.max_preferred_age,
+                    )
+                    emit_persona = True
+            except PersonaNotFound:
+                yield _sse("error", {
+                    "code": "PERSONA_NOT_FOUND",
+                    "message": "조건에 맞는 페르소나를 찾을 수 없습니다.",
+                })
+                return
 
-        if emit_persona:
-            yield _sse("persona", {"personaKey": entry.key, "displayName": entry.display_name})
+            if emit_persona:
+                yield _sse("persona", {"personaKey": entry.key, "displayName": entry.display_name})
 
-        # 2) history로 문맥 구성 후 답변 생성 (무상태)
-        system_prompt = build_system_prompt(entry.spec, stage="before")
-        prior, user_text = _prior_and_input(request.history)
-        conversation = Conversation(llm, system_prompt=system_prompt)
-        conversation.history = prior
-        try:
-            for token in conversation.stream_reply(user_text):
-                yield _sse("chunk", {"content": token})  # 생성 즉시 flush
-        except Exception:  # noqa: BLE001 — 스트림 도중 실패는 event: error로
-            yield _sse("error", {
-                "code": "AI_RESPONSE_GENERATION_FAILED",
-                "message": "AI 응답 생성에 실패했습니다.",
-            })
-            return
+            # 2) LLM 자리를 기다린다. 기다리는 동안 heartbeat로 연결을 살려 둔다.
+            if not ticket.acquired:
+                yield _sse("queued", {"position": ticket.position})
+            try:
+                while not ticket.wait(HEARTBEAT_SECONDS):
+                    yield _sse("heartbeat", {"status": "QUEUED"})
+            except QueueTimeout:
+                yield _sse("error", {
+                    "code": "AI_QUEUE_TIMEOUT",
+                    "message": "AI 응답 대기 시간이 초과되었습니다.",
+                })
+                return
 
-        yield _sse("done", {"personaKey": entry.key})
+            yield _sse("started", {"sessionId": request.session_id})
+
+            # 3) history로 문맥 구성 후 답변 생성 (무상태)
+            system_prompt = build_system_prompt(entry.spec, stage="before")
+            prior, user_text = _prior_and_input(request.history)
+            conversation = Conversation(llm, system_prompt=system_prompt)
+            conversation.history = prior
+            sequence = 0
+            try:
+                for token in conversation.stream_reply(user_text):
+                    sequence += 1
+                    yield _sse("chunk", {"sequence": sequence, "content": token})
+            except Exception:  # noqa: BLE001 — 스트림 도중 실패는 event: error로
+                yield _sse("error", {
+                    "code": "AI_RESPONSE_GENERATION_FAILED",
+                    "message": "AI 응답 생성에 실패했습니다.",
+                })
+                return
+
+            yield _sse("done", {"sessionId": request.session_id, "personaKey": entry.key})
+        finally:
+            # 클라이언트가 중간에 끊어도 여기를 지난다(GeneratorExit). 자리를 안 놓으면
+            # 대기열이 영구히 막힌다.
+            ticket.release()
 
     return StreamingResponse(
         generate(),

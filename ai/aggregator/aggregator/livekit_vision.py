@@ -11,6 +11,7 @@ from livekit import rtc
 from pydantic import ValidationError
 
 from aggregator.session_contracts import SessionEventRequest
+from aggregator.task_guard import log_task_failure
 from aggregator.vision_events import VisionEventBatch
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,9 @@ class LiveKitVisionAdapter:
             )
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
+            # 파싱 뒤 단계(관제실 투입)에서 터지면 이 태스크가 조용히 끝난다.
+            # 패킷 단위라 다음 패킷은 살지만, 로그가 없으면 유실을 알 수 없다.
+            task.add_done_callback(log_task_failure)
 
     async def close(self) -> None:
         if not self._tasks:

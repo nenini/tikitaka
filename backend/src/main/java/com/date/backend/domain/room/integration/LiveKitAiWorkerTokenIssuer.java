@@ -20,6 +20,14 @@ public class LiveKitAiWorkerTokenIssuer {
 	}
 
 	public IssuedAiWorkerToken issue(Long sessionId, String roomName) {
+		return issue(sessionId, roomName, false);
+	}
+
+	public IssuedAiWorkerToken issueConversationalWorker(Long sessionId, String roomName) {
+		return issue(sessionId, roomName, true);
+	}
+
+	private IssuedAiWorkerToken issue(Long sessionId, String roomName, boolean canPublish) {
 		if (!properties.configured()) {
 			return new IssuedAiWorkerToken(
 					false,
@@ -40,7 +48,7 @@ public class LiveKitAiWorkerTokenIssuer {
 		token.addGrants(
 				new RoomJoin(true),
 				new RoomName(roomName),
-				new CanPublish(false),
+				new CanPublish(canPublish),
 				new CanSubscribe(true)
 		);
 		return new IssuedAiWorkerToken(

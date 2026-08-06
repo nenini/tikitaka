@@ -295,11 +295,16 @@ export class BaselineCalibrator {
       return this.getState(nowMs);
     }
 
-    const wallTime =
-      this.collectingStartedAtMs === null
-        ? 0
-        : nowMs - this.collectingStartedAtMs;
-    if (wallTime < this.config.maximumWallDurationMs) {
+    const collectingExpired =
+      this.collectingStartedAtMs !== null &&
+      nowMs - this.collectingStartedAtMs >=
+        this.config.maximumWallDurationMs;
+    // COLLECTING may never start, which would leave maximumWallDurationMs
+    // inert and the session without behavior events.
+    const setupExpired =
+      this.setupStartedAtMs !== null &&
+      nowMs - this.setupStartedAtMs >= this.config.setupHardTimeoutMs;
+    if (!collectingExpired && !setupExpired) {
       this.baseline = {
         ...emptyBaseline(this.status),
         usableFrameCount: this.samples.length,

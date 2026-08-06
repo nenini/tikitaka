@@ -206,7 +206,7 @@ describe("SmileExpressionDetector", () => {
     expect(detector.getState().maintainedDurationMs).toBe(3_000);
   });
 
-  it("reduces confidence for asymmetric mouth movement", () => {
+  it("charges asymmetric mouth movement to signalClarity, not measurement quality", () => {
     const detector = new SmileExpressionDetector(
       defaultVisionConfig.smile,
       createDetectorEventFactory(),
@@ -219,8 +219,127 @@ describe("SmileExpressionDetector", () => {
       context,
     );
     expect(detector.getState().mouthAsymmetry).toBeCloseTo(0.35);
-    expect(detector.getState().measurementConfidence).toBeLessThan(
+    expect(detector.getState().measurementConfidence).toBe(
       context.quality.confidence,
     );
+    expect(detector.getState().signalClarity).toBeLessThan(1);
+  });
+
+  describe("measurement quality and signal clarity are separate axes", () => {
+    it("does not suspend on asymmetry alone", () => {
+      const detector = new SmileExpressionDetector(
+        defaultVisionConfig.smile,
+        createDetectorEventFactory(),
+      );
+      detector.update(
+        createNormalizedFaceFrame({
+          timestampMs: 0,
+          blendshapes: { mouthSmileLeft: 0.6, mouthSmileRight: 0.25 },
+        }),
+        { ...context, quality: { usable: true, confidence: 0.85, reasons: [] } },
+      );
+
+      expect(detector.getState().mouthAsymmetry).toBeCloseTo(0.35);
+      expect(detector.getState().state).not.toBe("SUSPENDED");
+    });
+
+    it("still suspends when the camera measurement itself is poor", () => {
+      const detector = new SmileExpressionDetector(
+        defaultVisionConfig.smile,
+        createDetectorEventFactory(),
+      );
+      detector.update(
+        createNormalizedFaceFrame({ timestampMs: 0, blendshapes: smile }),
+        { ...context, quality: { usable: true, confidence: 0.74, reasons: [] } },
+      );
+
+      expect(detector.getState().state).toBe("SUSPENDED");
+    });
+
+    it("emits an asymmetric smile with lower confidence than a symmetric one", () => {
+      const frames = [0, 200, 400];
+      const run = (blendshapes: Readonly<Record<string, number>>): number => {
+        const detector = new SmileExpressionDetector(
+          defaultVisionConfig.smile,
+          createDetectorEventFactory(),
+        );
+        const events = frames.flatMap((timestampMs) =>
+          detector.update(
+            createNormalizedFaceFrame({ timestampMs, blendshapes }),
+            context,
+          ),
+        );
+        const started = events.find(
+          (event) => event.eventType === "SMILE_STARTED",
+        );
+        expect(started).toBeDefined();
+        return started?.confidence ?? 0;
+      };
+
+      const symmetric = run({ mouthSmileLeft: 0.7, mouthSmileRight: 0.7 });
+      const asymmetric = run({ mouthSmileLeft: 0.9, mouthSmileRight: 0.55 });
+
+      expect(asymmetric).toBeLessThan(symmetric);
+    });
+
+    it("holds back a non-strong grade above asymmetryHold but lets STRONG through", () => {
+      const frames = [0, 200, 400];
+      const run = (
+        blendshapes: Readonly<Record<string, number>>,
+      ): readonly string[] => {
+        const detector = new SmileExpressionDetector(
+          defaultVisionConfig.smile,
+          createDetectorEventFactory(),
+        );
+        return frames
+          .flatMap((timestampMs) =>
+            detector.update(
+              createNormalizedFaceFrame({ timestampMs, blendshapes }),
+              context,
+            ),
+          )
+          .map((event) => event.eventType);
+      };
+
+      // score 0.475 -> SMILE_CONFIGURATION, asymmetry 0.55 > asymmetryHold
+      expect(run({ mouthSmileLeft: 0.75, mouthSmileRight: 0.2 })).not.toContain(
+        "SMILE_STARTED",
+      );
+      // score 0.725 -> STRONG_SMILE_CONFIGURATION, same asymmetry band
+      expect(run({ mouthSmileLeft: 1, mouthSmileRight: 0.45 })).toContain(
+        "SMILE_STARTED",
+      );
+    });
+
+    it("opens the GLOBAL_FALLBACK 0.70~0.75 measurement band", () => {
+      const globalBaseline = {
+        ...baseline,
+        baselineModeBySignal: {
+          ...baseline.baselineModeBySignal,
+          smile: "GLOBAL_FALLBACK" as const,
+        },
+      };
+      const detector = new SmileExpressionDetector(
+        defaultVisionConfig.smile,
+        createDetectorEventFactory(),
+      );
+      const events = [0, 200, 400, 600].flatMap((timestampMs) =>
+        detector.update(
+          createNormalizedFaceFrame({
+            timestampMs,
+            blendshapes: { mouthSmileLeft: 0.75, mouthSmileRight: 0.75 },
+          }),
+          {
+            ...context,
+            baseline: globalBaseline,
+            quality: { usable: true, confidence: 0.72, reasons: [] },
+          },
+        ),
+      );
+
+      expect(detector.getState().requiredMeasurementConfidence).toBe(0.7);
+      expect(detector.getState().state).not.toBe("SUSPENDED");
+      expect(events.map((event) => event.eventType)).toContain("SMILE_STARTED");
+    });
   });
 });

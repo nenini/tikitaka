@@ -8,15 +8,16 @@ import { useSessionStore } from '@/stores/session.store'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
-import { createApiTokenProvider } from './livekit/tokenProvider'
-import { useLiveKitRoom } from './livekit/useLiveKitRoom'
+import { useSessionMedia } from './useSessionMedia'
 import { isVisionEnabled, snapshotAnalysisSettings, useVisionAnalysis } from './vision'
+import { CoachOverlay } from './components/CoachOverlay'
 import { CoachRail } from './components/CoachRail'
 import { SessionStage } from './components/SessionStage'
 import { SilenceHint } from './components/SilenceHint'
 import type { SilenceTopic } from './components/SilenceHint'
 import type { ExtensionChoice } from './components/ExtensionOfferCard'
 import {
+  decideSessionExtension,
   getSessionDetail,
   getSessionMissions,
   getSessionStatus,
@@ -24,7 +25,14 @@ import {
   terminateSession,
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
-import type { SessionDetail, SessionMission, SessionStatusSnapshot } from './types'
+import { sessionElapsedSeedMs } from './sessionElapsed'
+import { EXTENSION_WINDOW_MINUTES } from './types'
+import type {
+  SessionDetail,
+  SessionExtensionDecision,
+  SessionMission,
+  SessionStatusSnapshot,
+} from './types'
 
 /** 세션 시작 조건 확인 폴링 주기. 진행 중이 되면 멈춘다. */
 const STATUS_POLL_MS = 3_000
@@ -35,16 +43,18 @@ const STATUS_POLL_MS = 3_000
  * 레이아웃: 데스크탑은 [상대 영상 | 코치 레일 322px] 2단, 모바일은 [영상 / 코치 스트립] 세로 적층.
  * 디자인 시스템 §7.3 — 상대 얼굴이 주인공이므로 OS 설정과 무관하게 **항상 다크**(DarkScope).
  *
+ * ⚠️ **LiveKit 연결을 이 화면이 소유하지 않는다.** 공통 레이아웃(`SessionMediaLayout`)이 들고,
+ *    대기방에서 미리 붙여 둔 연결을 그대로 물려받는다. 여기서 처음 연결하면 협상과 화질
+ *    ramp-up 이 입장 직후 화면에 그대로 보인다(약 5초).
+ *
  * 백엔드 연동
  *  - LiveKit 토큰: `POST /api/v1/sessions/{id}/join` 응답 (전용 토큰 엔드포인트는 없다)
  *  - 남은 시간: **서버가 SSOT** — STOMP `/topic/sessions/{id}/timer` + `GET /sessions/{id}/status`
  *  - 세션 시작: `POST /sessions/{id}/start` (2명 입장·준비·LiveKit 연결이 모두 끝나야 통과)
  *  - 코칭/침묵/안전/맥락 질문: STOMP (`useSessionRealtime`)
  *  - 미션: `GET /sessions/{id}/missions`
+ *  - 5분 연장: `POST /sessions/{id}/extensions` + STOMP `/topic/sessions/{id}/extensions`
  *  - 종료: `POST /sessions/{id}/terminate` · 서버 종료는 `/topic/sessions/{id}/lifecycle` 로 통보
- *
- * ⚠️ 5분 연장(W-15)은 백엔드에 CONTACT 도메인이 없어 **아직 로컬 토글**이다.
- *    수락해도 서버 타이머는 늘어나지 않는다.
  */
 export function SessionPage() {
   const { sessionId: sessionIdParam } = useParams()
@@ -56,14 +66,14 @@ export function SessionPage() {
   const setPhase = useSessionStore((s) => s.setPhase)
   const clearCoaching = useCoachingStore((s) => s.clear)
 
-  /* ── LiveKit ── */
-  // getToken 이 매 렌더 새 함수면 훅의 effect 가 재실행되어 재연결된다 — 반드시 고정한다.
-  const getToken = useMemo(
-    () => (validSession ? createApiTokenProvider(sessionId) : notConfiguredProvider),
-    [validSession, sessionId],
-  )
-  // roomName 은 서버 토큰에 이미 들어 있어 쓰이지 않는다(인자 자리만 채운다).
-  const session = useLiveKitRoom(String(sessionId), getToken)
+  /* ── LiveKit ──
+     연결은 공통 레이아웃(SessionMediaLayout)이 들고 있다. 대기방에서 미리 붙여 둔
+     연결을 그대로 물려받아, 입장 직후의 협상·화질 ramp-up 이 화면에 보이지 않게 한다.
+     대기방을 거치지 않은 직접 진입·새로고침을 위해 여기서도 connect() 를 부른다(멱등). */
+  const { session, connect: connectMedia } = useSessionMedia()
+  useEffect(() => {
+    if (validSession) connectMedia()
+  }, [validSession, connectMedia])
 
   /* ── 실시간(STOMP) ── */
   const realtime = useSessionRealtime({
@@ -188,7 +198,9 @@ export function SessionPage() {
     sessionId,
     userId: currentUser?.id ?? null,
     participantIdentity: session.localParticipantIdentity,
-    sessionStartedAt: status?.actualStartAt ?? detail?.actualStartAt ?? null,
+    // 시작 시각을 직접 파싱하지 않는다 — 서버 계산값에서 경과를 구해야 브라우저 타임존과
+    // 클라이언트 시계 오차가 두 참가자의 타임라인을 어긋나게 하지 않는다.
+    sessionElapsedSeedMs: sessionElapsedSeedMs(status, detail),
   })
 
   // 분석은 fail-soft 다 — 사용자에게는 알리지 않지만(§10 코칭만 노출), 조용히 죽으면
@@ -238,11 +250,47 @@ export function SessionPage() {
     }))
   }, [realtime.contextualQuestions, realtime.silence])
 
-  /* ── 5분 연장 ── ⚠️ 서버 API 없음(CONTACT 도메인 미구현) → 로컬 토글만 */
+  /* ── 5분 연장 (CONTACT-01) ──────────────────────────────
+     서버가 제출을 받는 창이 종료 **5분 전**부터라(`EXTENSION_WINDOW_MINUTES`)
+     카드도 같은 시점에 띄운다. 더 일찍 띄우면 눌러도 SESSION_EXTENSION_WINDOW_NOT_OPEN 이고,
+     더 늦게 띄우면 답할 시간이 부족하다.
+
+     ⚠️ `IN_PROGRESS` 확인이 반드시 필요하다. 서버의 `remainingSeconds` 는 세션이 시작하기
+        전에는 **종료까지가 아니라 예정 시작 시각까지**를 센다(`SessionLifecycleService.
+        remainingSeconds` — IN_PROGRESS 가 아니면 deadline 이 scheduledStartAt). 그래서 시작
+        직전에 입장하면 이 값이 5분 이하로 내려와, 세션이 열리자마자 연장 카드가 떴다. */
   const [extensionChoice, setExtensionChoice] = useState<ExtensionChoice>('pending')
+  const [extensionError, setExtensionError] = useState<string | null>(null)
   const extensionVisible =
-    realtime.timerEvent?.eventType === 'SESSION_ENDING_IMMINENT' ||
-    (remainingSec != null && remainingSec <= 60 && remainingSec > 0)
+    sessionPhase === 'IN_PROGRESS' &&
+    remainingSec != null &&
+    remainingSec > 0 &&
+    remainingSec <= EXTENSION_WINDOW_MINUTES * 60
+
+  /**
+   * 연장 의사 제출. 낙관적으로 화면을 먼저 바꾸고, 실패하면 되돌린다 —
+   * 답할 시간이 짧아 왕복을 기다리게 하면 놓친다.
+   *
+   * 🔒 성공해도 "상대가 수락했는지" 는 표시하지 않는다. 응답에 `targetDecision` 이 들어 있지만
+   *    쓰지 않는다(W-15). 연장되면 타이머가 늘어나는 것으로 알 수 있고, 안 되면 그냥 끝난다.
+   */
+  const submitExtension = useCallback(
+    async (decision: SessionExtensionDecision) => {
+      if (!validSession) return
+      const previous = extensionChoice
+      setExtensionChoice(decision === 'AGREE' ? 'accepted' : 'declined')
+      setExtensionError(null)
+      try {
+        await decideSessionExtension(sessionId, decision)
+      } catch (error) {
+        setExtensionChoice(previous)
+        setExtensionError(
+          errorMessageOf(error, '연장 의사를 전달하지 못했어요. 다시 눌러주세요.'),
+        )
+      }
+    },
+    [extensionChoice, sessionId, validSession],
+  )
 
   /* ── 종료 ── */
   const [endConfirmOpen, setEndConfirmOpen] = useState(false)
@@ -350,6 +398,14 @@ export function SessionPage() {
             partnerJoined={session.partnerConnected}
             partnerName={partnerName}
             cameraDisabled={session.cameraDisabled}
+            // 코칭은 레일이 아니라 영상 위(카메라 근처)에 띄운다 — 읽는 동안 시선이
+            // 렌즈를 크게 벗어나지 않게 하기 위해서다. 레일에는 대기 건수만 남는다.
+            coachOverlay={
+              <CoachOverlay
+                message={visibleMessage}
+                onDismiss={() => visibleMessage && dismissMessage(visibleMessage.id)}
+              />
+            }
           />
 
           {/* 모바일에서는 높이 고정 */}
@@ -365,9 +421,7 @@ export function SessionPage() {
                   onDismiss={realtime.dismissSilence}
                 />
               }
-              message={visibleMessage}
               pendingMessageCount={pendingMessageCount}
-              onDismissMessage={() => visibleMessage && dismissMessage(visibleMessage.id)}
               safetyWarning={
                 realtime.safety ? (
                   <SafetyWarningCard
@@ -385,8 +439,9 @@ export function SessionPage() {
               missions={missions}
               extensionVisible={extensionVisible}
               extensionChoice={extensionChoice}
-              onAcceptExtension={() => setExtensionChoice('accepted')}
-              onDeclineExtension={() => setExtensionChoice('declined')}
+              extensionError={extensionError}
+              onAcceptExtension={() => void submitExtension('AGREE')}
+              onDeclineExtension={() => void submitExtension('DECLINE')}
             />
           </aside>
         </div>
@@ -423,7 +478,9 @@ export function SessionPage() {
             onEnd={() => setEndConfirmOpen(true)}
             beforeEnd={
               <>
-                <IconButton icon="help" aria-label="도움 요청" />
+                {/* 도움 요청(SILENCE-02)은 서버 API 가 없어 화면에서 내렸다.
+                    눌러도 아무 일이 없는 버튼을 통화 화면에 두지 않는다.
+                    엔드포인트가 생기면 여기 다시 넣는다. */}
                 {/* 신고는 파괴적이지만 빨강 아이콘 버튼은 통화 종료 전용이다(§3.3).
                     실제 경고는 열리는 모달에서 라벨과 함께 전달한다. */}
                 {/* TODO(FE-A): 신고 화면(W-13)은 FE-A 담당이며 라우트·API 가 아직 없다 */}
@@ -536,7 +593,3 @@ function useServerTimer(sessionId: number | null, pushedRemaining: number | null
   return remaining
 }
 
-/** sessionId 가 잘못된 경우에만 쓰이는 자리 채우기 — 실제로 연결을 시도하지 않는다. */
-const notConfiguredProvider = async () => {
-  throw new Error('세션 정보가 없어요.')
-}

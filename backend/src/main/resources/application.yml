@@ -73,6 +73,9 @@ springdoc:
 app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  local-seed:
+    match-test-users-enabled: ${LOCAL_MATCH_TEST_USERS_ENABLED:false}
+    result-test-session-enabled: ${LOCAL_RESULT_TEST_SESSION_ENABLED:false}
 
 auth:
   jwt:
@@ -120,11 +123,24 @@ ai:
     internal-token: ${AI_TRANSCRIPT_INTERNAL_TOKEN:${AI_SESSION_INTERNAL_TOKEN:}}
     max-attempts: ${AI_TRANSCRIPT_MAX_ATTEMPTS:5}
     retry-delay: ${AI_TRANSCRIPT_RETRY_DELAY:2s}
+  report:
+    # AI가 세션 종료 후 결과를 Backend로 push하므로 기본 outbound generate 호출은 비활성화합니다.
+    base-url: ${AI_REPORT_BASE_URL:}
+    generation-path: ${AI_REPORT_GENERATION_PATH:/internal/v1/session-reports/generate}
+    connect-timeout: ${AI_REPORT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_REPORT_REQUEST_TIMEOUT:10s}
+    max-attempts: ${AI_REPORT_MAX_ATTEMPTS:3}
+    retry-delay: ${AI_REPORT_RETRY_DELAY:2s}
+    generation-timeout: ${AI_REPORT_GENERATION_TIMEOUT:5m}
+    timeout-batch-size: ${AI_REPORT_TIMEOUT_BATCH_SIZE:100}
+    timeout-monitor-fixed-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_FIXED_DELAY_MS:30000}
+    timeout-monitor-initial-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_INITIAL_DELAY_MS:30000}
   chat:
     base-url: ${AI_CHAT_BASE_URL:}
     stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
     connect-timeout: ${AI_CHAT_CONNECT_TIMEOUT:3s}
-    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:60s}
+    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:270s}
+    sse-timeout: ${AI_CHAT_SSE_TIMEOUT:300s}
     internal-token: ${AI_CHAT_INTERNAL_TOKEN:}
 
 match:
@@ -180,6 +196,11 @@ moderation:
     first-restriction: ${NO_SHOW_FIRST_RESTRICTION:1d}
     second-restriction: ${NO_SHOW_SECOND_RESTRICTION:3d}
     repeated-restriction: ${NO_SHOW_REPEATED_RESTRICTION:7d}
+    scheduler:
+      enabled: ${NO_SHOW_SCHEDULER_ENABLED:true}
+      fixed-delay-ms: ${NO_SHOW_SCHEDULER_FIXED_DELAY_MS:30000}
+      initial-delay-ms: ${NO_SHOW_SCHEDULER_INITIAL_DELAY_MS:10000}
+      batch-size: ${NO_SHOW_SCHEDULER_BATCH_SIZE:100}
 
 notification:
   waiting-recommendation:

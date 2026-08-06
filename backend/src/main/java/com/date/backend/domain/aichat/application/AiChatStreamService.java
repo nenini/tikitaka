@@ -11,6 +11,7 @@ import com.date.backend.domain.aichat.integration.AiChatResponseStreamRequest;
 import com.date.backend.domain.aichat.integration.AiChatResponseStreamListener;
 import com.date.backend.domain.aichat.integration.AiChatResponseStreamer;
 import com.date.backend.domain.aichat.integration.AiChatPersonaSelection;
+import com.date.backend.domain.aichat.integration.AiChatProperties;
 import com.date.backend.domain.aichat.domain.AiResponseState;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.AiChatErrorCode;
@@ -26,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,23 +35,24 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class AiChatStreamService {
 	private static final Logger log = LoggerFactory.getLogger(AiChatStreamService.class);
-	private static final long SSE_TIMEOUT_MILLIS = 60_000L;
-
 	private final AiChatContextService contextService;
 	private final AiChatTurnService turnService;
 	private final AiChatResponseStreamer responseStreamer;
 	private final Executor streamExecutor;
+	private final long sseTimeoutMillis;
 	private final Map<Long, ActiveStream> activeStreams = new ConcurrentHashMap<>();
 
 	public AiChatStreamService(
 			AiChatContextService contextService,
 			AiChatTurnService turnService,
 			AiChatResponseStreamer responseStreamer,
+			AiChatProperties properties,
 			@Qualifier("aiChatStreamExecutor") Executor streamExecutor
 	) {
 		this.contextService = contextService;
 		this.turnService = turnService;
 		this.responseStreamer = responseStreamer;
+		this.sseTimeoutMillis = properties.sseTimeout().toMillis();
 		this.streamExecutor = streamExecutor;
 	}
 
@@ -89,7 +92,7 @@ public class AiChatStreamService {
 			AiChatMessageResponse userMessage
 	) {
 		AiChatResponseStreamRequest aiRequest = contextService.createRequest(userId, sessionId);
-		SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
+		SseEmitter emitter = new SseEmitter(sseTimeoutMillis);
 		ActiveStream activeStream = new ActiveStream(emitter, userMessage.messageId());
 		if (activeStreams.putIfAbsent(sessionId, activeStream) != null) {
 			turnService.fail(
@@ -102,7 +105,7 @@ public class AiChatStreamService {
 		}
 
 		emitter.onCompletion(() -> removeStream(sessionId, activeStream));
-		emitter.onTimeout(() -> cancelStream(userId, sessionId, activeStream));
+		emitter.onTimeout(() -> timeoutStream(userId, sessionId, activeStream));
 		emitter.onError(exception -> cancelStream(userId, sessionId, activeStream));
 
 		FutureTask<Void> task = new FutureTask<>(() -> {
@@ -112,6 +115,16 @@ public class AiChatStreamService {
 		activeStream.setFuture(task);
 		try {
 			streamExecutor.execute(task);
+		} catch (RejectedExecutionException exception) {
+			removeStream(sessionId, activeStream);
+			activeStream.cancelAndComplete();
+			turnService.fail(
+					userId,
+					sessionId,
+					userMessage.messageId(),
+					AiChatErrorCode.AI_CHAT_SERVER_BUSY.code()
+			);
+			throw new BusinessException(AiChatErrorCode.AI_CHAT_SERVER_BUSY);
 		} catch (RuntimeException exception) {
 			removeStream(sessionId, activeStream);
 			turnService.fail(
@@ -237,6 +250,15 @@ public class AiChatStreamService {
 		if (activeStreams.remove(sessionId, activeStream)) {
 			activeStream.cancel();
 			turnService.cancelIfProcessing(userId, sessionId, activeStream.userMessageId());
+		}
+	}
+
+	private void timeoutStream(Long userId, Long sessionId, ActiveStream activeStream) {
+		cancelStream(userId, sessionId, activeStream);
+		try {
+			activeStream.emitter().complete();
+		} catch (IllegalStateException ignored) {
+			// Servlet container가 이미 응답을 닫은 경우 추가 정리가 필요하지 않습니다.
 		}
 	}
 

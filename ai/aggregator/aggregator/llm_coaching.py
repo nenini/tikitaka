@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -11,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from aggregator.settings import IntegrationSettings
 from aggregator.transcripts import TranscriptSegment
+
+logger = logging.getLogger(__name__)
 
 
 class ContextualCoachingError(RuntimeError):
@@ -32,6 +35,8 @@ class CoachingMessageGenerator(Protocol):
         segments: Sequence[TranscriptSegment],
         target_user_id: str,
     ) -> str | None: ...
+
+    async def warmup(self) -> None: ...
 
     async def close(self) -> None: ...
 
@@ -91,6 +96,37 @@ class ExaoneCoachingClient:
         self._http_client = http_client or httpx.AsyncClient(
             timeout=settings.coaching_llm_timeout_seconds
         )
+
+    async def warmup(self) -> None:
+        """세션 시작 시 모델을 VRAM에 올려 두고 내려가지 않게 고정한다.
+
+        Ollama는 기본 5분 유휴면 모델을 내린다. 그 뒤 첫 요청은 로딩까지 포함해
+        **4.7초**가 걸려 코칭 타임아웃(3초)을 넘긴다 — 워밍업 후엔 0.6초다(실측
+        2026-08-06). 가장 눈에 띄는 '세션 시작 직후 첫 코칭'이 정확히 이 경우다.
+
+        `keep_alive`는 **네이티브 `/api/chat`에만 먹는다.** OpenAI 호환
+        `/v1/chat/completions`는 이 필드를 조용히 무시한다(실측: expires_at 이
+        그대로 5분 뒤였다). 그래서 워밍업만 네이티브로 보낸다.
+
+        best-effort다. 백엔드가 Ollama가 아니면(exaone_server 등) 404가 나는데,
+        그때는 그냥 넘어간다 — 첫 요청에서 로딩될 뿐이다.
+        """
+        if not self._settings.coaching_llm_configured:
+            return
+        base = self._settings.coaching_llm_base_url.rstrip("/").removesuffix("/v1")
+        try:
+            await self._http_client.post(
+                f"{base}/api/chat",
+                json={
+                    "model": self._settings.coaching_llm_model,
+                    "messages": [{"role": "user", "content": "."}],
+                    "stream": False,
+                    "keep_alive": self._settings.coaching_llm_keep_alive,
+                    "options": {"num_predict": 1},
+                },
+            )
+        except httpx.HTTPError as error:
+            logger.info("coaching llm warmup skipped: %r", error)
 
     async def generate(
         self,

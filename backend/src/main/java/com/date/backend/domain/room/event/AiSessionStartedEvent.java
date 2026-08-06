@@ -8,6 +8,8 @@ import java.util.List;
 public record AiSessionStartedEvent(
 		String eventType,
 		int version,
+		String sessionType,
+		String scenario,
 		String sessionId,
 		Instant actualStartAt,
 		AiSessionLiveKitConnection liveKit,
@@ -16,6 +18,8 @@ public record AiSessionStartedEvent(
 ) {
 	public static final String EVENT_TYPE = "AI_SESSION_STARTED";
 	public static final int VERSION = 1;
+	public static final String REAL_DATE = "REAL_DATE";
+	public static final String AI_VIDEO = "AI_VIDEO";
 
 	public static AiSessionStartedEvent of(
 			Long sessionId,
@@ -29,12 +33,15 @@ public record AiSessionStartedEvent(
 								String.valueOf(participant.getUserId()),
 								participant.getParticipantIdentity(),
 								participant.isVoiceAnalysisEnabled(),
-								participant.isExpressionAnalysisEnabled()
-						))
+								participant.isExpressionAnalysisEnabled(),
+								List.of()
+					))
 						.toList();
 		return new AiSessionStartedEvent(
 				EVENT_TYPE,
 				VERSION,
+				REAL_DATE,
+				null,
 				String.valueOf(sessionId),
 				actualStartAt,
 				liveKit,
@@ -44,6 +51,30 @@ public record AiSessionStartedEvent(
 								.anyMatch(AiSessionParticipantContext::sttEnabled),
 						participantContexts.stream()
 								.anyMatch(AiSessionParticipantContext::visionEnabled),
+						true
+				)
+		);
+	}
+
+	public static AiSessionStartedEvent aiVideo(
+			Long sessionId,
+			Instant actualStartAt,
+			String scenario,
+			AiSessionLiveKitConnection liveKit,
+			AiSessionParticipantContext participant
+	) {
+		return new AiSessionStartedEvent(
+				EVENT_TYPE,
+				VERSION,
+				AI_VIDEO,
+				scenario,
+				String.valueOf(sessionId),
+				actualStartAt,
+				liveKit,
+				List.of(participant),
+				new AiSessionFeatures(
+						participant.sttEnabled(),
+						participant.visionEnabled(),
 						true
 				)
 		);

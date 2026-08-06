@@ -10,6 +10,7 @@ import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDateTime;
 
 import com.date.backend.domain.room.domain.RoomSessionStatus;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +36,10 @@ public interface WaitingRoomRepository extends JpaRepository<WaitingRoom, Long> 
 	);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select session from WaitingRoom session where session.id = :sessionId")
+	Optional<WaitingRoom> findByIdForUpdate(@Param("sessionId") Long sessionId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
 			select session
 			from WaitingRoom session
@@ -45,6 +50,39 @@ public interface WaitingRoomRepository extends JpaRepository<WaitingRoom, Long> 
 			""")
 	List<WaitingRoom> findActiveTimersForUpdate(
 			@Param("status") RoomSessionStatus status,
+			Pageable pageable
+	);
+
+	@Query("""
+			select distinct session.id
+			from WaitingRoom session
+			join RoomParticipant absent on absent.room = session
+			where session.sessionType = 'REAL_DATE'
+			  and session.scheduledStartAt <= :deadline
+			  and session.status in (
+			      com.date.backend.domain.room.domain.RoomSessionStatus.CREATED,
+			      com.date.backend.domain.room.domain.RoomSessionStatus.SCHEDULED,
+			      com.date.backend.domain.room.domain.RoomSessionStatus.WAITING,
+			      com.date.backend.domain.room.domain.RoomSessionStatus.READY
+			  )
+			  and absent.joinedAt is null
+			  and exists (
+			      select joined.id
+			      from RoomParticipant joined
+			      where joined.room = session
+			        and joined.joinedAt is not null
+			  )
+			  and not exists (
+			      select penalty.id
+			      from AttendancePenalty penalty
+			      where penalty.sessionId = session.id
+			        and penalty.userId = absent.userId
+			        and penalty.penaltyType = 'NO_SHOW'
+			  )
+			order by session.id
+			""")
+	List<Long> findNoShowCandidateIds(
+			@Param("deadline") LocalDateTime deadline,
 			Pageable pageable
 	);
 }

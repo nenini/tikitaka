@@ -16,8 +16,17 @@ services:
       - "8000:8000"                                 # 챗봇 스트리밍 API
     environment:
       OLLAMA_HOST: "http://host.docker.internal:11434"
+      # 시간 예산 (BE 합의 2026-08-05):
+      #   대기 120 + 생성 120 = 240  <  BE 요청 270  <  BE SSE 300  <  nginx 3600
+      # 이 순서가 깨지면 AI가 error 이벤트를 내기 전에 BE가 먼저 끊는다.
+      OLLAMA_TIMEOUT_SECONDS: "120"          # 생성 최대
+      AI_CHAT_QUEUE_TIMEOUT_SECONDS: "120"   # 대기 최대 → AI_QUEUE_TIMEOUT
+      # GPU가 한 번에 몇 개를 감당하는지에 맞춘다.
+      AI_CHAT_MAX_CONCURRENT: "1"
+      AI_CHAT_MAX_WAITING: "10"
       # OLLAMA_MODEL: "exaone3.5:2.4b"              # GPU 여유 부족 시 경량 모델
-      # AI_CHAT_INTERNAL_TOKEN: "change-me"         # 설정하면 X-Internal-Token 검사 활성화
+      # AI_CHAT_INTERNAL_TOKEN: "change-me"         # ⚠️ 미설정이면 토큰 검사를 건너뛴다(fail-open).
+      #                                             #    운영에서는 반드시 지정할 것.
     extra_hosts:
       - "host.docker.internal:host-gateway"         # Linux 호환(Docker Desktop은 자동)
     restart: unless-stopped
@@ -37,6 +46,42 @@ services:
     volumes:
       - ./face-analysis/artifacts:/app/artifacts:ro
       - ./face-analysis/data:/app/data:ro
+    restart: unless-stopped
+
+  # 관제실 — BE가 세션 라이프사이클을 보내는 대상(AI_SESSION_BASE_URL).
+  # ⚠️ 빌드 컨텍스트가 여기(ai/)다. aggregator/ 가 아니다 —
+  #    pyproject 의 `stt-pipeline = { path = "../stt" }` 때문에 형제 폴더가 필요하다.
+  # ⚠️ GPU: Whisper 가 프로세스 안에서 돈다. 아래 deploy 블록은 GPU 있는 호스트에서만
+  #    유효하므로, CPU 로 띄우려면 지우고 STT_DEVICE=cpu 로 바꾼다.
+  # LLM(코칭·리포트)은 컨테이너 밖에 붙는다. 비우면 규칙 기반 폴백만 나간다.
+  aggregator:
+    build:
+      context: ./
+      dockerfile: aggregator/Dockerfile
+    image: ssafy-ai-aggregator:latest
+    container_name: ai-aggregator
+    ports:
+      - "8002:8000"                                   # 관제실 API · GET /health
+    environment:
+      # deploy.resources 가 GPU를 하나만 넣어 주므로 컨테이너 안에서 그건 0번이다.
+      # 여기에 CUDA_VISIBLE_DEVICES=3 을 주면 없는 장치를 보라는 뜻이 돼 GPU가 0개가 된다.
+      # 특정 물리 GPU를 쓰려면 deploy 대신 `device_ids: ["3"]` 로 지정한다.
+      STT_DEVICE: "cuda:0"
+      COACHING_LLM_BASE_URL: "http://host.docker.internal:11500"
+      REPORT_LLM_BASE_URL: "http://host.docker.internal:11500"
+      REPORT_LLM_MODEL: "exaone3.5:7.8b"
+      BACKEND_BASE_URL: "${BACKEND_BASE_URL:-http://host.docker.internal:8080}"
+      # BE와 반드시 같은 값. **비워 두면 관제실이 모든 요청에 500을 낸다**(api.py:91)
+      AI_SESSION_INTERNAL_TOKEN: "${AI_SESSION_INTERNAL_TOKEN:?BE와 같은 토큰을 지정해야 한다}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["3"]                       # 공유 서버 에티켓 — 3번만 사용
+              capabilities: [gpu]
     restart: unless-stopped
 
   # vision-analysis는 브라우저용 TS 라이브러리라 도커 대상이 아님(FE 번들에 포함).

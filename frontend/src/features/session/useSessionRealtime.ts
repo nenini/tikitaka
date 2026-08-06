@@ -14,6 +14,7 @@ import type {
   SafetyWarningEvent,
   SessionClientConnectionState,
   SessionEndedPayload,
+  SessionExtensionEvent,
   SessionNetworkQuality,
   SessionParticipantEvent,
   SessionTimerEvent,
@@ -76,6 +77,8 @@ export interface SessionRealtime {
   dismissSafety: () => void
   /** 상대 참가자의 실시간 상태(userId → 상태) */
   participants: Record<number, SessionParticipantEvent>
+  /** 5분 연장 합산 결과. 아직 아무도 응답하지 않았으면 null */
+  extension: SessionExtensionEvent | null
   /** STOMP 연결이 살아 있는가 */
   realtimeConnected: boolean
 }
@@ -113,6 +116,7 @@ export function useSessionRealtime({
   const [contextualQuestions, setContextualQuestions] = useState<string[]>([])
   const [safety, setSafety] = useState<SafetyWarningEvent | null>(null)
   const [participants, setParticipants] = useState<Record<number, SessionParticipantEvent>>({})
+  const [extension, setExtension] = useState<SessionExtensionEvent | null>(null)
 
   const pushCoachMessage = useCoachingStore((s) => s.pushMessage)
 
@@ -165,6 +169,11 @@ export function useSessionRealtime({
 
   useStompSubscription(connection, topics?.safety ?? null, (body) => {
     setSafety(body as SafetyWarningEvent)
+  })
+
+  // 연장 결과. 양측 합산 상태만 쓰고 **상대의 개별 결정은 화면에 쓰지 않는다**(W-15 규칙).
+  useStompSubscription(connection, topics?.extensions ?? null, (body) => {
+    setExtension(body as SessionExtensionEvent)
   })
 
   /* ── 전송: 하트비트 ── */
@@ -245,6 +254,7 @@ export function useSessionRealtime({
     safety,
     dismissSafety,
     participants,
+    extension,
     realtimeConnected: stompState === 'connected',
   }
 }

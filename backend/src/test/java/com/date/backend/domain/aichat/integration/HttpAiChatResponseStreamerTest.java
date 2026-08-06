@@ -83,8 +83,8 @@ class HttpAiChatResponseStreamerTest {
 		);
 		assertThat(requestBody.get().path("userId").asLong()).isEqualTo(3L);
 		assertThat(requestBody.get().path("sessionId").asLong()).isEqualTo(7L);
-		assertThat(requestBody.get().path("personaCondition").path("gender").asText()).isEqualTo("MALE");
-		assertThat(requestBody.get().path("personaCondition").path("age").asInt()).isEqualTo(26);
+		assertThat(requestBody.get().path("personaCondition").path("preferredGender").asText()).isEqualTo("MALE");
+		assertThat(requestBody.get().path("personaCondition").path("preferredAge").asInt()).isEqualTo(26);
 		assertThat(requestBody.get().path("history").path(0).path("content").asText()).isEqualTo("인사해줘");
 		assertThat(internalToken.get()).isEqualTo("test-token");
 	}
@@ -132,6 +132,7 @@ class HttpAiChatResponseStreamerTest {
 						path,
 						Duration.ofSeconds(1),
 						Duration.ofSeconds(5),
+						Duration.ofSeconds(6),
 						internalToken
 				),
 				objectMapper

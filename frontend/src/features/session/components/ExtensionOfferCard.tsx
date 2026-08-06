@@ -9,6 +9,8 @@ export interface ExtensionOfferCardProps {
   onDecline: () => void
   /** 연장 시간(분). 기본 5 */
   minutes?: number
+  /** 제출 실패 사유. 낙관적 갱신을 되돌린 뒤 여기에 적는다 */
+  error?: string | null
 }
 
 /**
@@ -28,6 +30,7 @@ export function ExtensionOfferCard({
   onAccept,
   onDecline,
   minutes = 5,
+  error,
 }: ExtensionOfferCardProps) {
   return (
     <Card
@@ -59,6 +62,12 @@ export function ExtensionOfferCard({
         <p className="bt-body-sm bt-muted">연장을 신청했어요. 잠시만 기다려 주세요.</p>
       ) : (
         <p className="bt-body-sm bt-muted">이번 세션은 여기서 마무리할게요.</p>
+      )}
+
+      {error && (
+        <p className="bt-error mt-2" role="alert">
+          {error}
+        </p>
       )}
     </Card>
   )

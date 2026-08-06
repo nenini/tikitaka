@@ -173,3 +173,23 @@ def test_p0_and_p1_message_catalog_is_ready() -> None:
         "RESPONSE_PROMPT_03",
     }
     assert expected_keys <= COACHING_MESSAGES.keys()
+
+
+def test_coaching_types_match_backend_enum() -> None:
+    """BE CoachingType enum과 값 집합이 같아야 한다.
+
+    BE는 닫힌 enum이라 여기에만 있는 값을 보내면 400으로 코칭이 유실된다.
+    새 코칭 타입을 추가할 땐 BE enum 추가를 먼저 받고 이 목록을 늘린다.
+    """
+    from typing import get_args
+
+    from aggregator.coaching_candidates import CoachingType
+
+    assert set(get_args(CoachingType)) == {
+        "SILENCE_RECOVERY",
+        "RESPONSE_PROMPT",
+        "REACTION_PROMPT",
+        "ATTENTION_RECOVERY",
+        "VISION_SETUP_GUIDANCE",
+        "EXPRESSION_GUIDANCE",
+    }

@@ -93,7 +93,7 @@ export function DemoEntryPage() {
       if (controller.signal.aborted) return
       if (!matched) {
         throw new Error(
-          '상대가 큐에 들어오지 않았어요. 다른 기기에서도 시작 버튼을 눌렀는지 확인해 주세요.',
+          '상대가 아직 매칭 대기에 들어오지 않았어요. 다른 기기에서도 시작 버튼을 눌렀는지 확인해 주세요.',
         )
       }
 

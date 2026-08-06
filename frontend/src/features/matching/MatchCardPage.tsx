@@ -105,7 +105,7 @@ export function MatchCardPage() {
           <Icon name="bloom" size={32} style={{ color: 'var(--bt-color-text-tertiary)' }} />
           <b className="bt-h3">진행 중인 매칭이 없어요</b>
           <p className="bt-body-sm bt-muted">
-            {error ?? '대기 큐에 등록하면 조건이 맞는 상대를 찾아드려요.'}
+            {error ?? '매칭 대기에 등록하면 조건이 맞는 상대를 찾아드려요.'}
           </p>
           <Button variant="primary" onClick={() => navigate('/matching')}>
             매칭하러 가기
@@ -122,7 +122,7 @@ export function MatchCardPage() {
         <Card className="flex flex-col items-center gap-3 py-10">
           <Icon name="clock" size={32} style={{ color: 'var(--bt-color-text-tertiary)' }} />
           <b className="bt-h3">이 매칭은 진행되지 않았어요</b>
-          <p className="bt-body-sm bt-muted">다시 대기 큐에 등록하면 새 상대를 찾아드려요.</p>
+          <p className="bt-body-sm bt-muted">다시 매칭 대기에 등록하면 새 상대를 찾아드려요.</p>
           <Button variant="primary" onClick={() => navigate('/matching')}>
             다시 매칭하기
           </Button>

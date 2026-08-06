@@ -319,7 +319,8 @@ export class FaceQualityDetector {
       this.state = "USABLE";
     }
 
-    this.qualityComponents = this.computeQualityComponents(frame, runtime);
+    // computeQualityComponents is not pure: computeTrackingStability advances
+    // previousTrackingSample. Recomputing here would zero the frame delta.
     this.qualityConfidence = this.computeQualityConfidence(
       this.qualityComponents,
       immediateReasons,
