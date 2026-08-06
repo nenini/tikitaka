@@ -7,7 +7,7 @@ import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } 
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
 import { SIDO } from '@/features/profile/regions'
-import { errorMessageOf } from '@/shared/api/envelope'
+import { errorCodeOf, errorMessageOf, serverMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
 import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
 
@@ -15,9 +15,17 @@ import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
 /*  1차 확정 옵션:                                                              */
 /*   ① 성별 = 라디오 카드   ② 키(cm) = 제외   ③ 지역 = 시·도만                  */
-/*   ④ 선호 연령 = W-06 설문에서   ⑤ 닉네임 중복확인 = 있음                      */
+/*   ④ 선호 연령 = W-06 설문에서                                                */
 /*  - 상대 공개(닉네임·연령대·얼굴상) / 매칭 전용(시·도) 2분할                    */
 /*  - 실명·전화·정확한 주소·직업 미노출·미수집(D-08)                             */
+/*                                                                            */
+/*  ⚠️ 닉네임 중복 확인 버튼을 두지 않는다. 확인용 API 가 없어서 예전에는 화면에서   */
+/*     문자열만 비교하는 스텁을 돌렸는데, "사용 가능" 이라고 해놓고 저장할 때      */
+/*     서버가 `DUPLICATE_NICKNAME` 을 돌려주는 일이 생겼다. 확인할 수 없는 것을    */
+/*     확인해 준 것처럼 보이는 편이 확인 버튼이 없는 것보다 나쁘다.                */
+/*     지금은 저장 시점의 서버 판정 하나만 쓴다 — 프로필 수정 화면              */
+/*     (`account/ProfileEditPage`)과 같은 방식이다.                             */
+/*     TODO(AUTH): 중복 확인 API 가 생기면 두 화면에 함께 붙인다.                 */
 /* -------------------------------------------------------------------------- */
 
 
@@ -32,58 +40,29 @@ const profileSchema = z.object({
 })
 type ProfileForm = z.infer<typeof profileSchema>
 
-type NickStatus = 'idle' | 'checking' | 'available' | 'taken'
 
 const GENDERS: { value: ProfileForm['gender']; label: string }[] = [
   { value: 'female', label: '여성' },
   { value: 'male', label: '남성' },
 ]
 
-/** 데모용 닉네임 중복 확인 스텁. TODO(AUTH): GET /api/me/nickname/check 로 교체. */
-async function checkNicknameAvailable(nickname: string): Promise<boolean> {
-  await new Promise((r) => setTimeout(r, 600))
-  return nickname.trim() !== '유월'
-}
-
 export function ProfilePage() {
   const navigate = useNavigate()
-  const [nickStatus, setNickStatus] = useState<NickStatus>('idle')
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     control,
-    watch,
     setError,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: { nickname: '', gender: undefined as unknown as ProfileForm['gender'], regionSido: '' },
   })
 
-  const nickname = watch('nickname')
-
-  const nickReg = register('nickname', {
-    onChange: () => nickStatus !== 'idle' && setNickStatus('idle'),
-  })
-
-  const onCheckNickname = async () => {
-    const value = nickname?.trim()
-    if (!value || value.length < 2) {
-      setError('nickname', { message: '먼저 닉네임(2자 이상)을 입력하세요' })
-      return
-    }
-    setNickStatus('checking')
-    const ok = await checkNicknameAvailable(value)
-    setNickStatus(ok ? 'available' : 'taken')
-  }
-
   const onSubmit = async (data: ProfileForm) => {
-    if (nickStatus !== 'available') {
-      setError('nickname', { message: '닉네임 중복 확인을 해주세요' })
-      return
-    }
     setSubmitError(null)
     try {
       // POST /api/v1/users/me/profile — 온보딩 4단계 프로필 생성
@@ -98,15 +77,21 @@ export function ProfilePage() {
       useAuthStore.getState().setOnboarding('needs-survey')
       navigate('/signup/face')
     } catch (e) {
-      // 서버 검증 실패(닉네임 중복 등)·네트워크 오류를 사용자 메시지로 노출
+      // 닉네임 중복은 **닉네임 필드**에 붙인다. 화면 아래 공용 오류로 띄우면 어느 칸을
+      // 고쳐야 하는지 알 수 없어, 사용자가 성별·지역을 의심하며 헤맨다.
+      if (errorCodeOf(e) === 'DUPLICATE_NICKNAME') {
+        setError('nickname', {
+          message: serverMessageOf(e) ?? '이미 사용 중인 닉네임이에요. 다른 이름으로 바꿔주세요.',
+        })
+        setFocus('nickname')
+        return
+      }
       setSubmitError(errorMessageOf(e, '프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.'))
     }
   }
 
-  const nickError =
-    errors.nickname?.message ?? (nickStatus === 'taken' ? '이미 사용 중인 닉네임이에요' : undefined)
-  const nickHelp =
-    nickStatus === 'available' ? '사용 가능한 닉네임이에요' : '상대에게 보이는 이름이에요 (2~12자)'
+  const nickError = errors.nickname?.message
+  const nickHelp = '상대에게 보이는 이름이에요 (2~12자)'
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col justify-center gap-5 px-5 py-10">
@@ -132,24 +117,12 @@ export function ProfilePage() {
 
               <Stack gap={16}>
                 <Field label="닉네임" required error={nickError} help={nickError ? undefined : nickHelp}>
-                  <div className="flex items-start gap-2">
-                    <Input
-                      className="flex-1"
-                      placeholder="2~12자"
-                      autoComplete="nickname"
-                      maxLength={12}
-                      {...nickReg}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={onCheckNickname}
-                      loading={nickStatus === 'checking'}
-                      disabled={!nickname}
-                    >
-                      중복 확인
-                    </Button>
-                  </div>
+                  <Input
+                    placeholder="2~12자"
+                    autoComplete="nickname"
+                    maxLength={12}
+                    {...register('nickname')}
+                  />
                 </Field>
 
                 <Controller
@@ -262,16 +235,6 @@ export function ProfilePage() {
         </Stack>
       </form>
 
-      {/* 접근성: 닉네임 중복 확인 진행 상태 */}
-      <span className="bt-sr-only" role="status" aria-live="polite">
-        {nickStatus === 'checking'
-          ? '닉네임 중복 확인 중'
-          : nickStatus === 'available'
-            ? '사용 가능한 닉네임입니다'
-            : nickStatus === 'taken'
-              ? '이미 사용 중인 닉네임입니다'
-              : ''}
-      </span>
     </main>
   )
 }

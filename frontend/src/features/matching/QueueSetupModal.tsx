@@ -50,7 +50,7 @@ export function QueueSetupModal({
   initial,
   title = '매칭 조건 설정',
   description = '연령 범위와 가능한 시간대를 정하면 조건이 맞는 상대를 찾아드려요.',
-  submitLabel = '대기 큐 등록',
+  submitLabel = '매칭 대기 등록',
   error,
 }: QueueSetupModalProps) {
   const [ageMin, setAgeMin] = useState('')

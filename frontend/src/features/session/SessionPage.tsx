@@ -25,6 +25,7 @@ import {
   terminateSession,
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
+import { sessionElapsedSeedMs } from './sessionElapsed'
 import { EXTENSION_WINDOW_MINUTES } from './types'
 import type {
   SessionDetail,
@@ -197,7 +198,9 @@ export function SessionPage() {
     sessionId,
     userId: currentUser?.id ?? null,
     participantIdentity: session.localParticipantIdentity,
-    sessionStartedAt: status?.actualStartAt ?? detail?.actualStartAt ?? null,
+    // 시작 시각을 직접 파싱하지 않는다 — 서버 계산값에서 경과를 구해야 브라우저 타임존과
+    // 클라이언트 시계 오차가 두 참가자의 타임라인을 어긋나게 하지 않는다.
+    sessionElapsedSeedMs: sessionElapsedSeedMs(status, detail),
   })
 
   // 분석은 fail-soft 다 — 사용자에게는 알리지 않지만(§10 코칭만 노출), 조용히 죽으면
@@ -250,11 +253,19 @@ export function SessionPage() {
   /* ── 5분 연장 (CONTACT-01) ──────────────────────────────
      서버가 제출을 받는 창이 종료 **5분 전**부터라(`EXTENSION_WINDOW_MINUTES`)
      카드도 같은 시점에 띄운다. 더 일찍 띄우면 눌러도 SESSION_EXTENSION_WINDOW_NOT_OPEN 이고,
-     더 늦게 띄우면 답할 시간이 부족하다. */
+     더 늦게 띄우면 답할 시간이 부족하다.
+
+     ⚠️ `IN_PROGRESS` 확인이 반드시 필요하다. 서버의 `remainingSeconds` 는 세션이 시작하기
+        전에는 **종료까지가 아니라 예정 시작 시각까지**를 센다(`SessionLifecycleService.
+        remainingSeconds` — IN_PROGRESS 가 아니면 deadline 이 scheduledStartAt). 그래서 시작
+        직전에 입장하면 이 값이 5분 이하로 내려와, 세션이 열리자마자 연장 카드가 떴다. */
   const [extensionChoice, setExtensionChoice] = useState<ExtensionChoice>('pending')
   const [extensionError, setExtensionError] = useState<string | null>(null)
   const extensionVisible =
-    remainingSec != null && remainingSec > 0 && remainingSec <= EXTENSION_WINDOW_MINUTES * 60
+    sessionPhase === 'IN_PROGRESS' &&
+    remainingSec != null &&
+    remainingSec > 0 &&
+    remainingSec <= EXTENSION_WINDOW_MINUTES * 60
 
   /**
    * 연장 의사 제출. 낙관적으로 화면을 먼저 바꾸고, 실패하면 되돌린다 —

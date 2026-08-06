@@ -247,7 +247,6 @@ export function MyPage() {
             <Card>
               <CardHeader title="계정" />
               <Stack gap={4}>
-                <ListRowButton title="차단 목록" meta="2명" onClick={() => console.log('TODO: 차단 목록')} />
                 <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit')} />
                 <ListRowButton title="비밀번호 변경" onClick={() => console.log('TODO: 비밀번호 변경')} />
                 {/* 로그아웃과 회원 탈퇴는 성격이 전혀 다르다(되돌릴 수 있음 vs 없음).
