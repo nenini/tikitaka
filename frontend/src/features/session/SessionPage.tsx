@@ -25,6 +25,7 @@ import {
   terminateSession,
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
+import { sessionElapsedSeedMs } from './sessionElapsed'
 import { EXTENSION_WINDOW_MINUTES } from './types'
 import type {
   SessionDetail,
@@ -197,7 +198,9 @@ export function SessionPage() {
     sessionId,
     userId: currentUser?.id ?? null,
     participantIdentity: session.localParticipantIdentity,
-    sessionStartedAt: status?.actualStartAt ?? detail?.actualStartAt ?? null,
+    // 시작 시각을 직접 파싱하지 않는다 — 서버 계산값에서 경과를 구해야 브라우저 타임존과
+    // 클라이언트 시계 오차가 두 참가자의 타임라인을 어긋나게 하지 않는다.
+    sessionElapsedSeedMs: sessionElapsedSeedMs(status, detail),
   })
 
   // 분석은 fail-soft 다 — 사용자에게는 알리지 않지만(§10 코칭만 노출), 조용히 죽으면

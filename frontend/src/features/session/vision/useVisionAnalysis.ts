@@ -57,8 +57,11 @@ export interface UseVisionAnalysisOptions {
   readonly userId: string | null
   /** 내 LiveKit participant identity */
   readonly participantIdentity: string | null
-  /** 세션 실제 시작 시각(ISO). sessionElapsedMs 의 기준점이다 */
-  readonly sessionStartedAt: string | null
+  /**
+   * 세션 경과 시간(ms). `sessionElapsedMs` 의 기준점이며 `sessionElapsedSeedMs()` 가 만든다.
+   * null 이면 아직 알 수 없다는 뜻이라 분석을 시작하지 않는다.
+   */
+  readonly sessionElapsedSeedMs: number | null
 }
 
 const IDLE: VisionAnalysisStatus = { state: 'IDLE', error: null }
@@ -87,7 +90,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
     sessionId,
     userId,
     participantIdentity,
-    sessionStartedAt,
+    sessionElapsedSeedMs,
   } = options
 
   const [status, setStatus] = useState<VisionAnalysisStatus>(IDLE)
@@ -103,7 +106,7 @@ export function useVisionAnalysis(options: UseVisionAnalysisOptions): VisionAnal
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const mediaSourceRef = useRef<BrowserMediaSource | null>(null)
 
-  const anchorMs = useSessionElapsedAnchor(sessionStartedAt)
+  const anchorMs = useSessionElapsedAnchor(sessionElapsedSeedMs)
 
   // AI 워커가 들어오기 전에는 분석 자체를 시작하지 않는다. DataChannel 은 수신자가 없어도
   // publish 가 성공으로 끝나기 때문에, 워커보다 먼저 시작하면 초반 이벤트가 조용히 사라진다.
@@ -379,25 +382,26 @@ function useAiWorkerPresence(room: Room | null, aiWorkerIdentity: string): boole
 }
 
 /**
- * `sessionElapsedMs` 의 기준점.
+ * `sessionElapsedMs` 의 기준점을 **한 번만** 고정한다.
  *
- * 서버가 준 실제 시작 시각으로부터 지금까지 흐른 시간을 한 번만 계산해 고정한다.
- * (세션 도중 새로고침하면 0 이 아니라 "이미 흐른 만큼"에서 이어져야 한다.)
- * 시작 시각을 모르면 분석을 시작하지 않는다 — 0 으로 시작하면 두 참가자의 타임라인이
- * 어긋나 Aggregator 가 같은 순간을 다른 시각으로 본다.
+ * 세션 상태는 폴링으로 계속 갱신되지만 기준점은 첫 값에서 움직이면 안 된다. 이후 시간은
+ * `SessionTimeline` 이 단조 시계로 흘리므로, 기준점이 바뀌면 이미 보낸 이벤트와 앞으로 보낼
+ * 이벤트의 시간축이 어긋난다. (세션 도중 새로고침하면 0 이 아니라 "이미 흐른 만큼"에서 이어진다.)
+ *
+ * 값이 아직 없으면 분석을 시작하지 않는다. 계산은 `sessionElapsedSeedMs()` 가 하며 **서버가
+ * 계산한 값만** 쓴다 — 여기서 날짜를 파싱하면 브라우저 타임존과 클라이언트 시계 오차가
+ * 기준점에 실려, 참가자마다 다른 타임라인이 만들어진다.
  */
-function useSessionElapsedAnchor(sessionStartedAt: string | null): number | null {
+function useSessionElapsedAnchor(seedMs: number | null): number | null {
   const anchorRef = useRef<number | null>(null)
   const [anchor, setAnchor] = useState<number | null>(null)
 
   useEffect(() => {
-    if (anchorRef.current !== null || sessionStartedAt === null) return
-    const startedAtMs = new Date(sessionStartedAt).getTime()
-    if (!Number.isFinite(startedAtMs)) return
-    const elapsed = Math.max(0, Date.now() - startedAtMs)
-    anchorRef.current = elapsed
-    setAnchor(elapsed)
-  }, [sessionStartedAt])
+    if (anchorRef.current !== null || seedMs === null) return
+    if (!Number.isFinite(seedMs) || seedMs < 0) return
+    anchorRef.current = seedMs
+    setAnchor(seedMs)
+  }, [seedMs])
 
   return anchor
 }
