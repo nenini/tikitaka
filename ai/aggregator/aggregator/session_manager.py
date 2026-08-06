@@ -47,6 +47,7 @@ from aggregator.session_contracts import (
 )
 from aggregator.speech_events import parse_stt_event
 from aggregator.settings import IntegrationSettings
+from aggregator.task_guard import log_task_failure
 from aggregator.transcripts import RetainedTranscript, TranscriptSegment
 from aggregator.vision_events import (
     VisionBehaviorEvent,
@@ -350,17 +351,23 @@ class SessionRuntime:
             )
 
     async def _tick_loop(self) -> None:
-        try:
-            while True:
+        """감지기 tick. **한 번 실패했다고 루프를 끝내지 않는다.**
+
+        예전엔 try 가 while 바깥이라 예외 하나에 tick 이 영영 멈췄다. tick 이 멈추면
+        침묵·리액션 감지가 통째로 죽어 세션 내내 코칭이 한 건도 안 나간다 — 로그는
+        남지만 사용자는 "코칭이 원래 이런가 보다" 하고 넘어간다.
+        """
+        while True:
+            try:
                 await self.tick()
-                await asyncio.sleep(self._settings.tick_interval_seconds)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "aggregator tick worker stopped session=%s",
-                self.session_id,
-            )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "aggregator tick failed session=%s — 루프는 계속한다",
+                    self.session_id,
+                )
+            await asyncio.sleep(self._settings.tick_interval_seconds)
 
     async def _delivery_loop(self) -> None:
         contextual_cache: dict[tuple[str, int, str], str | None] = {}
@@ -668,6 +675,8 @@ class SessionManager:
         )
         self._warmup_tasks.add(task)
         task.add_done_callback(self._warmup_tasks.discard)
+        # discard 만 붙이면 예외가 회수돼 버려져 흔적이 안 남는다.
+        task.add_done_callback(log_task_failure)
 
     async def _end(
         self,
@@ -683,7 +692,17 @@ class SessionManager:
             )
         runtime = self._sessions.pop(event.session_id, None)
         if runtime is not None:
-            await runtime.stop()
+            # stop() 안에서 뭐가 터지든 **전사 보관과 리포트는 반드시 시도한다.**
+            # 예전엔 stop() 예외가 그대로 올라가 아래 두 줄이 통째로 스킵됐고,
+            # 세션 결과물이 전부 사라졌다(2026-08-06 운영 2건). 세션은 이미 끝났으니
+            # 남은 데이터를 건지는 게 예외를 위로 던지는 것보다 중요하다.
+            try:
+                await runtime.stop()
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "session stop failed session=%s — 남은 데이터는 계속 처리한다",
+                    event.session_id,
+                )
             self._retain_transcript(runtime, event.ended_at)
             self._schedule_report(runtime, event.ended_at)
         return "PROCESSED"
@@ -836,14 +855,25 @@ class SessionManager:
             )
 
     async def _retention_loop(self) -> None:
-        try:
-            while True:
+        """보관 기간이 지난 전사를 지운다.
+
+        **CancelledError 말고 다른 예외도 잡아야 한다.** 예전엔 안 잡아서 한 번 터지면
+        루프가 조용히 죽었고(아무도 이 태스크의 예외를 안 본다), 그러면 전사가
+        **영원히 안 지워진다** — 메모리도 문제지만 "종료 후 30분만 보관"이라는
+        개인정보 약속이 깨지는 게 더 크다.
+        """
+        while True:
+            try:
                 await asyncio.sleep(
                     self.settings.transcript_cleanup_interval_seconds
                 )
                 self._purge_expired_transcripts()
-        except asyncio.CancelledError:
-            raise
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "transcript retention sweep failed — 루프는 계속한다"
+                )
 
     def runtime(self, session_id: str) -> SessionRuntime:
         try:
