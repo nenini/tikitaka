@@ -6,6 +6,7 @@ import com.date.backend.domain.contact.dto.response.SessionExtensionDecisionResp
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,7 +31,7 @@ public class ContactController implements ContactSwaggerDocs {
 	@Override
 	public ApiResponse<SessionExtensionDecisionResponse> decideExtension(
 			@AuthenticationPrincipal AuthUser authUser,
-			@PathVariable Long sessionId,
+			@Positive @PathVariable Long sessionId,
 			@Valid @RequestBody SessionExtensionDecisionRequest request
 	) {
 		return ApiResponse.success(decisionService.decide(
