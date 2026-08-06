@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client'
 import { Badge, ConnectionIndicator, Icon, SessionTimer, Spinner } from '@/components'
 import type { ConnectionState } from '@/components'
@@ -15,14 +16,16 @@ export interface SessionStageProps {
   partnerName?: string
   /** 내 카메라를 끈 상태 — PIP 에 표시한다 */
   cameraDisabled: boolean
+  /** 카메라 쪽(상단 중앙)에 띄우는 코칭 카드. 아래 배치 주석 참고 */
+  coachOverlay?: ReactNode
 }
 
 /**
  * 세션 주 화면 — 상대 영상이 주인공이다.
  *
  * 오버레이 배치 규칙(§10): 코칭·힌트는 **상대 얼굴을 가리지 않는다.**
- * 그래서 영상 위에 남는 건 얇은 메타 정보(테마·타이머·연결 상태)와 PIP 뿐이고,
- * 침묵 힌트·코칭 카드는 전부 코치 레일에서 그린다.
+ * 얇은 메타 정보(테마·타이머·연결 상태)와 PIP, 그리고 상단 중앙의 코칭 카드만 영상 위에 올린다.
+ * 침묵 힌트·안전 경고·연장 제안은 그대로 코치 레일에서 그린다.
  */
 export function SessionStage({
   remoteVideo,
@@ -33,6 +36,7 @@ export function SessionStage({
   partnerJoined,
   partnerName,
   cameraDisabled,
+  coachOverlay,
 }: SessionStageProps) {
   return (
     <div
@@ -74,8 +78,20 @@ export function SessionStage({
         </div>
       </div>
 
-      {/* 하단 우: 내 영상 PIP.
-          침묵 힌트·코칭은 전부 코치 레일로 옮겨서, 영상 위에 얹히는 건 이제 PIP 뿐이다. */}
+      {/* 상단 중앙: 코칭 카드.
+          **웹캠은 화면 위쪽에 있다.** 코칭을 우측 레일에서 읽으면 시선이 카메라를 크게 벗어나
+          상대에게 '딴 데 보는' 것으로 보이고, 비전 분석에도 시선 이탈(GAZE_AWAY)로 잡힌다.
+          카메라와 가장 가까운 상단에 두면 읽는 동안에도 시선이 렌즈 근처에 머문다.
+
+          상단 배지 줄(p-3, 약 40px) 아래로 내려 겹치지 않게 하고, 폭을 제한해
+          상대 얼굴을 가리지 않는다. 카드는 TTL 로 스스로 사라진다(COACH-04). */}
+      {coachOverlay && (
+        <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center px-3">
+          <div className="pointer-events-auto w-full max-w-[420px]">{coachOverlay}</div>
+        </div>
+      )}
+
+      {/* 하단 우: 내 영상 PIP. */}
       <div
         className="absolute bottom-3 right-3 h-[110px] w-[82px] overflow-hidden rounded-lg sm:h-[150px] sm:w-[112px]"
         style={{

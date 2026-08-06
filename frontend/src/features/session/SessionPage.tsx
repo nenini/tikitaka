@@ -11,6 +11,7 @@ import { AudioTrackView } from './livekit/TrackView'
 import { createApiTokenProvider } from './livekit/tokenProvider'
 import { useLiveKitRoom } from './livekit/useLiveKitRoom'
 import { isVisionEnabled, snapshotAnalysisSettings, useVisionAnalysis } from './vision'
+import { CoachOverlay } from './components/CoachOverlay'
 import { CoachRail } from './components/CoachRail'
 import { SessionStage } from './components/SessionStage'
 import { SilenceHint } from './components/SilenceHint'
@@ -385,6 +386,14 @@ export function SessionPage() {
             partnerJoined={session.partnerConnected}
             partnerName={partnerName}
             cameraDisabled={session.cameraDisabled}
+            // 코칭은 레일이 아니라 영상 위(카메라 근처)에 띄운다 — 읽는 동안 시선이
+            // 렌즈를 크게 벗어나지 않게 하기 위해서다. 레일에는 대기 건수만 남는다.
+            coachOverlay={
+              <CoachOverlay
+                message={visibleMessage}
+                onDismiss={() => visibleMessage && dismissMessage(visibleMessage.id)}
+              />
+            }
           />
 
           {/* 모바일에서는 높이 고정 */}
@@ -400,9 +409,7 @@ export function SessionPage() {
                   onDismiss={realtime.dismissSilence}
                 />
               }
-              message={visibleMessage}
               pendingMessageCount={pendingMessageCount}
-              onDismissMessage={() => visibleMessage && dismissMessage(visibleMessage.id)}
               safetyWarning={
                 realtime.safety ? (
                   <SafetyWarningCard
