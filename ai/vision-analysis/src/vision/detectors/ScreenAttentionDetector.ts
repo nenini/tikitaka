@@ -689,10 +689,12 @@ export class ScreenAttentionDetector
             baselineMode: fallback
               ? "GLOBAL_FALLBACK"
               : baseline.baselineModeBySignal.gaze,
-            coachingEligible:
-              !fallback &&
-              screenAttentionConfidence >=
-                this.config.coachingMinimumConfidence,
+            coachingEligible: this.coachingEligibleFor(
+              this.entryCandidateKind,
+              fallback,
+              screenAttentionConfidence,
+              measurementConfidence,
+            ),
             baselineEpoch: baseline.baselineEpoch,
           };
           this.episodeClock.start(this.activeSinceMs ?? now, now);
@@ -741,10 +743,12 @@ export class ScreenAttentionDetector
               baselineMode: fallback
                 ? "GLOBAL_FALLBACK"
                 : baseline.baselineModeBySignal.gaze,
-              coachingEligible:
-                !fallback &&
-                screenAttentionConfidence >=
-                  this.config.coachingMinimumConfidence,
+              coachingEligible: this.coachingEligibleFor(
+                this.entryCandidateKind,
+                fallback,
+                screenAttentionConfidence,
+                measurementConfidence,
+              ),
               baselineEpoch: baseline.baselineEpoch,
             },
             episodeId: this.episodeId,
@@ -898,6 +902,28 @@ export class ScreenAttentionDetector
     }
     if (eye === "LEFT") this.leftBlinkActive = next;
     else this.rightBlinkActive = next;
+  }
+
+  // An aggregate episode is evidenced by a measured head departure, not by
+  // iris direction, so the mode-capped attention confidence is the wrong axis
+  // to judge it on. Turning the head is exactly what costs binocular
+  // agreement, which zeroes irisFusionReliability and forces
+  // HEAD_CENTER_ONLY, whose cap (0.65) sits below coachingMinimumConfidence
+  // (0.75) by construction — so every head-departure episode was emitted and
+  // then rejected, never once reaching coaching. Judge it on measurement
+  // quality instead, the same axis fallbackEntry already uses. Iris-only
+  // episodes keep the attention confidence: there the iris signal *is* the
+  // evidence, and that path already demands its own stricter floors.
+  private coachingEligibleFor(
+    kind: AttentionEntryCandidateKind | null,
+    fallback: boolean,
+    screenAttentionConfidence: number,
+    measurementConfidence: number,
+  ): boolean {
+    if (fallback) return false;
+    const evidence =
+      kind === "AGGREGATE" ? measurementConfidence : screenAttentionConfidence;
+    return evidence >= this.config.coachingMinimumConfidence;
   }
 
   private entryRequirements(

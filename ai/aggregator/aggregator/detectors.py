@@ -10,6 +10,8 @@ CoachingPolicy(coaching.py)가 게이트·쿨다운·TTL로 판단한다(친구 
 
 from __future__ import annotations
 
+import logging
+
 from aggregator.conversation_signals import (
     DEFAULT_SILENCE_THRESHOLD_MS,
     looks_like_question,
@@ -24,6 +26,8 @@ from aggregator.events import (
     SilencePayload,
 )
 from aggregator.state import SessionState, Utterance
+
+logger = logging.getLogger(__name__)
 
 
 class Detector:
@@ -94,15 +98,27 @@ class SilenceDetector(Detector):
     ) -> None:
         self.threshold_ms = threshold_ms
         self._fired_for_ms = -1
+        self._last_block_reason: str | None = None
 
     def on_tick(self, state: SessionState, now_ms: int) -> list[AnalysisEvent]:
-        if any(user.is_speaking for user in state.users.values()):
-            return []
+        speaking = [
+            user.user_id for user in state.users.values() if user.is_speaking
+        ]
+        if speaking:
+            return self._blocked("SOMEONE_SPEAKING", state, speakers=speaking)
         if state.last_activity_ms == 0:
-            return []
+            return self._blocked("NO_ACTIVITY_RECORDED", state)
         silent_ms = now_ms - state.last_activity_ms
-        if silent_ms < self.threshold_ms or self._fired_for_ms == state.last_activity_ms:
-            return []
+        if silent_ms < self.threshold_ms:
+            return self._blocked(
+                "BELOW_THRESHOLD",
+                state,
+                silent_ms=silent_ms,
+                threshold_ms=self.threshold_ms,
+            )
+        if self._fired_for_ms == state.last_activity_ms:
+            return self._blocked("ALREADY_FIRED", state)
+        self._last_block_reason = None
         self._fired_for_ms = state.last_activity_ms
         event = SilenceDetected(
             session_id=state.session_id,
@@ -111,6 +127,30 @@ class SilenceDetector(Detector):
             payload=SilencePayload(silence_sec=round(silent_ms / 1000, 1)),
         )
         return [event]
+
+    def _blocked(
+        self,
+        reason: str,
+        state: SessionState,
+        **details: object,
+    ) -> list[AnalysisEvent]:
+        """Record why this tick produced no silence, once per reason change.
+
+        Two production sessions reported zero silence detections with no way
+        to tell which of the four conditions held. on_tick runs continuously,
+        so only transitions are logged — a steady state says the same thing
+        every tick and would bury everything else.
+        """
+        if reason != self._last_block_reason:
+            self._last_block_reason = reason
+            logger.info(
+                "silence not detected reason=%s session=%s lastActivityMs=%d%s",
+                reason,
+                state.session_id,
+                state.last_activity_ms,
+                "".join(f" {key}={value}" for key, value in details.items()),
+            )
+        return []
 
 
 def default_detectors() -> list[Detector]:

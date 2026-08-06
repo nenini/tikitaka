@@ -99,13 +99,86 @@ def test_attention_coaches_listener_when_partner_is_speaking() -> None:
     assert command.expires_at_session_elapsed_ms == 201_000
 
 
-def test_attention_stays_off_until_stt_fills_speaking_state() -> None:
+def test_attention_skipped_when_no_partner_spoke() -> None:
     aggregator, coaching = _aggregator()
     aggregator.push_vision_event(
         _fixture("vision-metric-snapshot.valid.json")
     )
 
     aggregator.push_vision_event(_prolonged_gaze())
+
+    assert coaching == []
+
+
+def test_attention_counts_partner_speech_during_the_gaze_window() -> None:
+    """The event describes a window, so the partner need not still hold the floor.
+
+    A prolonged gaze-away lands at least its dwell time plus the publisher's
+    batch interval after the episode opened. Reading live ``is_speaking`` at
+    ingestion therefore asked whether the partner happened to be mid-utterance
+    seconds later, and speech is bursty enough that the answer was almost
+    always no.
+    """
+    aggregator, coaching = _aggregator()
+    partner = aggregator.state.user("user-b")
+    partner.last_speech_ended_at_ms = 183_000  # inside the 3.8s gaze episode
+
+    aggregator.push_vision_event(
+        _fixture("vision-metric-snapshot.valid.json")
+    )
+    aggregator.push_vision_event(_prolonged_gaze())
+
+    assert len(coaching) == 1
+    assert coaching[0].coaching_type == "ATTENTION_RECOVERY"
+
+
+def test_attention_ignores_partner_speech_before_the_gaze_window() -> None:
+    aggregator, coaching = _aggregator()
+    partner = aggregator.state.user("user-b")
+    partner.last_speech_ended_at_ms = 179_000  # window opens at 180_700
+
+    aggregator.push_vision_event(
+        _fixture("vision-metric-snapshot.valid.json")
+    )
+    aggregator.push_vision_event(_prolonged_gaze())
+
+    assert coaching == []
+
+
+def test_attention_scores_head_departure_on_measurement_confidence() -> None:
+    """A head turn caps attention confidence below the coaching floor.
+
+    Turning the head is what costs binocular agreement, which zeroes iris
+    fusion and forces the producer into HEAD_CENTER_ONLY, whose confidence cap
+    (0.65) sits under the 0.75 coaching floor by construction. Session 11
+    emitted three such episodes at exactly 0.65 and coached none of them.
+    """
+    aggregator, coaching = _aggregator()
+    aggregator.state.user("user-b").is_speaking = True
+    aggregator.push_vision_event(
+        _fixture("vision-metric-snapshot.valid.json")
+    )
+    event = _prolonged_gaze()
+    event["confidence"] = 0.65
+    event["measurementConfidence"] = 0.855
+
+    aggregator.push_vision_event(event)
+
+    assert len(coaching) == 1
+    assert coaching[0].coaching_type == "ATTENTION_RECOVERY"
+
+
+def test_attention_rejects_poorly_measured_frame() -> None:
+    aggregator, coaching = _aggregator()
+    aggregator.state.user("user-b").is_speaking = True
+    aggregator.push_vision_event(
+        _fixture("vision-metric-snapshot.valid.json")
+    )
+    event = _prolonged_gaze()
+    event["confidence"] = 0.65
+    event["measurementConfidence"] = 0.4
+
+    aggregator.push_vision_event(event)
 
     assert coaching == []
 

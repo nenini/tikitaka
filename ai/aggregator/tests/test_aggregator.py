@@ -118,6 +118,39 @@ def test_speech_events_update_runtime_state() -> None:
     assert agg.state.user("user-A").last_speech_ended_at_ms == 2500
 
 
+def test_tick_releases_a_speaking_flag_no_end_event_ever_closed() -> None:
+    """A dropped SPEECH_ENDED must not silence the session for good.
+
+    is_speaking gates SilenceDetector on the first line of on_tick, so a
+    pinned flag takes silence detection down with it for the rest of the
+    session — and attention coaching keeps reading the user as mid-utterance.
+    """
+    agg = SessionAggregator("t", on_analysis=lambda _: None, detectors=[])
+    started = SpeechStartedEvent(
+        session_id="t",
+        user_id="user-A",
+        participant_identity="participant-user-A",
+        client_instance_id=_CLIENT_A,
+        utterance_id="00000000-0000-4000-8000-000000000098",
+        seq=1,
+        session_elapsed_ms=1_000,
+        confidence=0.9,
+        payload=SpeechStartedPayload(observed_start_elapsed_ms=1_000),
+    )
+    assert agg.push_stt_event(started)  # no SPEECH_ENDED ever follows
+
+    agg.tick(60_000)
+    assert agg.state.user("user-A").is_speaking
+
+    agg.tick(121_000)
+
+    user = agg.state.user("user-A")
+    assert not user.is_speaking
+    assert user.speech_started_at_ms is None
+    assert user.current_utterance_id is None
+    assert user.last_speech_ended_at_ms == 121_000
+
+
 def test_duplicate_stt_event_is_ignored() -> None:
     agg = SessionAggregator("t", on_analysis=lambda _: None, detectors=[])
     event = _transcript("user-A", 0, 1000, "중복 검사")
