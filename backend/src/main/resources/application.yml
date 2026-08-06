@@ -196,6 +196,11 @@ moderation:
     first-restriction: ${NO_SHOW_FIRST_RESTRICTION:1d}
     second-restriction: ${NO_SHOW_SECOND_RESTRICTION:3d}
     repeated-restriction: ${NO_SHOW_REPEATED_RESTRICTION:7d}
+    scheduler:
+      enabled: ${NO_SHOW_SCHEDULER_ENABLED:true}
+      fixed-delay-ms: ${NO_SHOW_SCHEDULER_FIXED_DELAY_MS:30000}
+      initial-delay-ms: ${NO_SHOW_SCHEDULER_INITIAL_DELAY_MS:10000}
+      batch-size: ${NO_SHOW_SCHEDULER_BATCH_SIZE:100}
 
 notification:
   waiting-recommendation:
