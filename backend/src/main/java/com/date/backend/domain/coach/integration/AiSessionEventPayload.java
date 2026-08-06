@@ -14,6 +14,8 @@ public record AiSessionEventPayload(
 		String eventId,
 		String eventType,
 		int version,
+		String sessionType,
+		String scenario,
 		String sessionId,
 		Instant actualStartAt,
 		Instant endedAt,
