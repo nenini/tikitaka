@@ -21,7 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 
 @Configuration
@@ -67,6 +67,7 @@ public class SecurityConfig {
 						.accessDeniedHandler(accessDeniedHandler)
 				)
 				.authorizeHttpRequests(authorize -> authorize
+						.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
 						.requestMatchers(PUBLIC_ENDPOINTS).permitAll() //나중에 변결 해야할듯?
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 						.requestMatchers(
