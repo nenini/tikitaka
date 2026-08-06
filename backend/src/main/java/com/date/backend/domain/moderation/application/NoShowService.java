@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -32,9 +33,12 @@ public class NoShowService {
 			AttendancePenaltyRepository penaltyRepository,
 			UserSanctionRepository sanctionRepository,
 			NoShowPolicyProperties properties, Clock clock) {
-		this.sessionRepository = sessionRepository; this.participantRepository = participantRepository;
-		this.penaltyRepository = penaltyRepository; this.sanctionRepository = sanctionRepository;
-		this.properties = properties; this.clock = clock;
+		this.sessionRepository = sessionRepository;
+		this.participantRepository = participantRepository;
+		this.penaltyRepository = penaltyRepository;
+		this.sanctionRepository = sanctionRepository;
+		this.properties = properties;
+		this.clock = clock;
 	}
 
 	@Transactional
@@ -45,27 +49,80 @@ public class NoShowService {
 		RoomParticipant reporter = participants.stream()
 				.filter(item -> item.getUserId().equals(reporterUserId)).findFirst()
 				.orElseThrow(() -> new BusinessException(ModerationErrorCode.NO_SHOW_NOT_SESSION_PARTICIPANT));
-		if (!reporter.isJoined()) throw new BusinessException(ModerationErrorCode.NO_SHOW_REPORTER_NOT_JOINED);
+		if (!reporter.isJoined()) {
+			throw new BusinessException(ModerationErrorCode.NO_SHOW_REPORTER_NOT_JOINED);
+		}
 		LocalDateTime now = LocalDateTime.now(clock);
 		LocalDateTime deadline = session.getScheduledStartAt().plus(properties.gracePeriod());
-		if (now.isBefore(deadline)) throw new BusinessException(ModerationErrorCode.NO_SHOW_GRACE_PERIOD_NOT_ELAPSED);
-		RoomParticipant absent = participants.stream().filter(item -> !item.getUserId().equals(reporterUserId))
+		if (now.isBefore(deadline)) {
+			throw new BusinessException(ModerationErrorCode.NO_SHOW_GRACE_PERIOD_NOT_ELAPSED);
+		}
+		RoomParticipant absent = participants.stream()
+				.filter(item -> !item.getUserId().equals(reporterUserId))
 				.filter(item -> !item.isJoined()).findFirst()
 				.orElseThrow(() -> new BusinessException(ModerationErrorCode.NO_SHOW_TARGET_NOT_FOUND));
 
-		var existing = penaltyRepository.findBySessionIdAndUserIdAndPenaltyType(sessionId, absent.getUserId(), "NO_SHOW");
-		if (existing.isPresent()) return existingResponse(existing.get(), true);
-		AttendancePenalty penalty = penaltyRepository.save(new AttendancePenalty(absent.getUserId(), sessionId, now));
-		long count = penaltyRepository.countByUserIdAndPenaltyType(absent.getUserId(), "NO_SHOW");
+		var existing = penaltyRepository.findBySessionIdAndUserIdAndPenaltyType(
+				sessionId, absent.getUserId(), "NO_SHOW");
+		if (existing.isPresent()) {
+			return existingResponse(existing.get(), true);
+		}
+		return createPenalty(sessionId, absent.getUserId(), reporterUserId, now);
+	}
+
+	@Transactional
+	public int recordAutomatically(Long sessionId) {
+		var session = sessionRepository.findWithMatchPairByIdForUpdate(sessionId)
+				.orElse(null);
+		if (session == null || session.isAiVideo() || session.isEnded()
+				|| session.isInProgress()) {
+			return 0;
+		}
+
+		LocalDateTime now = LocalDateTime.now(clock);
+		LocalDateTime deadline = session.getScheduledStartAt().plus(properties.gracePeriod());
+		if (now.isBefore(deadline)) {
+			return 0;
+		}
+
+		List<RoomParticipant> participants =
+				participantRepository.findAllByRoom_IdOrderByUserIdAsc(sessionId);
+		boolean anyoneJoined = participants.stream()
+				.anyMatch(participant -> participant.getJoinedAt() != null);
+		if (!anyoneJoined) {
+			return 0;
+		}
+
+		int recorded = 0;
+		for (RoomParticipant participant : participants) {
+			if (participant.getJoinedAt() != null) {
+				continue;
+			}
+			if (penaltyRepository.findBySessionIdAndUserIdAndPenaltyType(
+					sessionId, participant.getUserId(), "NO_SHOW").isPresent()) {
+				continue;
+			}
+			createPenalty(sessionId, participant.getUserId(), null, now);
+			recorded++;
+		}
+		return recorded;
+	}
+
+	private NoShowResponse createPenalty(Long sessionId, Long absentUserId,
+			Long recordedByUserId, LocalDateTime now) {
+		AttendancePenalty penalty = penaltyRepository.save(
+				new AttendancePenalty(absentUserId, sessionId, now));
+		long count = penaltyRepository.countByUserIdAndPenaltyType(absentUserId, "NO_SHOW");
 		LocalDateTime endsAt = now.plus(properties.restrictionFor((int) count));
-		UserSanction sanction = sanctionRepository.save(new UserSanction(absent.getUserId(),
-				"예약 세션 노쇼 누적 " + count + "회", now, endsAt, reporterUserId));
-		return new NoShowResponse(sessionId, absent.getUserId(), count, penalty.getCreatedAt(),
+		UserSanction sanction = sanctionRepository.save(new UserSanction(absentUserId,
+				"예약 세션 노쇼 누적 " + count + "회", now, endsAt, recordedByUserId));
+		return new NoShowResponse(sessionId, absentUserId, count, penalty.getCreatedAt(),
 				sanction.getStartsAt(), sanction.getEndsAt(), false);
 	}
 
 	private NoShowResponse existingResponse(AttendancePenalty penalty, boolean alreadyRecorded) {
-		var active = sanctionRepository.findActiveByUserId(penalty.getUserId(), LocalDateTime.now(clock));
+		var active = sanctionRepository.findActiveByUserId(
+				penalty.getUserId(), LocalDateTime.now(clock));
 		var sanction = active.isEmpty() ? null : active.get(0);
 		return new NoShowResponse(penalty.getSessionId(), penalty.getUserId(),
 				penaltyRepository.countByUserIdAndPenaltyType(penalty.getUserId(), "NO_SHOW"),
