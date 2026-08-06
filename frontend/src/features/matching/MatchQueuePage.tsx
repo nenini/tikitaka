@@ -17,8 +17,11 @@ import type { DelayReason, MatchRequestInput, QueueStatus } from './types'
  *    그래서 가짜 진행바·예상 시간·순번을 쓰지 않고, 대신 ① 지금 무슨 일이 일어나는지
  *    ② 기다리는 동안 할 수 있는 일 ③ 언제든 멈출 수 있다는 사실을 화면에 남긴다.
  *
- * 규칙: 홈·챗봇을 이용해도 대기 큐는 유지되고 ‘큐 이탈’(DELETE)로만 해제된다.
- * 큐 이탈은 패널티·온도 감점 없음.
+ * 규칙: 홈·챗봇을 이용해도 대기는 유지되고 ‘매칭 대기 취소’(DELETE)로만 해제된다.
+ * 취소는 패널티·온도 감점 없음.
+ *
+ * 화면 문구에는 ‘큐’ 를 쓰지 않는다 — 개발 용어라 일반 사용자에게 전달되지 않는다.
+ * 코드·주석에서는 서버 개념을 가리킬 때 그대로 쓴다.
  *
  * 백엔드 연동
  *  - 조회는 `GET /api/v1/match-requests/me/current` 단건뿐이다(요청 id 로 조회하는 엔드포인트가 없다).
@@ -76,7 +79,7 @@ export function MatchQueuePage() {
       await leaveQueue()
       navigate('/matching')
     } catch (error) {
-      setLoadError(errorMessageOf(error, '큐에서 나가지 못했어요.'))
+      setLoadError(errorMessageOf(error, '매칭 대기를 취소하지 못했어요.'))
       setLeaveOpen(false)
     } finally {
       setLeaving(false)
@@ -96,7 +99,7 @@ export function MatchQueuePage() {
       <header className="mb-5">
         <h1 className="bt-h1">상대를 찾고 있어요</h1>
         <p className="bt-body bt-muted mt-1">
-          조건이 맞는 사람이 대기 큐에 들어오면 바로 연결해 드려요.
+          조건이 맞는 사람이 나타나면 바로 연결해 드려요.
         </p>
       </header>
 
@@ -139,7 +142,7 @@ export function MatchQueuePage() {
               조건 완화
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setLeaveOpen(true)}>
-              큐 이탈
+              매칭 대기 취소
             </Button>
           </div>
         </Card>
@@ -205,24 +208,24 @@ export function MatchQueuePage() {
         submitLabel="조건 적용"
       />
 
-      {/* 큐 이탈 확인 */}
+      {/* 매칭 대기 취소 확인 */}
       <Modal
         open={leaveOpen}
         onClose={() => setLeaveOpen(false)}
         role="alertdialog"
-        title="대기를 멈출까요?"
+        title="매칭 대기를 취소할까요?"
         actions={
           <>
             <Button variant="ghost" onClick={() => setLeaveOpen(false)}>
-              계속 대기
+              계속 기다리기
             </Button>
             <Button variant="secondary" loading={leaving} onClick={handleLeave}>
-              큐 이탈
+              대기 취소
             </Button>
           </>
         }
       >
-        큐에서 나가도 패널티나 온도 감점은 없어요. 다시 매칭하려면 트랙을 새로 선택하면 됩니다.
+        취소해도 패널티나 온도 감점은 없어요. 다시 매칭하려면 트랙을 새로 선택하면 됩니다.
       </Modal>
     </main>
   )

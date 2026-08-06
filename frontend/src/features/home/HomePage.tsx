@@ -330,7 +330,7 @@ export function HomePage() {
                   <Badge tone="success">● 매칭 가능</Badge>
                 </div>
                 <p className="bt-caption mt-1">
-                  30분 세션 · 신청하면 <b className="text-ink">대기 큐 등록</b> → 매칭 시 알림 (예상 ~4분)
+                  30분 세션 · 신청하면 <b className="text-ink">매칭 대기 등록</b> → 매칭 시 알림 (예상 ~4분)
                 </p>
               </div>
               <Button
