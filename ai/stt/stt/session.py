@@ -13,6 +13,7 @@ seq는 종류 무관 (sessionId, userId, clientInstanceId)에서 단조 증가(w
 from __future__ import annotations
 
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -310,6 +311,10 @@ class SessionSttRunner:
         self._session_epoch_ms = session_epoch_ms
         self._worker = TranscriptionWorker(engine, max_pending=max_pending, now_ms=self._now_ms)
         self._streams: Dict[str, SpeakerStream] = {}
+        # feed()가 관제실에서 asyncio.to_thread 로 불린다(VAD를 이벤트 루프 밖으로
+        # 빼기 위해). 트랙이 둘이면 서로 다른 스레드에서 동시에 들어오므로 지연
+        # 생성을 락으로 감싼다. 스트림 하나는 자기 트랙 태스크만 만지므로 안전하다.
+        self._streams_lock = threading.Lock()
 
     def _now_ms(self) -> int:
         return self._session_epoch_ms + int((time.monotonic() - self._anchor) * 1000)
@@ -321,8 +326,11 @@ class SessionSttRunner:
         stream_epoch_ms: int = 0,
         client_instance_id: str | None = None,
     ) -> SpeakerStream:
-        if user_id not in self._streams:
-            self._streams[user_id] = SpeakerStream(
+        with self._streams_lock:
+            existing = self._streams.get(user_id)
+            if existing is not None:
+                return existing
+            created = SpeakerStream(
                 self.engine,
                 session_id=self.session_id,
                 user_id=user_id,
@@ -335,7 +343,8 @@ class SessionSttRunner:
                 submit_transcription=self._worker.submit,
                 next_seq=self._worker.next_seq,
             )
-        return self._streams[user_id]
+            self._streams[user_id] = created
+            return created
 
     def feed(
         self,
@@ -370,7 +379,14 @@ class SessionSttRunner:
         **여기서 꺼내지 않으면 세션 마지막 발화들이 그대로 유실된다.**
         호출자가 close() 뒤에 poll_transcripts()를 또 부르게 만들면 잊어버린다.
         """
-        final: List[StreamEvent] = []
+        # 순서가 중요하다. seq는 발급 순서대로 나가야 하고, 관제실은 역행을
+        # SttSequenceError 로 거부한다 — 종료 처리가 거기서 끊기면 전사 보관과
+        # 리포트 생성이 통째로 스킵된다(2026-08-06 운영 장애).
+        #
+        #   ① 이미 발급돼 큐에 남은 전사를 먼저 꺼낸다 (낮은 seq)
+        #   ② flush 가 마지막 SPEECH_ENDED 에 새 seq 를 받는다
+        #   ③ worker 가 남은 오디오를 전사하며 그다음 seq 를 받는다
+        final: List[StreamEvent] = list(self.poll_transcripts())
         for s in self._streams.values():
             final += s.flush()
         self._worker.close(flush=True, timeout=timeout)
