@@ -30,6 +30,7 @@ from aggregator.coaching_detectors import (
     ConversationCoachingDetector,
     SmileCoachingDetector,
     VisionSetupCoachingDetector,
+    VolumeCoachingDetector,
 )
 from aggregator.config import MvpCoachingConfig
 from aggregator.detectors import Detector, default_detectors
@@ -116,6 +117,7 @@ class SessionAggregator:
         self._conversation_detector = ConversationCoachingDetector(self.config)
         self._vision_setup_detector = VisionSetupCoachingDetector(self.config)
         self._smile_detector = SmileCoachingDetector(self.config)
+        self._volume_detector = VolumeCoachingDetector(self.config)
         self._coaching_arbitrator = CoachingArbitrator()
         self._vision_event_ids: set[UUID] = set()
         self._vision_event_id_order: deque[UUID] = deque()
@@ -123,6 +125,7 @@ class SessionAggregator:
         self._stt_event_ids: set[str] = set()
         self._stt_event_id_order: deque[str] = deque()
         self._stt_last_seq: dict[tuple[str, str], int] = {}
+        self._last_suppressed: dict[str, tuple[str, ...]] = {}
 
     def _dispatch(self, events: list[AnalysisEvent]) -> None:
         for event in events:
@@ -139,6 +142,44 @@ class SessionAggregator:
             command = self.policy.evaluate_candidate(candidate, self.state)
             if command is not None:
                 self._on_coaching(command)
+
+    def _dispatch_arbitrated(
+        self,
+        candidates: list[CoachingCandidate],
+    ) -> None:
+        """타깃별로 우선순위 순서대로 시도하되, 정책이 거부하면 다음 후보로 넘어간다.
+
+        타깃당 최대 1건이라는 중재 규칙은 그대로다. 달라지는 건 "1등이 거부당하면
+        아무것도 안 나간다"에서 "그다음 순위가 나간다"로 바뀌는 것뿐이다.
+        `evaluate_candidate` 는 거부할 때 상태를 건드리지 않으므로 순서대로 물어봐도
+        안전하다.
+        """
+        for target, ordered in self._coaching_arbitrator.ranked(
+            candidates
+        ).items():
+            for candidate in ordered:
+                command = self.policy.evaluate_candidate(candidate, self.state)
+                if command is not None:
+                    self._last_suppressed.pop(target, None)
+                    self._on_coaching(command)
+                    break
+            else:
+                # 후보는 있었는데 전부 거부됐다. 이 구간이 지금까지 완전 암전이라
+                # "코칭이 왜 하나도 안 나갔나"를 사후에 알 수 없었다.
+                #
+                # **매 tick 찍으면 안 된다.** 거부는 한 번 시작되면 그 구간 내내
+                # 이어진다(같은 trigger_id 는 계속 거부된다). tick 이 0.5초라
+                # 30분 세션이면 대상 1명당 수천 줄이 되고, 정작 봐야 할
+                # silence detected·coaching requested 가 묻힌다.
+                kinds = tuple(item.coaching_type for item in ordered)
+                if self._last_suppressed.get(target) != kinds:
+                    self._last_suppressed[target] = kinds
+                    logger.info(
+                        "coaching suppressed session=%s target=%s candidates=%s",
+                        self.state.session_id,
+                        target,
+                        list(kinds),
+                    )
 
     def push_stt_event(
         self,
@@ -200,6 +241,12 @@ class SessionAggregator:
             self.state.last_activity_ms = max(
                 self.state.last_activity_ms,
                 parsed.payload.observed_end_elapsed_ms,
+            )
+            self._volume_detector.on_speech_ended(
+                self.state,
+                parsed.user_id,
+                rms_dbfs=parsed.payload.rms_dbfs,
+                speech_duration_ms=parsed.payload.speech_duration_ms,
             )
         else:
             self._apply_transcript(parsed)
@@ -360,18 +407,33 @@ class SessionAggregator:
                 self._on_analysis(event)
                 if isinstance(event, SilenceDetected):
                     target_user_id = self._silence_coaching_target()
-                    if target_user_id is not None:
-                        candidates.append(
-                            CoachingCandidate(
-                                coaching_type="SILENCE_RECOVERY",
-                                target_user_id=target_user_id,
-                                message_key="SILENCE_RECOVERY_01",
-                                reason_code="LONG_SILENCE",
-                                triggered_at_ms=event.session_elapsed_ms,
-                                trigger_id=f"{event.event_id}:{target_user_id}",
-                                priority="LOW",
-                            )
+                    if target_user_id is None:
+                        logger.info(
+                            "silence coaching skipped session=%s "
+                            "reason=NO_TARGET elapsedMs=%d",
+                            self.state.session_id,
+                            event.session_elapsed_ms,
                         )
+                        continue
+                    candidates.append(
+                        CoachingCandidate(
+                            coaching_type="SILENCE_RECOVERY",
+                            target_user_id=target_user_id,
+                            message_key="SILENCE_RECOVERY_01",
+                            reason_code="LONG_SILENCE",
+                            triggered_at_ms=event.session_elapsed_ms,
+                            # **구간마다 안정적이어야 한다.** 감지기는 침묵이 이어지는
+                            # 동안 주기적으로 다시 내는데(중재기에서 밀렸을 때 재시도),
+                            # event_id 를 쓰면 매번 새 UUID 라 정책이 중복을 못 막아
+                            # 같은 침묵에 코칭이 여러 번 나간다. last_activity_ms 는
+                            # 그 침묵 구간의 고유 식별자다.
+                            trigger_id=(
+                                f"silence:{self.state.last_activity_ms}"
+                                f":{target_user_id}"
+                            ),
+                            priority="LOW",
+                        )
+                    )
         candidates.extend(
             self._conversation_detector.on_tick(self.state, now_ms)
         )
@@ -379,9 +441,8 @@ class SessionAggregator:
             self._vision_setup_detector.on_tick(self.state, now_ms)
         )
         candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
-        self._dispatch_candidates(
-            self._coaching_arbitrator.select(candidates)
-        )
+        candidates.extend(self._volume_detector.on_tick(self.state, now_ms))
+        self._dispatch_arbitrated(candidates)
 
     def _expire_stuck_speaking(self, now_ms: int) -> None:
         """Release a speaking flag that no SPEECH_ENDED ever closed.
@@ -448,6 +509,5 @@ class SessionAggregator:
             self._vision_setup_detector.on_tick(self.state, now_ms)
         )
         candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
-        self._dispatch_candidates(
-            self._coaching_arbitrator.select(candidates)
-        )
+        candidates.extend(self._volume_detector.on_tick(self.state, now_ms))
+        self._dispatch_arbitrated(candidates)

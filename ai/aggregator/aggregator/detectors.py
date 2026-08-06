@@ -95,9 +95,12 @@ class SilenceDetector(Detector):
     def __init__(
         self,
         threshold_ms: int = DEFAULT_SILENCE_THRESHOLD_MS,
+        retry_interval_ms: int = 5_000,
     ) -> None:
         self.threshold_ms = threshold_ms
+        self.retry_interval_ms = retry_interval_ms
         self._fired_for_ms = -1
+        self._fired_at_ms = 0
         self._last_block_reason: str | None = None
 
     def on_tick(self, state: SessionState, now_ms: int) -> list[AnalysisEvent]:
@@ -116,10 +119,23 @@ class SilenceDetector(Detector):
                 silent_ms=silent_ms,
                 threshold_ms=self.threshold_ms,
             )
-        if self._fired_for_ms == state.last_activity_ms:
+        # 한 침묵 구간에 **한 번만** 내면 안 된다. 이 이벤트는 코칭 후보가 되는데,
+        # 후보는 중재기(타깃당 1건)와 정책(쿨다운·상한)을 더 통과해야 한다. 한 번
+        # 내고 끝내면 그 tick 에 더 높은 순위 후보가 있었다는 이유만으로 그 침묵은
+        # 영영 코칭되지 않는다. 실제로 질문 뒤 10초 침묵은 RESPONSE_PROMPT(랭크 1)와
+        # 항상 같은 tick·같은 대상에서 만나 항상 졌다.
+        #
+        # 그래서 침묵이 이어지는 동안 주기적으로 다시 낸다. 중복 발행은 정책이
+        # trigger_id 로 막는다 — 그래서 후보의 trigger_id 가 구간마다 안정적이어야 한다
+        # (aggregator.tick 참조).
+        if (
+            self._fired_for_ms == state.last_activity_ms
+            and now_ms - self._fired_at_ms < self.retry_interval_ms
+        ):
             return self._blocked("ALREADY_FIRED", state)
         self._last_block_reason = None
         self._fired_for_ms = state.last_activity_ms
+        self._fired_at_ms = now_ms
         event = SilenceDetected(
             session_id=state.session_id,
             speaker_id=None,

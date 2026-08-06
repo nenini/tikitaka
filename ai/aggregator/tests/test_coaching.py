@@ -192,4 +192,5 @@ def test_coaching_types_match_backend_enum() -> None:
         "ATTENTION_RECOVERY",
         "VISION_SETUP_GUIDANCE",
         "EXPRESSION_GUIDANCE",
+        "VOLUME_GUIDANCE",
     }
