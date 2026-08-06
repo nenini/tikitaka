@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
 
@@ -112,6 +113,18 @@ class AiAnalysisEventServiceTest {
 				exception -> assertThat(exception.getErrorCode())
 						.isEqualTo(CoachErrorCode.AI_ANALYSIS_CONSENT_REQUIRED)
 		);
+	}
+
+	@Test
+	void acceptsFinalVisionEventImmediatelyAfterSessionEnd() {
+		when(session.isInProgress()).thenReturn(false);
+		when(session.isEnded()).thenReturn(true);
+		when(session.getActualEndAt()).thenReturn(LocalDateTime.of(2026, 7, 30, 10, 0, 25));
+
+		var response = service.receive(AiAnalysisType.VISION, request("event-final-vision"));
+
+		assertThat(response.status()).isEqualTo("STORED");
+		verify(eventRepository).saveAndFlush(any());
 	}
 
 	private AiAnalysisEventRequest request(String eventId) {

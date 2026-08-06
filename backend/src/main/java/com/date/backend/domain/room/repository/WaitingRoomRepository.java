@@ -35,6 +35,10 @@ public interface WaitingRoomRepository extends JpaRepository<WaitingRoom, Long> 
 	);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select session from WaitingRoom session where session.id = :sessionId")
+	Optional<WaitingRoom> findByIdForUpdate(@Param("sessionId") Long sessionId);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
 			select session
 			from WaitingRoom session

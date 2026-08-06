@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -24,8 +25,8 @@ public record AiAnalysisEventRequest(
 		@PositiveOrZero long sessionElapsedMs,
 		@DecimalMin("0.0") @DecimalMax("1.0") BigDecimal confidence,
 		@NotNull OffsetDateTime occurredAt,
-		String modelVersion,
-		String ruleVersion,
+		@Size(max = 128) String modelVersion,
+		@Size(max = 128) String ruleVersion,
 		@NotNull JsonNode payload
 ) {
 }

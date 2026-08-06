@@ -13,7 +13,8 @@ public class AiChatAsyncConfig {
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
 		executor.setCorePoolSize(4);
 		executor.setMaxPoolSize(16);
-		executor.setQueueCapacity(100);
+		// GPU 작업 대기열은 AI 서버 한 곳에서만 관리합니다.
+		executor.setQueueCapacity(0);
 		executor.setThreadNamePrefix("ai-chat-stream-");
 		executor.setWaitForTasksToCompleteOnShutdown(false);
 		executor.initialize();

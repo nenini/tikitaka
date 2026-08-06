@@ -18,9 +18,8 @@ class SessionReportCommandServiceTest {
 	private final RoomParticipantRepository participants = mock(RoomParticipantRepository.class);
 	private final SessionReportRepository reports = mock(SessionReportRepository.class);
 	private final SessionReportGenerationService generation = mock(SessionReportGenerationService.class);
-	private final SessionReportGenerationRequester requester = mock(SessionReportGenerationRequester.class);
 	private final SessionReportCommandService service = new SessionReportCommandService(
-			sessions, participants, reports, generation, requester,
+			sessions, participants, reports, generation,
 			Clock.fixed(Instant.parse("2026-08-04T01:00:00Z"), ZoneId.of("Asia/Seoul")));
 
 	@Test

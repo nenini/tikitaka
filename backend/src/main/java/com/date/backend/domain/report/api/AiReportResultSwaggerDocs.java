@@ -4,6 +4,7 @@ import com.date.backend.domain.report.dto.request.AiReportResultRequest;
 import com.date.backend.domain.report.dto.response.AiReportResultAcceptedResponse;
 import com.date.backend.global.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +17,8 @@ public interface AiReportResultSwaggerDocs {
 			동일한 세션·사용자·reportVersion과 동일한 결과 재전송은 중복 저장하지 않습니다.
 			""")
 	ApiResponse<AiReportResultAcceptedResponse> receive(
+			@Parameter(required = true, description = "AI-BE 내부 인증 토큰")
+			String internalToken,
 			@RequestBody(required = true, content = @Content(mediaType = "application/json",
 					examples = @ExampleObject(value = """
 						{

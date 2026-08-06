@@ -275,7 +275,7 @@ class FlywayMigrationTests {
 		Integer sessionReportFailureCodeColumnCount = columnCount("SESSION_REPORTS", "FAILURECODE");
 		Integer sessionReportPayloadHashColumnCount = columnCount("SESSION_REPORTS", "RESULTPAYLOADHASH");
 
-		assertThat(migrationCount).isEqualTo(40);
+		assertThat(migrationCount).isEqualTo(42);
 		assertThat(sessionAnalysisReceiptTableCount).isEqualTo(1);
 		assertThat(sessionParticipantAnalysisTableCount).isEqualTo(1);
 		assertThat(sessionAnalysisEvidenceTableCount).isEqualTo(1);
