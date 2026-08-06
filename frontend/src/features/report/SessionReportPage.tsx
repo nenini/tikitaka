@@ -9,6 +9,7 @@ import {
   MetricStat,
   NotMeasuredNote,
   RadarChart,
+  TopicBreakdown,
 } from './parts'
 import type { MetricView, RadarPoint } from './parts'
 import {
@@ -216,6 +217,11 @@ export function SessionReportPage() {
   const improvements = narrativeItems(report.improvements)
   const missions = narrativeItems(report.nextMissions)
   const measuredCount = measuredAxisCount(report.axes)
+  // 축 키가 하나도 없다 = 분석 POST 가 BE 에 도달하지 못했다는 뜻이다.
+  // (일부만 measured=false 인 '측정 부족'과는 원인도 안내 문구도 다르다)
+  // `?? {}` 를 붙이지 않는다 — 위 :159 가 이미 report.axes 를 무방비로 읽으므로
+  // 여기서만 방어해 봐야 죽은 코드다. BE 계약상 axes 는 최소 {} 로 온다.
+  const analysisMissing = Object.keys(report.axes).length === 0
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
@@ -236,18 +242,31 @@ export function SessionReportPage() {
               몇 개가 측정됐는지를 제목에서 바로 밝힌다. */}
           <div>
             <div className="bt-h3">대화 행동 6축 분석</div>
-            <p className="bt-caption bt-muted mt-0.5">
-              <span className="bt-numeric">{measuredCount}</span>개 축 측정
-              {measuredCount < REPORT_AXIS_ORDER.length && (
-                <>
-                  {' · '}
-                  <span className="bt-numeric">{REPORT_AXIS_ORDER.length - measuredCount}</span>개 축
-                  측정 부족
-                </>
-              )}
-            </p>
+            {/* axes 가 통째로 비면 '측정 부족'이 아니라 지표 수집 자체가 실패한 것이다.
+                둘을 같은 문구로 보여주면 사용자는 원래 그런 줄 알고 넘어간다. */}
+            {analysisMissing ? (
+              <p className="bt-caption bt-muted mt-0.5">
+                지표를 불러오지 못했어요. 아래 요약과 피드백은 정상이에요.
+              </p>
+            ) : (
+              <p className="bt-caption bt-muted mt-0.5">
+                <span className="bt-numeric">{measuredCount}</span>개 축 측정
+                {measuredCount < REPORT_AXIS_ORDER.length && (
+                  <>
+                    {' · '}
+                    <span className="bt-numeric">{REPORT_AXIS_ORDER.length - measuredCount}</span>개 축
+                    측정 부족
+                  </>
+                )}
+              </p>
+            )}
           </div>
-          <RadarChart axes={radar} onSelect={selectAxis} selected={selectedAxis} />
+          <RadarChart
+            axes={radar}
+            analysisMissing={analysisMissing}
+            onSelect={selectAxis}
+            selected={selectedAxis}
+          />
           {selectedAxis && (
             <AxisDetailPanel
               label={REPORT_AXIS_LABEL[selectedAxis]}
@@ -295,6 +314,17 @@ export function SessionReportPage() {
                 <NotMeasuredNote text="표정·시선 분석은 이 세션에서 측정되지 않았어요." />
               )}
             </div>
+          </Card>
+
+          <Card>
+            <div className="bt-h3 mb-1">무슨 얘기를 했나요</div>
+            <p className="bt-caption bt-muted mb-3">
+              내가 말한 시간을 주제별로 나눈 값이에요.
+            </p>
+            <TopicBreakdown
+              topics={report.topicBreakdown ?? []}
+              analysisMissing={analysisMissing}
+            />
           </Card>
 
           <div className="flex flex-col gap-4 sm:flex-row">
