@@ -68,6 +68,28 @@ def _normalize_gender(value: str | None) -> str | None:
     return None
 
 
+_OPPOSITE = {"female": "male", "male": "female"}
+
+
+def opposite_gender(user_gender: str | None) -> str | None:
+    """사용자 성별 → 상대 페르소나 성별. 모르면 None(성별 무관 선택).
+
+    `select_persona(gender=...)`가 받는 건 **상대의 성별**이다. 사용자 성별을 그대로
+    넘기면 동성이 나온다 — 소개팅 연습에서 원하는 결과가 아니다.
+
+    BE는 `personaCondition`에 사용자 프로필 성별을 담아 보내므로(`AiChatContextService`),
+    호출부는 이 함수를 거쳐야 한다. 필드 이름은 `preferredGender`지만 실제로 오는 값은
+    '내 성별'이다 — 이름과 내용이 어긋나 있어 팀 확인 중이다.
+    """
+    normalized = _normalize_gender(user_gender)
+    return _OPPOSITE.get(normalized or "")
+
+
+def select_partner(user_gender: str | None, **kw: object) -> PersonaEntry:
+    """사용자 성별의 **반대** 페르소나를 고른다. AI 화상 세션 진입점."""
+    return select_persona(gender=opposite_gender(user_gender), **kw)  # type: ignore[arg-type]
+
+
 def get_persona(key: str) -> PersonaEntry:
     entry = _BY_KEY.get(key)
     if entry is None:
