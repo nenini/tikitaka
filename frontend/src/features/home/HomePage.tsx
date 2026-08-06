@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CSSProperties } from 'react'
 import {
@@ -10,9 +11,13 @@ import {
   EmptyState,
   Icon,
   ListRow,
+  Skeleton,
   Stack,
   TagChip,
 } from '@/components'
+import { getCurrentMatch } from '@/features/matching/api'
+import { isMatchClosed } from '@/features/matching/types'
+import type { MatchPair } from '@/features/matching/types'
 import { useAuthStore } from '@/stores/auth.store'
 
 /* -------------------------------------------------------------------------- */
@@ -25,24 +30,82 @@ import { useAuthStore } from '@/stores/auth.store'
 /* -------------------------------------------------------------------------- */
 
 /**
- * 데모 예정 세션. null 이면 EmptyState 분기. TODO(HOME): GET /api/v1/sessions/upcoming
+ * 예정된 세션 카드에 그릴 값.
+ *
+ * ⚠️ **`GET /sessions/upcoming` 은 서버에 없다.** 확정된 매칭이 곧 예정 세션이므로
+ *    `GET /v1/matches/me/current`(→ `getCurrentMatch`)로 읽는다. 매칭이 없거나
+ *    이미 끝난 상태면 카드 대신 EmptyState 를 그린다.
  *
  * ⚠️ 키(cm)는 넣지 않는다. **수집하지 않기로 확정된 항목**이라
  *    (`ProfilePage` W-04 확정 옵션 ②, D-08) 서버 `PublicProfileResponse` 에도 필드가 없다.
  *    데모 데이터에만 있으면 영영 채워지지 않는 칸이 화면에 남는다.
  */
-const UPCOMING: {
+interface UpcomingView {
+  sessionId: number | null
+  matchPairId: number
   partnerName: string
   age: string
+  /** 얼굴상 · 테마 요약. 서버가 주지 않는 값은 빼고 잇는다 */
   face: string
   when: string
-  startsIn: string
-} | null = {
-  partnerName: '유월',
-  age: '20대 후반',
-  face: '🐰 토끼상 · 차분한 인상',
-  when: '오늘 19:00 · 저녁 식당 테마',
-  startsIn: '2시간 12분 뒤',
+  /** 남은 시간. 시작 시각을 모르면 null */
+  startsIn: string | null
+  /** 아직 양측 수락 전인가 — 대기방 입장 대신 매칭 카드로 보낸다 */
+  awaitingAcceptance: boolean
+}
+
+/**
+ * 매칭 응답 → 카드 표시값.
+ *
+ * 확정(`CONFIRMED`)과 수락 대기(`PENDING_ACCEPTANCE`)만 예정 세션으로 본다.
+ * 종료·거절·만료는 `isMatchClosed` 로 걸러지고, `COMPLETED` 는 이미 끝난 세션이라 제외한다.
+ */
+function toUpcomingView(pair: MatchPair | null): UpcomingView | null {
+  if (!pair) return null
+  if (isMatchClosed(pair.status) || pair.status === 'COMPLETED') return null
+
+  const startAt = pair.session.scheduledStartAt
+  // 얼굴상은 서버 미제공이라 대부분 null 이다. 없는 조각은 빼고 ' · ' 로 잇는다.
+  const face = [pair.opponent.faceTag, pair.session.themeName && `${pair.session.themeName} 테마`]
+    .filter(Boolean)
+    .join(' · ')
+
+  return {
+    sessionId: pair.session.sessionId,
+    matchPairId: pair.matchPairId,
+    partnerName: pair.opponent.nickname,
+    age: pair.opponent.ageBand,
+    face,
+    when: startAt ? formatWhen(startAt) : '시작 시각 조율 중',
+    startsIn: startAt ? formatStartsIn(startAt) : null,
+    awaitingAcceptance: pair.status === 'PENDING_ACCEPTANCE',
+  }
+}
+
+/** "오늘 19:00" · "8월 7일 19:00". 오늘이면 날짜를 생략해 한 줄을 짧게 둔다. */
+function formatWhen(iso: string): string {
+  const date = new Date(iso)
+  const time = date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const today = new Date()
+  const sameDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  if (sameDay) return `오늘 ${time}`
+  return `${date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} ${time}`
+}
+
+/** "2시간 12분 뒤". 이미 지났으면 '곧 시작'. */
+function formatStartsIn(iso: string): string {
+  const diffMs = new Date(iso).getTime() - Date.now()
+  if (Number.isNaN(diffMs) || diffMs <= 0) return '곧 시작'
+  const totalMin = Math.floor(diffMs / 60_000)
+  const days = Math.floor(totalMin / (60 * 24))
+  if (days >= 1) return `${days}일 뒤`
+  const hours = Math.floor(totalMin / 60)
+  const minutes = totalMin % 60
+  if (hours >= 1) return `${hours}시간 ${minutes}분 뒤`
+  return `${Math.max(1, minutes)}분 뒤`
 }
 
 /** 사랑의 온도 미터바. 36.5 기준, 30~42 범위를 게이지로. (전용 컴포넌트 없어 페이지 로컬) */
@@ -82,6 +145,27 @@ function LoveTemperatureMeter({ value, delta }: { value: number; delta: number }
 export function HomePage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+
+  const [upcoming, setUpcoming] = useState<UpcomingView | null>(null)
+  const [upcomingLoading, setUpcomingLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    // 예정 세션이 없는 것은 정상 상태다 — 실패해도 홈을 막지 않고 EmptyState 로 둔다.
+    getCurrentMatch()
+      .then((pair) => {
+        if (alive) setUpcoming(toUpcomingView(pair))
+      })
+      .catch(() => {
+        if (alive) setUpcoming(null)
+      })
+      .finally(() => {
+        if (alive) setUpcomingLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // pb-10: AppShell 이 주는 하단 여백은 모바일 네비 높이(pb-[76px])뿐이고 `md:pb-0` 이라
   // 데스크탑에서는 0 이 된다. 마지막 카드가 뷰포트 바닥에 붙지 않도록 홈에서 직접 준다.
@@ -131,36 +215,46 @@ export function HomePage() {
           </div>
         </Card>
 
-        {UPCOMING ? (
+        {upcomingLoading ? (
+          <Card>
+            <Stack gap={12}>
+              <Skeleton width={140} height={24} />
+              <Skeleton height={56} />
+              <Skeleton height={44} />
+            </Stack>
+          </Card>
+        ) : upcoming ? (
           <Card>
             {/* `.bt-card` 에는 gap 이 없어 자식들이 그대로 붙는다. 자식마다 mt-* 를 다는 대신
                 Stack 으로 세로 리듬을 한 번에 준다 — 옆 카드와도 간격이 맞는다. */}
             <Stack gap={12}>
               <div className="flex items-center justify-between gap-2">
                 <CardHeader title="예정된 세션" />
-                <Badge tone="warning" className="shrink-0">
-                  {UPCOMING.startsIn}
-                </Badge>
+                {upcoming.startsIn && (
+                  <Badge tone="warning" className="shrink-0">
+                    {upcoming.startsIn}
+                  </Badge>
+                )}
               </div>
 
               {/* items-start: 이름·태그가 줄바꿈돼도 아바타와 '상세' 가 위에 정렬돼 있어야
                   행 높이가 튀지 않는다. 버튼은 shrink-0 으로 텍스트에 밀리지 않게 고정한다. */}
               <div className="flex items-start gap-3">
-                <Avatar size="md" name={UPCOMING.partnerName} className="shrink-0" />
+                <Avatar size="md" name={upcoming.partnerName} className="shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <b className="text-[15px]">{UPCOMING.partnerName}</b>
-                    <TagChip>{UPCOMING.age}</TagChip>
+                    <b className="text-[15px]">{upcoming.partnerName}</b>
+                    <TagChip>{upcoming.age}</TagChip>
                   </div>
                   <p className="bt-caption mt-1">
-                    {UPCOMING.face} · {UPCOMING.when}
+                    {[upcoming.face, upcoming.when].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 <Button
                   variant="secondary"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => navigate('/session/demo')}
+                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}`)}
                 >
                   상세
                 </Button>
@@ -175,17 +269,25 @@ export function HomePage() {
                   ⚠️ `block` 프로퍼티(`width:100%`)를 쓰지 않는다 — 가로 배치에서 두 번째 버튼이
                      100% 를 요구해 행을 밀어낸다. 폭은 유틸리티로 브레이크포인트마다 정한다. */}
               <div className="flex flex-col gap-2 sm:flex-row">
+                {/* 아직 양측 수락 전이면 대기방이 없다 — 매칭 카드로 보내 수락부터 하게 한다.
+                    sessionId 가 없을 때도 마찬가지다(서버가 세션을 아직 만들지 않았다). */}
                 <Button
                   variant="primary"
                   className="w-full sm:w-auto sm:flex-1"
-                  onClick={() => navigate('/session/demo')}
+                  onClick={() =>
+                    navigate(
+                      upcoming.awaitingAcceptance || upcoming.sessionId == null
+                        ? `/matching/pair/${upcoming.matchPairId}`
+                        : `/session/${upcoming.sessionId}/room`,
+                    )
+                  }
                 >
-                  대기방 입장
+                  {upcoming.awaitingAcceptance ? '매칭 확인' : '대기방 입장'}
                 </Button>
                 <Button
                   variant="secondary"
                   className="w-full sm:w-auto"
-                  onClick={() => console.log('TODO(HOME): 일정 취소')}
+                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}`)}
                 >
                   일정 취소
                 </Button>
