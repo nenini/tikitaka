@@ -139,11 +139,18 @@ export interface ComposerProps {
 
 /**
  * 메시지 입력창. Enter 전송 / Shift+Enter 줄바꿈.
+ *
  * ⚠️ 한글 IME 조합 중의 Enter 는 전송이 아니라 **조합 확정**이다 — composing 중에는 보내지 않는다.
+ *
+ * **한 번에 한 메시지만 보낼 수 있다.** 답변을 받는 동안(`busy`)에는 입력창까지 잠근다 —
+ * 예전에는 전송 버튼만 잠기고 입력은 열려 있어서, 타이핑 후 Enter 를 눌러도 아무 일이
+ * 일어나지 않았다(`handleSend` 가 조용히 return). 눌리는데 반응이 없는 것이 가장 나쁘다.
+ * 답변이 끝나면 포커스를 되돌려 대화를 이어서 칠 수 있게 한다.
  */
 export function Composer({ value, onChange, onSend, busy, disabled }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const composing = useRef(false)
+  const wasBusy = useRef(false)
 
   // 입력량에 따라 높이를 늘린다(최대 5줄). 값이 비면 한 줄로 되돌린다.
   useEffect(() => {
@@ -153,10 +160,20 @@ export function Composer({ value, onChange, onSend, busy, disabled }: ComposerPr
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`
   }, [value])
 
+  // 답변이 끝나는 순간에만 포커스를 되돌린다. 매 렌더 focus() 를 부르면
+  // 모바일에서 키보드가 계속 올라오고, 다른 곳을 누른 사용자를 붙잡게 된다.
+  useEffect(() => {
+    if (wasBusy.current && !busy && !disabled) ref.current?.focus()
+    wasBusy.current = busy
+  }, [busy, disabled])
+
+  const locked = disabled || busy
+
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== 'Enter' || e.shiftKey) return
     if (composing.current || e.nativeEvent.isComposing) return
     e.preventDefault()
+    if (locked) return
     onSend()
   }
 
@@ -171,9 +188,13 @@ export function Composer({ value, onChange, onSend, busy, disabled }: ComposerPr
         rows={1}
         className="bt-input flex-1 resize-none"
         style={{ borderRadius: 'var(--bt-radius-xl)' }}
-        placeholder={disabled ? '종료된 대화예요' : '메시지를 입력하세요'}
+        placeholder={
+          disabled ? '종료된 대화예요' : busy ? '답변을 받는 중이에요' : '메시지를 입력하세요'
+        }
         value={value}
-        disabled={disabled}
+        disabled={locked}
+        // 잠긴 이유를 스크린리더에도 전달한다 — placeholder 만으로는 상태 변화가 읽히지 않는다
+        aria-busy={busy || undefined}
         onChange={(e) => onChange(e.currentTarget.value)}
         onCompositionStart={() => (composing.current = true)}
         onCompositionEnd={() => (composing.current = false)}
@@ -184,7 +205,7 @@ export function Composer({ value, onChange, onSend, busy, disabled }: ComposerPr
         icon="send"
         state="on"
         aria-label="메시지 보내기"
-        disabled={disabled || busy || value.trim().length === 0}
+        disabled={locked || value.trim().length === 0}
         onClick={onSend}
       />
     </div>
