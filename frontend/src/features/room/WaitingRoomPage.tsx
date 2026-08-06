@@ -18,6 +18,8 @@ import { useStomp, useStompSubscription } from '@/shared/realtime/useStomp'
 import { joinSession } from '@/features/session/api'
 import { snapshotAnalysisSettings } from '@/features/session/vision'
 import { roomParticipantsTopic } from '@/features/session/types'
+import { useSessionMedia } from '@/features/session/useSessionMedia'
+import { VideoTrackView } from '@/features/session/livekit/TrackView'
 import { useDeviceCheck } from './useDeviceCheck'
 import {
   cancelReady,
@@ -70,6 +72,13 @@ export function WaitingRoomPage() {
   const [togglingReady, setTogglingReady] = useState(false)
   const [joining, setJoining] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  /* ── LiveKit 프리워밍 ──
+     세션 화면에 들어가서 처음 연결하면 ICE·DTLS 협상과 화질 ramp-up 이 그대로 보인다(약 5초).
+     양측 준비가 끝나 서버가 join 을 받아 주는 시점(READY)부터 미리 붙여, 그 시간이
+     사용자가 보기 전에 지나가게 한다. 연결은 공통 레이아웃이 들고 있어 세션이 그대로 물려받는다. */
+  const { session: media, connect: connectMedia, idle: mediaIdle } = useSessionMedia()
+  const prewarmedRef = useRef(false)
 
   useEffect(() => {
     if (!validRoom) return
@@ -187,6 +196,21 @@ export function WaitingRoomPage() {
   const [myReady, setMyReady] = useState(false)
   const otherReady = allReady || (myReady ? readyCount >= 2 : readyCount >= 1)
 
+  /**
+   * 양측 준비가 끝나면 미리 붙는다.
+   *
+   * ⚠️ 점검 스트림을 **먼저 놓는다.** 같은 카메라를 두 번 잡으면 일부 환경(특히 Windows)에서
+   *    실패하거나 장치가 잠긴다. 미리보기는 아래에서 LiveKit 로컬 트랙으로 갈아끼운다.
+   * ⚠️ 실패해도 화면을 막지 않는다 — 프리워밍은 최적화일 뿐이고, 입장 자체는
+   *    `handleEnter` 가 지금까지처럼 처리한다.
+   */
+  useEffect(() => {
+    if (!validRoom || !allReady || prewarmedRef.current) return
+    prewarmedRef.current = true
+    device.releaseStream()
+    connectMedia()
+  }, [validRoom, allReady, device, connectMedia])
+
   async function toggleReady() {
     if (!validRoom || togglingReady) return
     setTogglingReady(true)
@@ -273,7 +297,18 @@ export function WaitingRoomPage() {
             </Cluster>
           </Cluster>
 
-          <CameraPreview status={device.camera} videoRef={device.videoRef} />
+          {/* 프리워밍으로 점검 스트림을 놓은 뒤에는 LiveKit 로컬 트랙으로 미리보기를 잇는다.
+              화면이 끊기지 않고, 여기 보이는 것이 실제로 상대에게 가는 영상이 된다. */}
+          {media.localVideo && !mediaIdle ? (
+            <div
+              className="relative aspect-[4/3] w-full overflow-hidden rounded-xl"
+              style={{ background: 'var(--bt-mist-900)' }}
+            >
+              <VideoTrackView track={media.localVideo} mirror />
+            </div>
+          ) : (
+            <CameraPreview status={device.camera} videoRef={device.videoRef} />
+          )}
         </section>
 
         {/* ── 우: 점검 패널 — 데스크탑은 헤딩/CTA 고정 + 카드 영역만 내부 스크롤 ── */}

@@ -74,7 +74,23 @@ function isPermissionError(err: unknown): boolean {
     return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError')
 }
 
-export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveKitSession {
+export interface UseLiveKitRoomOptions {
+    /**
+     * false 면 **연결을 시도하지 않는다**(장치 probe 도 하지 않는다).
+     *
+     * 대기방에서 미리 붙여 두는(프리워밍) 흐름 때문에 필요하다 — 훅은 대기방·세션이
+     * 공유하는 레이아웃에서 한 번만 마운트되지만, 실제 연결은 서버가 받아 주는
+     * `READY` 시점 이후여야 한다(`SESSION_PARTICIPANTS_NOT_READY`).
+     * 기본값 true — 기존 호출부는 그대로 동작한다.
+     */
+    enabled?: boolean
+}
+
+export function useLiveKitRoom(
+    roomName: string,
+    getToken: TokenProvider,
+    { enabled = true }: UseLiveKitRoomOptions = {},
+): LiveKitSession {
     const [state, setState] = useState<BtConnectionState>('connecting')
     const [localVideo, setLocalVideo] = useState<LocalVideoTrack | null>(null)
     const [remoteVideo, setRemoteVideo] = useState<RemoteVideoTrack | null>(null)
@@ -106,6 +122,8 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
     }, [])
 
     useEffect(() => {
+        // 아직 붙을 때가 아니다. Room 을 만들지도, 장치를 잡지도 않는다.
+        if (!enabled) return
         let cancelled = false
         // Room 은 disconnect 후 재사용하지 않는다 — effect 마다 새로 만든다(StrictMode 이중 실행 대응).
         const room = new Room({
@@ -275,7 +293,7 @@ export function useLiveKitRoom(roomName: string, getToken: TokenProvider): LiveK
             // 로컬 트랙 정지(카메라 표시등 OFF)까지 여기서 완료
             void room.disconnect()
         }
-    }, [roomName, getToken, retryNonce])
+    }, [roomName, getToken, retryNonce, enabled])
 
     const toggleMute = useCallback(async () => {
         const room = roomRef.current
