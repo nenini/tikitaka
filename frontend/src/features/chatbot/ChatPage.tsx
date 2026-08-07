@@ -86,6 +86,24 @@ export function ChatPage() {
 
         const detail = await getChatSessionDetail(chatSessionId)
         if (!alive) return
+
+        /*
+         * 끝난 대화의 주소로 **들어오는** 것을 막는다(W-73 과 같은 규칙).
+         *
+         * ⚠️ 여기서만 판정한다 — 최초 로드 시점의 상태만 본다. 화면에 머무는 동안
+         *    상태가 바뀌는 경우(사용자가 방금 `종료` 를 누른 흐름)까지 튕기면
+         *    "대화를 마쳤어요" 안내를 볼 새도 없이 화면이 갈아엎힌다.
+         *
+         * 중단된 대화(CANCELLED)는 종합 피드백이 없으므로 홈으로 보낸다.
+         */
+        if (detail.session.status !== 'ACTIVE') {
+          navigate(
+            detail.session.status === 'COMPLETED' ? `/chatbot/${chatSessionId}/report` : '/',
+            { replace: true },
+          )
+          return
+        }
+
         setSession(detail.session)
         setMessages(detail.messages)
         setLoading(false)
@@ -289,7 +307,10 @@ export function ChatPage() {
     )
   }
 
-  const ended = session?.status === 'COMPLETED'
+  // ACTIVE 가 아니면 전부 '끝난 대화'다. COMPLETED 만 보면 중단된 대화(CANCELLED)에
+  // 입력창이 그대로 그려져, 쳐 보고 나서야 못 보낸다는 걸 알게 된다.
+  const ended = session != null && session.status !== 'ACTIVE'
+  const completed = session?.status === 'COMPLETED'
   const personaName = session?.persona.name ?? '챗봇'
 
   return (
@@ -403,15 +424,20 @@ export function ChatPage() {
 
           {ended ? (
             <Callout tone="info">
-              대화를 마쳤어요. 주고받은 대화를 정리해 종합 피드백을 만들고 있어요.
+              {completed
+                ? '대화를 마쳤어요. 주고받은 대화를 정리해 종합 피드백을 만들고 있어요.'
+                : '중단된 대화예요. 이어서 대화하거나 피드백을 받을 수는 없어요.'}
               <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => navigate(`/chatbot/${session?.chatSessionId}/report`)}
-                >
-                  종합 피드백 보기
-                </Button>
+                {/* 중단된 대화에는 종합 피드백이 없다 — 버튼을 그리면 빈 화면으로 보낸다 */}
+                {completed && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => navigate(`/chatbot/${session?.chatSessionId}/report`)}
+                  >
+                    종합 피드백 보기
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                   홈으로
                 </Button>
