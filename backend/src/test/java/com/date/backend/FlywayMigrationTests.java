@@ -275,8 +275,12 @@ class FlywayMigrationTests {
 		Integer growthMetricSnapshotTableCount = tableCount("GROWTH_METRIC_SNAPSHOTS");
 		Integer userTemperatureTableCount = tableCount("USER_TEMPERATURES");
 		Integer temperatureHistoryTableCount = tableCount("TEMPERATURE_CHANGE_HISTORIES");
+		Integer firstChatBadgeCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM BADGE_CATALOG WHERE CODE = 'FIRST_CHAT'",
+				Integer.class
+		);
 
-		assertThat(migrationCount).isEqualTo(46);
+		assertThat(migrationCount).isEqualTo(47);
 		assertThat(moderationMigrationCount).isEqualTo(1);
 		assertThat(moderationEvidenceTableCount).isEqualTo(1);
 		assertThat(reportSessionSnapshotColumnCount).isEqualTo(1);
@@ -285,6 +289,7 @@ class FlywayMigrationTests {
 		assertThat(growthMetricSnapshotTableCount).isEqualTo(1);
 		assertThat(userTemperatureTableCount).isEqualTo(1);
 		assertThat(temperatureHistoryTableCount).isEqualTo(1);
+		assertThat(firstChatBadgeCount).isEqualTo(1);
 		assertThat(userTableCount).isEqualTo(1);
 		assertThat(passwordResetTableCount).isEqualTo(1);
 		assertThat(profileTableCount).isEqualTo(1);
