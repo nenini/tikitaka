@@ -30,6 +30,9 @@ import { WaitingRoomPage } from '@/features/room/WaitingRoomPage'
 import { TrackSelectPage } from '@/features/matching/TrackSelectPage'
 import { MatchQueuePage } from '@/features/matching/MatchQueuePage'
 import { MatchCardPage } from '@/features/matching/MatchCardPage'
+// AI 화상 연습 W-21 — 서버 세션이 없어 **혼자 연습 모드**로 동작한다(features/aivideo/types.ts)
+import { AiVideoSetupPage } from '@/features/aivideo/AiVideoSetupPage'
+import { AiVideoPracticePage } from '@/features/aivideo/AiVideoPracticePage'
 // AI 챗봇 F5
 import { ChatPage } from '@/features/chatbot/ChatPage'
 import { ChatReportPage } from '@/features/chatbot/ChatReportPage'
@@ -130,7 +133,12 @@ export const router = createBrowserRouter([
       { path: '/chatbot', element: <ChatPage /> },
       { path: '/chatbot/:chatSessionId', element: <ChatPage /> },
       { path: '/chatbot/:chatSessionId/report', element: <ChatReportPage /> },
-      // TODO(FE-B 다음 배치): /ai-video/setup(W-21) · W-13 신고 전용 화면 · W-18 알림 ...
+      // AI 화상 연습 W-21: 주제·카메라 점검 → 연습.
+      // ⚠️ 서버 세션이 없다(백엔드에 AI_VIDEO 생성 엔드포인트 없음) → 영상·분석 모두
+      //    브라우저 안에서만 처리하고 리포트를 만들지 않는다.
+      { path: '/ai-video/setup', element: <AiVideoSetupPage /> },
+      { path: '/ai-video/practice', element: <AiVideoPracticePage /> },
+      // TODO(FE-B 다음 배치): W-13 신고 전용 화면 · W-18 알림 ...
 
       //-----------
       // 개발용, 추후 삭제

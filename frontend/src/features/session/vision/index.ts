@@ -1,4 +1,6 @@
 export { useVisionAnalysis } from './useVisionAnalysis'
+export { useSoloVisionAnalysis } from './useSoloVisionAnalysis'
+export type { UseSoloVisionAnalysisOptions } from './useSoloVisionAnalysis'
 export type {
   UseVisionAnalysisOptions,
   VisionAnalysisState,

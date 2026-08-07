@@ -142,17 +142,19 @@ export function TrackSelectPage() {
           }
         />
 
-        {/* AI 화상 */}
+        {/* AI 화상 — **혼자 연습 모드**다. 서버 세션도 AI 음성 상대도 아직 없다
+            (features/aivideo/types.ts 의 경위 참고). 카드 문구를 실제 동작에 맞춘다 —
+            'TTS 상대'·'10~15분'·'대화 코칭'은 붙지 않은 기능을 약속하는 말이었다. */}
         <TrackCard
           icon="bot"
           title="AI 화상 연습"
-          subtitle="음성(TTS) 상대 · 내 얼굴만 표시"
+          subtitle="주제 질문 5개 · 내 얼굴만 표시"
           facts={[
-            { icon: 'clock', label: '10~15분 · 즉시 시작' },
-            { icon: 'sparkle', label: '대화 코칭 + 표정 코칭' },
-            { icon: 'close', label: '상호 평가·연락처 없음', muted: true },
+            { icon: 'clock', label: '5분 · 즉시 시작' },
+            { icon: 'sparkle', label: '표정 코칭(브라우저 안에서 처리)' },
+            { icon: 'close', label: '기록·리포트 없음', muted: true },
           ]}
-          note="표정·음성 분석은 세션 시작 전에 끌 수 있어요."
+          note="영상은 서버로 보내지 않아요."
           cta={
             <Button variant="secondary" block onClick={() => navigate('/ai-video/setup')}>
               AI 화상 시작
