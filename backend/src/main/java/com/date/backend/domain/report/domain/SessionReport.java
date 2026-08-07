@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +32,17 @@ public class SessionReport {
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "topicSummaryJson", columnDefinition = "json") private String topicSummaryJson;
 	@Column(name = "summaryText", columnDefinition = "TEXT") private String summaryText;
+
+	// 6축 점수. AI 는 session_participant_analyses.axes_json 에 보내고, 성장 지표는
+	// 여기를 읽는다(CompletedReportMetricRepository). 두 곳이 연결돼 있지 않아 계속
+	// NULL 이었다 — 리포트 결과 수신 시점에 분석에서 옮겨 담는다.
+	// balance 축이 aiMannerScore 다(ERD 명명). 나머지 다섯은 이름이 대응한다.
+	@Column(name = "aiFlowScore") private BigDecimal aiFlowScore;
+	@Column(name = "aiQuestionScore") private BigDecimal aiQuestionScore;
+	@Column(name = "aiListeningScore") private BigDecimal aiListeningScore;
+	@Column(name = "aiReactionScore") private BigDecimal aiReactionScore;
+	@Column(name = "aiMannerScore") private BigDecimal aiMannerScore;
+	@Column(name = "aiNonverbalScore") private BigDecimal aiNonverbalScore;
 	@Column(name = "failureCode", length = 80) private String failureCode;
 	@Column(name = "failureReason", length = 1000) private String failureReason;
 	@Column(name = "resultPayloadHash", length = 64) private String resultPayloadHash;
@@ -140,6 +152,29 @@ public class SessionReport {
 		this.updatedAt = failedAt;
 		return true;
 	}
+
+	/**
+	 * 6축 점수를 분석 결과에서 옮겨 담는다. 측정 부족인 축은 null 로 남긴다.
+	 *
+	 * <p>성장 지표(GrowthMetricSnapshot)가 이 값을 읽는다. null 은 "측정 안 됨"으로
+	 * 정상 처리되므로 비워 두는 게 0 을 넣는 것보다 맞다.
+	 */
+	public void applyAxisScores(BigDecimal flow, BigDecimal question, BigDecimal listening,
+			BigDecimal reaction, BigDecimal balance, BigDecimal nonverbal) {
+		this.aiFlowScore = flow;
+		this.aiQuestionScore = question;
+		this.aiListeningScore = listening;
+		this.aiReactionScore = reaction;
+		this.aiMannerScore = balance;
+		this.aiNonverbalScore = nonverbal;
+	}
+
+	public BigDecimal getAiFlowScore() { return aiFlowScore; }
+	public BigDecimal getAiQuestionScore() { return aiQuestionScore; }
+	public BigDecimal getAiListeningScore() { return aiListeningScore; }
+	public BigDecimal getAiReactionScore() { return aiReactionScore; }
+	public BigDecimal getAiMannerScore() { return aiMannerScore; }
+	public BigDecimal getAiNonverbalScore() { return aiNonverbalScore; }
 
 	private String requireText(String value) {
 		if (value == null || value.isBlank()) throw new IllegalArgumentException("필수 문자열이 비어 있습니다.");

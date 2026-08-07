@@ -3,17 +3,21 @@ package com.date.backend.domain.report.application;
 import com.date.backend.domain.report.domain.*;
 import com.date.backend.domain.report.dto.request.AiReportResultRequest;
 import com.date.backend.domain.report.dto.response.AiReportResultAcceptedResponse;
+import com.date.backend.domain.report.dto.response.ReportAxisResponse;
+import com.date.backend.domain.report.repository.SessionParticipantAnalysisRepository;
 import com.date.backend.domain.report.repository.SessionReportRepository;
 import com.date.backend.domain.room.repository.RoomParticipantRepository;
 import com.date.backend.domain.room.repository.WaitingRoomRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.ReportErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.time.ZoneId;
@@ -25,14 +29,20 @@ public class AiReportResultService {
 	private final WaitingRoomRepository sessionRepository;
 	private final RoomParticipantRepository participantRepository;
 	private final SessionReportRepository reportRepository;
+	private final SessionParticipantAnalysisRepository analysisRepository;
 	private final ObjectMapper objectMapper;
+	private static final TypeReference<Map<String, ReportAxisResponse>> AXES_TYPE =
+			new TypeReference<>() {};
 
 	public AiReportResultService(WaitingRoomRepository sessionRepository,
 			RoomParticipantRepository participantRepository,
-			SessionReportRepository reportRepository, ObjectMapper objectMapper) {
+			SessionReportRepository reportRepository,
+			SessionParticipantAnalysisRepository analysisRepository,
+			ObjectMapper objectMapper) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
 		this.reportRepository = reportRepository;
+		this.analysisRepository = analysisRepository;
 		this.objectMapper = objectMapper;
 	}
 
@@ -72,10 +82,51 @@ public class AiReportResultService {
 				throw new BusinessException(ReportErrorCode.REPORT_RESULT_CONFLICT);
 			}
 			if (changed) accepted++; else duplicates++;
+			copyAxisScores(request.sessionId(), result.userId(), request.analysisVersion(), report);
 		}
 		log.info("AI report result received. sessionId={}, reportVersion={}, accepted={}, duplicates={}",
 				request.sessionId(), request.reportVersion(), accepted, duplicates);
 		return new AiReportResultAcceptedResponse(request.sessionId(), request.reportVersion(), accepted, duplicates);
+	}
+
+	/**
+	 * 분석에 저장된 6축 점수를 리포트 행으로 옮긴다.
+	 *
+	 * <p>AI 는 축 점수를 session_participant_analyses.axes_json 으로 보내고, 성장 지표는
+	 * session_reports 의 aiXxxScore 칼럼을 읽는다(CompletedReportMetricRepository).
+	 * 두 경로가 연결돼 있지 않아 그 칼럼이 계속 NULL 이었다.
+	 *
+	 * <p>여기서 옮기는 이유는 리포트 행의 존재가 보장되는 유일한 지점이기 때문이다 —
+	 * 분석 수신 시점에는 행이 아직 없을 수 있다(REPORT_NOT_PREPARED).
+	 *
+	 * <p>실패해도 리포트 수신을 막지 않는다. 점수는 부가 정보이고, 여기서 예외를 던지면
+	 * 이미 저장된 리포트 본문까지 롤백된다.
+	 */
+	private void copyAxisScores(Long sessionId, Long userId, String analysisVersion,
+			SessionReport report) {
+		analysisRepository.findBySessionUserAndVersion(sessionId, userId, analysisVersion)
+				.ifPresent(analysis -> {
+					if (analysis.getAxesJson() == null) return;
+					try {
+						Map<String, ReportAxisResponse> axes =
+								objectMapper.readValue(analysis.getAxesJson(), AXES_TYPE);
+						report.applyAxisScores(
+								score(axes, "flow"), score(axes, "question"),
+								score(axes, "listening"), score(axes, "reaction"),
+								// balance 축이 aiMannerScore 다(ERD 명명).
+								score(axes, "balance"), score(axes, "nonverbal")
+						);
+					} catch (JsonProcessingException exception) {
+						log.warn("Axis score copy skipped. sessionId={}, userId={}, reason={}",
+								sessionId, userId, exception.getMessage());
+					}
+				});
+	}
+
+	/** 측정 부족인 축은 null 이다 — 성장 지표가 "측정 안 됨"으로 정상 처리한다. */
+	private BigDecimal score(Map<String, ReportAxisResponse> axes, String code) {
+		ReportAxisResponse axis = axes.get(code);
+		return axis == null ? null : axis.score();
 	}
 
 	private void validateResult(AiReportResultRequest.ParticipantReportResult result) {

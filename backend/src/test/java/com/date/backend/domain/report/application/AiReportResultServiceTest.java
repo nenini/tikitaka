@@ -2,6 +2,7 @@ package com.date.backend.domain.report.application;
 
 import com.date.backend.domain.report.domain.*;
 import com.date.backend.domain.report.dto.request.AiReportResultRequest;
+import com.date.backend.domain.report.repository.SessionParticipantAnalysisRepository;
 import com.date.backend.domain.report.repository.SessionReportRepository;
 import com.date.backend.domain.room.domain.WaitingRoom;
 import com.date.backend.domain.room.repository.*;
@@ -21,8 +22,11 @@ class AiReportResultServiceTest {
 	private final WaitingRoomRepository sessions = mock(WaitingRoomRepository.class);
 	private final RoomParticipantRepository participants = mock(RoomParticipantRepository.class);
 	private final SessionReportRepository reports = mock(SessionReportRepository.class);
+	private final SessionParticipantAnalysisRepository analyses =
+			mock(SessionParticipantAnalysisRepository.class);
 	private final AiReportResultService service = new AiReportResultService(
-			sessions, participants, reports, new ObjectMapper().findAndRegisterModules());
+			sessions, participants, reports, analyses,
+			new ObjectMapper().findAndRegisterModules());
 
 	@Test
 	void storesCompletedResult() {
