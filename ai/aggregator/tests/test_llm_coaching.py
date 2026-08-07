@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from aggregator.llm_coaching import (
+    WARMUP_TIMEOUT_SECONDS,
     ContextualCoachingError,
     ExaoneCoachingClient,
 )
@@ -247,6 +248,40 @@ def test_warmup_uses_native_endpoint_with_keep_alive() -> None:
     assert isinstance(body, dict)
     assert body["keep_alive"] == "1h"
     assert body["model"] == "exaone3.5:7.8b"
+
+
+def test_warmup_does_not_share_the_coaching_timeout() -> None:
+    """워밍업이 코칭용 3초를 쓰면 스스로 막으려던 콜드스타트(4.7초)에 걸린다.
+
+    걸리면 keep_alive 가 서버에 도달하지 못해 모델이 5분 뒤 내려가고, 이후 코칭이
+    전부 콜드스타트를 만나 3초를 넘겨 폴백으로 떨어진다(세션 19: 3회 시도 3회 폴백).
+    """
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["timeout"] = request.extensions.get("timeout")
+        return httpx.Response(200, json={"message": {"content": "."}})
+
+    settings = IntegrationSettings(
+        internal_token="t",
+        backend_base_url="http://be",
+        coaching_llm_enabled=True,
+        coaching_llm_base_url="http://ollama:11500/v1",
+        coaching_llm_model="m",
+    )
+    client = ExaoneCoachingClient(
+        settings,
+        http_client=httpx.AsyncClient(
+            timeout=settings.coaching_llm_timeout_seconds,
+            transport=httpx.MockTransport(handler),
+        ),
+    )
+    asyncio.run(client.warmup())
+
+    timeout = seen["timeout"]
+    assert isinstance(timeout, dict)
+    assert timeout["read"] == WARMUP_TIMEOUT_SECONDS
+    assert WARMUP_TIMEOUT_SECONDS > settings.coaching_llm_timeout_seconds
 
 
 def test_warmup_survives_a_non_ollama_backend() -> None:

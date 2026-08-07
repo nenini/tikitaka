@@ -15,6 +15,14 @@ from aggregator.transcripts import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 
+WARMUP_TIMEOUT_SECONDS = 60.0
+"""워밍업 전용 타임아웃. 코칭용(3초)과 분리한다.
+
+콜드스타트가 4.7초라 코칭 타임아웃으로 워밍업하면 반드시 실패한다 — 막으려던 것에
+스스로 걸리는 구조였다. 워밍업은 백그라운드라 오래 걸려도 사용자를 막지 않으므로
+모델 로딩이 느린 경우까지 넉넉히 잡는다.
+"""
+
 
 class ContextualCoachingError(RuntimeError):
     """The local model failed or returned an unsafe/unusable sentence."""
@@ -108,6 +116,12 @@ class ExaoneCoachingClient:
         `/v1/chat/completions`는 이 필드를 조용히 무시한다(실측: expires_at 이
         그대로 5분 뒤였다). 그래서 워밍업만 네이티브로 보낸다.
 
+        **타임아웃을 따로 준다.** 공유 클라이언트는 코칭용 3초인데, 워밍업이 막으려는
+        콜드스타트가 바로 그보다 오래 걸린다(4.7초) — 3초로 워밍업하면 ReadTimeout 이
+        나고 keep_alive 가 전달되지 못해 모델이 5분 뒤 내려간다. 그러면 이후 코칭이
+        전부 콜드스타트를 만나 3초에 걸린다(세션 19: 3회 시도 3회 폴백).
+        워밍업은 백그라운드 태스크라 느려도 사용자를 막지 않는다.
+
         best-effort다. 백엔드가 Ollama가 아니면(exaone_server 등) 404가 나는데,
         그때는 그냥 넘어간다 — 첫 요청에서 로딩될 뿐이다.
         """
@@ -124,9 +138,17 @@ class ExaoneCoachingClient:
                     "keep_alive": self._settings.coaching_llm_keep_alive,
                     "options": {"num_predict": 1},
                 },
+                timeout=WARMUP_TIMEOUT_SECONDS,
             )
         except httpx.HTTPError as error:
-            logger.info("coaching llm warmup skipped: %r", error)
+            # info 가 아니라 warning 이다. 실패하면 그 세션 코칭이 전부 폴백으로
+            # 떨어지므로 조용히 넘어가면 안 된다.
+            logger.warning(
+                "coaching llm warmup failed (%.0fs timeout): %r — "
+                "모델이 유휴 시 내려가 코칭이 콜드스타트를 만난다",
+                WARMUP_TIMEOUT_SECONDS,
+                error,
+            )
 
     async def generate(
         self,
