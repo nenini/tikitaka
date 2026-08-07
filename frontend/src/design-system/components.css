@@ -418,8 +418,10 @@
 .bt-card {
   padding: var(--bt-space-6);
   border-radius: var(--bt-radius-xl);
-  background: var(--bt-color-surface);
-  border: 1px solid var(--bt-color-border);
+  background: var(--bt-color-surface-glass);
+  border: 1px solid var(--bt-color-border-glass);
+  -webkit-backdrop-filter: var(--bt-glass-blur);
+  backdrop-filter: var(--bt-glass-blur);
   box-shadow: var(--bt-shadow-card);
 }
 
@@ -435,6 +437,9 @@
   padding: var(--bt-space-4);
   border-radius: var(--bt-radius-lg);
   background: var(--bt-color-bg-elevated);
+  background: color-mix(in srgb, var(--bt-color-surface) 86%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: var(--bt-shadow-xs);
 }
 
@@ -474,7 +479,16 @@
 
 .bt-card--interactive:hover {
   transform: translateY(-2px);
-  box-shadow: var(--bt-shadow-lg);
+  border-color: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 24px 56px rgba(75, 45, 34, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .bt-card {
+    background: var(--bt-color-surface);
+  }
 }
 
 /* CardButton/CardLink — 실제 button·a 로 렌더되므로 기본 스타일을 카드로 되돌린다 */

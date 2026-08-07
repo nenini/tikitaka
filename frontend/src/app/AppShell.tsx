@@ -42,9 +42,9 @@ export function AppShell() {
   // 얼굴상 진단을 마쳤으면 그 동물 이미지가 프로필 사진이 된다. 없으면 닉네임 이니셜.
   const faceImage = faceTypeImage(useMyFaceAnalysis()?.primaryType)
   return (
-    <div className="flex min-h-dvh flex-col bg-bg">
+    <div className="tk-app-atmosphere flex min-h-dvh flex-col">
       {/* ── 데스크탑 상단 네비 (모바일 숨김) ───────────────────────── */}
-      <header className="sticky top-0 z-30 hidden border-b border-[var(--bt-color-border)] bg-surface md:block">
+      <header className="tk-glass-nav sticky top-0 z-30 hidden border-b border-[var(--bt-color-border)] md:block">
         <div className="mx-auto flex h-14 max-w-[1080px] items-center justify-between px-6">
           <div className="flex items-center gap-8">
             {/* TODO(브랜드): 로고 마크 확정 시 워드마크 옆에 추가 */}
@@ -119,14 +119,13 @@ export function AppShell() {
 
       {/* ── 본문 (각 페이지가 자체 max-width/main 을 가진다) ────────── */}
       {/* pb: 모바일 하단 네비 높이만큼 여백 확보 */}
-      <div className="flex-1 pb-[76px] md:pb-0">
+      <div className="tk-app-content flex-1">
         <Outlet />
       </div>
 
       {/* ── 모바일 하단 네비 (데스크탑 숨김) ───────────────────────── */}
       <div
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--bt-color-border)] bg-surface md:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="tk-glass-nav tk-mobile-nav fixed inset-x-0 bottom-0 z-30 md:hidden"
       >
         <BottomNav items={MOBILE_NAV.map(({ to, label, icon, end }) => ({ to, label, icon, end }))} />
       </div>

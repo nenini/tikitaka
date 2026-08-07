@@ -16,6 +16,28 @@
    1. PRIMITIVE
    ========================================================================== */
 :root {
+  /* ---- Klarna Pink + white reference -------------------------------- */
+  --bt-klarna-50:  #FFF7F9;
+  --bt-klarna-100: #FFF0F4;
+  --bt-klarna-200: #FFDDE6;
+  --bt-klarna-300: #FFC9D6;
+  --bt-klarna-400: #FFB3C7;
+  --bt-klarna-500: #FF99B5;
+  --bt-klarna-600: #E86C95;
+  --bt-klarna-700: #B8436D;
+  --bt-klarna-800: #923251;
+  --bt-klarna-900: #6A253D;
+  --bt-klarna-ink: #17120F;
+
+  /* ---- Chocolate · 딥 로즈를 대체하는 따뜻한 중성 강조색 ----------- */
+  --bt-chocolate-100: #F6EDE8;
+  --bt-chocolate-300: #C9A696;
+  --bt-chocolate-500: #8A5A44;
+  --bt-chocolate-600: #6F4635;
+  --bt-chocolate-700: #5A382C;
+  --bt-chocolate-800: #452A21;
+  --bt-chocolate-900: #2F1D17;
+
   /* ---- Bloom Blue (brand) · hue 220.5 / sat 82% ------------------------
      500 = 컨셉아트 버튼·FAB·링에서 샘플링한 실제 값(#5B8BEF).
      흰 글자 대비 3.29:1 → 텍스트를 얹는 면에는 600 이상을 쓴다. */
@@ -129,13 +151,13 @@
   --bt-shadow-md: 0 8px 24px rgba(28, 31, 39, 0.06);
   --bt-shadow-lg: 0 16px 40px rgba(28, 31, 39, 0.08);
   --bt-shadow-xl: 0 24px 64px rgba(28, 31, 39, 0.10);
-  --bt-shadow-action: 0 8px 20px rgba(51, 110, 235, 0.28);
+  --bt-shadow-action: 0 8px 20px rgba(255, 153, 181, 0.32);
   --bt-shadow-inset:  inset 0 1px 0 rgba(255, 255, 255, 0.7);
 
   /* ---- Glass ---------------------------------------------------------- */
-  --bt-glass-fill:   rgba(255, 255, 255, 0.72);
-  --bt-glass-stroke: rgba(255, 255, 255, 0.9);
-  --bt-glass-blur:   blur(20px) saturate(1.4);
+  --bt-glass-fill:   rgba(255, 255, 255, 0.62);
+  --bt-glass-stroke: rgba(255, 255, 255, 0.82);
+  --bt-glass-blur:   blur(24px) saturate(1.35);
 
   /* ---- Motion --------------------------------------------------------- */
   --bt-duration-instant: 100ms;
@@ -168,31 +190,31 @@
    ========================================================================== */
 :root,
 [data-theme="light"] {
-  --bt-color-bg:            var(--bt-mist-50);
+  --bt-color-bg:            var(--bt-klarna-50);
   --bt-color-bg-elevated:   var(--bt-mist-0);
   --bt-color-surface:       var(--bt-mist-0);
-  --bt-color-surface-sunken: var(--bt-mist-100);
+  --bt-color-surface-sunken: var(--bt-klarna-100);
   --bt-color-surface-glass: var(--bt-glass-fill);
 
-  --bt-color-text:           var(--bt-ink);
-  --bt-color-text-secondary: var(--bt-mist-600);
-  --bt-color-text-tertiary:  var(--bt-mist-500); /* 3.31:1 · 비필수 정보 한정 */
+  --bt-color-text:           var(--bt-klarna-ink);
+  --bt-color-text-secondary: #5D5659;
+  --bt-color-text-tertiary:  #777074;
   --bt-color-text-inverse:   var(--bt-mist-0);
-  --bt-color-text-link:      var(--bt-blue-700);
-  --bt-color-text-disabled:  var(--bt-mist-400);
+  --bt-color-text-link:      var(--bt-chocolate-900);
+  --bt-color-text-disabled:  #A59DA1;
 
-  --bt-color-border:        var(--bt-mist-200);
-  --bt-color-border-strong: var(--bt-mist-300);
+  --bt-color-border:        rgba(23, 18, 15, 0.12);
+  --bt-color-border-strong: rgba(23, 18, 15, 0.22);
   --bt-color-border-glass:  var(--bt-glass-stroke);
 
   /* brand = 정체성(장식). action = 누를 수 있는 것. 둘은 다르다. */
-  --bt-color-brand:         var(--bt-blue-500);
-  --bt-color-brand-subtle:  var(--bt-blue-50);
-  --bt-color-action:        var(--bt-blue-600);
-  --bt-color-action-hover:  var(--bt-blue-700);
-  --bt-color-action-press:  var(--bt-blue-800);
-  --bt-color-action-subtle: var(--bt-blue-50);
-  --bt-color-action-on:     var(--bt-mist-0);
+  --bt-color-brand:         var(--bt-chocolate-900);
+  --bt-color-brand-subtle:  var(--bt-klarna-100);
+  --bt-color-action:        var(--bt-klarna-400);
+  --bt-color-action-hover:  var(--bt-klarna-500);
+  --bt-color-action-press:  var(--bt-klarna-600);
+  --bt-color-action-subtle: var(--bt-klarna-100);
+  --bt-color-action-on:     var(--bt-klarna-ink);
 
   --bt-color-success:        var(--bt-leaf-700);
   --bt-color-success-bg:     var(--bt-leaf-100);
@@ -210,12 +232,12 @@
   --bt-color-danger-bg:      var(--bt-rose-100);
   --bt-color-danger-fill:    var(--bt-rose-600);
   --bt-color-danger-marker:  var(--bt-rose-500);
-  --bt-color-info:           var(--bt-blue-700);
-  --bt-color-info-bg:        var(--bt-blue-50);
+  --bt-color-info:           #4F474A;
+  --bt-color-info-bg:        var(--bt-klarna-100);
 
   /* 호감(하트)은 danger와 같은 색상 계열을 쓴다. 색만으로 구분하지 말고
      반드시 아이콘+라벨을 동반할 것. DESIGN_SYSTEM.md §3.3 참고. */
-  --bt-color-like: var(--bt-rose-500);
+  --bt-color-like: var(--bt-klarna-700);
 
   /* 면 틴트 — 같은 흰 카드를 여러 장 늘어놓지 않기 위한 "의미별로 물든 면".
      의미색 램프의 가장 옅은 단계라 채도가 낮고(원칙 6), 본문색을 그대로 얹어도 AA 를 지킨다.
@@ -224,13 +246,16 @@
   --bt-color-panel-success-line: var(--bt-leaf-200);
   --bt-color-panel-warning:      var(--bt-pollen-50);
   --bt-color-panel-warning-line: var(--bt-pollen-200);
-  --bt-color-panel-brand:        var(--bt-blue-50);
-  --bt-color-panel-brand-line:   var(--bt-blue-200);
+  --bt-color-panel-brand:        var(--bt-klarna-100);
+  --bt-color-panel-brand-line:   var(--bt-klarna-300);
 
-  --bt-color-focus: var(--bt-blue-600);
-  --bt-color-scrim: rgba(23, 24, 31, 0.44);
+  --bt-color-focus: var(--bt-klarna-ink);
+  --bt-color-scrim: rgba(23, 18, 15, 0.58);
 
-  --bt-shadow-card: var(--bt-shadow-md);
+  --bt-shadow-card:
+    0 18px 48px rgba(75, 45, 34, 0.10),
+    0 2px 10px rgba(23, 18, 15, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 /* ==========================================================================
@@ -239,31 +264,31 @@
    그 외 화면의 다크모드는 OS 설정을 따른다.
    ========================================================================== */
 [data-theme="dark"] {
-  --bt-color-bg:            var(--bt-mist-950);
-  --bt-color-bg-elevated:   var(--bt-mist-900);
-  --bt-color-surface:       var(--bt-mist-900);
-  --bt-color-surface-sunken: #101216;
-  --bt-color-surface-glass: rgba(28, 31, 39, 0.72);
+  --bt-color-bg:            var(--bt-chocolate-900);
+  --bt-color-bg-elevated:   #3A251D;
+  --bt-color-surface:       #3A251D;
+  --bt-color-surface-sunken: #21130F;
+  --bt-color-surface-glass: rgba(58, 37, 29, 0.76);
 
   --bt-color-text:           var(--bt-mist-100);
-  --bt-color-text-secondary: var(--bt-mist-400);
-  --bt-color-text-tertiary:  var(--bt-mist-500);
-  --bt-color-text-inverse:   var(--bt-ink);
-  --bt-color-text-link:      var(--bt-blue-300);
-  --bt-color-text-disabled:  var(--bt-mist-700);
+  --bt-color-text-secondary: #D7CFD2;
+  --bt-color-text-tertiary:  #AAA1A5;
+  --bt-color-text-inverse:   var(--bt-chocolate-900);
+  --bt-color-text-link:      var(--bt-klarna-300);
+  --bt-color-text-disabled:  #7C7477;
 
   --bt-color-border:        rgba(255, 255, 255, 0.10);
   --bt-color-border-strong: rgba(255, 255, 255, 0.18);
   --bt-color-border-glass:  rgba(255, 255, 255, 0.14);
 
   /* 다크에서는 램프가 뒤집힌다: 밝은 톤이 대비를 얻는다. */
-  --bt-color-brand:         var(--bt-blue-400);
-  --bt-color-brand-subtle:  rgba(91, 139, 239, 0.16);
-  --bt-color-action:        var(--bt-blue-500);
-  --bt-color-action-hover:  var(--bt-blue-400);
-  --bt-color-action-press:  var(--bt-blue-300);
-  --bt-color-action-subtle: rgba(91, 139, 239, 0.16);
-  --bt-color-action-on:     var(--bt-mist-0);
+  --bt-color-brand:         var(--bt-klarna-400);
+  --bt-color-brand-subtle:  rgba(255, 179, 199, 0.16);
+  --bt-color-action:        var(--bt-klarna-400);
+  --bt-color-action-hover:  var(--bt-klarna-300);
+  --bt-color-action-press:  var(--bt-klarna-500);
+  --bt-color-action-subtle: rgba(255, 179, 199, 0.16);
+  --bt-color-action-on:     var(--bt-klarna-ink);
 
   --bt-color-success:        var(--bt-leaf-400);
   --bt-color-success-bg:     rgba(87, 201, 126, 0.16);
@@ -280,10 +305,10 @@
   --bt-color-danger-bg:      rgba(228, 64, 79, 0.18);
   --bt-color-danger-fill:    var(--bt-rose-500);
   --bt-color-danger-marker:  var(--bt-rose-500);
-  --bt-color-info:           var(--bt-blue-300);
-  --bt-color-info-bg:        rgba(91, 139, 239, 0.16);
+  --bt-color-info:           var(--bt-klarna-300);
+  --bt-color-info-bg:        rgba(255, 179, 199, 0.16);
 
-  --bt-color-like: var(--bt-rose-400);
+  --bt-color-like: var(--bt-klarna-400);
 
   /* 다크에서는 램프의 50 단계가 오히려 밝은 면이 된다. 어두운 표면 위에 의미색을
      아주 낮은 알파로 얹어 "물든 면"의 인상만 남긴다. */
@@ -291,10 +316,10 @@
   --bt-color-panel-success-line: rgba(87, 201, 126, 0.22);
   --bt-color-panel-warning:      rgba(240, 169, 60, 0.10);
   --bt-color-panel-warning-line: rgba(240, 169, 60, 0.22);
-  --bt-color-panel-brand:        rgba(91, 139, 239, 0.12);
-  --bt-color-panel-brand-line:   rgba(91, 139, 239, 0.24);
+  --bt-color-panel-brand:        rgba(255, 179, 199, 0.12);
+  --bt-color-panel-brand-line:   rgba(255, 179, 199, 0.24);
 
-  --bt-color-focus: var(--bt-blue-300);
+  --bt-color-focus: var(--bt-klarna-300);
   --bt-color-scrim: rgba(0, 0, 0, 0.64);
 
   --bt-glass-fill:   rgba(28, 31, 39, 0.72);
