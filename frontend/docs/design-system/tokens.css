@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light;
+
+  /* Primitive colors */
+  --color-ink: #0b0d0c;
+  --color-paper: #f8f6f0;
+  --color-white: #ffffff;
+  --color-forest: #083e2b;
+  --color-moss: #496653;
+  --color-leaf: #a7be9c;
+  --color-sun: #f0c96b;
+  --color-blush: #eab4c2;
+
+  /* Semantic colors */
+  --surface-page: var(--color-paper);
+  --surface-raised: var(--color-white);
+  --surface-inverse: var(--color-ink);
+  --surface-brand: var(--color-forest);
+  --text-primary: var(--color-ink);
+  --text-secondary: #4f5652;
+  --text-inverse: var(--color-white);
+  --text-brand: var(--color-forest);
+  --border-subtle: rgb(11 13 12 / 14%);
+  --overlay-media: rgb(5 12 9 / 36%);
+  --focus-ring: var(--color-sun);
+
+  /* Typography */
+  --font-sans: "Pretendard Variable", "SUIT Variable", "Noto Sans KR", system-ui, sans-serif;
+  --font-accent: "Cormorant Garamond", Georgia, serif;
+  --text-display: clamp(3rem, 7vw, 4.5rem);
+  --text-h1: clamp(2.5rem, 5vw, 3.5rem);
+  --text-h2: clamp(2rem, 4vw, 2.5rem);
+  --text-h3: clamp(1.5rem, 3vw, 1.75rem);
+  --text-body-lg: clamp(1.125rem, 2vw, 1.25rem);
+  --text-body: 1rem;
+  --text-label: 0.8125rem;
+  --leading-display: 0.96;
+  --leading-heading: 1.1;
+  --leading-body: 1.6;
+  --tracking-display: -0.045em;
+  --tracking-heading: -0.03em;
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+  --space-30: 7.5rem;
+
+  /* Layout */
+  --container-max: 80rem;
+  --container-pad: clamp(1.25rem, 4vw, 4rem);
+  --copy-max: 45rem;
+  --hero-copy-max: 47.5rem;
+
+  /* Shape and depth */
+  --radius-control: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-media: 1.5rem;
+  --radius-pill: 999px;
+  --shadow-float: 0 0.75rem 2.5rem rgb(6 12 9 / 16%);
+
+  /* Motion */
+  --duration-fast: 180ms;
+  --duration-base: 320ms;
+  --duration-slow: 600ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
