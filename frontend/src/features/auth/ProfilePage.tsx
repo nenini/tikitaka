@@ -3,13 +3,14 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack, Steps } from '@/components'
+import { Badge, Button, Callout, Card, CardButton, Field, Input, Stack } from '@/components'
 import { cn } from '@/shared/lib/cn'
 import { createProfile } from '@/features/profile/api'
 import { SIDO } from '@/features/profile/regions'
 import { errorCodeOf, errorMessageOf, serverMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
+import { ONBOARDING_STEP } from './onboardingSteps'
+import { OnboardingShell } from './OnboardingShell'
 
 /* -------------------------------------------------------------------------- */
 /*  W-04 · 기본 프로필 (FE-PROFILE-01) — 온보딩 4/5                              */
@@ -94,17 +95,12 @@ export function ProfilePage() {
   const nickHelp = '상대에게 보이는 이름이에요 (2~12자)'
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col justify-center gap-5 px-5 py-10">
-      <header>
-        <Steps
-          count={ONBOARDING_STEP_COUNT}
-          current={ONBOARDING_STEP.profile}
-          labels={ONBOARDING_STEP_LABELS}
-        />
-        <h1 className="bt-h2 mt-4">기본 프로필</h1>
-        <p className="bt-body-sm bt-muted mt-1">상대에게 보일 정보와 매칭에만 쓰는 정보를 나눠 받아요.</p>
-      </header>
-
+    <OnboardingShell
+      current={ONBOARDING_STEP.profile}
+      title="기본 프로필"
+      description="상대에게 보일 정보와 매칭에만 쓰는 정보를 분명하게 나눠 받을게요."
+      maxWidth="lg"
+    >
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <Stack gap={20}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -234,7 +230,6 @@ export function ProfilePage() {
           </div>
         </Stack>
       </form>
-
-    </main>
+    </OnboardingShell>
   )
 }

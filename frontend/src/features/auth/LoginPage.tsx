@@ -14,8 +14,7 @@ import type { OAuthProviderId } from './types'
 /*  W-01 · 랜딩 · 로그인 (AUTH-01)                                              */
 /*  - 랜딩 히어로 + 로그인 카드를 한 화면에 (와이어프레임 W-01)                  */
 /*  - 모바일/PC 반응형 · 레이아웃은 Tailwind, 컴포넌트는 공용 래퍼               */
-/*  - 레이아웃 옵션(분할형/중앙형)은 개발 중 하단 컨트롤로 전환해 비교한다.       */
-/*    → 확정되면 LayoutToggle 과 useState 를 제거하고 한 쪽으로 고정.           */
+/*  - 영상 전 홈과 시각 흐름을 잇는 사진형 분할 레이아웃으로 고정한다.           */
 /* -------------------------------------------------------------------------- */
 
 const loginSchema = z.object({
@@ -24,17 +23,8 @@ const loginSchema = z.object({
 })
 type LoginForm = z.infer<typeof loginSchema>
 
-type Layout = 'split' | 'centered'
-
 export function LoginPage() {
-  const [layout, setLayout] = useState<Layout>('split')
-
-  return (
-    <div className="min-h-dvh">
-      {layout === 'split' ? <SplitLayout /> : <CenteredLayout />}
-      {import.meta.env.DEV && <LayoutToggle value={layout} onChange={setLayout} />}
-    </div>
-  )
+  return <SplitLayout />
 }
 
 /* -------------------------------------------------------------------------- */
@@ -81,7 +71,7 @@ function SplitLayout() {
 
   return (
     <main
-      className="flex min-h-dvh flex-col lg:grid"
+      className="tk-brand-scope flex min-h-dvh flex-col lg:grid"
       style={{
         // 1fr 0fr(풀블리드) → 1.05fr 1fr(분할). 모바일은 flex-col 이라 이 값이 무시된다.
         gridTemplateColumns: settled ? '1.05fr 1fr' : '1fr 0fr',
@@ -91,7 +81,7 @@ function SplitLayout() {
       <HeroPanel mounted={mounted} settled={settled} />
       {/* 폭이 0 인 동안 폼이 삐져나오지 않도록 overflow-hidden */}
       <section
-        className="flex flex-1 items-center justify-center overflow-hidden bg-bg px-5 py-10 sm:px-8"
+        className="tk-login-panel flex flex-1 items-center justify-center overflow-hidden px-5 py-10 sm:px-8"
         style={{
           opacity: settled ? 1 : 0,
           transform: settled ? 'none' : 'translateX(28px)',
@@ -114,11 +104,11 @@ function SplitLayout() {
 function HeroPanel({ mounted, settled }: { mounted: boolean; settled: boolean }) {
   return (
     <section
-      className="relative flex min-w-0 flex-col justify-center overflow-hidden px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16"
+      className="tk-login-hero relative flex min-w-0 flex-col justify-center overflow-hidden px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16"
       style={{
         // 히어로 사진(public/hero-couple.webp · 스플래시와 동일 파일이라 캐시 재사용) · 없을 때 브랜드 그라데이션 폴백
-        background:
-          "url('/hero-couple.webp') center / cover no-repeat, " +
+        backgroundImage:
+          "url('/hero-couple.webp'), " +
           'linear-gradient(158deg, var(--bt-color-action) 0%, var(--bt-color-brand) 52%, var(--bt-blue-400) 100%)',
       }}
     >
@@ -128,7 +118,7 @@ function HeroPanel({ mounted, settled }: { mounted: boolean; settled: boolean })
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(158deg, rgba(24,12,20,.62) 0%, rgba(24,12,20,.28) 42%, rgba(24,12,20,.68) 100%)',
+            'linear-gradient(158deg, rgba(3,15,10,.70) 0%, rgba(3,15,10,.22) 42%, rgba(3,15,10,.74) 100%)',
           opacity: settled ? 1 : 0.45,
           transition: `opacity ${SETTLE_MS}ms ease-out`,
         }}
@@ -163,41 +153,6 @@ function HeroPanel({ mounted, settled }: { mounted: boolean; settled: boolean })
         <HeroStats className="mt-8" style={reveal(settled, 380)} />
       </div>
     </section>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/*  레이아웃 B · 중앙형 — 데스크탑·모바일 모두 중앙 카드                          */
-/* -------------------------------------------------------------------------- */
-function CenteredLayout() {
-  return (
-    <main className="flex min-h-dvh items-center justify-center bg-surface-sunken px-5 py-10">
-      <div className="w-full max-w-[440px]">
-        <header className="mb-6 text-center">
-          <div className="flex justify-center">
-            <BrandMark tone="dark" />
-          </div>
-          <span
-            className="bt-caption mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold"
-            style={{
-              background: 'var(--bt-color-action-subtle)',
-              color: 'var(--bt-color-text-link)',
-            }}
-          >
-            낯선 사람과의 대화, 연습이 됩니다
-          </span>
-          <h1 className="mt-3 text-[24px] font-bold leading-[1.3] tracking-[-0.02em] text-ink sm:text-[27px]">
-            30분 모의 소개팅으로
-            <br />
-            대화 습관을 바꿔보세요
-          </h1>
-          <p className="bt-body-sm bt-muted mx-auto mt-2 max-w-[360px]">
-            연애 매칭이 아니라 <b className="font-semibold text-ink">대화 연습</b> 서비스예요.
-          </p>
-        </header>
-        <LoginCard />
-      </div>
-    </main>
   )
 }
 
@@ -409,33 +364,5 @@ function NaverGlyph() {
       <rect width="18" height="18" rx="4" fill="#03C75A" />
       <path fill="#fff" d="M10.3 9.35 7.5 5.2H5.2v7.6h2.5V8.65l2.8 4.15h2.3V5.2h-2.5v4.15z" />
     </svg>
-  )
-}
-
-/** 개발 전용 — 레이아웃 옵션 미리보기 스위처 (확정 후 제거) */
-function LayoutToggle({ value, onChange }: { value: Layout; onChange: (l: Layout) => void }) {
-  const options: { id: Layout; label: string }[] = [
-    { id: 'split', label: '분할형' },
-    { id: 'centered', label: '중앙형' },
-  ]
-  return (
-    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
-      <div
-        className="flex items-center gap-1 rounded-full p-1 shadow-lg"
-        style={{ background: 'var(--bt-color-surface)', border: '1px solid var(--bt-color-border)' }}
-      >
-        <span className="bt-caption px-2">레이아웃</span>
-        {options.map((o) => (
-          <Button
-            key={o.id}
-            size="sm"
-            variant={value === o.id ? 'primary' : 'ghost'}
-            onClick={() => onChange(o.id)}
-          >
-            {o.label}
-          </Button>
-        ))}
-      </div>
-    </div>
   )
 }

@@ -7,7 +7,6 @@ import {
   Button,
   Callout,
   Card,
-  CardHeader,
   EmptyState,
   Icon,
   ListRowButton,
@@ -213,250 +212,212 @@ export function HomePage() {
     }
   }, [])
 
-  // pb-10: AppShell 이 주는 하단 여백은 모바일 네비 높이(pb-[76px])뿐이고 `md:pb-0` 이라
-  // 데스크탑에서는 0 이 된다. 마지막 카드가 뷰포트 바닥에 붙지 않도록 홈에서 직접 준다.
+  const heroTarget = upcoming
+    ? upcoming.awaitingAcceptance || upcoming.sessionId == null
+      ? `/matching/pair/${upcoming.matchPairId}`
+      : `/session/${upcoming.sessionId}/room`
+    : '/matching'
+  const heroAction = upcoming
+    ? upcoming.awaitingAcceptance
+      ? '매칭 확인하기'
+      : '대기방 입장'
+    : '새 매칭 시작'
+  const heroStatus = upcomingLoading
+    ? '오늘의 일정을 확인하고 있어요.'
+    : upcoming
+      ? `${upcoming.partnerName} 님과 ${upcoming.when}에 만나요.`
+      : '아직 예정된 세션이 없어요. 새로운 대화를 준비해볼까요?'
+
   return (
-    <main className="mx-auto w-full max-w-[1080px] px-4 pb-10 pt-6 sm:px-6">
-      {/* ── 인사줄 ─────────────────────────────────────────── */}
-      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="bt-h2">오늘도 한 걸음, 연습해볼까요?</h1>
-          <p className="bt-body-sm bt-muted mt-1">
-            {user ? `${user.nickname} 님 · ` : ''}이번 주 예정 세션 1개 · 완료한 연습 7회
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge tone="success">● 매칭 가능</Badge>
-          {/* 상단 빠른 진입 — 아래 '연습 시작' 카드의 매칭 신청과 상호 보완.
-              size 를 지정하지 않아 기본 md(44px · 좌우 24px · 16px)를 쓴다. 왼쪽 제목+부제 블록이
-              약 59px 이라 44px 버튼이 그 안에 들어가므로, 인사줄 높이는 그대로 두고 버튼만 커진다.
-              (sm=36px 는 이 줄에서 혼자 작아 보여 주 동작으로 읽히지 않았다.) */}
-          <Button variant="primary" onClick={() => navigate('/matching')}>
-            새 매칭 시작
-          </Button>
-        </div>
-      </header>
-
-      {/* ── 상단 밴드: 사랑의 온도 + 예정된 세션 ───────────────────── */}
-      {/* 두 밴드 모두 같은 규칙을 쓴다 — 사이드 340px, gap 20px, 행 최소 높이 290px.
-          `items-start` 를 쓰지 않는다: 기본값 stretch 로 두면 같은 행의 카드 높이가 저절로
-          같아져, 카드마다 h-[…] 를 박고 내용이 바뀔 때마다 다시 재는 일을 안 해도 된다.
-          290px 은 nav 56 + 본문 여백을 뺀 뒤 두 밴드가 800px 뷰포트 안에 들어가도록 잡은 값이다
-          (56 + 24 + 76 + 290 + 20 + 290 + 40 = 796). 이 숫자를 키우면 스크롤이 생긴다. */}
-      <div className="grid gap-5 lg:min-h-[290px] lg:grid-cols-[340px_minmax(0,1fr)]">
-        <Card>
-          <CardHeader title="사랑의 온도" />
-          <LoveTemperatureMeter value={38.2} delta={1.7} />
-          <p className="bt-caption mt-2">최근 세션 이후 상승. 상대에게 정확한 온도는 공개되지 않아요.</p>
-          <div className="mt-3 flex gap-7">
-            {[
-              { v: 7, k: '완료 세션' },
-              { v: 0, k: '노쇼' },
-            ].map((s) => (
-              <div key={s.k} className="flex flex-col gap-0.5">
-                <span className="bt-numeric text-[22px] font-extrabold">{s.v}</span>
-                <span className="bt-caption">{s.k}</span>
-              </div>
-            ))}
+    <main className="tk-brand-scope tk-home-page">
+      <section className="tk-home-hero" aria-labelledby="home-hero-title">
+        <div className="tk-home-hero__media">
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/hero-couple.webp"
+            aria-hidden="true"
+          >
+            <source src="/main_hero_video.mp4" type="video/mp4" />
+          </video>
+          <div className="tk-home-hero__scrim" aria-hidden="true" />
+          <div className="tk-home-hero__mark" aria-hidden="true">
+            <img src="/tika-logo-whitever.webp" alt="" width={82} height={48} />
+            <span>티키타카</span>
           </div>
-        </Card>
+          <div className="tk-home-hero__desktop-copy">
+            <p>Practice · Connect · Bloom</p>
+            <h1 id="home-hero-title">
+              좋은 대화는,
+              <br />
+              연습할수록 자연스러워져요.
+            </h1>
+          </div>
+        </div>
 
-        {upcomingLoading ? (
-          <Card>
-            <Stack gap={12}>
-              <Skeleton width={140} height={24} />
-              <Skeleton height={56} />
-              <Skeleton height={44} />
-            </Stack>
-          </Card>
-        ) : upcoming ? (
-          <Card>
-            {/* `.bt-card` 에는 gap 이 없어 자식들이 그대로 붙는다. 자식마다 mt-* 를 다는 대신
-                Stack 으로 세로 리듬을 한 번에 준다 — 옆 카드와도 간격이 맞는다. */}
-            <Stack gap={12}>
-              <div className="flex items-center justify-between gap-2">
-                <CardHeader title="예정된 세션" />
-                {upcoming.startsIn && (
-                  <Badge tone="warning" className="shrink-0">
-                    {upcoming.startsIn}
-                  </Badge>
-                )}
+        <div className="tk-home-cta-sheet">
+          <p className="tk-home-cta-sheet__eyebrow">
+            {user?.nickname ? `${user.nickname} 님의 오늘` : '오늘의 티키타카'}
+          </p>
+          <h2>오늘도 한 걸음, 연습해볼까요?</h2>
+          <p className="tk-home-cta-sheet__status">{heroStatus}</p>
+          <Button variant="primary" size="lg" block onClick={() => navigate(heroTarget)}>
+            {heroAction}
+          </Button>
+          <span className="tk-home-cta-sheet__note">30분 화상 세션 · 매칭 시 알림</span>
+        </div>
+      </section>
+
+      <div className="tk-home-content">
+        <section className="tk-home-grid" aria-label="오늘의 활동">
+          {upcomingLoading ? (
+            <Card className="tk-home-session-card">
+              <Stack gap={12}>
+                <Skeleton width={140} height={24} />
+                <Skeleton height={72} />
+                <Skeleton height={44} />
+              </Stack>
+            </Card>
+          ) : upcoming ? (
+            <Card className="tk-home-session-card">
+              <div className="tk-home-section-heading">
+                <div>
+                  <span>Next conversation</span>
+                  <h2>예정된 세션</h2>
+                </div>
+                {upcoming.startsIn && <Badge tone="warning">{upcoming.startsIn}</Badge>}
               </div>
 
-              {/* items-start: 이름·태그가 줄바꿈돼도 아바타와 '상세' 가 위에 정렬돼 있어야
-                  행 높이가 튀지 않는다. 버튼은 shrink-0 으로 텍스트에 밀리지 않게 고정한다. */}
-              <div className="flex items-start gap-3">
-                <Avatar size="md" name={upcoming.partnerName} className="shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <b className="text-[15px]">{upcoming.partnerName}</b>
+              <div className="tk-home-session-card__person">
+                <Avatar size="md" name={upcoming.partnerName} />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b>{upcoming.partnerName} 님</b>
                     <TagChip>{upcoming.age}</TagChip>
                   </div>
-                  <p className="bt-caption mt-1">
-                    {[upcoming.face, upcoming.when].filter(Boolean).join(' · ')}
-                  </p>
+                  <p>{[upcoming.face, upcoming.when].filter(Boolean).join(' · ')}</p>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}`)}
-                >
-                  상세
-                </Button>
               </div>
 
               <Callout tone="info">
-                <b>시작 1시간 전까지</b> 취소하면 패널티가 없어요. 이후 취소는 온도 감소 + 노쇼 1회.
+                시작 1시간 전까지 취소하면 패널티가 없어요. 편안하게 준비해 주세요.
               </Callout>
-
-              {/* 모바일은 세로로 쌓는다 — 한 줄에 두면 '일정 취소' 가 눌려 글자가 깨진다.
-                  주 동작(대기방 입장)을 위에 둬 엄지에서 먼 쪽이 파괴적 동작이 되지 않게 한다.
-                  ⚠️ `block` 프로퍼티(`width:100%`)를 쓰지 않는다 — 가로 배치에서 두 번째 버튼이
-                     100% 를 요구해 행을 밀어낸다. 폭은 유틸리티로 브레이크포인트마다 정한다. */}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {/* 아직 양측 수락 전이면 대기방이 없다 — 매칭 카드로 보내 수락부터 하게 한다.
-                    sessionId 가 없을 때도 마찬가지다(서버가 세션을 아직 만들지 않았다). */}
-                <Button
-                  variant="primary"
-                  className="w-full sm:w-auto sm:flex-1"
-                  onClick={() =>
-                    navigate(
-                      upcoming.awaitingAcceptance || upcoming.sessionId == null
-                        ? `/matching/pair/${upcoming.matchPairId}`
-                        : `/session/${upcoming.sessionId}/room`,
-                    )
-                  }
-                >
-                  {upcoming.awaitingAcceptance ? '매칭 확인' : '대기방 입장'}
+              <div className="tk-home-actions">
+                <Button variant="primary" onClick={() => navigate(heroTarget)}>
+                  {heroAction}
                 </Button>
-                {/* `?cancel=1` 로 매칭 카드의 취소 확인 모달을 바로 연다.
-                    취소 자체는 카드 화면이 수행한다 — 정책 안내와 확인을 한 곳에 모아둔다. */}
                 <Button
                   variant="secondary"
-                  className="w-full sm:w-auto"
-                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}?cancel=1`)}
+                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}`)}
                 >
-                  일정 취소
+                  일정 상세
                 </Button>
               </div>
-            </Stack>
-          </Card>
-        ) : (
-          <Card className="flex items-center justify-center">
-            <EmptyState
-              icon={<Icon name="clock" size={30} />}
-              title="예정된 세션이 없어요"
-              text="새 매칭을 시작하면 여기에 표시돼요."
-              action={
-                <Button variant="primary" size="sm" onClick={() => navigate('/matching')}>
-                  새 매칭 시작
-                </Button>
-              }
-            />
-          </Card>
-        )}
-      </div>
+            </Card>
+          ) : (
+            <Card className="tk-home-session-card tk-home-session-card--empty">
+              <EmptyState
+                icon={<Icon name="clock" size={30} />}
+                title="예정된 세션이 없어요"
+                text="지금 매칭을 신청하면 새로운 대화가 여기에 이어져요."
+                action={
+                  <Button variant="primary" size="sm" onClick={() => navigate('/matching')}>
+                    새 매칭 시작
+                  </Button>
+                }
+              />
+            </Card>
+          )}
 
-      {/* ── 하단 밴드: 연습 시작 + 최근 리포트 ───────────────────── */}
-      {/* 사이드 레일이 위 밴드와 반대쪽(우측)에 온다. 폭이 같은 340px 이라 좌우 대칭으로 읽히고,
-          '예정된 세션'·'연습 시작' 처럼 내용이 많은 카드가 늘 넓은 쪽을 쓴다. */}
-      <div className="mt-5 grid gap-5 lg:min-h-[290px] lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* 연습 시작 — 실사용자 매칭 / 바로 연습 2파트.
-            두 파트 모두 `설명 좌 · 액션 우` 한 줄로 눕힌다. 세로로 쌓으면 파트당 3줄이 되어
-            카드가 행 높이 290px 을 넘고, 그만큼 첫 화면이 밀려 스크롤이 생긴다.
-            좁은 화면(sm 미만)에서는 버튼이 눌려 글자가 깨지므로 그때만 세로로 되돌린다. */}
-        <Card>
-          <CardHeader title="연습 시작" />
-          <Stack gap={16}>
-            {/* 파트① 실사용자 매칭 (비동기 · 대기 큐) */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span aria-hidden="true">🧑</span>
-                  <b className="text-[14px]">실사용자 매칭</b>
-                  <Badge tone="success">● 매칭 가능</Badge>
-                </div>
-                <p className="bt-caption mt-1">
-                  30분 세션 · 신청하면 <b className="text-ink">매칭 대기 등록</b> → 매칭 시 알림 (예상 ~4분)
-                </p>
+          <Card className="tk-home-temperature-card">
+            <div className="tk-home-section-heading">
+              <div>
+                <span>My progress</span>
+                <h2>사랑의 온도</h2>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                className="shrink-0 self-start sm:self-center"
-                onClick={() => navigate('/matching')}
-              >
-                매칭 신청
+            </div>
+            <LoveTemperatureMeter value={38.2} delta={1.7} />
+            <p className="bt-caption mt-3">최근 세션 이후 1.7° 올랐어요. 작은 변화가 쌓이고 있습니다.</p>
+            <dl className="tk-home-stats">
+              <div>
+                <dt>완료한 연습</dt>
+                <dd>7</dd>
+              </div>
+              <div>
+                <dt>노쇼</dt>
+                <dd>0</dd>
+              </div>
+            </dl>
+          </Card>
+        </section>
+
+        <section className="tk-home-practice" aria-labelledby="practice-title">
+          <div className="tk-home-practice__copy">
+            <span>Choose your pace</span>
+            <h2 id="practice-title">내 속도에 맞는 연습</h2>
+            <p>사람과 만나도, AI와 가볍게 시작해도 좋아요.</p>
+          </div>
+          <div className="tk-home-practice__actions">
+            <button type="button" onClick={() => navigate('/matching')}>
+              <span aria-hidden="true">01</span>
+              <b>실사용자 매칭</b>
+              <small>30분 · 매칭 시 알림</small>
+            </button>
+            {/* AI 화상 연습(W-21) — 상대 없이 5분간 혼자 말하는 연습이라 시간을 5분으로 둔다.
+                '15분'은 서버 대화가 붙는 것을 전제한 값이었다. */}
+            <button type="button" onClick={() => navigate('/ai-video/setup')}>
+              <span aria-hidden="true">02</span>
+              <b>AI 화상 연습</b>
+              <small>5분 · 대기 없음</small>
+            </button>
+            {/* 진행 중 대화가 있으면 그 대화로, 없으면 페르소나 설정으로 —
+                목적지를 조회하는 동안 버튼을 잠근다. */}
+            <button
+              type="button"
+              disabled={chatEntering}
+              onClick={() => {
+                if (chatEntering) return
+                setChatEntering(true)
+                void resolveChatbotEntryPath()
+                  .then((path) => navigate(path))
+                  .finally(() => setChatEntering(false))
+              }}
+            >
+              <span aria-hidden="true">03</span>
+              <b>AI 챗봇</b>
+              <small>{chatEntering ? '여는 중…' : '텍스트로 가볍게'}</small>
+            </button>
+          </div>
+        </section>
+
+        <section className="tk-home-reports" aria-labelledby="recent-report-title">
+          <div className="tk-home-section-heading">
+            <div>
+              <span>Look back</span>
+              <h2 id="recent-report-title">최근 리포트</h2>
+            </div>
+            {recent.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
+                전체 보기
               </Button>
-            </div>
-
-            <div className="h-px bg-[var(--bt-color-border)]" />
-
-            {/* 파트② AI 바로 연습 (즉시).
-                CardButton(세로 아이콘+라벨) 대신 Button 을 쓴다 — `.bt-card` 패딩이 24px 라
-                한 줄에 눕히면 버튼 하나가 70px 를 넘어 이 카드만 리듬에서 튄다. */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span aria-hidden="true">⚡</span>
-                  <b className="text-[14px]">바로 연습</b>
-                  <Badge tone="neutral">대기 없음</Badge>
-                </div>
-                <p className="bt-caption mt-1">지금 바로 시작 · AI 분석 단독 · 상대 평가 없음</p>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                {/* AI 화상 연습(W-21). 상대 없이 5분간 혼자 말하는 연습이라 시간 표기를
-                    5분으로 맞춘다 — 예전 문구('15분')는 서버 대화가 붙는 것을 전제한 값이었다. */}
-                <Button variant="secondary" size="sm" onClick={() => navigate('/ai-video/setup')}>
-                  <span aria-hidden="true">🤖</span> AI 화상 5분
-                </Button>
-                {/* 챗봇 F5 진입점 — 진행 중 대화가 있으면 그 대화로, 없으면 설정(W-10)으로. */}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={chatEntering}
-                  onClick={() => {
-                    if (chatEntering) return
-                    setChatEntering(true)
-                    void resolveChatbotEntryPath()
-                      .then((path) => navigate(path))
-                      .finally(() => setChatEntering(false))
-                  }}
-                >
-                  <span aria-hidden="true">💬</span> AI 챗봇
-                </Button>
-              </div>
-            </div>
-          </Stack>
-        </Card>
-
-        {/* 최근 리포트 — 완성된 것만 최대 2건. 목록 전체는 '/reports' 가 맡는다 */}
-        <Card>
-          <CardHeader
-            title="최근 리포트"
-            action={
-              recent.length > 0 ? (
-                <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
-                  전체 보기
-                </Button>
-              ) : undefined
-            }
-          />
+            )}
+          </div>
           {recentLoading ? (
-            <div className="flex flex-col gap-3">
-              <Skeleton height={44} />
-              <Skeleton height={44} />
+            <div className="tk-home-report-list">
+              <Skeleton height={64} />
+              <Skeleton height={64} />
             </div>
           ) : recent.length === 0 ? (
-            /* 생성 중·실패까지 여기서 설명하지 않는다 — 홈은 요약이고, 사유는 목록이 말한다 */
             <EmptyState
-              icon={<Icon name="sparkle" size={24} style={{ color: 'var(--bt-color-text-tertiary)' }} />}
+              icon={<Icon name="sparkle" size={24} />}
               title="아직 리포트가 없어요"
-              text="세션을 마치면 여기에 쌓여요."
+              text="첫 세션을 마치면 대화의 강점과 다음 연습 포인트가 쌓여요."
             />
           ) : (
-            <div>
+            <div className="tk-home-report-list">
               {recent.map((item) => (
                 <ListRowButton
                   key={item.sessionId}
@@ -468,7 +429,7 @@ export function HomePage() {
               ))}
             </div>
           )}
-        </Card>
+        </section>
       </div>
     </main>
   )
