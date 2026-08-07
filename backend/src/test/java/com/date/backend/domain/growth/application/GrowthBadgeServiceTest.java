@@ -4,6 +4,8 @@ import com.date.backend.domain.growth.domain.*;
 import com.date.backend.domain.growth.repository.*;
 import com.date.backend.domain.user.domain.User;
 import com.date.backend.domain.user.repository.UserRepository;
+import com.date.backend.global.exception.BusinessException;
+import com.date.backend.global.exception.code.GrowthErrorCode;
 import org.junit.jupiter.api.Test;
 import java.time.*;
 import java.util.*;
@@ -47,6 +49,30 @@ class GrowthBadgeServiceTest {
         verify(userBadgeRepository, never()).save(any());
         assertThat(response.badges().getFirst().active()).isFalse();
         assertThat(response.badges().getFirst().progressPercent()).isEqualTo(100);
+    }
+
+    @Test
+    void acquiredBadgeCanBeDisplayedAndHiddenIdempotently() {
+        UserBadge acquired = mock(UserBadge.class);
+        when(userBadgeRepository.findByUserIdAndBadgeIdForUpdate(7L, 1L))
+                .thenReturn(Optional.of(acquired));
+        when(acquired.display()).thenReturn(true, false);
+        when(acquired.hide()).thenReturn(true, false);
+
+        assertThat(service.display(7L, 1L).changed()).isTrue();
+        assertThat(service.display(7L, 1L).changed()).isFalse();
+        assertThat(service.hide(7L, 1L).changed()).isTrue();
+        assertThat(service.hide(7L, 1L).changed()).isFalse();
+    }
+
+    @Test
+    void badgeThatUserDidNotAcquireCannotBeDisplayed() {
+        when(userBadgeRepository.findByUserIdAndBadgeIdForUpdate(7L, 99L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.display(7L, 99L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(GrowthErrorCode.BADGE_NOT_ACQUIRED));
     }
 
     private BadgeCatalog badge(Long id, boolean active, BadgeConditionType type, int threshold) {

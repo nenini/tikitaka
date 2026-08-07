@@ -6,6 +6,7 @@ import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionSummaryResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionDetailResponse;
+import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.Valid;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -34,9 +36,10 @@ public class AiChatSessionController implements AiChatSessionSwaggerDocs {
 	@Override
 	@GetMapping
 	public ApiResponse<List<AiChatSessionSummaryResponse>> getSessions(
-			@AuthenticationPrincipal AuthUser authUser
+			@AuthenticationPrincipal AuthUser authUser,
+			@RequestParam(required = false) ChatSessionPurpose purpose
 	) {
-		return ApiResponse.success(sessionService.getSessions(authUser.userId()));
+		return ApiResponse.success(sessionService.getSessions(authUser.userId(), purpose));
 	}
 
 	@Override

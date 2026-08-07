@@ -74,15 +74,36 @@ class AiChatSessionServiceTest {
 	void authenticatedUserCanCreateActiveChatSession() {
 		AiChatSessionCreateResponse response = sessionService.create(
 				userId,
-				new AiChatSessionCreateRequest(ChatSessionPurpose.DATE_PRACTICE)
+				new AiChatSessionCreateRequest(ChatSessionPurpose.BEFORE_DATE)
 		);
 
 		assertThat(response.sessionId()).isNotNull();
 		assertThat(response.aiPersonaKey()).isNull();
-		assertThat(response.purpose()).isEqualTo(ChatSessionPurpose.DATE_PRACTICE);
+		assertThat(response.purpose()).isEqualTo(ChatSessionPurpose.BEFORE_DATE);
 		assertThat(response.stage()).isEqualTo(ConversationStage.INTRO);
 		assertThat(response.status()).isEqualTo(ChatSessionStatus.ACTIVE);
 		assertThat(response.createdAt()).isNotNull();
+	}
+
+	@Test
+	void sessionListCanBeSeparatedByBeforeAndAfterDatePurpose() {
+		Long beforeSessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(ChatSessionPurpose.BEFORE_DATE)
+		).sessionId();
+		sessionService.close(userId, beforeSessionId);
+		Long afterSessionId = sessionService.create(
+				userId,
+				new AiChatSessionCreateRequest(ChatSessionPurpose.AFTER_DATE)
+		).sessionId();
+
+		var beforeSessions = sessionService.getSessions(userId, ChatSessionPurpose.BEFORE_DATE);
+		var afterSessions = sessionService.getSessions(userId, ChatSessionPurpose.AFTER_DATE);
+
+		assertThat(beforeSessions).extracting(session -> session.sessionId())
+				.containsExactly(beforeSessionId);
+		assertThat(afterSessions).extracting(session -> session.sessionId())
+				.containsExactly(afterSessionId);
 	}
 
 	@Test
