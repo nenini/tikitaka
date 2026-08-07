@@ -103,7 +103,14 @@ class _Run:
     하나로 뭉개진다. 실제 런타임은 시간순으로 들어온다.
     """
 
-    def __init__(self, events: list[SttEvent], *, until_ms: int) -> None:
+    def __init__(
+        self,
+        events: list[SttEvent],
+        *,
+        until_ms: int,
+        awaiting: tuple[int, int] | None = None,
+    ) -> None:
+        """awaiting: (시작ms, 끝ms) — 그 구간 동안 전사가 처리 중이라고 본다."""
         self.commands: list[CoachingCommand] = []
         self.silences: list[int] = []
         self.aggregator = SessionAggregator(
@@ -121,7 +128,10 @@ class _Run:
             ):
                 self.aggregator.push_stt_event(pending[index])
                 index += 1
-            self.aggregator.tick(now_ms)
+            in_flight = (
+                1 if awaiting and awaiting[0] <= now_ms < awaiting[1] else 0
+            )
+            self.aggregator.tick(now_ms, awaiting_transcripts=in_flight)
 
     def _on_analysis(self, event: AnalysisEvent) -> None:
         if isinstance(event, SilenceDetected):
@@ -326,3 +336,84 @@ def test_new_silence_episode_gets_its_own_coaching() -> None:
         if command.coaching_type == "SILENCE_RECOVERY"
     }
     assert len(triggers) == 2, "두 침묵 구간은 서로 다른 코칭이어야 한다"
+
+
+# ── ④ 잡음이 침묵 시계를 되돌리던 문제 (세션 14) ──────────────────
+
+
+def _noise(seq: _Seq, user: str, at_ms: int, duration_ms: int = 300) -> list[SttEvent]:
+    """전사가 안 나오는 짧은 VAD 개방 — 숨소리·잡음.
+
+    VAD 는 min_speech_duration_ms=250 이라 이런 블립에도 발화를 연다.
+    """
+    return [
+        _started(seq, user, at_ms),
+        _ended(seq, user, at_ms, at_ms + duration_ms),
+    ]
+
+
+def test_noise_blips_do_not_reset_the_silence_clock() -> None:
+    """세션 14 재현 — 배치는 침묵 4회, 실시간은 0회였다.
+
+    전사 사이가 40초 비어 있는데 그 안에서 잡음이 5초마다 VAD 를 열었다. 예전에는
+    SPEECH_STARTED 마다 last_activity_ms 가 0으로 돌아가 silent_ms 가 1.2초를
+    못 넘겼다. 로그상 BELOW_THRESHOLD 22회 / SOMEONE_SPEAKING 22회가 정확히
+    번갈아 나왔고, 어느 쪽으로도 10초를 통과할 수 없는 구조였다.
+    """
+    seq = _Seq()
+    events: list[SttEvent] = [
+        _started(seq, "A", 0),
+        _ended(seq, "A", 0, 3_000),
+        _text(seq, "A", 0, 3_000, "안녕하세요 반가워요"),
+    ]
+    # 5초마다 300ms 잡음. 전사는 하나도 안 나온다.
+    for at_ms in range(8_000, 44_000, 5_000):
+        events += _noise(seq, "B", at_ms)
+
+    run = _Run(events, until_ms=50_000)
+
+    assert run.silences, "잡음만 있는 40초 구간은 침묵으로 잡혀야 한다"
+    assert any(
+        command.coaching_type == "SILENCE_RECOVERY" for command in run.commands
+    )
+
+
+def test_silence_is_held_while_a_transcript_is_still_in_flight() -> None:
+    """소리는 멈췄는데 말인지 아직 모르는 구간에서는 결론을 미룬다.
+
+    여기서 침묵으로 단정하면 방금 6초를 말한 사람에게 "대화가 끊겼어요"가 나간다.
+    반대로 활동으로 치면 잡음 하나가 침묵을 영영 막는다. 그래서 보류다.
+    """
+    seq = _Seq()
+    events: list[SttEvent] = [
+        _started(seq, "A", 0),
+        _ended(seq, "A", 0, 3_000),
+        _text(seq, "A", 0, 3_000, "안녕하세요 반가워요"),
+        # 6초 발화. 전사가 아직 워커에 있다.
+        _started(seq, "B", 8_000),
+        _ended(seq, "B", 8_000, 14_000),
+    ]
+
+    held = _Run(events, until_ms=22_000, awaiting=(14_000, 30_000))
+    assert held.silences == [], "전사 처리 중에는 침묵으로 단정하지 않는다"
+
+    # 워커가 끝났는데도 전사가 안 나왔다 = 말이 아니었다. 그때는 침묵이 맞다
+    # (리포트의 배치 판정도 전사 간격만 본다 — 두 숫자가 어긋나면 안 된다).
+    released = _Run(events, until_ms=22_000, awaiting=(14_000, 16_000))
+    assert released.silences
+
+
+def test_long_utterance_in_progress_is_never_silence() -> None:
+    """말하는 도중에는 전사가 없어도 침묵이 아니다 — is_speaking 게이트가 막는다."""
+    seq = _Seq()
+    run = _Run(
+        [
+            _started(seq, "A", 0),
+            _ended(seq, "A", 0, 3_000),
+            _text(seq, "A", 0, 3_000, "안녕하세요 반가워요"),
+            _started(seq, "B", 5_000),  # 계속 말하는 중 (ENDED 없음)
+        ],
+        until_ms=25_000,
+    )
+
+    assert run.silences == []

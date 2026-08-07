@@ -140,6 +140,10 @@ class LiveKitSttAdapter:
         self._vision_adapter.register(self._room)
         self._register_room_handlers()
 
+    @property
+    def pending_transcripts(self) -> int:
+        return self._runner.pending_transcripts
+
     def start(self) -> None:
         self._main_task = asyncio.create_task(
             self._run(),

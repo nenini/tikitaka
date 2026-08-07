@@ -131,7 +131,18 @@ class SessionState:
     users: dict[str, UserRuntimeState] = field(default_factory=dict)
     participant_user_ids: list[str] = field(default_factory=list)
     session_active: bool = True
-    last_activity_ms: int = 0              # 마지막으로 누군가 발화를 끝낸 시각
+    last_activity_ms: int = 0
+    """마지막으로 **말이 된** 발화가 끝난 시각. 전사만 이 값을 민다(add_utterance).
+
+    VAD 이벤트(SPEECH_STARTED/ENDED)는 여기 손대지 않는다. VAD 는 250ms 잡음에도
+    열리는데, 그걸 활동으로 치면 침묵 시계가 계속 0으로 돌아가 10초를 못 채운다
+    (세션 14: 배치 침묵 4회 / 실시간 0회, silent_ms 최대 1.2초).
+
+    리포트의 `find_long_silences` 도 같은 축(전사 간격)을 쓴다 — 두 숫자가 어긋나면
+    사용자에게 동시에 노출된다.
+    """
+    awaiting_transcripts: int = 0
+    """전사가 아직 안 끝난 발화 수. tick 마다 오디오 어댑터가 채운다."""
 
     def speaker(self, speaker_id: str) -> SpeakerState:
         state = self.speakers.get(speaker_id)

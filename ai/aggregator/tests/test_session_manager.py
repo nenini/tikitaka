@@ -83,6 +83,8 @@ class FakeAudioAdapter:
         self.vision_sink = vision_sink
         self.started = False
         self.stopped = False
+        # 침묵 판정 보류 게이트가 읽는다. 테스트가 직접 올려 시나리오를 만든다.
+        self.pending_transcripts = 0
 
     def start(self) -> None:
         self.started = True

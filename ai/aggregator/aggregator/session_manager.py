@@ -237,8 +237,14 @@ class SessionRuntime:
     async def tick(self, now_ms: int | None = None) -> None:
         async with self._lock:
             self.aggregator.tick(
-                self.elapsed_ms() if now_ms is None else now_ms
+                self.elapsed_ms() if now_ms is None else now_ms,
+                awaiting_transcripts=self._awaiting_transcripts(),
             )
+
+    def _awaiting_transcripts(self) -> int:
+        """전사 대기 중인 발화 수. 어댑터가 없으면(설정 미비·테스트) 0 이다."""
+        adapter = self._audio_adapter
+        return 0 if adapter is None else adapter.pending_transcripts
 
     async def push_stt_event(
         self,

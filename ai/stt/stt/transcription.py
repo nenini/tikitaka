@@ -158,6 +158,17 @@ class TranscriptionWorker:
                     self._pending -= 1
                 self._jobs.task_done()
 
+    @property
+    def pending_count(self) -> int:
+        """제출됐지만 아직 끝나지 않은 전사 job 수.
+
+        환각 필터로 결과가 비어도 job 은 완료 처리되므로(`finally` 에서 감소) 이 값은
+        "말인지 아직 모르는 소리가 처리 중"인 동안만 0 이 아니다. 관제실의 침묵 판정이
+        그 구간에 결론을 미루는 데 쓴다.
+        """
+        with self._lock:
+            return self._pending
+
     def poll(self) -> list[TranscriptFinalizedEvent]:
         out: list[TranscriptFinalizedEvent] = []
         while True:

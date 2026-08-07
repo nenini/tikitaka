@@ -227,10 +227,9 @@ class SessionAggregator:
             user.last_speech_started_at_ms = (
                 parsed.payload.observed_start_elapsed_ms
             )
-            self.state.last_activity_ms = max(
-                self.state.last_activity_ms,
-                parsed.payload.observed_start_elapsed_ms,
-            )
+            # **침묵 시계를 여기서 되돌리지 않는다.** 발화가 열렸다는 것만으로는
+            # 진짜 말인지 알 수 없고, VAD 는 250ms 잡음에도 열린다. 말하는 중이라는
+            # 사실은 SilenceDetector 의 is_speaking 게이트가 이미 막는다.
         elif isinstance(parsed, SpeechEndedEvent):
             user.is_speaking = False
             user.current_utterance_id = None
@@ -238,10 +237,13 @@ class SessionAggregator:
             user.last_speech_ended_at_ms = (
                 parsed.payload.observed_end_elapsed_ms
             )
-            self.state.last_activity_ms = max(
-                self.state.last_activity_ms,
-                parsed.payload.observed_end_elapsed_ms,
-            )
+            # **여기서도 침묵 시계를 되돌리지 않는다.** VAD 가 소리를 잡았다는 것과
+            # 그게 말이었다는 것은 다르다. 700ms 필터로 잡음을 걸러 보려 했지만
+            # 기침·의자 소리는 그 선을 넘고, 그런 게 10초에 한 번만 나도 침묵이
+            # 영영 성립하지 않는다 — 문턱만 올라갈 뿐 구조가 같다.
+            #
+            # 대신 전사가 끝날 때까지 **판단을 보류**한다(SilenceDetector 의
+            # AWAITING_TRANSCRIPT 게이트). 시계는 전사만 민다.
             self._volume_detector.on_speech_ended(
                 self.state,
                 parsed.user_id,
@@ -397,8 +399,14 @@ class SessionAggregator:
             expired = self._vision_event_id_order.popleft()
             self._vision_event_ids.discard(expired)
 
-    def tick(self, now_ms: int) -> None:
-        """시간 기반 감지(침묵 등)를 구동한다. now_ms = 세션 경과 시간."""
+    def tick(self, now_ms: int, *, awaiting_transcripts: int = 0) -> None:
+        """시간 기반 감지(침묵 등)를 구동한다. now_ms = 세션 경과 시간.
+
+        awaiting_transcripts: 전사가 아직 안 끝난 발화 수. 0 이 아니면 침묵 판정을
+        보류한다 — 그 소리가 말인지 잡음인지 아직 모르기 때문이다. 기본 0 이라
+        오디오 어댑터 없이 도는 데모·테스트는 그대로 동작한다.
+        """
+        self.state.awaiting_transcripts = awaiting_transcripts
         self._expire_stuck_speaking(now_ms)
         candidates: list[CoachingCandidate] = []
         for detector in self.detectors:

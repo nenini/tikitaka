@@ -398,6 +398,11 @@ class SessionSttRunner:
     def dropped_count(self) -> int:
         return self._worker.dropped_count
 
+    @property
+    def pending_transcripts(self) -> int:
+        """전사 대기 중인 발화 수. 침묵 판정 보류에 쓴다."""
+        return self._worker.pending_count
+
     def flush_speaker(self, user_id: str) -> List[StreamEvent]:
         """트랙이 끊기거나 음소거된 화자의 진행 중 발화를 마감한다.
 
