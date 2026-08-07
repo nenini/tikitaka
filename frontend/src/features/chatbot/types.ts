@@ -10,8 +10,8 @@
  *
  * ⚠️ **`stage` 이름 충돌**: 화면의 "연습 단계"(소개팅 전/후)와 백엔드 `ConversationStage`
  *    (INTRO/CONVERSATION/CLOSING — 대화가 어디까지 진행됐는지)는 **완전히 다른 개념**이고
- *    값 교집합이 없다. 세션 생성 요청은 `purpose` 만 받으므로 화면의 연습 단계·성향은
- *    서버에 전달되지 않는다 → 로컬(localStorage)에 보관한다(api.ts `readPreference` 참고).
+ *    값 교집합이 없다. 화면의 연습 단계는 서버 **`ChatSessionPurpose`** 로 전달된다
+ *    (`BEFORE_DATE` / `AFTER_DATE`) — 이름이 겹치는 `ConversationStage` 가 아니다.
  *
  * 규칙(와이어플로우 W-10b):
  *  - 선톡은 12시간 무응답 시 **1회 한정**, 야간 00–09시는 아침까지 보류 (⚠️ 백엔드 미구현)
@@ -31,14 +31,17 @@ export type ConversationStage = 'BEFORE_DATE' | 'AFTER_DATE'
  */
 export type ServerConversationStage = 'INTRO' | 'CONVERSATION' | 'CLOSING'
 
-/** 백엔드 `ChatSessionPurpose`. 현재 값이 하나뿐이고 생성 요청에 **필수**다. */
-export type ChatSessionPurpose = 'DATE_PRACTICE'
+/**
+ * 백엔드 `ChatSessionPurpose`. 생성 요청에 **필수**다.
+ * 값이 화면의 연습 단계와 같아졌다 — `DATE_PRACTICE` 는 단계 도입 전 세션에만 남아 있다.
+ */
+export type ChatSessionPurpose = ConversationStage | 'DATE_PRACTICE'
 
 /*
  * 페르소나 성향(적극적·중간·내향적)은 **제거됐다**.
  *
- * 세션 생성 요청은 `purpose` 하나만 받고 그 값도 `'DATE_PRACTICE'` 고정이라
- * 성향은 서버에 전달된 적이 없다 — localStorage 에만 남아 화면에 되비치는 값이었다.
+ * 세션 생성 요청은 `purpose` 하나만 받으므로 성향은 서버에 전달된 적이 없다 —
+ * localStorage 에만 남아 화면에 되비치는 값이었다.
  * AI 응답에 아무 영향을 주지 못하는 선택지를 사용자에게 고르게 할 이유가 없어
  * 설정 항목과 표시를 함께 걷어냈다. 남은 사용자 선택지는 연습 단계뿐이다.
  */

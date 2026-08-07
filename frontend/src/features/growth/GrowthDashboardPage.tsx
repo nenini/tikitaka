@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, Icon, Skeleton } from '@/components'
-import { getGrowthDashboard, getImprovementKeywords, getMyBadges, getStrengthKeywords } from './api'
+import {
+  getGrowthDashboard,
+  getImprovementKeywords,
+  getMyBadges,
+  getStrengthKeywords,
+  setBadgeDisplayed,
+} from './api'
 import {
   BadgeGrid,
   GrowthPanel,
@@ -11,6 +17,7 @@ import {
   TrendPager,
 } from './parts'
 import type { EarnedBadge, GrowthDashboard, GrowthKeyword } from './types'
+
 
 /** 한 화면에 그릴 점의 수. 이보다 많아지면 점이 붙어 흐름이 읽히지 않는다. */
 const TREND_PAGE_SIZE = 12
@@ -42,7 +49,8 @@ export function GrowthDashboardPage() {
       getGrowthDashboard(),
       getStrengthKeywords(),
       getImprovementKeywords(),
-      getMyBadges(),
+      // 뱃지 조회 실패로 대시보드 전체를 막지 않는다 — 진열장만 비워 둔다.
+      getMyBadges().catch(() => []),
     ]).then(([d, s, i, b]) => {
       if (!alive) return
       setDashboard(d)
@@ -53,6 +61,18 @@ export function GrowthDashboardPage() {
     return () => {
       alive = false
     }
+  }, [])
+
+  /**
+   * 착용/해제. 서버가 판정한 최종 상태만 반영한다 —
+   * 낙관적 갱신을 쓰지 않는 이유는 실패 시 되돌린 상태가 진짜인지 알 수 없어서다.
+   * 실패는 던져서 모달이 문구를 띄우게 한다.
+   */
+  const toggleBadgeDisplay = useCallback(async (badge: EarnedBadge, next: boolean) => {
+    const displayed = await setBadgeDisplayed(badge.badgeId, next)
+    setBadges((prev) =>
+      prev.map((b) => (b.badgeId === badge.badgeId ? { ...b, displayed } : b)),
+    )
   }, [])
 
   const points = dashboard?.history ?? []
@@ -185,7 +205,12 @@ export function GrowthDashboardPage() {
             <span className="bt-h3">획득 뱃지</span>
             <span className="bt-caption bt-muted bt-numeric">{dashboard.badgeCount}</span>
           </div>
-          <BadgeGrid badges={badges} />
+          {badges.length > 0 && (
+            <p className="bt-caption bt-muted">
+              뱃지를 눌러 프로필에 착용하거나 해제할 수 있어요.
+            </p>
+          )}
+          <BadgeGrid badges={badges} onToggleDisplay={toggleBadgeDisplay} />
         </Card>
       </div>
     </main>

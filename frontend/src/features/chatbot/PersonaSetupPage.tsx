@@ -19,8 +19,8 @@ const STAGE_OPTIONS = (Object.keys(STAGE_LABEL) as ConversationStage[]).map((val
  *  - 연습 단계: 소개팅 전 / 소개팅 후
  *
  * ⚠️ 성향(적극적·중간·내향적) 선택은 제거했다. 세션 생성 요청이 `purpose` 하나만
- *    받고 그 값도 고정이라 성향은 서버에 전달된 적이 없다 — AI 응답에 아무 영향을
- *    주지 못하는 선택지였다. 사용자가 고르는 항목은 연습 단계뿐이다.
+ *    받아 성향은 서버에 전달된 적이 없다 — AI 응답에 아무 영향을 주지 못하는
+ *    선택지였다. 사용자가 고르는 항목은 연습 단계뿐이고, 그 값이 `purpose` 로 간다.
  */
 export function PersonaSetupPage() {
   const navigate = useNavigate()
@@ -53,7 +53,7 @@ export function PersonaSetupPage() {
     setError(null)
     try {
       if (needsRegion) await saveRegionCity(regionCity)
-      // ⚠️ 서버는 `purpose` 만 받는다 — 연습 단계는 브라우저에 보관된다(api.ts 참고).
+      // 연습 단계는 `purpose` 로 서버에 저장된다 — 기기가 바뀌어도 유지된다.
       const session = await createChatSession({ stage })
       navigate(`/chatbot/${session.chatSessionId}`, { replace: true })
     } catch (startError) {

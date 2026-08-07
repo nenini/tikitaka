@@ -2071,6 +2071,29 @@ textarea.bt-input {
   cursor: pointer;
 }
 
+/* 착용 중 표시.
+   미착용을 흐리게 만들지 않는다 — 아무것도 착용하지 않은 사용자에게는 진열장 전체가
+   비활성으로 보인다. 대신 착용한 것에만 체크 점을 얹는다(있는 쪽에 표시를 더한다).
+   테두리를 두르지 않는 이유는 위 `.bt-badge-tile` 주석과 같다(액자 안의 액자). */
+.bt-badge-tile--worn {
+  position: relative;
+}
+
+.bt-badge-tile--worn::after {
+  content: '';
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  width: 30%;
+  height: 30%;
+  min-width: 14px;
+  min-height: 14px;
+  border-radius: var(--bt-radius-pill);
+  background: var(--bt-color-success) center / 62% no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  box-shadow: 0 0 0 2px var(--bt-color-surface);
+}
+
 .bt-badge-tile img {
   width: 100%;
   height: 100%;

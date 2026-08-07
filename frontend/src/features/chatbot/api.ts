@@ -49,12 +49,16 @@ const BASE = '/v1/ai-chat/sessions'
 /* ── 로컬 보관 설정 ────────────────────────────────────── */
 
 /**
- * 연습 단계는 서버가 받지 않는다(`AiChatSessionCreateRequest` 는 `purpose` 만).
- * 화면은 이 값으로 헤더를 그리므로 세션별로 브라우저에 보관한다.
+ * 세션별 로컬 보관값.
  *
- * ⚠️ 기기가 바뀌면 초기값으로 되돌아간다. 서버가 필드를 받아주면 이 저장소는 지운다.
+ * ⚠️ **연습 단계(`stage`)는 더 이상 여기서 읽지 않는다.** 서버가 `purpose` 로
+ *    `BEFORE_DATE` / `AFTER_DATE` 를 받아 저장하게 되면서 정본이 서버로 옮겨갔다.
+ *    다만 그 이전에 만들어진 세션은 서버에 `DATE_PRACTICE`(deprecated) 로 남아 있어
+ *    단계를 알 수 없으므로, **그 경우에만** 이 보관값을 폴백으로 쓴다.
+ *    남은 항목은 서버에 자리가 없는 값들이다(페르소나 표시명·선톡 설정).
  */
 interface SessionPreference {
+  /** @deprecated 서버 `purpose` 가 정본. `DATE_PRACTICE` 레거시 세션의 폴백으로만 남긴다. */
   stage: ConversationStage
   personaName?: string
   proactiveMessageEnabled?: boolean
@@ -90,11 +94,26 @@ export function rememberPersonaName(sessionId: number, personaName: string) {
 
 /* ── 원본 응답 ─────────────────────────────────────────── */
 
+/**
+ * 서버 `ChatSessionPurpose`.
+ * `DATE_PRACTICE` 는 단계 도입 전에 만들어진 세션에만 남아 있다(서버에서도 deprecated).
+ */
+type RawPurpose = ConversationStage | 'DATE_PRACTICE'
+
+/**
+ * 서버 `purpose` → 화면의 연습 단계.
+ * 레거시(`DATE_PRACTICE`)만 로컬 보관값으로 되돌아간다 — 그 세션은 서버가 단계를 모른다.
+ */
+function toStage(purpose: RawPurpose, sessionId: number): ConversationStage {
+  if (purpose === 'BEFORE_DATE' || purpose === 'AFTER_DATE') return purpose
+  return readPreference(sessionId).stage
+}
+
 /** `AiChatSessionSummaryResponse`. */
 interface RawSessionSummary {
   sessionId: number
   aiPersonaKey: string | null
-  purpose: string
+  purpose: RawPurpose
   status: ChatSessionStatus
   aiResponseState: AiResponseState
   pendingUserMessageId: number | null
@@ -109,7 +128,7 @@ interface RawSessionSummary {
 interface RawSessionCreated {
   sessionId: number
   aiPersonaKey: string | null
-  purpose: string
+  purpose: RawPurpose
   stage: ServerConversationStage
   status: ChatSessionStatus
   createdAt: string
@@ -145,7 +164,7 @@ function toSession(raw: RawSessionSummary, practiceGoal: string | null): AiChatS
   return {
     chatSessionId: raw.sessionId,
     status: raw.status,
-    stage: pref.stage,
+    stage: toStage(raw.purpose, raw.sessionId),
     persona: {
       // 첫 AI 응답 전에는 서버가 페르소나를 고르지 않아 key 가 null 이다.
       personaId: raw.aiPersonaKey ?? '',
@@ -209,15 +228,16 @@ export async function saveRegionCity(regionCity: string): Promise<void> {
 
 /**
  * 세션 생성('대화 시작').
- * 서버는 `purpose` 만 받는다(값도 'DATE_PRACTICE' 고정) — 연습 단계는 로컬에 보관한다.
+ *
+ * 연습 단계를 `purpose` 로 그대로 보낸다 — 서버 `ChatSessionPurpose` 가
+ * `BEFORE_DATE` / `AFTER_DATE` 를 받으면서 두 값이 같아졌다.
  * 이미 ACTIVE 세션이 있으면 409(`ACTIVE_CHAT_SESSION_EXISTS`) → 그 세션을 돌려준다.
  */
 export async function createChatSession(input: CreateChatSessionInput): Promise<AiChatSession> {
   try {
     const created = unwrap(
-      await apiClient.post<ApiEnvelope<RawSessionCreated>>(BASE, { purpose: 'DATE_PRACTICE' }),
+      await apiClient.post<ApiEnvelope<RawSessionCreated>>(BASE, { purpose: input.stage }),
     )
-    writePreference(created.sessionId, { stage: input.stage })
     const practiceGoal = await getMyPracticeGoal().catch(() => null)
     return toSession(
       {
@@ -239,14 +259,15 @@ export async function createChatSession(input: CreateChatSessionInput): Promise<
     if (errorCodeOf(error) === 'ACTIVE_CHAT_SESSION_EXISTS') {
       const current = await getCurrentChatSession()
       if (current) {
-        // 진행 중 세션의 설정을 사용자가 방금 고른 값으로 갱신한다.
-        writePreference(current.chatSessionId, {
-          stage: input.stage,
-        })
-        return {
-          ...current,
-          stage: input.stage,
-        }
+        /*
+         * 진행 중 세션을 **그대로** 돌려준다.
+         *
+         * 예전에는 사용자가 방금 고른 단계로 라벨을 덮어썼다. 이제 단계는 서버
+         * `purpose` 라 대화 내용과 묶여 있고, 이미 시작된 대화의 성격을 화면에서만
+         * 바꾸면 표시가 거짓이 된다. 진행 중 대화가 있으면 애초에 이 화면에
+         * 도달하지 않는다(`resolveChatbotEntryPath` 가 대화로 곧장 보낸다).
+         */
+        return current
       }
     }
     throw error
@@ -285,9 +306,20 @@ export async function resolveChatbotEntryPath(): Promise<string> {
   }
 }
 
-/** 내 세션 목록(히스토리). 전용 화면은 아직 없지만 계약은 열어둔다. */
-export async function getChatSessions(): Promise<AiChatSession[]> {
-  const list = unwrap(await apiClient.get<ApiEnvelope<RawSessionSummary[]>>(BASE))
+/**
+ * 내 세션 목록(히스토리).
+ *
+ * `purpose` 를 주면 서버가 소개팅 전/후로 걸러 준다. 생략하면 전체다.
+ * ⚠️ 필터를 걸면 **`DATE_PRACTICE` 레거시 세션은 어느 쪽에도 안 잡힌다** —
+ *    서버가 그 세션의 단계를 모르기 때문이다. 목록 화면은 전체를 받아
+ *    화면에서 나누는 쪽을 택했다(아래 `ReportListPage` 참고).
+ */
+export async function getChatSessions(purpose?: ConversationStage): Promise<AiChatSession[]> {
+  const list = unwrap(
+    await apiClient.get<ApiEnvelope<RawSessionSummary[]>>(BASE, {
+      params: purpose ? { purpose } : undefined,
+    }),
+  )
   return list.map((raw) => toSession(raw, null))
 }
 
