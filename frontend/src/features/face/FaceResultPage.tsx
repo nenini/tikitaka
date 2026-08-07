@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge,
@@ -9,10 +10,10 @@ import {
   EmptyState,
   Spinner,
   Stack,
-  Steps,
 } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
+import { ONBOARDING_STEP } from '@/features/auth/onboardingSteps'
+import { OnboardingShell } from '@/features/auth/OnboardingShell'
 import { getMyFaceAnalysis } from './api'
 import { faceTypeImage } from './faceImage'
 import { FACE_TYPE_DESCRIPTION, type FaceAnalysisResult } from './types'
@@ -65,25 +66,7 @@ export function FaceResultPage({ mode = 'onboarding' }: FaceResultPageProps) {
   const goCapture = () => navigate(capturePath, { replace: true })
 
   return (
-    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
-      <header className="mb-5">
-        {onboarding ? (
-          <Steps
-            count={ONBOARDING_STEP_COUNT}
-            current={ONBOARDING_STEP.face}
-            labels={ONBOARDING_STEP_LABELS}
-          />
-        ) : (
-          <Button variant="ghost" size="sm" onClick={() => navigate('/me/edit')}>
-            ‹ 개인정보 관리
-          </Button>
-        )}
-        <h1 className="bt-h2 mt-4">얼굴상 결과</h1>
-        <p className="bt-body-sm bt-muted mt-1">
-          재미로 보는 결과예요. 매칭에서는 참고 정보로만 쓰이고, 사진은 이미 폐기됐어요.
-        </p>
-      </header>
-
+    <FaceResultFrame onboarding={onboarding} onBack={() => navigate('/me/edit')}>
       {loading ? (
         <div className="grid place-items-center py-16" aria-busy="true">
           <Spinner size={28} />
@@ -111,6 +94,45 @@ export function FaceResultPage({ mode = 'onboarding' }: FaceResultPageProps) {
           onNext={goNext}
         />
       )}
+    </FaceResultFrame>
+  )
+}
+
+function FaceResultFrame({
+  onboarding,
+  onBack,
+  children,
+}: {
+  onboarding: boolean
+  onBack: () => void
+  children: ReactNode
+}) {
+  if (onboarding) {
+    return (
+      <OnboardingShell
+        current={ONBOARDING_STEP.face}
+        eyebrow="분석 결과"
+        title="나와 닮은 얼굴상"
+        description="재미로 보는 결과예요. 매칭에서는 참고 정보로만 쓰이고, 사진은 이미 폐기됐습니다."
+        maxWidth="md"
+      >
+        {children}
+      </OnboardingShell>
+    )
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
+      <header className="mb-5">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          ‹ 개인정보 관리
+        </Button>
+        <h1 className="bt-h2 mt-4">얼굴상 결과</h1>
+        <p className="bt-body-sm bt-muted mt-1">
+          재미로 보는 결과예요. 매칭에서는 참고 정보로만 쓰이고, 사진은 이미 폐기됐어요.
+        </p>
+      </header>
+      {children}
     </main>
   )
 }

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, Cluster, Spinner, Stack, Steps } from '@/components'
+import { Button, Callout, Card, Cluster, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getMyProfile } from '@/features/profile/api'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
+import { ONBOARDING_STEP } from '@/features/auth/onboardingSteps'
+import { OnboardingShell } from '@/features/auth/OnboardingShell'
 import {
   analyzeFace,
   createFaceAnalysisRequest,
@@ -164,21 +166,7 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
   const canCapture = camera.status === 'ready' && Boolean(group) && !analyzing
 
   return (
-    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
-      <header className="mb-5">
-        {onboarding && (
-          <Steps
-            count={ONBOARDING_STEP_COUNT}
-            current={ONBOARDING_STEP.face}
-            labels={ONBOARDING_STEP_LABELS}
-          />
-        )}
-        <h1 className="bt-h2 mt-4">{onboarding ? '얼굴상 분석' : '얼굴 다시 찍기'}</h1>
-        <p className="bt-body-sm bt-muted mt-1">
-          사진은 분석에만 쓰이고 서버에 저장하지 않아요. 결과는 재미 요소이자 매칭 참고 정보예요.
-        </p>
-      </header>
-
+    <FaceCaptureFrame onboarding={onboarding}>
       {profileError && (
         <Callout tone="danger" icon="report">
           {profileError} 프로필을 먼저 입력해 주세요.
@@ -300,6 +288,33 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
 
       {/* 결과 표시는 이 화면에 두지 않는다 — 저장 직후 /…/face-result 로 넘어간다.
           그 화면이 서버에서 최신 결과를 다시 읽어, 새로고침해도 결과가 유지된다. */}
+    </FaceCaptureFrame>
+  )
+}
+
+function FaceCaptureFrame({ onboarding, children }: { onboarding: boolean; children: ReactNode }) {
+  if (onboarding) {
+    return (
+      <OnboardingShell
+        current={ONBOARDING_STEP.face}
+        title="얼굴상 분석"
+        description="사진은 분석에만 쓰이고 바로 폐기돼요. 결과는 재미 요소이자 매칭 참고 정보입니다."
+        maxWidth="md"
+      >
+        {children}
+      </OnboardingShell>
+    )
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
+      <header className="mb-5">
+        <h1 className="bt-h2 mt-4">얼굴 다시 찍기</h1>
+        <p className="bt-body-sm bt-muted mt-1">
+          사진은 분석에만 쓰이고 서버에 저장하지 않아요. 결과는 재미 요소이자 매칭 참고 정보예요.
+        </p>
+      </header>
+      {children}
     </main>
   )
 }

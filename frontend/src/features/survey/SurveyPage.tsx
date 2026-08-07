@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, CardHeader, Spinner, Stack, Steps } from '@/components'
+import { Button, Callout, Card, CardHeader, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { useAuthStore } from '@/stores/auth.store'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from '@/features/auth/onboardingSteps'
+import { ONBOARDING_STEP } from '@/features/auth/onboardingSteps'
+import { OnboardingShell } from '@/features/auth/OnboardingShell'
 import { createMySurvey, getMySurvey, getSurveyOptions, updateMySurvey } from './api'
 import { AgeRangeField, MultiChoice, SingleChoice } from './parts'
 import {
@@ -157,15 +159,17 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
 
   if (loading) {
     return (
-      <main className="mx-auto grid w-full max-w-[720px] place-items-center px-5 py-20" aria-busy="true">
-        <Spinner size={28} />
-      </main>
+      <SurveyFrame onboarding={onboarding} onBack={() => navigate('/me/edit')}>
+        <div className="grid place-items-center py-20" aria-busy="true">
+          <Spinner size={28} />
+        </div>
+      </SurveyFrame>
     )
   }
 
   if (loadError || !options) {
     return (
-      <main className="mx-auto w-full max-w-[720px] px-5 py-10">
+      <SurveyFrame onboarding={onboarding} onBack={() => navigate('/me/edit')}>
         <Stack gap={12}>
           <Callout tone="danger" icon="report">
             {loadError ?? '설문 선택지를 불러오지 못했어요.'}
@@ -186,32 +190,12 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
             )}
           </div>
         </Stack>
-      </main>
+      </SurveyFrame>
     )
   }
 
   return (
-    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
-      <header className="mb-5">
-        {onboarding ? (
-          <Steps
-            count={ONBOARDING_STEP_COUNT}
-            current={ONBOARDING_STEP.survey}
-            labels={ONBOARDING_STEP_LABELS}
-          />
-        ) : (
-          /* 온보딩은 되돌아갈 곳이 흐름상 정해져 있지만, 편집은 허브에서 들어온다.
-             프로필·지역 편집 화면과 같은 자리에 같은 문구로 둔다. */
-          <Button variant="ghost" size="sm" onClick={() => navigate('/me/edit')}>
-            ‹ 개인정보 관리
-          </Button>
-        )}
-        <h1 className="bt-h2 mt-4">{onboarding ? '이상형과 개선 목표' : '설문 다시 응답'}</h1>
-        <p className="bt-body-sm bt-muted mt-1">
-          매칭 조건과 코칭 방향을 정하는 데 써요. 마이페이지에서 언제든 바꿀 수 있어요.
-        </p>
-      </header>
-
+    <SurveyFrame onboarding={onboarding} onBack={() => navigate('/me/edit')}>
       <Stack gap={16}>
         <Card>
           <CardHeader title="어떤 얼굴상을 선호하세요?" />
@@ -312,6 +296,52 @@ export function SurveyPage({ mode = 'onboarding' }: SurveyPageProps) {
           )}
         </Stack>
       </Stack>
+    </SurveyFrame>
+  )
+}
+
+function SurveyFrame({
+  onboarding,
+  onBack,
+  children,
+}: {
+  onboarding: boolean
+  onBack: () => void
+  children: ReactNode
+}) {
+  if (onboarding) {
+    return (
+      <OnboardingShell
+        current={ONBOARDING_STEP.survey}
+        eyebrow="마지막 단계"
+        title="이상형과 개선 목표"
+        description="매칭 조건과 코칭 방향을 정해요. 마이페이지에서 언제든 바꿀 수 있습니다."
+        maxWidth="md"
+        visualTitle={
+          <>
+            이제, 첫 대화를
+            <br />
+            시작해볼까요?
+          </>
+        }
+      >
+        {children}
+      </OnboardingShell>
+    )
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-[720px] px-5 py-6">
+      <header className="mb-5">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          ‹ 개인정보 관리
+        </Button>
+        <h1 className="bt-h2 mt-4">설문 다시 응답</h1>
+        <p className="bt-body-sm bt-muted mt-1">
+          매칭 조건과 코칭 방향을 정하는 데 써요. 마이페이지에서 언제든 바꿀 수 있어요.
+        </p>
+      </header>
+      {children}
     </main>
   )
 }

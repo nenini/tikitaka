@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Callout, Card, CardButton, Icon, Stack, Steps } from '@/components'
+import { Badge, Button, Callout, Card, CardButton, Icon, Stack } from '@/components'
 import { cn } from '@/shared/lib/cn'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
+import { ONBOARDING_STEP } from './onboardingSteps'
+import { OnboardingShell } from './OnboardingShell'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02b · 본인 인증 (KYC · Mock) — 온보딩 2/4                                  */
@@ -53,17 +54,12 @@ export function VerifyKycPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
-      <header>
-        <Steps
-          count={ONBOARDING_STEP_COUNT}
-          current={ONBOARDING_STEP.verify}
-          labels={ONBOARDING_STEP_LABELS}
-        />
-        <h1 className="bt-h2 mt-4">본인 인증</h1>
-        <p className="bt-body-sm bt-muted mt-1">성인 여부만 확인해요. 오래 걸리지 않아요.</p>
-      </header>
-
+    <OnboardingShell
+      current={ONBOARDING_STEP.verify}
+      title="본인 인증"
+      description="성인 여부만 확인해요. 오래 걸리지 않고, 민감한 개인정보는 저장하지 않습니다."
+      maxWidth="sm"
+    >
       <Card>
         <Stack gap={16}>
           <div>
@@ -172,6 +168,6 @@ export function VerifyKycPage() {
             ? '본인확인이 완료되었습니다. 성인으로 확인되었습니다.'
             : ''}
       </span>
-    </main>
+    </OnboardingShell>
   )
 }

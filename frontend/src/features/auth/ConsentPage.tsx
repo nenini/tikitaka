@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, ConsentRow, Spinner, Stack, Steps } from '@/components'
+import { Button, Callout, Card, ConsentRow, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getActiveConsentTypes, saveMyConsents } from '@/features/consent/api'
 import { CONSENT_DESCRIPTION, isRequiredConsent, type ConsentType } from '@/features/consent/types'
 import { useAuthStore } from '@/stores/auth.store'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
+import { ONBOARDING_STEP } from './onboardingSteps'
+import { OnboardingShell } from './OnboardingShell'
 
 /* -------------------------------------------------------------------------- */
 /*  W-03 · 목적별 개인정보 동의 (AUTH-03) — 온보딩 3/6                          */
@@ -79,17 +80,12 @@ export function ConsentPage() {
   const required = types?.filter((t) => isRequiredConsent(t.code)) ?? []
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[640px] flex-col justify-center gap-5 px-5 py-10">
-      <header>
-        <Steps
-          count={ONBOARDING_STEP_COUNT}
-          current={ONBOARDING_STEP.consent}
-          labels={ONBOARDING_STEP_LABELS}
-        />
-        <h1 className="bt-h2 mt-4">목적별 개인정보 동의</h1>
-        <p className="bt-body-sm bt-muted mt-1">필요한 목적에만 동의할 수 있어요.</p>
-      </header>
-
+    <OnboardingShell
+      current={ONBOARDING_STEP.consent}
+      title="목적별 개인정보 동의"
+      description="필요한 목적에만 동의할 수 있어요. 선택 항목은 언제든 바꿀 수 있습니다."
+      maxWidth="md"
+    >
       {loadError && (
         <Callout tone="danger" icon="report">
           {loadError}
@@ -164,6 +160,6 @@ export function ConsentPage() {
           </Button>
         </>
       )}
-    </main>
+    </OnboardingShell>
   )
 }

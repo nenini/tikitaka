@@ -3,11 +3,12 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Field, Input, Progress, Stack, Steps } from '@/components'
+import { Badge, Button, Callout, Card, Field, Input, Progress, Stack } from '@/components'
 import { errorCodeOf, serverMessageOf } from '@/shared/api/envelope'
-import { ONBOARDING_STEP, ONBOARDING_STEP_COUNT, ONBOARDING_STEP_LABELS } from './onboardingSteps'
+import { ONBOARDING_STEP } from './onboardingSteps'
 import { useAuthStore } from '@/stores/auth.store'
 import { signup } from './api'
+import { OnboardingShell } from './OnboardingShell'
 
 /* -------------------------------------------------------------------------- */
 /*  W-02 · 계정 만들기 (AUTH-01) — 온보딩 1/5                                    */
@@ -152,17 +153,12 @@ export function SignupPage() {
   const emailError = errors.email?.message
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col justify-center gap-5 px-5 py-10">
-      <header>
-        <Steps
-          count={ONBOARDING_STEP_COUNT}
-          current={ONBOARDING_STEP.account}
-          labels={ONBOARDING_STEP_LABELS}
-        />
-        <h1 className="bt-h2 mt-4">계정 만들기</h1>
-        <p className="bt-body-sm bt-muted mt-1">이메일과 비밀번호로 시작해요. 4단계만 더 하면 끝나요.</p>
-      </header>
-
+    <OnboardingShell
+      current={ONBOARDING_STEP.account}
+      title="계정 만들기"
+      description="이메일과 비밀번호로 시작해요. 필요한 정보만 차근차근 확인할게요."
+      maxWidth="sm"
+    >
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <Stack gap={20}>
           <Card>
@@ -259,7 +255,6 @@ export function SignupPage() {
           </Button>
         </Stack>
       </form>
-
-    </main>
+    </OnboardingShell>
   )
 }
