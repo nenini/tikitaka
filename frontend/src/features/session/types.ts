@@ -91,6 +91,18 @@ export interface SessionStatusSnapshot {
   allJoined: boolean
   allReady: boolean
   allConnected: boolean
+  /**
+   * 분석 동의 플래그 — **요청한 본인 기준**이다(상대 설정이 아니다).
+   *
+   * 이 두 값이 상태 응답에 실리면서 분석 on/off 에 **읽기 경로**가 생겼다. 예전에는
+   * `PATCH /analysis-settings` 의 응답이 유일한 통로였는데, 그 PATCH 는 세션이
+   * `IN_PROGRESS` 면 409 라 새로고침·늦은 입장·대기방 우회가 전부 "영구히 꺼짐"으로
+   * 끝났다. 이제 3초 폴링이 알아서 복구한다.
+   *
+   * ⚠️ 서버가 아직 안 내려주면 `undefined` 다 — 호출부에서 폴백을 둔다.
+   */
+  voiceAnalysisEnabled: boolean
+  expressionAnalysisEnabled: boolean
   participants: SessionParticipantState[]
 }
 
