@@ -4,6 +4,7 @@ import { Badge, Button, Callout, Card, Icon } from '@/components'
 import type { IconName } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getMySurveyOrNull } from '@/shared/api/me'
+import { resolveChatbotEntryPath } from '@/features/chatbot/api'
 import { createMatchRequest, getCurrentMatchRequest, onboardingBlockReason } from './api'
 import { QueueSetupModal } from './QueueSetupModal'
 import type { MatchRequestInput } from './types'
@@ -27,6 +28,10 @@ export function TrackSelectPage() {
   const [initialInput, setInitialInput] = useState<Partial<MatchRequestInput> | undefined>()
   const [blockReason, setBlockReason] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  /** 대기 중인 매칭 요청 id. 없으면 null. */
+  const [queued, setQueued] = useState<number | null>(null)
+  /** 챗봇 진입 목적지를 조회하는 중 — 버튼을 잠근다. */
+  const [chatEntering, setChatEntering] = useState(false)
 
   /*
    * 음성 분석 동의 게이트를 두지 않는다.
@@ -40,14 +45,19 @@ export function TrackSelectPage() {
    * 이 화면에 도달한 사용자는 동의를 마친 상태다. 여기서 다시 물을 근거가 없다.
    */
 
-  // 이미 대기 중인 요청이 있으면 트랙 선택 화면에 머무를 이유가 없다.
+  /*
+   * 대기 중이어도 이 화면에 **머무른다.**
+   *
+   * 예전에는 대기 요청이 있으면 큐 화면으로 곧장 replace 했다. 그러면 대기 중인
+   * 사용자는 AI 화상·챗봇 카드를 영영 볼 수 없어서, 화면이 스스로 안내하는
+   * "AI 화상·챗봇은 매칭 대기를 유지한 채 이용할 수 있어요" 가 거짓말이 됐다.
+   * 대신 실사용자 카드의 CTA 만 '대기 화면 보기'로 바꾼다.
+   */
   useEffect(() => {
     let alive = true
     getCurrentMatchRequest()
       .then((current) => {
-        if (alive && current && current.status === 'WAITING') {
-          navigate(`/matching/queue/${current.matchRequestId}`, { replace: true })
-        }
+        if (alive) setQueued(current && current.status === 'WAITING' ? current.matchRequestId : null)
       })
       .catch(() => {
         /* 조회 실패는 무시 — 등록 시점에 서버가 다시 판정한다 */
@@ -55,7 +65,7 @@ export function TrackSelectPage() {
     return () => {
       alive = false
     }
-  }, [navigate])
+  }, [])
 
   /** 설문에서 연령 범위를 끌어와 모달 초기값으로 쓴다. */
   async function openSetup() {
@@ -105,10 +115,11 @@ export function TrackSelectPage() {
 
       {/* 카드 내부를 [헤더 / 핵심 3개 / 안내+CTA] 3행 그리드로 고정해 3열의 CTA 라인을 맞춘다 */}
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
-        {/* 실사용자 — 추천 */}
+        {/* 실사용자 — 추천. 이미 대기 중이면 등록 대신 대기 화면으로 보낸다
+            (동시 진행 매칭은 1개라 여기서 새로 등록할 수 없다) */}
         <TrackCard
           icon="user"
-          badge={<Badge tone="info">추천</Badge>}
+          badge={queued != null ? <Badge tone="warning">대기 중</Badge> : <Badge tone="info">추천</Badge>}
           title="실사용자 화상 세션"
           subtitle="실제 사람과 30분 대화"
           recommended
@@ -119,9 +130,15 @@ export function TrackSelectPage() {
           ]}
           note="노쇼·직전 취소 시 패널티가 있어요."
           cta={
-            <Button variant="primary" block loading={checking} onClick={openSetup}>
-              매칭 대기 등록
-            </Button>
+            queued != null ? (
+              <Button variant="primary" block onClick={() => navigate(`/matching/queue/${queued}`)}>
+                대기 화면 보기
+              </Button>
+            ) : (
+              <Button variant="primary" block loading={checking} onClick={openSetup}>
+                매칭 대기 등록
+              </Button>
+            )
           }
         />
 
@@ -155,7 +172,20 @@ export function TrackSelectPage() {
           ]}
           note="매칭 대기를 유지한 채 이용할 수 있어요."
           cta={
-            <Button variant="secondary" block onClick={() => navigate('/chatbot/persona')}>
+            <Button
+              variant="secondary"
+              block
+              loading={chatEntering}
+              onClick={() => {
+                if (chatEntering) return
+                setChatEntering(true)
+                void resolveChatbotEntryPath()
+                  .then((path) => navigate(path))
+                  .finally(() => setChatEntering(false))
+              }}
+            >
+              {/* 진행 중 대화가 있으면 그 대화로 이어진다 — 문구도 그때만 바꿔야 정확하지만,
+                  목적지를 미리 조회하지 않으므로 중립적인 '챗봇 시작'을 유지한다. */}
               챗봇 시작
             </Button>
           }

@@ -290,7 +290,9 @@ export function MyPage() {
             <Card>
               <CardHeader title="계정" />
               <Stack gap={4}>
-                <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit')} />
+                {/* 촬영 화면으로 곧장 보낸다. 예전에는 허브(`/me/edit`)로 보내서
+                    '얼굴 재촬영'을 눌러도 한 번 더 찾아 들어가야 했다. */}
+                <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit/face')} />
                 <ListRowButton title="비밀번호 변경" onClick={() => console.log('TODO: 비밀번호 변경')} />
                 {/* 로그아웃과 회원 탈퇴는 성격이 전혀 다르다(되돌릴 수 있음 vs 없음).
                     구분선으로 떼어 두 행이 나란히 보이지 않게 한다 — 오클릭이 곧 탈퇴가 되면 안 된다. */}
