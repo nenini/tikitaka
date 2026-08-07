@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Avatar, Button, Callout, Card, Progress, Spinner, Stack } from '@/components'
+import { Avatar, Button, Callout, Card, ExitToHomeButton, Progress, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getPublicProfile } from '@/features/profile/api'
 import { getReportStatus } from '@/features/report/api'
@@ -8,17 +8,17 @@ import type { ReportStatus } from '@/features/report/types'
 import { useIsCompactViewport } from '@/shared/lib/useIsCompactViewport'
 import {
   getEvaluationItems,
-  getEvaluationStatus,
+  getEvaluationStatus,
   submitEvaluation,
 } from './api'
 import { canOpenReport, PHASE_NOTICE, resolveSessionEndPhase } from './sessionEndFlow'
 // OverflowMenu 는 아래 '이 세션 관리' 블록을 다시 켤 때 함께 import 한다(현재 주석 처리됨).
 import { FreeTextField, MetricRow, ReportBlockDialog } from './parts'
 import { formatDeadline } from './format'
-import type {
+import type {
   EvaluationItems,
   EvaluationScores,
-  EvaluationStatus,
+  EvaluationStatus,
 } from './types'
 
 /** 화면이 다루는 상대 정보. `/items` 는 userId 만 주므로 닉네임은 공개 프로필에서 채운다. */
@@ -38,7 +38,7 @@ export function PeerReviewPage() {
 
   const [items, setItems] = useState<EvaluationItems | null>(null)
   const [status, setStatus] = useState<EvaluationStatus | null>(null)
-  const [opponent, setOpponent] = useState<Opponent | null>(null)
+  const [opponent, setOpponent] = useState<Opponent | null>(null)
 
   const [scores, setScores] = useState<Partial<EvaluationScores>>({})
   const [goodText, setGoodText] = useState('')
@@ -172,6 +172,9 @@ export function PeerReviewPage() {
             </p>
           </div>
         </div>
+        {/* 지금 안 내도 마감(48시간)까지는 다시 올 수 있다 — 나가는 길을 막지 않는다.
+            제출 조건과 마감 안내는 우측 GateCallout 이 그대로 설명한다. */}
+        <ExitToHomeButton className="shrink-0" />
         {/* 회차·진행 시간 배지는 평가 API 계약에 없어서 뺐다. 세션 상세를 붙일 때 되살린다. */}
         {/* TODO: 추후 global header 생기면 신고/차단 기능 더보기로 넣기 */}
         {/* <OverflowMenu

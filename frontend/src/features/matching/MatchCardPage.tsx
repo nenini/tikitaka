@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Avatar, Badge, Button, Callout, Card, Cluster, Icon, Modal, Spinner, Stack, TagChip } from '@/components'
+import { Avatar, Badge, Button, Callout, Card, Cluster, ExitToHomeButton, Icon, Modal, Spinner, Stack, TagChip } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { acceptMatch, getCurrentMatch, rejectMatch } from './api'
 import { InfoRow } from './parts'
@@ -135,6 +135,12 @@ export function MatchCardPage() {
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-5 py-6">
+      {/* 수락 마감은 계속 흐른다 — 나가도 카드는 남아 있고 알림으로 다시 들어올 수 있다.
+          카드 안이 아니라 바깥에 두어 수락/거절 버튼과 멀찍이 떨어뜨린다. */}
+      <div className="mb-3 flex justify-end">
+        <ExitToHomeButton />
+      </div>
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* 좌: 상대 카드 + 수락/거절 */}
         <Card className="flex flex-col gap-4 lg:max-w-[470px] lg:flex-1">

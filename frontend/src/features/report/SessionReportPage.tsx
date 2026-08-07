@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Cluster, EmptyState, Icon, Skeleton } from '@/components'
+import { Button, Card, Cluster, EmptyState, ExitToHomeButton, Icon, Skeleton } from '@/components'
 import { getAxisDetail, getReportDetail, getReportStatus, requestReportGeneration } from './api'
 import {
   AxisDetailPanel,
@@ -171,6 +172,7 @@ export function SessionReportPage() {
         }
         actionLabel="평가 결과 보기"
         onAction={() => navigate(`/session/${sessionId}/review`)}
+        secondaryAction={<ExitToHomeButton size="md" />}
       />
     )
   }
@@ -188,9 +190,13 @@ export function SessionReportPage() {
               ? '세션 분석을 시작하는 중이에요. 잠시만 기다려 주세요.'
               : '분석 결과를 정리하는 중이에요. 잠시만 기다려 주세요.'}
           </p>
-          <Button variant="ghost" onClick={() => navigate(`/session/${sessionId}/review`)}>
-            평가 결과 보기
-          </Button>
+          {/* 생성 중에도 나갈 길을 준다 — 리포트는 완성되면 목록에서 다시 볼 수 있다. */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="ghost" onClick={() => navigate(`/session/${sessionId}/review`)}>
+              평가 결과 보기
+            </Button>
+            <ExitToHomeButton size="md" />
+          </div>
         </Card>
       </main>
     )
@@ -205,6 +211,7 @@ export function SessionReportPage() {
         actionLabel="다시 시도"
         actionLoading={retrying}
         onAction={() => void retry()}
+        secondaryAction={<ExitToHomeButton size="md" />}
       />
     )
   }
@@ -225,6 +232,8 @@ export function SessionReportPage() {
 
   return (
     <main className="mx-auto w-full max-w-[1080px] px-5 py-6">
+      {/* 이 화면은 앱 셸 밖이라 상단 네비가 없다 — 헤더가 유일한 이동 수단이다.
+          '지난 리포트' 는 옆으로(다른 회차), '홈으로' 는 밖으로 나가는 길이다. */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="bt-h1">세션 리포트</h1>
@@ -232,6 +241,12 @@ export function SessionReportPage() {
             {report.generatedAt ? `${formatDate(report.generatedAt)} 생성` : '생성 완료'}
             {report.analysisVersion ? ` · 분석 ${report.analysisVersion}` : ''}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" leadingIcon="report" onClick={() => navigate('/reports')}>
+            지난 리포트
+          </Button>
+          <ExitToHomeButton />
         </div>
       </div>
 
@@ -458,6 +473,13 @@ function toVisionMetrics(metrics: ReportMetrics | null): MetricView[] {
 
 /* ── 상태 화면 ──────────────────────────────────────────── */
 
+/**
+ * 리포트를 못 그리는 상태(준비 중·실패·기능 없음)의 안내.
+ *
+ * ⚠️ 동작이 **하나뿐이면 안 된다.** 예전에는 `평가 결과 보기` 또는 `다시 시도` 만 있어
+ *    여기서 홈으로 갈 길이 없었다. 이 화면은 앱 셸 밖이라 네비도 없어서, 사용자는
+ *    브라우저 뒤로가기(=방금 끝난 세션 화면)로 되돌아가야 했다.
+ */
 function ReportNotice({
   icon,
   title,
@@ -465,6 +487,7 @@ function ReportNotice({
   actionLabel,
   actionLoading,
   onAction,
+  secondaryAction,
 }: {
   icon: 'sparkle' | 'wrench'
   title: string
@@ -472,6 +495,8 @@ function ReportNotice({
   actionLabel: string
   actionLoading?: boolean
   onAction: () => void
+  /** 주 동작 옆의 보조 경로. 보통 `<ExitToHomeButton />` */
+  secondaryAction?: ReactNode
 }) {
   return (
     <main className="mx-auto w-full max-w-[560px] px-5 py-16">
@@ -481,9 +506,12 @@ function ReportNotice({
           title={title}
           text={text}
           action={
-            <Button variant="primary" loading={actionLoading} onClick={onAction}>
-              {actionLabel}
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" loading={actionLoading} onClick={onAction}>
+                {actionLabel}
+              </Button>
+              {secondaryAction}
+            </div>
           }
         />
       </Card>
