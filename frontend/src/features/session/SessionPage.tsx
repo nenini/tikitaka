@@ -9,7 +9,7 @@ import { errorCodeOf, errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
 import { useSessionMedia } from './useSessionMedia'
-import { isVisionEnabled, snapshotAnalysisSettings, useVisionAnalysis } from './vision'
+import { isVisionEnabled, useVisionAnalysis } from './vision'
 import { CoachOverlay } from './components/CoachOverlay'
 import { CoachRail } from './components/CoachRail'
 import { SessionStage } from './components/SessionStage'
@@ -171,25 +171,24 @@ export function SessionPage() {
   }, [validSession, sessionId, status?.status])
 
   /* ── 표정·시선 분석 (COACH-01) ──
-     동의 플래그는 대기방 입장 때 찍은 스냅샷이 SSOT 다(§8 — 세션 화면에는 노출하지 않는다).
-     대기방을 거치지 않았거나 스냅샷이 사라졌으면 **시작 전에만** 한 번 더 찍어 본다
-     (PATCH 는 IN_PROGRESS 부터 409 다). 끝내 모르면 false — 분석하지 않는다. */
+     동의 플래그는 **상태 응답이 SSOT** 다(§8 — 세션 화면에는 노출하지 않는다).
+
+     예전에는 대기방에서 찍은 sessionStorage 스냅샷을 읽고, 없으면 시작 전에 한 번 더
+     `PATCH /analysis-settings` 로 찍어 봤다. 그런데 브라우저가 플래그를 아는 길이
+     그 PATCH 의 응답뿐이었고 PATCH 는 IN_PROGRESS 부터 409 라 —
+     **쓰기로만 읽을 수 있는 구조**였다. 타이밍을 놓치면 복구가 없었다(새로고침·
+     대기방 우회·늦은 입장이 전부 여기 걸려 분석이 영구히 꺼졌다).
+
+     이제 3초 상태 폴링이 값을 실어 오므로 위 경우가 모두 저절로 복구된다.
+     `useVisionAnalysis` 는 false → true 변화를 받아 그때 분석을 시작한다.
+
+     ⚠️ `??` 폴백은 지우지 말 것 — 서버가 이 필드를 내려주기 전(배포 순서가 뒤집힌
+        경우)에는 값이 `undefined` 라, 폴백이 없으면 지금 잘 되던 정상 경로까지
+        같이 꺼진다. 서버 배포가 확인되면 대기방 PATCH 와 함께 걷어낸다. */
   const currentUser = useAuthStore((s) => s.user)
-  const [visionEnabled, setVisionEnabled] = useState(() =>
-    validSession ? isVisionEnabled(sessionId) : false,
-  )
   const sessionPhase = status?.status
-  useEffect(() => {
-    if (!validSession || visionEnabled) return
-    if (sessionPhase !== undefined && sessionPhase !== 'READY') return
-    let alive = true
-    void snapshotAnalysisSettings(sessionId).then((snapshot) => {
-      if (alive && snapshot) setVisionEnabled(snapshot.expressionAnalysisEnabled)
-    })
-    return () => {
-      alive = false
-    }
-  }, [validSession, sessionId, visionEnabled, sessionPhase])
+  const visionEnabled =
+    status?.expressionAnalysisEnabled ?? (validSession ? isVisionEnabled(sessionId) : false)
 
   const vision = useVisionAnalysis({
     visionEnabled,
@@ -482,6 +481,17 @@ export function SessionPage() {
           {!realtime.realtimeConnected && session.state === 'connected' && (
             <Callout tone="warning" className="bt-session-error">
               코칭 연결이 끊겼어요. 영상·음성은 계속 이어집니다.
+            </Callout>
+          )}
+
+          {/* 표정 분석이 죽었을 때만 알린다.
+              ⚠️ `expressionAnalysisEnabled === false` 자체는 장애가 아니다 — 선택 동의에
+                 따른 정상 비활성화다. 그걸 오류로 알리면 동의하지 않은 사용자에게 매 세션
+                 고장 났다고 말하는 셈이 된다. **켜기로 돼 있는데 못 켠 경우**만 짚는다.
+              지금까지는 30분 뒤 리포트에서 표정 지표가 통째로 비어야 알 수 있었다. */}
+          {status?.expressionAnalysisEnabled === true && vision.state === 'UNAVAILABLE' && (
+            <Callout tone="warning" className="bt-session-error">
+              표정 분석을 시작하지 못했어요. 통화와 대화 코칭은 그대로 이어집니다.
             </Callout>
           )}
 
