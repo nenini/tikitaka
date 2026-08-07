@@ -569,7 +569,7 @@ def _ensure_floor(
         measured = [a for a in axes if a.measured and a.score is not None]
         if measured:
             worst = min(measured, key=lambda a: a.score or 0.0)
-            improvements = (f"{worst.axis}을(를) 다음 세션에서 조금 더 신경 써 보세요.",)
+            improvements = (_improvement_hint(worst.axis),)
     if (strengths, improvements, missions) == (
         narrative.strengths,
         narrative.improvements,
@@ -748,6 +748,31 @@ def _strip_timestamps(text: str) -> str:
     return cleaned.strip()
 
 
+def _particle(word: str, with_batchim: str, without_batchim: str) -> str:
+    """받침에 맞는 조사를 붙인다.
+
+    "대화흐름을(를)" 이 사용자 화면에 그대로 나갔다(세션 19). 한국어 조사는 앞 글자의
+    받침 유무로 갈리는데 "을(를)" 처럼 둘 다 적어 두면 템플릿 티가 난다.
+
+    한글 음절은 유니코드에서 (초성*21 + 중성)*28 + 종성 으로 배치돼 있어, 28로 나눈
+    나머지가 0이 아니면 받침이 있다.
+    """
+    if not word:
+        return without_batchim
+    last = word[-1]
+    if not ("가" <= last <= "힣"):
+        return without_batchim
+    return with_batchim if (ord(last) - ord("가")) % 28 else without_batchim
+
+
+def _improvement_hint(axis_label: str) -> str:
+    return f"{axis_label}{_particle(axis_label, '을', '를')} 다음 세션에서 조금 더 신경 써 보세요."
+
+
+def _strength_hint(axis_label: str) -> str:
+    return f"{axis_label}{_particle(axis_label, '이', '가')} 이번 세션에서 가장 안정적이었어요."
+
+
 def _ensure_positive_card(narrative: ReportNarrative) -> ReportNarrative:
     """긍정 카드 최소 1개 보장(D-14). 없으면 강점 문장으로 하나 만든다."""
     if any(card.kind == "positive" for card in narrative.cards):
@@ -784,8 +809,8 @@ def fallback_narrative(
     if measured:
         best = max(measured, key=lambda a: a.score or 0.0)
         worst = min(measured, key=lambda a: a.score or 0.0)
-        strengths.append(f"{best.axis}이(가) 이번 세션에서 가장 안정적이었어요.")
-        improvements.append(f"{worst.axis}을(를) 다음 세션에서 조금 더 신경 써 보세요.")
+        strengths.append(_strength_hint(best.axis))
+        improvements.append(_improvement_hint(worst.axis))
     for axis in axes:
         # 목표 축이 최저점이 아니어서 개선점에 안 잡혔으면 여기서 넣어 준다.
         note = next((a.note for a in measured if a.axis == axis), None)

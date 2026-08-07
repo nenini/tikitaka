@@ -17,6 +17,8 @@ from aggregator.report.builder import (
     _AXIS_KEYWORDS,
     MAX_CARDS,
     ReportLlmError,
+    _improvement_hint,
+    _strength_hint,
     build_narrative,
     build_prompt,
     fallback_narrative,
@@ -504,6 +506,28 @@ def test_fallback_mentions_best_and_worst_axis() -> None:
     narrative = fallback_narrative(score_report(report), A)
     assert narrative.strengths and narrative.improvements
     assert not narrative.generated_by_llm
+
+
+def test_axis_hints_pick_the_particle_instead_of_printing_both() -> None:
+    """`대화흐름을(를) 다음 세션에서…` 가 사용자 화면에 그대로 나갔다(세션 19).
+
+    실제 6축 라벨은 전부 받침이 있어 '을·이'만 나오지만, 축 이름이 바뀌었을 때
+    괄호 표기로 되돌아가지 않도록 받침 없는 경우까지 같이 고정한다.
+    """
+    assert _improvement_hint("대화흐름").startswith("대화흐름을 ")
+    assert _strength_hint("대화흐름").startswith("대화흐름이 ")
+    assert _improvement_hint("리액션").startswith("리액션을 ")
+    assert _improvement_hint("공감도").startswith("공감도를 ")
+    assert _strength_hint("공감도").startswith("공감도가 ")
+
+
+def test_fallback_never_emits_bracketed_particles() -> None:
+    """폴백은 LLM 없이 템플릿으로만 만든다 — 조사 티가 가장 나기 쉬운 경로다."""
+    report = _report()
+    narrative = fallback_narrative(score_report(report), A)
+    text = " ".join((*narrative.strengths, *narrative.improvements, *narrative.missions))
+    for template in ("을(를)", "이(가)", "은(는)", "와(과)"):
+        assert template not in text
 
 
 def test_build_narrative_happy_path() -> None:
