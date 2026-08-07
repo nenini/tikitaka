@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Field, Segmented, Select, Spinner } from '@/components'
+import { Badge, Button, Callout, Card, ExitToHomeButton, Field, Segmented, Select, Spinner } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { createChatSession, getPersonaOptions, requestPersonaRecommendation, saveRegionCity } from './api'
 import { REGION_CITIES, STAGE_DESC, STAGE_LABEL } from './types'
@@ -73,11 +73,14 @@ export function PersonaSetupPage() {
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-5 py-6">
-      <header className="mb-5">
-        <h1 className="bt-h1">챗봇 상대를 설정할까요?</h1>
-        <p className="bt-body bt-muted mt-1">
-          AI 채팅은 텍스트로 진행됩니다. 소개팅 전후 대화 감각을 익혀요.
-        </p>
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="bt-h1">챗봇 상대를 설정할까요?</h1>
+          <p className="bt-body bt-muted mt-1">
+            AI 채팅은 텍스트로 진행됩니다. 소개팅 전후 대화 감각을 익혀요.
+          </p>
+        </div>
+        <ExitToHomeButton />
       </header>
 
       <div className="flex flex-col gap-4">

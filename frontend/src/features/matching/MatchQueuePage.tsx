@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, Icon, Modal, Stack, TagChip } from '@/components'
+import { Button, Callout, Card, ExitToHomeButton, Icon, Modal, Stack, TagChip } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getCurrentMatchRequest, leaveQueue, updateMatchRequest } from './api'
 import { QueueSetupModal } from './QueueSetupModal'
@@ -96,11 +96,16 @@ export function MatchQueuePage() {
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-5 py-6">
-      <header className="mb-5">
-        <h1 className="bt-h1">상대를 찾고 있어요</h1>
-        <p className="bt-body bt-muted mt-1">
-          조건이 맞는 사람이 나타나면 바로 연결해 드려요.
-        </p>
+      {/* '홈으로' 는 **대기를 취소하지 않는다.** 취소는 아래 '매칭 대기 취소' 뿐이라,
+          둘을 헷갈리지 않게 톤을 나눈다(취소 secondary · 홈 ghost). */}
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="bt-h1">상대를 찾고 있어요</h1>
+          <p className="bt-body bt-muted mt-1">
+            조건이 맞는 사람이 나타나면 바로 연결해 드려요.
+          </p>
+        </div>
+        <ExitToHomeButton />
       </header>
 
       {loadError && (

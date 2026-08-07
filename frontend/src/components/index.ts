@@ -16,6 +16,9 @@ export { Icon, iconNames } from './Icon'
 export type { IconName, IconProps } from './Icon'
 
 /* ── UI ── */
+export { ExitToHomeButton } from './ui/ExitToHomeButton'
+export type { ExitToHomeButtonProps } from './ui/ExitToHomeButton'
+
 export {
   Button,
   IconButton,
