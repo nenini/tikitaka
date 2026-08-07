@@ -240,29 +240,22 @@ def _score_listening(interruptions: int, duration_ms: int) -> AxisScore:
     )
 
 
-def _score_question(question_count: int, duration_ms: int) -> AxisScore:
-    """질문균형 — 30분 환산 질문 수. 적어도 많아도 감점인 산 모양이다.
+def _score_question() -> AxisScore:
+    """질문균형 — 측정 불가.
 
-    2026-08-06 이전에는 통째로 측정 불가였다. QuestionDetector 가 '?'에 의존하는데
-    whisper 가 짧은 발화에 부호를 안 붙였기 때문이다. 부호가 없으면 한국어 의문문은
-    평서문과 텍스트가 같아서("커피 자주 드세요"(질문) vs "한번 해보세요"(권유)) 어미
-    규칙으로는 가를 수 없었다.
+    QuestionDetector 는 '?' 와 몇몇 의문 어미로 질문을 가른다. 그런데 whisper 는 짧은
+    발화(2~4초)에 문장부호를 붙이지 않는다. 부호가 없으면 한국어 의문문은 평서문과
+    텍스트가 같다("커피 자주 드세요"(질문) vs "한번 해보세요"(권유)). 어미 규칙을
+    넓히면 평서문이 질문으로 잡혀 점수가 부풀고, 좁히면 전부 최저점으로 깔린다.
 
-    `stt.pipeline.PUNCTUATION_PROMPT` 가 그 전제를 깼다 — fixtures/audio 6개 실측에서
-    "취미가 어떻게 되세요" 가 "취미가 어떻게 되세요?" 로 복원됐다. 그래서 되살린다.
+    2026-08-06 에 `initial_prompt` 로 부호를 복원해 이 축을 되살렸다가 하루 만에
+    되돌렸다. 부호는 얻었지만(클립 6개에서 물음표 3→4) 무음 환각이 필터를 100%
+    통과하게 됐다 — 프로덕션 세션 15 에서 전사의 46% 가 프롬프트 문장이었다.
+    축 하나를 살리자고 전사 전체를 오염시킨 셈이라 프롬프트를 뺐다.
 
-    곡선: 질문이 없으면 상대에게 관심이 없어 보이고, 너무 많으면 심문이 된다. 소개팅
-    맥락에서 30분에 12~20회를 상단으로 잡았다.
+    되살리는 조건: 문장부호에 기대지 않는 판정(의도 분류기 등). 프롬프트로는 안 된다.
     """
-    normalized = _per_30min(question_count, duration_ms)
-    score = _interpolate(
-        normalized,
-        ((0.0, 1.0), (4.0, 2.5), (10.0, 4.0), (16.0, 5.0), (30.0, 4.0), (50.0, 2.5)),
-    )
-    return AxisScore(
-        AXIS_QUESTION, _clamp(score), round(normalized, 2), True,
-        f"질문 {question_count}회",
-    )
+    return AxisScore(AXIS_QUESTION, None, None, False, "STT 문장부호 미제공으로 측정 부족")
 
 
 def _score_reaction(vision: VisionInput | None, backchannels: int, duration_ms: int) -> AxisScore:
@@ -364,7 +357,7 @@ def score_report(report: ReportInput) -> ReportScores:
         )
         axes[speaker.speaker_id] = (
             _score_flow(speaker_metrics.long_silence_count, duration),
-            _score_question(speaker.question_count, duration),
+            _score_question(),
             _score_listening(speaker_metrics.interruption_count, duration),
             _score_reaction(vision, backchannels, duration),
             _score_balance(speaker_metrics.speaking_ratio),

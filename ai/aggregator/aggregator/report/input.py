@@ -9,9 +9,17 @@
 
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass, field
 
 from aggregator.state import SessionState, Utterance, VisionUserState
+
+logger = logging.getLogger(__name__)
+
+_LOW_COVERAGE = 0.70
+"""이 아래면 사유를 로그로 남긴다. `scoring.VISION_COVERAGE_THRESHOLD` 와 같은 값이다
+— scoring 이 input 을 import 하므로 여기서 거꾸로 import 하면 순환이다."""
 
 
 @dataclass(frozen=True)
@@ -132,7 +140,7 @@ def build_report_input(
             user_id=user.user_id,
             available=user.vision_available,
             behavior_counts=dict(user.behavior_event_counts),
-            coverage=_vision_coverage(user),
+            coverage=_coverage_with_diagnosis(user),
             observation_window_ms=user.observation_window_ms,
         )
         for user in state.vision_users.values()
@@ -146,6 +154,38 @@ def build_report_input(
         speakers=speakers,
         vision=vision,
         vision_enabled=vision_enabled,
+    )
+
+
+def _coverage_with_diagnosis(user: VisionUserState) -> float | None:
+    """커버리지를 구하고, 낮으면 사유를 남긴다."""
+    coverage = _vision_coverage(user)
+    if coverage is not None:
+        _log_low_coverage(user.user_id, user, coverage)
+    return coverage
+
+
+def _log_low_coverage(user_id: str, user: VisionUserState, coverage: float) -> None:
+    """커버리지가 낮으면 **왜** 낮은지 남긴다.
+
+    실측 세션 17 에서 같은 세션인데 한 명은 0.93, 다른 한 명은 0.15 였다. 그 사람의
+    비전 지표가 전부 null 이 됐는데, 카메라 위치·조명 문제인지 우리 임계가 빡빡한
+    건지 판단할 근거가 없었다. 사유는 이미 페이로드에 실려 온다.
+
+    상위 3개만 찍는다 — 한 스냅샷이 사유를 여러 개 달 수 있어 전부 찍으면 길다.
+    """
+    if coverage >= _LOW_COVERAGE or not user.unusable_reason_counts:
+        return
+    top = sorted(
+        user.unusable_reason_counts.items(), key=lambda item: -item[1]
+    )[:3]
+    logger.warning(
+        "vision coverage low user=%s coverage=%.2f snapshots=%d/%d reasons=%s",
+        user_id,
+        coverage,
+        user.usable_snapshot_count,
+        user.metric_snapshot_count,
+        ", ".join(f"{name}={count}" for name, count in top),
     )
 
 

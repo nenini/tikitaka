@@ -67,6 +67,13 @@ class VisionUserState:
     usable_snapshot_count: int = 0
     observation_window_ms: float = 0.0
     usable_observed_ms: float = 0.0
+    unusable_reason_counts: dict[str, int] = field(default_factory=dict)
+    """비전이 못 쓰인 사유별 스냅샷 수. 커버리지가 낮을 때 원인을 가른다.
+
+    실측 세션 17 에서 같은 세션인데 한 명은 0.93, 다른 한 명은 0.15 였다. 카메라
+    위치·조명 문제인지 우리 임계가 빡빡한 건지 구분할 방법이 없었다. 사유는 이미
+    페이로드에 실려 오는데(`VisionQuality.reasons`) 아무도 안 세고 있었다.
+    """
 
     def apply_behavior(self, event: VisionBehaviorEvent) -> None:
         self.latest_behavior = event
@@ -194,6 +201,11 @@ class SessionState:
         if event.payload.quality.usable:
             vision.usable_snapshot_count += 1
             vision.usable_observed_ms += interval.observed_duration_ms
+        else:
+            for reason in event.payload.quality.reasons:
+                vision.unusable_reason_counts[reason] = (
+                    vision.unusable_reason_counts.get(reason, 0) + 1
+                )
 
     def speaking_ratio(self, speaker_id: str) -> float | None:
         """화자 발화시간 / 두 화자 발화시간 합. 1명뿐이면 None(비율 무의미)."""
