@@ -108,17 +108,17 @@ def test_all_six_axis_keys_use_be_names() -> None:
 def test_unmeasured_axis_nulls_score_raw_and_unit() -> None:
     """계약: measured=false이면 score와 raw는 반드시 null.
 
-    vision 미수신 세션의 리액션 축으로 검증한다(질문 축은 2026-08-06부터 측정된다).
+    질문 축으로 검증한다 — 상시 미측정이라 조건이 안정적이다.
     """
-    axes = _first(_analysis(vision=False))["axes"]
+    axes = _first(_analysis())["axes"]
     assert isinstance(axes, dict)
-    reaction = axes["reaction"]
-    assert isinstance(reaction, dict)
-    assert reaction["measured"] is False
-    assert reaction["score"] is None
-    assert reaction["raw"] is None
-    assert reaction["rawUnit"] is None
-    assert reaction["note"]  # 이유는 남긴다
+    question = axes["question"]
+    assert isinstance(question, dict)
+    assert question["measured"] is False
+    assert question["score"] is None
+    assert question["raw"] is None
+    assert question["rawUnit"] is None
+    assert question["note"]  # 이유는 남긴다
 
 
 def test_balance_uses_ratio_unit_others_use_per_30min() -> None:
@@ -153,11 +153,11 @@ def test_vision_counts_null_when_unmeasured() -> None:
     assert metrics["faceMissingCount"] is None
 
 
-def test_question_count_is_reported() -> None:
-    """STT 문장부호 복원 뒤로는 실제 집계를 보낸다."""
+def test_question_count_is_always_null() -> None:
+    """STT 문장부호 미제공 — 집계를 믿을 수 없어 보내지 않는다."""
     metrics = _first(_analysis())["metrics"]
     assert isinstance(metrics, dict)
-    assert isinstance(metrics["questionCount"], int)
+    assert metrics["questionCount"] is None
 
 
 def test_silence_threshold_is_reported() -> None:

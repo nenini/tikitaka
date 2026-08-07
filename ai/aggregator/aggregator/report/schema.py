@@ -34,24 +34,25 @@ from aggregator.report.scoring import (
 )
 
 SCHEMA_VERSION = 1
-ANALYSIS_VERSION = "analysis-v1.1.0"
-"""2026-08-06 v1.0.0 → v1.1.0.
+ANALYSIS_VERSION = "analysis-v1.2.0"
+"""2026-08-07 v1.1.0 → v1.2.0.
 
 BE는 이 값을 `(sessionId, analysisVersion)` 멱등 키로 쓰고, **성장 지표 스냅샷에
 그대로 기록한다**(`GrowthMetricSnapshot.analysisVersion`). 산출물이 달라졌는데 버전을
 그대로 두면 같은 라벨 아래 서로 다른 두 종류의 점수가 섞여 추이가 무의미해진다.
 
 바뀐 것:
-  - `question` 축이 상시 미측정 → **측정됨.** 성장 지표의 questionScore 가 null 에서
-    실제 점수로 바뀐다. 이게 버전을 올리는 주된 이유다.
-  - `metrics.questionCount` 가 null → 실제 집계값.
-  - `topicBreakdown` 필드 신설.
+  - v1.1.0 에서 되살렸던 `question` 축을 **다시 미측정으로 되돌린다.** 근거였던 STT
+    문장부호 복원(initial_prompt)이 무음 환각을 필터에 통과시켜 전사를 오염시켰다.
+    성장 지표의 questionScore 가 다시 null 이 되므로 버전을 올려 구분한다.
+  - `metrics.questionCount` 도 null 로 되돌린다.
+  - `topicBreakdown` 은 v1.1.0 그대로 유지한다.
 """
-REPORT_VERSION = "report-v1.1.0"
+REPORT_VERSION = "report-v1.2.0"
 """분석 버전과 같이 올린다.
 
-질문 축이 측정되면서 미측정 축 문장 필터가 더 이상 질문 관련 문장을 버리지 않는다.
-즉 같은 세션이라도 생성되는 문장 집합이 달라진다. 리포트 본문 스키마 자체는 그대로다.
+질문 축이 다시 미측정이라 미측정 축 문장 필터가 질문 관련 문장을 도로 버린다.
+같은 세션이라도 생성되는 문장 집합이 달라진다. 리포트 본문 스키마는 그대로다.
 """
 
 _AXIS_KEY = {
@@ -192,9 +193,9 @@ def build_analysis_payload(
                     "interruptionCount": metrics.interruption_count,
                     "backchannelCount": metrics.backchannel_count,
                     "fillerCount": metrics.filler_count,
-                    # 2026-08-06부터 집계한다. STT가 initial_prompt로 문장부호를
-                    # 복원하면서 '?' 기반 질문 판정이 성립하게 됐다(scoring 참고).
-                    "questionCount": metrics.question_count,
+                    # 질문은 STT 문장부호 미제공으로 집계를 신뢰할 수 없다(scoring 참고).
+                    # 2026-08-06 에 잠깐 집계했다가 v1.2.0 에서 되돌렸다.
+                    "questionCount": None,
                     # 계약: visionMeasured=false면 비전 횟수도 null
                     "smileEpisodeCount": metrics.smile_episode_count if vision_ok else None,
                     "gazeAwayCount": metrics.gaze_away_count if vision_ok else None,
@@ -216,7 +217,9 @@ def build_analysis_payload(
                         "speakingMs": share.speaking_ms,
                         "ratio": share.ratio,
                     }
-                    for share in build_topic_breakdown(speaker.utterances)
+                    for share in build_topic_breakdown(
+                        report.all_utterances, speaker.speaker_id
+                    )
                 ],
                 "evidenceSegments": _evidence_segments(report, speaker.speaker_id),
             }

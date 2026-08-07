@@ -140,6 +140,15 @@ _SYSTEM_RULES = """너는 소개팅 대화 연습 서비스의 리포트 작성�
 6. 연습을 돕는 코치의 말투로 쓴다. 인격을 비난하지 말고 행동만 말한다.
 7. 잘한 점은 반드시 1개 이상 쓴다. 지적할 게 없어도 긍정은 남긴다.
 
+문장 형식 규칙:
+12. **'~해요'체로 쓴다.** "~있었습니다"·"~합니다" 같은 격식체를 쓰지 마라.
+    ("대화를 이어갔어요" O / "대화를 이어갔습니다" X)
+13. **시각을 쓰지 마라.** "[00:29]", "3분경", "초반부" 같은 표현 금지.
+    근거 구간은 화면이 타임라인으로 따로 보여준다. 여기서 시각을 지어내면 실제와 어긋난다.
+14. **'대화 기록'에 없는 내용을 쓰지 마라.** 나눈 적 없는 화제(취미·여행 등)를
+    나눴다고 쓰면 안 된다. 무슨 얘기를 했는지 모르겠으면 화제를 언급하지 말고
+    측정된 행동(침묵·말 끊기·발화 비율)만 가지고 써라.
+
 점수를 있는 그대로 말하는 규칙 (중요):
 8. **2.5점 이하인 축은 요약과 개선점에서 반드시 짚어라.** 낮은 점수를 좋게 포장하지 마라.
    "침묵이 많았어요"를 "편안한 분위기였어요"로 바꿔 쓰면 안 된다.
@@ -261,10 +270,9 @@ def _format_metrics(metrics: SpeakerMetrics | None, duration_ms: int) -> str:
         # **기준선을 같이 준다.** 41% 만 주면 LLM 이 그게 많은지 적은지 모른 채
         # 예시 문구를 따라간다(실제로 41% 인 사람에게 "말수가 많다"가 나갔다).
         f"- 내 발화 비율: {ratio} (50%가 균형, 낮으면 내가 적게 말한 것)",
-        # STT 가 initial_prompt 로 문장부호를 복원하면서 질문 집계가 성립했다
-        # (scoring._score_question). 축이 측정되는데 프롬프트만 "언급 금지"로 남아
-        # 있으면 LLM 이 실제로 관찰된 축 하나를 통째로 못 쓴다.
-        f"- 질문: {metrics.question_count}회",
+        # 질문 수는 넣지 않는다 — STT가 짧은 발화에 문장부호를 안 붙여 집계가 틀린다
+        # (scoring._score_question 참고). 틀린 숫자를 주면 LLM이 그걸로 문장을 만든다.
+        "- 질문: 측정 부족 (질문 횟수·질문이 많다/적다는 언급하지 마라)",
         f"- 필러워드: {metrics.filler_count}회",
         # 초를 손으로 적지 않는다 — 임계값이 15초에서 10초로 바뀐 뒤에도 라벨만 15초로
         # 남아 LLM에게 틀린 기준을 알려주고 있었다(2026-08-05 발견).
@@ -693,14 +701,51 @@ def parse_narrative(
 
     forbidden = _unmeasured_keywords(axes)
     narrative = ReportNarrative(
-        summary=summary,
-        strengths=_drop_unfounded(_as_str_tuple(data.get("strengths"), 3), forbidden),
-        improvements=_drop_unfounded(_as_str_tuple(data.get("improvements"), 2), forbidden),
-        missions=_drop_unfounded(_as_str_tuple(data.get("missions"), 3), forbidden),
+        summary=_strip_timestamps(summary),
+        strengths=tuple(
+            _strip_timestamps(t)
+            for t in _drop_unfounded(_as_str_tuple(data.get("strengths"), 3), forbidden)
+        ),
+        improvements=tuple(
+            _strip_timestamps(t)
+            for t in _drop_unfounded(_as_str_tuple(data.get("improvements"), 2), forbidden)
+        ),
+        missions=tuple(
+            _strip_timestamps(t)
+            for t in _drop_unfounded(_as_str_tuple(data.get("missions"), 3), forbidden)
+        ),
         cards=tuple(cards[:MAX_CARDS]),
         generated_by_llm=True,
     )
     return _ensure_positive_card(_ensure_floor(_apply_goals(narrative, goals), axes))
+
+
+_TIMESTAMP = re.compile(
+    r"\s*[(（]?\s*(?:예\s*[:：])?\s*\[?\d{1,2}\s*[:：]\s*\d{2}\]?"
+    r"(?:\s*[~\-–]\s*\[?\d{1,2}\s*[:：]\s*\d{2}\]?)?\s*[)）]?"
+)
+"""LLM 이 지어낸 시각 표기. "[00:29] ~ [00:32]", "(예: 00:29)" 등."""
+
+
+def _strip_timestamps(text: str) -> str:
+    """문장에서 시각 표기를 지운다.
+
+    LLM 은 근거를 보여주려고 시각을 지어낸다 — 실측 세션에서 "침묵이 길어져
+    (예: [00:29] ~ [00:32])" 가 나왔는데 실제로는 3초 간격이었고 임계는 10초였다.
+    프롬프트로 금지해도 새므로(예시 베끼기 때 이미 겪었다) 코드로 지운다.
+
+    근거 구간은 `evidenceSegments` 가 코드 계산으로 정확히 내려간다 — 화면이 그걸
+    타임라인으로 보여주므로 산문에는 시각이 없어도 된다.
+    """
+    # 빈 문자열이 아니라 공백으로 바꾼다 — 문장 중간에 있던 경우 어절이 붙어버린다
+    # ("초반에 [01:05] 부근에서" → "초반에부근에서").
+    cleaned = _TIMESTAMP.sub(" ", text)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([.,!?)\]])", r"", cleaned)
+    cleaned = re.sub(r"([(\[])\s+", r"", cleaned)
+    # 시각만 들어 있던 괄호가 비었으면 통째로 지운다: "길어졌어요 ( )" → "길어졌어요"
+    cleaned = re.sub(r"\s*[(（]\s*(?:예\s*[:：])?\s*[)）]", "", cleaned)
+    return cleaned.strip()
 
 
 def _ensure_positive_card(narrative: ReportNarrative) -> ReportNarrative:

@@ -286,14 +286,13 @@ def test_build_narrative_verifies_against_own_utterances() -> None:
 def test_unmeasured_axis_mentions_are_dropped() -> None:
     """측정하지 않은 걸 좋다/나쁘다고 쓰면 거짓이다.
 
-    실측: 축이 측정 부족인데 LLM이 그 축을 평가하는 문장을 냈다. (원래 사례는 질문
-    축이었으나 2026-08-06부터 질문은 측정된다 — vision 미수신 축으로 옮겼다.)
+    실측: 질문 축이 측정 부족인데 LLM이 "질문의 다양성이 조금 부족했어요"를 냈다.
     """
-    report = _report(vision=False)
+    report = _report()
     axes = score_report(report).for_speaker(A)
     payload = _good_payload()
-    payload["improvements"] = ["표정이 조금 굳어 있었어요", "한 주제에 오래 머물렀어요"]
-    payload["missions"] = ["미소를 더 지어 보기", "새 주제를 꺼내 보기"]
+    payload["improvements"] = ["질문의 다양성이 조금 부족했어요", "한 주제에 오래 머물렀어요"]
+    payload["missions"] = ["질문을 더 던져 보기", "새 주제를 꺼내 보기"]
     narrative = parse_narrative(
         json.dumps(payload, ensure_ascii=False), include_quotes=False, axes=axes
     )
@@ -755,15 +754,73 @@ def test_speaking_ratio_carries_its_baseline() -> None:
     assert "50%가 균형" in prompt
 
 
-def test_question_count_is_given_to_the_llm() -> None:
-    """질문 축을 되살렸으면 프롬프트도 같이 움직여야 한다.
+def test_question_is_marked_unmeasured_in_the_prompt() -> None:
+    """축이 미측정이면 프롬프트도 같이 움직여야 한다.
 
-    축은 측정되는데 프롬프트만 "언급하지 마라"로 남아 있으면, 실제로 관찰된 축
-    하나를 LLM 이 통째로 못 쓴다.
+    한쪽만 바꾸면 LLM 이 재지도 않은 축을 평가하거나(축 살림+프롬프트 금지 유지의 반대),
+    측정된 축을 못 쓰게 된다. 2026-08-06~07 에 양방향으로 한 번씩 어긋났다.
     """
     report = _report(vision=False)
     prompt = build_prompt(
         report, score_report(report), A, include_quotes=False
     )
-    assert "질문: 2회" in prompt
-    assert "질문이 많다/적다는 언급하지 마라" not in prompt
+    assert "질문: 측정 부족" in prompt
+    assert "질문이 많다/적다는 언급하지 마라" in prompt
+
+
+# ── 리포트 문장 품질 (세션 17·18) ───────────────────────────────
+
+
+def test_prompt_pins_the_casual_tone() -> None:
+    """어투를 예시 문장에 기대면 안 된다.
+
+    예시 누출을 막으려고 완성 문장을 자리표시자로 바꾼 순간 어투 기준도 같이
+    사라져서, 세션 17·18 리포트가 "~있었습니다" 격식체로 바뀌었다. 예시는 구조와
+    문체를 동시에 지고 있었는데 구조만 보고 갈아치운 결과다.
+    """
+    report = _report(vision=False)
+    prompt = build_prompt(report, score_report(report), A, include_quotes=False)
+    assert "'~해요'체로 쓴다" in prompt
+
+
+def test_prompt_forbids_timestamps_and_ungrounded_topics() -> None:
+    """실측: 없는 화제를 지어내고 틀린 시각을 근거로 달았다."""
+    report = _report(vision=False)
+    prompt = build_prompt(report, score_report(report), A, include_quotes=False)
+    assert "시각을 쓰지 마라" in prompt
+    assert "'대화 기록'에 없는 내용을 쓰지 마라" in prompt
+
+
+def test_timestamps_are_stripped_from_narrative() -> None:
+    """프롬프트로 금지해도 새므로 코드가 지운다.
+
+    실측: "침묵 시간이 길어져... (예: [00:29] ~ [00:32])" — 실제로는 3초 간격이고
+    임계는 10초였다. 근거 구간은 evidenceSegments 가 정확히 내려가므로 산문에는
+    시각이 없어야 한다.
+    """
+    report = _report(vision=False)
+    axes = score_report(report).for_speaker(A)
+    payload = _good_payload()
+    payload["summary"] = "침묵 시간이 길어졌어요 (예: [00:29] ~ [00:32])"
+    payload["improvements"] = ["초반 [01:05] 부근에서 말이 끊겼어요", "한 주제에 오래 머물렀어요"]
+
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False), include_quotes=False, axes=axes
+    )
+
+    assert narrative.summary == "침묵 시간이 길어졌어요"
+    assert all("[" not in item and ":" not in item for item in narrative.improvements)
+
+
+def test_clean_sentences_are_untouched() -> None:
+    """시각이 없는 문장은 한 글자도 바뀌면 안 된다."""
+    report = _report(vision=False)
+    axes = score_report(report).for_speaker(A)
+    payload = _good_payload()
+    payload["summary"] = "편안한 분위기로 대화가 이어졌어요."
+
+    narrative = parse_narrative(
+        json.dumps(payload, ensure_ascii=False), include_quotes=False, axes=axes
+    )
+
+    assert narrative.summary == "편안한 분위기로 대화가 이어졌어요."
