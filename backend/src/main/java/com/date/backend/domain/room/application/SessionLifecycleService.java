@@ -102,7 +102,7 @@ public class SessionLifecycleService {
 		WaitingRoom session = findSessionForUpdate(sessionId);
 		assertParticipant(userId, sessionId);
 		if (session.isInProgress()) {
-			return createStatus(session);
+			return createStatus(userId, session);
 		}
 		if (session.getStatus() != RoomSessionStatus.READY) {
 			throw new BusinessException(SessionErrorCode.SESSION_STATE_CONFLICT);
@@ -149,7 +149,7 @@ public class SessionLifecycleService {
 				AiSessionLiveKitConnection.from(aiWorkerToken),
 				participants
 		));
-		return createStatus(session, participants, now);
+		return createStatus(userId, session, participants, now);
 	}
 
 	@Transactional
@@ -180,7 +180,7 @@ public class SessionLifecycleService {
 						SessionErrorCode.SESSION_NOT_FOUND
 				));
 		assertParticipant(userId, sessionId);
-		return createStatus(session);
+		return createStatus(userId, session);
 	}
 
 	private WaitingRoom findSessionForUpdate(Long sessionId) {
@@ -237,8 +237,9 @@ public class SessionLifecycleService {
 		}
 	}
 
-	private SessionStatusResponse createStatus(WaitingRoom session) {
+	private SessionStatusResponse createStatus(Long userId, WaitingRoom session) {
 		return createStatus(
+				userId,
 				session,
 				participantRepository.findAllByRoom_IdOrderByUserIdAsc(session.getId()),
 				LocalDateTime.now(clock)
@@ -246,6 +247,7 @@ public class SessionLifecycleService {
 	}
 
 	private SessionStatusResponse createStatus(
+			Long userId,
 			WaitingRoom session,
 			List<RoomParticipant> participants,
 			LocalDateTime now
@@ -259,6 +261,10 @@ public class SessionLifecycleService {
 						participant -> participant.getConnectionStatus()
 								== SessionConnectionStatus.CONNECTED
 				);
+		RoomParticipant caller = participants.stream()
+				.filter(participant -> participant.getUserId().equals(userId))
+				.findFirst()
+				.orElse(null);
 		return new SessionStatusResponse(
 				session.getId(),
 				session.getStatus(),
@@ -268,6 +274,8 @@ public class SessionLifecycleService {
 				allJoined,
 				allReady,
 				allConnected,
+				caller != null && caller.isVoiceAnalysisEnabled(),
+				caller != null && caller.isExpressionAnalysisEnabled(),
 				participants.stream()
 						.map(participant -> new SessionParticipantStateResponse(
 								participant.getUserId(),

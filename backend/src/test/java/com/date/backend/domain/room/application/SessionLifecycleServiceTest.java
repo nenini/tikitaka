@@ -329,6 +329,33 @@ class SessionLifecycleServiceTest {
 	}
 
 	@Test
+	void statusCarriesCallerOwnAnalysisFlags() {
+		when(participantA.isVoiceAnalysisEnabled()).thenReturn(true);
+		when(participantA.isExpressionAnalysisEnabled()).thenReturn(true);
+		when(participantB.isVoiceAnalysisEnabled()).thenReturn(false);
+		when(participantB.isExpressionAnalysisEnabled()).thenReturn(false);
+
+		var response = service.getStatus(USER_A_ID, SESSION_ID);
+
+		assertThat(response.voiceAnalysisEnabled()).isTrue();
+		assertThat(response.expressionAnalysisEnabled()).isTrue();
+	}
+
+	@Test
+	void statusResolvesAnalysisFlagsPerCallerNotPerSession() {
+		when(participantRepository.existsByRoom_IdAndUserId(
+				SESSION_ID,
+				102L
+		)).thenReturn(true);
+		when(participantA.isExpressionAnalysisEnabled()).thenReturn(true);
+		when(participantB.isExpressionAnalysisEnabled()).thenReturn(false);
+
+		var response = service.getStatus(102L, SESSION_ID);
+
+		assertThat(response.expressionAnalysisEnabled()).isFalse();
+	}
+
+	@Test
 	void nonParticipantCannotReadStatus() {
 		when(participantRepository.existsByRoom_IdAndUserId(
 				SESSION_ID,
