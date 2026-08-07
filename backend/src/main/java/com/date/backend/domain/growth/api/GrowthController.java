@@ -9,6 +9,7 @@ import com.date.backend.domain.growth.dto.response.GrowthSessionHistoryResponse;
 import com.date.backend.domain.growth.dto.response.GrowthMetricsResponse;
 import com.date.backend.domain.growth.dto.response.UserTemperatureResponse;
 import com.date.backend.domain.growth.dto.response.GrowthBadgesResponse;
+import com.date.backend.domain.growth.dto.response.GrowthBadgeDisplayResponse;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.security.AuthUser;
 import jakarta.validation.constraints.*;
@@ -62,5 +63,19 @@ public class GrowthController implements GrowthSwaggerDocs {
 	@GetMapping("/badges")
 	public ApiResponse<GrowthBadgesResponse> getBadges(@AuthenticationPrincipal AuthUser authUser) {
 		return ApiResponse.success(badgeService.getBadges(authUser.userId()));
+	}
+
+	@PutMapping("/badges/{badgeId}/display")
+	public ApiResponse<GrowthBadgeDisplayResponse> displayBadge(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long badgeId) {
+		return ApiResponse.success(badgeService.display(authUser.userId(), badgeId));
+	}
+
+	@DeleteMapping("/badges/{badgeId}/display")
+	public ApiResponse<GrowthBadgeDisplayResponse> hideBadge(
+			@AuthenticationPrincipal AuthUser authUser,
+			@PathVariable Long badgeId) {
+		return ApiResponse.success(badgeService.hide(authUser.userId(), badgeId));
 	}
 }

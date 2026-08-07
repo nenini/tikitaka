@@ -5,6 +5,7 @@ import com.date.backend.domain.aichat.dto.response.AiChatSessionCloseResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionCreateResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionSummaryResponse;
 import com.date.backend.domain.aichat.dto.response.AiChatSessionDetailResponse;
+import com.date.backend.domain.aichat.domain.ChatSessionPurpose;
 import com.date.backend.global.api.ApiResponse;
 import com.date.backend.global.config.OpenApiConfig;
 import com.date.backend.global.security.AuthUser;
@@ -25,7 +26,9 @@ public interface AiChatSessionSwaggerDocs {
 
 	@Operation(summary = "내 AI 채팅 세션 목록", description = "최신 세션부터 응답 상태와 마지막 메시지를 조회합니다.")
 	ApiResponse<List<AiChatSessionSummaryResponse>> getSessions(
-			@Parameter(hidden = true) AuthUser authUser
+			@Parameter(hidden = true) AuthUser authUser,
+			@Parameter(description = "소개팅 전(BEFORE_DATE) 또는 소개팅 후(AFTER_DATE). 생략하면 전체 조회")
+			ChatSessionPurpose purpose
 	);
 
 	@Operation(summary = "AI 채팅 세션 상세", description = "세션 상태와 전체 USER·AI 메시지를 순서대로 조회합니다.")

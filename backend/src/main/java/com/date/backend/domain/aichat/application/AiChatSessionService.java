@@ -41,7 +41,17 @@ public class AiChatSessionService {
 	}
 
 	public List<AiChatSessionSummaryResponse> getSessions(Long userId) {
-		return sessionRepository.findAllByUser_IdOrderByCreatedAtDesc(userId).stream()
+		return getSessions(userId, null);
+	}
+
+	public List<AiChatSessionSummaryResponse> getSessions(
+			Long userId,
+			com.date.backend.domain.aichat.domain.ChatSessionPurpose purpose
+	) {
+		var sessions = purpose == null
+				? sessionRepository.findAllByUser_IdOrderByCreatedAtDesc(userId)
+				: sessionRepository.findAllByUser_IdAndPurposeOrderByCreatedAtDesc(userId, purpose);
+		return sessions.stream()
 				.map(this::toSummary)
 				.toList();
 	}

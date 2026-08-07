@@ -19,4 +19,15 @@ public class UserBadge {
     }
     public Long getId(){return id;} public Long getBadgeId(){return badgeId;}
     public LocalDateTime getAwardedAt(){return awardedAt;} public String getAwardPolicyVersion(){return awardPolicyVersion;}
+    public boolean isDisplayed(){return displayed;}
+    public boolean display(){
+        if (displayed) return false;
+        displayed = true;
+        return true;
+    }
+    public boolean hide(){
+        if (!displayed) return false;
+        displayed = false;
+        return true;
+    }
 }

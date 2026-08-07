@@ -6,6 +6,7 @@ import com.date.backend.domain.growth.repository.*;
 import com.date.backend.domain.user.repository.UserRepository;
 import com.date.backend.global.exception.BusinessException;
 import com.date.backend.global.exception.code.CommonErrorCode;
+import com.date.backend.global.exception.code.GrowthErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.*;
@@ -53,6 +54,20 @@ public class GrowthBadgeService {
         return new GrowthBadgesResponse(acquiredCount, activeCount, badges);
     }
 
+    @Transactional
+    public GrowthBadgeDisplayResponse display(Long userId, Long badgeId) {
+        UserBadge badge = acquiredBadgeForUpdate(userId, badgeId);
+        boolean changed = badge.display();
+        return new GrowthBadgeDisplayResponse(badgeId, true, changed);
+    }
+
+    @Transactional
+    public GrowthBadgeDisplayResponse hide(Long userId, Long badgeId) {
+        UserBadge badge = acquiredBadgeForUpdate(userId, badgeId);
+        boolean changed = badge.hide();
+        return new GrowthBadgeDisplayResponse(badgeId, false, changed);
+    }
+
     private GrowthBadgeResponse response(BadgeCatalog badge, UserBadge acquired, Progress progress) {
         int threshold = badge.getThresholdCount() == null ? 0 : badge.getThresholdCount();
         long count = badge.getConditionType() == null ? 0 : current(progress, badge.getConditionType());
@@ -60,7 +75,12 @@ public class GrowthBadgeService {
         return new GrowthBadgeResponse(badge.getId(), badge.getCode(), badge.getName(), badge.getDescription(),
                 badge.getIconUrl(), badge.getConditionType() == null ? null : badge.getConditionType().name(),
                 count, threshold, percent, acquired != null, acquired == null ? null : acquired.getAwardedAt(),
-                badge.isActive(), badge.getPolicyVersion());
+                acquired != null && acquired.isDisplayed(), badge.isActive(), badge.getPolicyVersion());
+    }
+
+    private UserBadge acquiredBadgeForUpdate(Long userId, Long badgeId) {
+        return userBadgeRepository.findByUserIdAndBadgeIdForUpdate(userId, badgeId)
+                .orElseThrow(() -> new BusinessException(GrowthErrorCode.BADGE_NOT_ACQUIRED));
     }
 
     private Progress progress(Long userId) {

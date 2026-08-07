@@ -34,4 +34,14 @@ public interface GrowthSwaggerDocs {
 
     @Operation(summary = "성장 뱃지 조회", description = "완료 세션과 완료 리포트 횟수를 기준으로 획득·미획득 뱃지와 진행률을 조회합니다. 조회 시 활성 뱃지 조건을 다시 판정하므로 기존 실적도 소급 반영됩니다. 비활성 뱃지는 신규 지급하지 않지만 이미 획득한 기록과 획득 시각은 유지됩니다.")
     ApiResponse<GrowthBadgesResponse> getBadges(@Parameter(hidden = true) AuthUser authUser);
+
+    @Operation(summary = "뱃지 착용", description = "본인이 획득한 뱃지를 프로필 표시 상태로 변경합니다. 반복 요청은 멱등하게 처리됩니다.")
+    ApiResponse<GrowthBadgeDisplayResponse> displayBadge(
+            @Parameter(hidden = true) AuthUser authUser,
+            @Parameter(description = "착용할 뱃지 ID", example = "1") Long badgeId);
+
+    @Operation(summary = "뱃지 착용 취소", description = "본인이 착용 중인 뱃지를 표시 해제합니다. 반복 요청은 멱등하게 처리됩니다.")
+    ApiResponse<GrowthBadgeDisplayResponse> hideBadge(
+            @Parameter(hidden = true) AuthUser authUser,
+            @Parameter(description = "착용 취소할 뱃지 ID", example = "1") Long badgeId);
 }
