@@ -406,13 +406,10 @@ export function HomePage() {
                 <p className="bt-caption mt-1">지금 바로 시작 · AI 분석 단독 · 상대 평가 없음</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {/* TODO(HOME): AI 화상(W-21) 화면 생기면 /ai-video/setup 으로 연결 */}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => console.log('TODO(HOME): AI 화상 15분 시작')}
-                >
-                  <span aria-hidden="true">🤖</span> AI 화상 15분
+                {/* AI 화상 연습(W-21). 상대 없이 5분간 혼자 말하는 연습이라 시간 표기를
+                    5분으로 맞춘다 — 예전 문구('15분')는 서버 대화가 붙는 것을 전제한 값이었다. */}
+                <Button variant="secondary" size="sm" onClick={() => navigate('/ai-video/setup')}>
+                  <span aria-hidden="true">🤖</span> AI 화상 5분
                 </Button>
                 {/* 챗봇 F5 진입점 — 진행 중 대화가 있으면 그 대화로, 없으면 설정(W-10)으로. */}
                 <Button
