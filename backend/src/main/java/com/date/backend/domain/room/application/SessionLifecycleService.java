@@ -1,5 +1,6 @@
 package com.date.backend.domain.room.application;
 
+import com.date.backend.domain.consent.application.SessionAnalysisConsentPolicy;
 import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
 import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.config.RoomEntryProperties;
@@ -41,6 +42,7 @@ public class SessionLifecycleService {
 	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 	private final UserRestrictionPolicy restrictionPolicy;
+	private final SessionAnalysisConsentPolicy analysisConsentPolicy;
 
 	public SessionLifecycleService(
 			WaitingRoomRepository sessionRepository,
@@ -51,7 +53,8 @@ public class SessionLifecycleService {
 			SessionMissionProvisioningService missionProvisioningService,
 			ApplicationEventPublisher eventPublisher,
 			Clock clock,
-			UserRestrictionPolicy restrictionPolicy
+			UserRestrictionPolicy restrictionPolicy,
+			SessionAnalysisConsentPolicy analysisConsentPolicy
 	) {
 		this.sessionRepository = sessionRepository;
 		this.participantRepository = participantRepository;
@@ -62,6 +65,7 @@ public class SessionLifecycleService {
 		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 		this.restrictionPolicy = restrictionPolicy;
+		this.analysisConsentPolicy = analysisConsentPolicy;
 	}
 
 	@Transactional
@@ -71,6 +75,9 @@ public class SessionLifecycleService {
 		RoomParticipant participant = findParticipantForUpdate(userId, sessionId);
 		LocalDateTime now = LocalDateTime.now(clock);
 		validateJoinable(session, participant, now);
+		if (!session.isInProgress()) {
+			applyCurrentAnalysisConsent(userId, participant);
+		}
 
 		boolean joinedNow = participant.recordJoin(now);
 		if (session.getStatus() == RoomSessionStatus.CREATED
@@ -157,9 +164,12 @@ public class SessionLifecycleService {
 		}
 		RoomParticipant participant =
 				findParticipantForUpdate(userId, sessionId);
+		var consent = analysisConsentPolicy.resolve(userId);
 		participant.updateAnalysisSettings(
-				request.voiceAnalysisEnabled(),
+				request.voiceAnalysisEnabled()
+						&& consent.voiceAnalysisEnabled(),
 				request.expressionAnalysisEnabled()
+						&& consent.expressionAnalysisEnabled()
 		);
 		return SessionAnalysisSettingsResponse.from(sessionId, participant);
 	}
@@ -191,6 +201,17 @@ public class SessionLifecycleService {
 		if (!participantRepository.existsByRoom_IdAndUserId(sessionId, userId)) {
 			throw new BusinessException(SessionErrorCode.SESSION_NOT_PARTICIPANT);
 		}
+	}
+
+	private void applyCurrentAnalysisConsent(
+			Long userId,
+			RoomParticipant participant
+	) {
+		var consent = analysisConsentPolicy.resolve(userId);
+		participant.updateAnalysisSettings(
+				consent.voiceAnalysisEnabled(),
+				consent.expressionAnalysisEnabled()
+		);
 	}
 
 	private void validateJoinable(

@@ -1,5 +1,6 @@
 package com.date.backend.domain.room.application;
 
+import com.date.backend.domain.consent.application.SessionAnalysisConsentPolicy;
 import com.date.backend.domain.mission.application.SessionMissionProvisioningService;
 import com.date.backend.domain.moderation.application.UserRestrictionPolicy;
 import com.date.backend.domain.room.config.RoomEntryProperties;
@@ -49,6 +50,7 @@ class SessionLifecycleServiceTest {
 	private ApplicationEventPublisher eventPublisher;
 	private SessionLifecycleService service;
 	private UserRestrictionPolicy restrictionPolicy;
+	private SessionAnalysisConsentPolicy analysisConsentPolicy;
 	private WaitingRoom session;
 	private RoomParticipant participantA;
 	private RoomParticipant participantB;
@@ -63,6 +65,10 @@ class SessionLifecycleServiceTest {
 				mock(SessionMissionProvisioningService.class);
 		eventPublisher = mock(ApplicationEventPublisher.class);
 		restrictionPolicy = mock(UserRestrictionPolicy.class);
+		analysisConsentPolicy = mock(SessionAnalysisConsentPolicy.class);
+		when(analysisConsentPolicy.resolve(USER_A_ID)).thenReturn(
+				new SessionAnalysisConsentPolicy.SessionAnalysisConsent(true, true)
+		);
 		service = new SessionLifecycleService(
 				sessionRepository,
 				participantRepository,
@@ -78,7 +84,8 @@ class SessionLifecycleServiceTest {
 						Instant.parse("2026-07-30T10:00:00Z"),
 						ZoneId.of("Asia/Seoul")
 				),
-				restrictionPolicy
+				restrictionPolicy,
+				analysisConsentPolicy
 		);
 		session = mock(WaitingRoom.class);
 		participantA = mock(RoomParticipant.class);
@@ -134,6 +141,7 @@ class SessionLifecycleServiceTest {
 		assertThat(response.alreadyJoined()).isFalse();
 		assertThat(response.liveKitConfigured()).isTrue();
 		assertThat(response.liveKitAccessToken()).isEqualTo("token");
+		verify(participantA).updateAnalysisSettings(true, true);
 	}
 
 	@Test
@@ -208,6 +216,23 @@ class SessionLifecycleServiceTest {
 		assertThat(response.userId()).isEqualTo(USER_A_ID);
 		assertThat(response.voiceAnalysisEnabled()).isTrue();
 		assertThat(response.expressionAnalysisEnabled()).isTrue();
+	}
+
+	@Test
+	void analysisSettingsCannotEnableExpressionWithoutFaceConsent() {
+		when(session.isInProgress()).thenReturn(false);
+		when(session.isEnded()).thenReturn(false);
+		when(analysisConsentPolicy.resolve(USER_A_ID)).thenReturn(
+				new SessionAnalysisConsentPolicy.SessionAnalysisConsent(true, false)
+		);
+
+		service.updateAnalysisSettings(
+				USER_A_ID,
+				SESSION_ID,
+				new SessionAnalysisSettingsRequest(true, true)
+		);
+
+		verify(participantA).updateAnalysisSettings(true, false);
 	}
 
 	@Test
