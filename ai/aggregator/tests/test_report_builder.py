@@ -713,3 +713,57 @@ def test_prompt_silence_label_matches_the_threshold() -> None:
     prompt = build_prompt(report, score_report(report), A, include_quotes=False)
     assert f"{SILENCE_THRESHOLD_MS // 1000}초 이상 침묵" in prompt
     assert "15초 이상 침묵" not in prompt
+
+
+# ── 프롬프트 예시 누출 (세션 14) ─────────────────────────────────
+
+
+def test_output_spec_has_no_copyable_sentences() -> None:
+    """출력 예시에 완성된 한국어 문장을 넣으면 LLM 이 그대로 답변으로 쓴다.
+
+    세션 14: 발화 비율 41%(적게 말한 쪽)인 사용자에게 "말수가 조금 많은 편이었어요"가
+    나갔는데, 그 문장이 예시에 그대로 있었다. 형식만 보여주고 내용은 자리표시자로 둔다.
+
+    자리표시자는 꺾쇠 <>로 감싼다 — 그대로 출력돼도 사람이 즉시 알아본다.
+    """
+    report = _report(vision=False)
+    prompt = build_prompt(
+        report, score_report(report), A, include_quotes=False
+    )
+
+    leaked = [
+        "편안한 분위기로 대화가 이어졌어요",
+        "취미로 공통점을 찾았어요",
+        "말하는 리듬이 편안했어요",
+        "상대 말을 끝까지 들었어요",
+        "한 주제에 오래 머물렀어요",
+        "말수가 조금 많은 편이었어요",
+        "상대 이야기에 내 경험을 한마디 얹어 보기",
+    ]
+    assert [phrase for phrase in leaked if phrase in prompt] == []
+    # 구조는 그대로 보여줘야 한다 — 자리표시자가 실제로 들어 있는지.
+    assert "<개선점 1>" in prompt
+    assert '"improvements"' in prompt
+
+
+def test_speaking_ratio_carries_its_baseline() -> None:
+    """41% 만 주면 그게 많은 건지 적은 건지 모른다. 기준선을 같이 준다."""
+    report = _report(vision=False)
+    prompt = build_prompt(
+        report, score_report(report), A, include_quotes=False
+    )
+    assert "50%가 균형" in prompt
+
+
+def test_question_count_is_given_to_the_llm() -> None:
+    """질문 축을 되살렸으면 프롬프트도 같이 움직여야 한다.
+
+    축은 측정되는데 프롬프트만 "언급하지 마라"로 남아 있으면, 실제로 관찰된 축
+    하나를 LLM 이 통째로 못 쓴다.
+    """
+    report = _report(vision=False)
+    prompt = build_prompt(
+        report, score_report(report), A, include_quotes=False
+    )
+    assert "질문: 2회" in prompt
+    assert "질문이 많다/적다는 언급하지 마라" not in prompt
