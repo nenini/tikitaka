@@ -16,7 +16,7 @@ import {
   Stack,
 } from '@/components'
 import { errorCodeOf, errorMessageOf } from '@/shared/api/envelope'
-import { withdrawAccount } from '@/features/auth/api'
+import { requestPasswordReset, withdrawAccount } from '@/features/auth/api'
 import { faceTypeImage } from '@/features/face/faceImage'
 import { resetMyFaceAnalysis, useMyFaceAnalysis } from '@/features/face/useMyFaceAnalysis'
 import { getMyProfile, getPublicProfile } from '@/features/profile/api'
@@ -87,6 +87,11 @@ export function MyPage() {
   const [withdrawError, setWithdrawError] = useState<string | null>(null)
   const [withdrawing, setWithdrawing] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  // 비밀번호 재설정 메일 — 발송은 되돌릴 수 없지만 파괴적이지도 않아 확인 한 번만 받는다.
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pwSending, setPwSending] = useState(false)
+  const [pwSent, setPwSent] = useState(false)
+  const [pwError, setPwError] = useState<string | null>(null)
   const face = useMyFaceAnalysis()
   const [summary, setSummary] = useState<ProfileSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
@@ -158,6 +163,27 @@ export function MyPage() {
    * 서버는 본인 확인을 위해 비밀번호를 요구한다. 실패하면 다이얼로그를 **닫지 않는다** —
    * 닫아 버리면 무엇이 잘못됐는지 모른 채 처음부터 다시 해야 한다.
    */
+  /**
+   * 비밀번호 재설정 메일 발송.
+   *
+   * 서버는 계정 존재 여부를 흘리지 않으려고 **없는 이메일에도 202** 를 준다 →
+   * "보냈다"고 단정하지 않고 받은 편지함을 확인하라고만 안내한다.
+   */
+  const onRequestPasswordReset = async () => {
+    const email = authUser?.email
+    if (!email || pwSending) return
+    setPwSending(true)
+    setPwError(null)
+    try {
+      await requestPasswordReset(email)
+      setPwSent(true)
+    } catch (error) {
+      setPwError(errorMessageOf(error, '메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'))
+    } finally {
+      setPwSending(false)
+    }
+  }
+
   const onWithdraw = async () => {
     const password = withdrawPassword.trim()
     if (password.length === 0) {
@@ -256,14 +282,14 @@ export function MyPage() {
                 as={Link}
                 to="/me/consent"
                 title="개인정보 동의 관리"
-                meta="목적별 동의 확인·철회 (AUTH-03)"
+                meta="목적별 동의 확인·철회"
                 trailing={<span className="bt-caption text-link">관리 ›</span>}
               />
               <ListRowLink
                 as={Link}
                 to="/me/edit"
                 title="개인정보 수정·관리"
-                meta="얼굴 재촬영 · 이상형 설문 · 프로필 · 지역 (W-19b)"
+                meta="얼굴 재촬영 · 이상형 설문 · 프로필 · 지역"
                 trailing={<span className="bt-caption text-link">이동 ›</span>}
               />
             </Stack>
@@ -293,7 +319,18 @@ export function MyPage() {
                 {/* 촬영 화면으로 곧장 보낸다. 예전에는 허브(`/me/edit`)로 보내서
                     '얼굴 재촬영'을 눌러도 한 번 더 찾아 들어가야 했다. */}
                 <ListRowButton title="얼굴 재촬영" onClick={() => navigate('/me/edit/face')} />
-                <ListRowButton title="비밀번호 변경" onClick={() => console.log('TODO: 비밀번호 변경')} />
+                {/* 서버에 '현재 비밀번호로 즉시 변경'하는 경로가 없다 — 메일 링크 방식뿐이라
+                    확인 모달을 거쳐 재설정 메일을 보낸다(api.ts `requestPasswordReset` 참고). */}
+                <ListRowButton
+                  title="비밀번호 변경"
+                  meta="가입 이메일로 재설정 링크를 보내요"
+                  disabled={signingOut}
+                  onClick={() => {
+                    setPwSent(false)
+                    setPwError(null)
+                    setPwOpen(true)
+                  }}
+                />
                 {/* 로그아웃과 회원 탈퇴는 성격이 전혀 다르다(되돌릴 수 있음 vs 없음).
                     구분선으로 떼어 두 행이 나란히 보이지 않게 한다 — 오클릭이 곧 탈퇴가 되면 안 된다. */}
                 <ListRowButton
@@ -326,6 +363,60 @@ export function MyPage() {
       {/* 문구를 실제 동작에 맞춘다. 예전에는 '프로필·리포트·동의 내역이 삭제된다'고 적혀
           있었지만 서버는 계정을 **비활성 처리**할 뿐이다. 지우지 않는 것을 지운다고 말하면
           개인정보 안내로서 틀린 말이 된다. */}
+      {/* 비밀번호 변경 — 메일 링크 방식이라 '보내기 → 안내' 두 단계로 끝난다 */}
+      <Modal
+        open={pwOpen}
+        onClose={() => setPwOpen(false)}
+        title={pwSent ? '메일을 확인해 주세요' : '비밀번호를 변경할까요?'}
+        actions={
+          pwSent ? (
+            <Button variant="primary" onClick={() => setPwOpen(false)}>
+              확인
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setPwOpen(false)} disabled={pwSending}>
+                취소
+              </Button>
+              <Button
+                variant="primary"
+                loading={pwSending}
+                disabled={!authUser?.email}
+                onClick={() => void onRequestPasswordReset()}
+              >
+                재설정 메일 보내기
+              </Button>
+            </>
+          )
+        }
+      >
+        <Stack gap={10}>
+          {pwSent ? (
+            <>
+              {/* 서버가 존재하지 않는 계정에도 202 를 주므로 '보냈다'고 단정하지 않는다 */}
+              <p className="bt-body-sm">
+                <b>{authUser?.email}</b> 로 재설정 링크를 요청했어요. 받은 편지함을 확인해 주세요.
+              </p>
+              <p className="bt-caption bt-muted">
+                메일이 보이지 않으면 스팸함도 확인해 주세요. 링크는 일정 시간이 지나면 만료돼요.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="bt-body-sm">
+                가입 이메일 <b>{authUser?.email ?? '—'}</b> 로 재설정 링크를 보내 드려요. 링크에서
+                새 비밀번호를 정하면 됩니다.
+              </p>
+              {/* 소셜 가입 계정은 비밀번호가 없다 — 링크를 받아도 쓸 데가 없다는 걸 미리 알린다 */}
+              <p className="bt-caption bt-muted">
+                소셜 로그인으로 가입했다면 설정할 비밀번호가 없어 메일이 오지 않을 수 있어요.
+              </p>
+              {pwError && <Callout tone="danger">{pwError}</Callout>}
+            </>
+          )}
+        </Stack>
+      </Modal>
+
       <Modal
         open={withdrawOpen}
         onClose={closeWithdraw}

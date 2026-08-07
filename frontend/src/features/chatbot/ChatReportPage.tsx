@@ -7,6 +7,7 @@ import {
   Card,
   Cluster,
   EmptyState,
+  ExitToHomeButton,
   Hedge,
   Icon,
   Skeleton,
@@ -100,9 +101,13 @@ export function ChatReportPage() {
             title="피드백을 만들지 못했어요"
             text="정리 중 문제가 생겼어요. 다시 시도하면 저장된 대화로 새로 만들어 드려요."
             action={
-              <Button variant="primary" loading={retrying} onClick={retry}>
-                다시 시도
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" loading={retrying} onClick={retry}>
+                  다시 시도
+                </Button>
+                {/* 실패 화면에 동작이 하나뿐이면 리포트가 막힐 때 갇힌다 */}
+                <ExitToHomeButton size="md" />
+              </div>
             }
           />
         </Card>
@@ -113,6 +118,8 @@ export function ChatReportPage() {
   return (
     <main className="mx-auto w-full max-w-[880px] px-5 py-6">
       {/* 헤더 */}
+      {/* 이 화면은 앱 셸 밖이라 상단 네비가 없다 — 나가는 길을 헤더에 둔다.
+          '지난 리포트' 는 옆으로(다른 회차), '홈으로' 는 밖으로 나가는 길이다. */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="bt-h1">챗봇 연습 피드백</h1>
@@ -120,7 +127,13 @@ export function ChatReportPage() {
             {formatDate(report.startedAt)} · {STAGE_LABEL[report.stage]}
           </p>
         </div>
-        <Badge tone="neutral">텍스트 연습</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="neutral">텍스트 연습</Badge>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/reports?track=chat')}>
+            지난 리포트
+          </Button>
+          <ExitToHomeButton />
+        </div>
       </div>
 
       {/* 챗봇은 온도에 반영되지 않는다 — 화상 리포트와 헷갈리지 않게 맨 위에서 못박는다 */}

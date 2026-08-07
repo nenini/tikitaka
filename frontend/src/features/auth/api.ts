@@ -71,6 +71,20 @@ export async function withdrawAccount(password: string): Promise<void> {
   await apiClient.delete(`${AUTH}/account`, { data: { password } })
 }
 
+/**
+ * 비밀번호 재설정 메일 발송 — `POST /api/v1/auth/password/reset-request` (202).
+ *
+ * ⚠️ **로그인 상태에서 현재 비밀번호로 즉시 바꾸는 엔드포인트는 없다.** 서버에 있는 건
+ *    메일 링크 방식뿐(`reset-request` → 토큰 → `PATCH /password/reset`)이라,
+ *    마이의 '비밀번호 변경'도 이 경로를 쓴다.
+ *
+ * ⚠️ 계정 존재 여부를 응답으로 흘리지 않으려고 서버는 **없는 이메일에도 202** 를 준다.
+ *    화면에서 "메일을 보냈다"고 단정하면 안 되고, 받은 편지함을 확인하라고만 안내한다.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiClient.post(`${AUTH}/password/reset-request`, { email })
+}
+
 /** 현재 로그인 사용자 신원. 토큰 응답엔 유저 정보가 없어 로그인 직후 이걸로 하이드레이션한다. */
 export async function getMe(): Promise<MeResponse> {
   return unwrap(await apiClient.get<ApiEnvelope<MeResponse>>('/v1/users/me'))
