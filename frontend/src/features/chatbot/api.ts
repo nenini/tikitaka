@@ -266,6 +266,25 @@ export async function getCurrentChatSession(): Promise<AiChatSession | null> {
   return active ? toSession(active, practiceGoal) : null
 }
 
+/**
+ * 챗봇 진입 목적지.
+ *
+ * 진행 중인 대화가 있으면 **그 대화로 곧장** 보낸다. 예전에는 어디서 들어오든
+ * `/chatbot/persona` 였는데, 그 화면은 '대화 시작' 밖에 없어서 이어서 하려는
+ * 사용자가 새 대화를 만드는 줄 알았다(실제로는 서버가 `ACTIVE_CHAT_SESSION_EXISTS`
+ * 로 막고 기존 세션을 돌려준다 — 화면만 새로 시작하는 것처럼 보였다).
+ *
+ * 조회에 실패하면 설정 화면으로 보낸다. 진입 자체를 막을 이유는 없다.
+ */
+export async function resolveChatbotEntryPath(): Promise<string> {
+  try {
+    const current = await getCurrentChatSession()
+    return current ? `/chatbot/${current.chatSessionId}` : '/chatbot/persona'
+  } catch {
+    return '/chatbot/persona'
+  }
+}
+
 /** 내 세션 목록(히스토리). 전용 화면은 아직 없지만 계약은 열어둔다. */
 export async function getChatSessions(): Promise<AiChatSession[]> {
   const list = unwrap(await apiClient.get<ApiEnvelope<RawSessionSummary[]>>(BASE))

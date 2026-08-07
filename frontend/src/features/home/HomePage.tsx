@@ -15,6 +15,7 @@ import {
   Stack,
   TagChip,
 } from '@/components'
+import { resolveChatbotEntryPath } from '@/features/chatbot/api'
 import { getCurrentMatch } from '@/features/matching/api'
 import { isMatchClosed } from '@/features/matching/types'
 import type { MatchPair } from '@/features/matching/types'
@@ -165,6 +166,9 @@ export function HomePage() {
 
   const [recent, setRecent] = useState<SessionHistoryItem[]>([])
   const [recentLoading, setRecentLoading] = useState(true)
+
+  // 챗봇 진입은 목적지를 조회한 뒤 이동한다 — 그동안 버튼을 잠근다.
+  const [chatEntering, setChatEntering] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -326,10 +330,12 @@ export function HomePage() {
                 >
                   {upcoming.awaitingAcceptance ? '매칭 확인' : '대기방 입장'}
                 </Button>
+                {/* `?cancel=1` 로 매칭 카드의 취소 확인 모달을 바로 연다.
+                    취소 자체는 카드 화면이 수행한다 — 정책 안내와 확인을 한 곳에 모아둔다. */}
                 <Button
                   variant="secondary"
                   className="w-full sm:w-auto"
-                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}`)}
+                  onClick={() => navigate(`/matching/pair/${upcoming.matchPairId}?cancel=1`)}
                 >
                   일정 취소
                 </Button>
@@ -408,8 +414,19 @@ export function HomePage() {
                 >
                   <span aria-hidden="true">🤖</span> AI 화상 15분
                 </Button>
-                {/* 챗봇 F5 진입점 — 페르소나 설정(W-10)부터 시작한다. */}
-                <Button variant="secondary" size="sm" onClick={() => navigate('/chatbot/persona')}>
+                {/* 챗봇 F5 진입점 — 진행 중 대화가 있으면 그 대화로, 없으면 설정(W-10)으로. */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={chatEntering}
+                  onClick={() => {
+                    if (chatEntering) return
+                    setChatEntering(true)
+                    void resolveChatbotEntryPath()
+                      .then((path) => navigate(path))
+                      .finally(() => setChatEntering(false))
+                  }}
+                >
                   <span aria-hidden="true">💬</span> AI 챗봇
                 </Button>
               </div>

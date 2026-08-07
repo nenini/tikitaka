@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Avatar, Badge, Button, Callout, Card, Cluster, ExitToHomeButton, Icon, Modal, Spinner, Stack, TagChip } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
-import { acceptMatch, getCurrentMatch, rejectMatch } from './api'
+import { acceptMatch, cancelMatch, getCurrentMatch, rejectMatch } from './api'
 import { InfoRow } from './parts'
 import { formatMMSS, formatSessionTime, useNow } from './format'
 import { isMatchClosed } from './types'
@@ -25,23 +25,30 @@ const POLL_INTERVAL_MS = 4_000
 export function MatchCardPage() {
   const navigate = useNavigate()
   const now = useNow()
+  // 홈의 '일정 취소' 는 `?cancel=1` 로 들어온다 — 확인 모달을 바로 연다.
+  const [searchParams] = useSearchParams()
+  const cancelIntent = searchParams.get('cancel') === '1'
 
   const [pair, setPair] = useState<MatchPair | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [responding, setResponding] = useState<'ACCEPTED' | 'REJECTED' | null>(null)
   const [policyOpen, setPolicyOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const navigateRef = useRef(navigate)
-  navigateRef.current = navigate
-
-  /** 확정되면 대기방으로 넘긴다. 세션 id 가 아직 없으면(방 생성 전) 그대로 기다린다. */
+  /*
+   * ⚠️ 확정돼도 **대기방으로 자동 이동하지 않는다.**
+   *
+   * 예전에는 `CONFIRMED` 를 보는 즉시 `/session/{id}/room` 으로 replace 했다. 그런데
+   * 이 화면은 홈의 '상세'·'일정 취소' 가 도착하는 곳이기도 해서, 확정된 세션은
+   * 무엇을 눌러도 대기방에 떨어졌다 — 일정을 확인할 수도, 취소할 수도 없었다.
+   * 게다가 확정 시각은 보통 몇 시간 뒤라 그 시점에 대기방에 들어갈 이유도 없다.
+   * 대기방 입장은 아래 버튼으로 **명시적으로** 한다.
+   */
   const applyPair = useCallback((next: MatchPair | null) => {
     setPair(next)
     setLoaded(true)
-    if (next?.status === 'CONFIRMED' && next.session.sessionId != null) {
-      navigateRef.current(`/session/${next.session.sessionId}/room`, { replace: true })
-    }
   }, [])
 
   const load = useCallback(async () => {
@@ -64,6 +71,40 @@ export function MatchCardPage() {
   const remainingSec = deadlineMs != null ? Math.floor((deadlineMs - now) / 1000) : null
   const deadlinePassed = remainingSec != null && remainingSec <= 0 && pair?.status === 'PENDING_ACCEPTANCE'
   const closed = pair != null && (isMatchClosed(pair.status) || deadlinePassed)
+
+  const confirmed = pair?.status === 'CONFIRMED'
+
+  // 확정 상태를 확인한 **뒤에** 연다. 아직 수락 전인 매칭에 취소 모달을 띄우면
+  // 사용자가 '거절'과 헷갈린다.
+  useEffect(() => {
+    if (cancelIntent && confirmed) setCancelOpen(true)
+  }, [cancelIntent, confirmed])
+
+  /** 시작 1시간 이내인가 — 취소 시 노쇼가 붙는 구간이라 확인 문구를 바꾼다. */
+  const startAtMs = pair?.session.scheduledStartAt
+    ? new Date(pair.session.scheduledStartAt).getTime()
+    : null
+  const lateCancel = startAtMs != null && startAtMs - now <= 60 * 60 * 1000
+
+  /**
+   * 확정된 매칭 취소. 서버가 `lateCancellation` 판정과 패널티 부과를 맡으므로
+   * 여기서는 막지 않고 **무슨 일이 일어나는지만** 알린 뒤 그대로 보낸다.
+   */
+  async function handleCancel() {
+    if (cancelling || !pair) return
+    setCancelling(true)
+    setError(null)
+    try {
+      await cancelMatch(pair.matchPairId)
+      navigate('/', { replace: true })
+    } catch (cancelError) {
+      setError(errorMessageOf(cancelError, '일정을 취소하지 못했어요.'))
+      setCancelOpen(false)
+      void load() // 이미 취소·시작된 경우를 화면에 반영한다
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   async function respond(response: 'ACCEPTED' | 'REJECTED') {
     if (responding || !pair) return
@@ -145,9 +186,10 @@ export function MatchCardPage() {
         {/* 좌: 상대 카드 + 수락/거절 */}
         <Card className="flex flex-col gap-4 lg:max-w-[470px] lg:flex-1">
           <div className="flex items-center justify-between">
-            <span className="bt-h3">매칭이 성립했어요</span>
-            {/* 서버가 수락 마감을 주지 않으면 카운트다운을 그리지 않는다(가짜 시한 금지) */}
-            {remainingSec != null && (
+            <span className="bt-h3">{confirmed ? '세션이 확정됐어요' : '매칭이 성립했어요'}</span>
+            {/* 서버가 수락 마감을 주지 않으면 카운트다운을 그리지 않는다(가짜 시한 금지).
+                확정 뒤에는 수락 마감이 의미를 잃으므로 감춘다. */}
+            {!confirmed && remainingSec != null && (
               <Badge tone={remainingSec <= 60 ? 'danger' : 'warning'}>
                 수락 <span className="bt-numeric">{formatMMSS(remainingSec)}</span> 남음
               </Badge>
@@ -172,26 +214,50 @@ export function MatchCardPage() {
             공개되는 정보는 닉네임 · 연령대 · 얼굴상뿐이에요. 실명·연락처·정확한 지역은 공개되지 않습니다.
           </Callout>
 
-          <div className="mt-auto flex gap-2">
-            <Button
-              variant="ghost"
-              className="flex-1"
-              loading={responding === 'REJECTED'}
-              disabled={myAccepted}
-              onClick={() => respond('REJECTED')}
-            >
-              거절
-            </Button>
-            <Button
-              variant="primary"
-              style={{ flex: 2 }}
-              loading={responding === 'ACCEPTED'}
-              disabled={myAccepted}
-              onClick={() => respond('ACCEPTED')}
-            >
-              {myAccepted ? '수락 완료 · 상대 대기' : '수락하기'}
-            </Button>
-          </div>
+          {/* 확정 전에는 수락/거절, 확정 뒤에는 입장/취소.
+              두 조합을 한 줄에 섞지 않는다 — '거절'과 '일정 취소'는 결과가 다르다
+              (거절은 큐 재등록, 취소는 패널티 구간이 있다). */}
+          {confirmed ? (
+            <div className="mt-auto flex gap-2">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                onClick={() => setCancelOpen(true)}
+              >
+                일정 취소
+              </Button>
+              <Button
+                variant="primary"
+                style={{ flex: 2 }}
+                // 세션이 아직 만들어지지 않았으면 들어갈 방이 없다.
+                disabled={pair.session.sessionId == null}
+                onClick={() => navigate(`/session/${pair.session.sessionId}/room`)}
+              >
+                {pair.session.sessionId == null ? '대기방 준비 중' : '대기방 입장'}
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-auto flex gap-2">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                loading={responding === 'REJECTED'}
+                disabled={myAccepted}
+                onClick={() => respond('REJECTED')}
+              >
+                거절
+              </Button>
+              <Button
+                variant="primary"
+                style={{ flex: 2 }}
+                loading={responding === 'ACCEPTED'}
+                disabled={myAccepted}
+                onClick={() => respond('ACCEPTED')}
+              >
+                {myAccepted ? '수락 완료 · 상대 대기' : '수락하기'}
+              </Button>
+            </div>
+          )}
         </Card>
 
         {/* 우: 세션 정보 · 수락 현황 */}
@@ -236,6 +302,39 @@ export function MatchCardPage() {
       </div>
 
       <CancelPolicyModal open={policyOpen} onClose={() => setPolicyOpen(false)} />
+
+      {/* 일정 취소 확인. 되돌릴 수 없고 상대에게도 영향이 가므로 한 번 묻는다.
+          시작 1시간 이내면 패널티가 붙는다는 사실을 **누르기 전에** 알린다. */}
+      <Modal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        role="alertdialog"
+        title="이 세션 일정을 취소할까요?"
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => setCancelOpen(false)}>
+              돌아가기
+            </Button>
+            <Button variant="secondary" loading={cancelling} onClick={handleCancel}>
+              일정 취소
+            </Button>
+          </>
+        }
+      >
+        <Stack gap={10}>
+          {lateCancel ? (
+            <Callout tone="danger">
+              시작 <b>1시간 이내</b> 취소라 온도가 크게 내려가고 <b>노쇼 1회</b>가 부과돼요.
+            </Callout>
+          ) : (
+            <p className="bt-body-sm">온도가 소폭 내려가지만 노쇼 패널티는 없어요.</p>
+          )}
+          <p className="bt-body-sm bt-muted">
+            취소하면 상대에게도 알림이 가고 이 매칭은 되돌릴 수 없어요. 다시 하려면 매칭 대기에 새로
+            등록해야 합니다.
+          </p>
+        </Stack>
+      </Modal>
     </main>
   )
 }
