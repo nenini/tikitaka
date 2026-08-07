@@ -49,8 +49,10 @@ export interface GrowthKeyword {
   count: number
 }
 
-/** user_badges + badge_catalog. */
+/** user_badges + badge_catalog. 획득한 뱃지만 담는다. */
 export interface EarnedBadge {
+  /** 착용/해제 요청의 경로 파라미터. `code` 가 아니라 이 값을 쓴다. */
+  badgeId: number
   code: string
   name: string
   /** 카탈로그 이모지 (없으면 화면에서 기본값 사용) */
@@ -58,6 +60,8 @@ export interface EarnedBadge {
   /** 획득 조건 설명 — 툴팁/보조 설명 */
   condition?: string | null
   acquiredAt: string
+  /** 프로필에 착용 중인가(`user_badges.isDisplayed`). */
+  displayed: boolean
 }
 
 /** 온도 게이지 상한. 사랑의 온도는 0~100 스케일로 다룬다. */

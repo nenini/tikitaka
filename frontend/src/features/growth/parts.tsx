@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
-import { Button, Icon, Modal, VisuallyHidden } from '@/components'
+import { Badge, Button, Icon, Modal, VisuallyHidden } from '@/components'
 import { badgeArtOf } from './badges'
 import { TEMPERATURE_MAX, type EarnedBadge, type GrowthKeyword, type TemperaturePoint } from './types'
 
@@ -618,13 +618,19 @@ const BADGE_COLLAPSED_COUNT = 6
 export function BadgeGrid({
   badges,
   collapsedCount = BADGE_COLLAPSED_COUNT,
+  onToggleDisplay,
 }: {
   badges: EarnedBadge[]
   collapsedCount?: number
+  /** 착용/해제. 넘기지 않으면 상세는 읽기 전용이 된다. */
+  onToggleDisplay?: (badge: EarnedBadge, next: boolean) => Promise<void>
 }) {
-  const [selected, setSelected] = useState<EarnedBadge | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const [expanded, setExpanded] = useState(false)
   const withArt = badges.filter((b) => badgeArtOf(b.code))
+
+  // 목록에서 다시 찾는다 — 착용 상태가 바뀌면 모달도 새 값을 그려야 한다.
+  const selected = withArt.find((b) => b.badgeId === selectedId) ?? null
 
   if (withArt.length === 0) {
     return <p className="bt-body-sm bt-muted">첫 세션을 마치면 첫 뱃지를 받을 수 있어요.</p>
@@ -645,12 +651,14 @@ export function BadgeGrid({
           const art = badgeArtOf(badge.code)
           if (!art) return null
           return (
-            <li key={badge.code}>
+            <li key={badge.badgeId}>
               <button
                 type="button"
-                className="bt-badge-tile"
-                aria-label={`${badge.name} 뱃지 자세히 보기`}
-                onClick={() => setSelected(badge)}
+                // 착용 중인 뱃지는 흐리게 두지 않고 **미착용 쪽을 물러나게** 한다 —
+                // 진열장에서 눈에 먼저 들어와야 하는 건 지금 달고 있는 뱃지다.
+                className={badge.displayed ? 'bt-badge-tile bt-badge-tile--worn' : 'bt-badge-tile'}
+                aria-label={`${badge.name} 뱃지${badge.displayed ? ' (착용 중)' : ''} 자세히 보기`}
+                onClick={() => setSelectedId(badge.badgeId)}
               >
                 <img src={art.image} alt="" loading="lazy" />
               </button>
@@ -674,22 +682,62 @@ export function BadgeGrid({
         </div>
       )}
 
-      <BadgeDetailModal badge={selected} onClose={() => setSelected(null)} />
+      <BadgeDetailModal
+        badge={selected}
+        onClose={() => setSelectedId(null)}
+        onToggleDisplay={onToggleDisplay}
+      />
     </>
   )
 }
 
-function BadgeDetailModal({ badge, onClose }: { badge: EarnedBadge | null; onClose: () => void }) {
+function BadgeDetailModal({
+  badge,
+  onClose,
+  onToggleDisplay,
+}: {
+  badge: EarnedBadge | null
+  onClose: () => void
+  onToggleDisplay?: (badge: EarnedBadge, next: boolean) => Promise<void>
+}) {
   const art = badge ? badgeArtOf(badge.code) : null
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function toggle() {
+    if (!badge || !onToggleDisplay || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onToggleDisplay(badge, !badge.displayed)
+    } catch {
+      setError('상태를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <Modal
       open={badge != null}
-      onClose={onClose}
+      // 요청 중에 닫으면 결과를 반영할 곳이 사라진다.
+      onClose={busy ? () => {} : onClose}
       title={badge?.name ?? '뱃지'}
       actions={
-        <Button variant="primary" onClick={onClose}>
-          확인
-        </Button>
+        <>
+          {badge && onToggleDisplay && (
+            <Button
+              variant={badge.displayed ? 'ghost' : 'primary'}
+              loading={busy}
+              onClick={() => void toggle()}
+            >
+              {badge.displayed ? '착용 해제' : '착용하기'}
+            </Button>
+          )}
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            닫기
+          </Button>
+        </>
       }
     >
       {badge && (
@@ -703,8 +751,10 @@ function BadgeDetailModal({ badge, onClose }: { badge: EarnedBadge | null; onClo
               style={{ width: 140, height: 140, objectFit: 'contain' }}
             />
           )}
+          {badge.displayed && <Badge tone="success">착용 중</Badge>}
           {badge.condition && <p className="bt-body">{badge.condition}</p>}
           <span className="bt-caption bt-muted">{formatAcquired(badge.acquiredAt)} 획득</span>
+          {error && <p className="bt-caption" style={{ color: 'var(--bt-color-danger)' }}>{error}</p>}
         </div>
       )}
     </Modal>

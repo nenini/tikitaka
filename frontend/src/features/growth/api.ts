@@ -61,32 +61,63 @@ export async function getImprovementKeywords(): Promise<GrowthKeyword[]> {
   }
 }
 
+/** `GrowthBadgeResponse` — 카탈로그 전체가 내려오고 획득 여부는 `acquired` 로 온다. */
+interface RawGrowthBadge {
+  badgeId: number
+  code: string
+  name: string
+  description: string | null
+  iconUrl: string | null
+  acquired: boolean
+  acquiredAt: string | null
+  displayed: boolean
+}
+
+/** `GrowthBadgesResponse`. */
+interface RawGrowthBadges {
+  acquiredCount: number
+  totalActiveCount: number
+  badges: RawGrowthBadge[]
+}
+
+/**
+ * 내 뱃지.
+ *
+ * ⚠️ 예전에는 `/v1/users/me/badges` 를 부르고 **실패하면 하드코딩 목록을 돌려줬다.**
+ *    그 경로는 서버에 없어서 화면은 늘 가짜 뱃지를 보고 있었다. 정본은
+ *    `GET /v1/growth/badges` 다. 실패를 목업으로 덮지 않는다 — 이제 뱃지에는
+ *    착용/해제 요청이 딸려 있어, 존재하지 않는 `badgeId` 를 쥐고 있으면 404 가 난다.
+ *
+ * 카탈로그 전체가 내려오므로 **획득한 것만** 남긴다(그리드는 획득 뱃지 진열장이다).
+ */
 export async function getMyBadges(): Promise<EarnedBadge[]> {
-  try {
-    return unwrap(await apiClient.get<ApiEnvelope<EarnedBadge[]>>('/v1/users/me/badges'))
-  } catch {
-    // 코드는 badges.ts 의 아트 카탈로그와 맞춘다 — 아트가 없는 코드는 화면에 그려지지 않는다.
-    return [
-      {
-        code: 'FIRST_CHAT',
-        name: '첫 대화',
-        condition: '첫 연습 세션을 끝까지 마쳤어요.',
-        acquiredAt: daysAgo(30),
-      },
-      {
-        code: 'GOOD_LISTENER',
-        name: '경청왕',
-        condition: '경청 지표가 세 세션 연속으로 올랐어요.',
-        acquiredAt: daysAgo(12),
-      },
-      {
-        code: 'AQUAMAN',
-        name: '아쿠아맨',
-        condition: '연락처 교환에 3번 실패했어요.',
-        acquiredAt: daysAgo(6),
-      },
-    ]
-  }
+  const res = unwrap(await apiClient.get<ApiEnvelope<RawGrowthBadges>>('/v1/growth/badges'))
+  return (res.badges ?? [])
+    .filter((b) => b.acquired && b.acquiredAt)
+    .map((b) => ({
+      badgeId: b.badgeId,
+      code: b.code,
+      name: b.name,
+      condition: b.description,
+      acquiredAt: b.acquiredAt as string,
+      displayed: b.displayed,
+    }))
+}
+
+/**
+ * 뱃지 착용/해제. 서버가 판정한 최종 상태를 돌려준다.
+ *
+ * `PUT`(착용) · `DELETE`(해제) 로 경로가 같고 메서드만 다르다.
+ * 획득하지 않은 뱃지면 404 `BADGE_NOT_ACQUIRED`.
+ */
+export async function setBadgeDisplayed(badgeId: number, displayed: boolean): Promise<boolean> {
+  const path = `/v1/growth/badges/${badgeId}/display`
+  const res = unwrap(
+    displayed
+      ? await apiClient.put<ApiEnvelope<{ displayed: boolean }>>(path)
+      : await apiClient.delete<ApiEnvelope<{ displayed: boolean }>>(path),
+  )
+  return res.displayed
 }
 
 /* ── 데모 폴백 ─────────────────────────────────────────── */

@@ -4,7 +4,7 @@ import { Avatar, Badge, Button, Card, EmptyState, Icon, ListRowButton, Segmented
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getChatSessions } from '@/features/chatbot/api'
 import { STAGE_LABEL } from '@/features/chatbot/types'
-import type { AiChatSession } from '@/features/chatbot/types'
+import type { AiChatSession, ConversationStage } from '@/features/chatbot/types'
 import { getSessionDetail } from '@/features/session/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { getSessionHistory } from './api'
@@ -239,13 +239,26 @@ function SessionRow({
 /**
  * 챗봇 대화 목록.
  *
- * ⚠️ 연습 단계(소개팅 전/후)는 **서버가 모른다** — 세션 생성 요청이 `purpose` 만 받고
- *    목록 응답에도 필드가 없어 localStorage 에 있다(`chatbot/api.ts` 의 `readPreference`).
- *    그래서 다른 기기에서 보면 전부 기본값으로 보인다. 여기서는 **분류 기준으로 쓰지 않고
- *    보조 배지로만** 표시한다 — 틀릴 수 있는 값으로 목록을 가르면 없는 대화가 생긴다.
+ * 연습 단계(소개팅 전/후)는 이제 **서버가 안다** — 세션 생성이 그 값을 `purpose` 로
+ * 받아 저장하고, 목록도 `?purpose=` 로 걸러 준다. 그래서 분류 기준으로 쓸 수 있다.
+ *
+ * ⚠️ 단, 단계 도입 **이전에 만들어진 대화**는 서버에 `DATE_PRACTICE` 로 남아 있어
+ *    어느 쪽에도 잡히지 않는다. 그 대화를 잃어버리지 않도록 `전체` 를 기본 탭으로 두고,
+ *    걸렀을 때만 안내 문구를 띄운다.
  */
+
+/** 챗봇 하위 필터. `all` 은 레거시 대화까지 포함한다. */
+type ChatFilter = 'all' | ConversationStage
+
+const CHAT_FILTER_OPTIONS = [
+  { value: 'all', label: '전체' },
+  { value: 'BEFORE_DATE', label: STAGE_LABEL.BEFORE_DATE },
+  { value: 'AFTER_DATE', label: STAGE_LABEL.AFTER_DATE },
+]
+
 function ChatTrack() {
   const navigate = useNavigate()
+  const [filter, setFilter] = useState<ChatFilter>('all')
   const [items, setItems] = useState<AiChatSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -254,7 +267,7 @@ function ChatTrack() {
     setLoading(true)
     setError(null)
     try {
-      const list = await getChatSessions()
+      const list = await getChatSessions(filter === 'all' ? undefined : filter)
       // 최신순. 서버 정렬을 가정하지 않는다.
       setItems([...list].sort((a, b) => b.startedAt.localeCompare(a.startedAt)))
     } catch (loadError) {
@@ -262,33 +275,66 @@ function ChatTrack() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [filter])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  if (loading) return <ListSkeleton />
+  const picker = (
+    <Segmented
+      className="mb-4"
+      aria-label="연습 단계"
+      options={CHAT_FILTER_OPTIONS}
+      value={filter}
+      onChange={(next) => setFilter(next as ChatFilter)}
+    />
+  )
+
+  if (loading) {
+    return (
+      <>
+        {picker}
+        <ListSkeleton />
+      </>
+    )
+  }
 
   if (items.length === 0) {
     return (
-      <EmptyCard
-        text={error ?? 'AI 챗봇으로 대화를 연습하면 여기에 쌓여요.'}
-        actionLabel={error ? '다시 시도' : '챗봇 연습하기'}
-        onAction={() => (error ? void load() : navigate('/chatbot/persona'))}
-      />
+      <>
+        {picker}
+        <EmptyCard
+          text={
+            error ??
+            (filter === 'all'
+              ? 'AI 챗봇으로 대화를 연습하면 여기에 쌓여요.'
+              : `${STAGE_LABEL[filter]} 대화가 아직 없어요.`)
+          }
+          actionLabel={error ? '다시 시도' : '챗봇 연습하기'}
+          onAction={() => (error ? void load() : navigate('/chatbot/persona'))}
+        />
+      </>
     )
   }
 
   return (
-    <Card>
-      <div>
-        {items.map((chat) => (
-          <ChatRow key={chat.chatSessionId} chat={chat} onOpen={navigate} />
-        ))}
-      </div>
-      {error && <ErrorLine text={error} />}
-    </Card>
+    <>
+      {picker}
+      <Card>
+        <div>
+          {items.map((chat) => (
+            <ChatRow key={chat.chatSessionId} chat={chat} onOpen={navigate} />
+          ))}
+        </div>
+        {error && <ErrorLine text={error} />}
+      </Card>
+      {filter !== 'all' && (
+        <p className="bt-caption bt-muted mt-3">
+          단계를 고르기 전에 시작한 예전 대화는 <b>전체</b>에서만 보여요.
+        </p>
+      )}
+    </>
   )
 }
 
