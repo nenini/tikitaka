@@ -109,6 +109,15 @@ class SilenceDetector(Detector):
         ]
         if speaking:
             return self._blocked("SOMEONE_SPEAKING", state, speakers=speaking)
+        # 소리는 멈췄는데 그게 말이었는지 아직 모른다 — 전사가 끝나야 알 수 있다.
+        # 여기서 침묵으로 단정하면 방금 말한 사람에게 "대화가 끊겼어요"가 나가고,
+        # 반대로 활동으로 치면 잡음 하나에 침묵이 영영 안 잡힌다. 결론을 미룬다.
+        if state.awaiting_transcripts > 0:
+            return self._blocked(
+                "AWAITING_TRANSCRIPT",
+                state,
+                pending=state.awaiting_transcripts,
+            )
         if state.last_activity_ms == 0:
             return self._blocked("NO_ACTIVITY_RECORDED", state)
         silent_ms = now_ms - state.last_activity_ms

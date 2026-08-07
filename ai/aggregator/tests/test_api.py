@@ -39,6 +39,10 @@ class FakeAudioAdapter:
     async def stop(self) -> None:
         return None
 
+    @property
+    def pending_transcripts(self) -> int:
+        return 0
+
 
 class FakeAudioAdapterFactory:
     async def warmup(self) -> None:
