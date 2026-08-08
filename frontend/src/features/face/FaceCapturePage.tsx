@@ -80,6 +80,20 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
     navigate(onboarding ? '/signup/survey' : '/me/edit', { replace: true })
   }, [camera, navigate, onboarding])
 
+  /**
+   * 이전 단계로.
+   *
+   * `goNext` 와 달리 `replace` 를 쓰지 않는다 — 앞으로 가는 길은 되돌아올 이유가 없지만
+   * 뒤로 가는 길은 사용자가 다시 앞으로 올 수 있어야 한다.
+   *
+   * 훅이 언마운트 때 트랙을 정리하지만(`useEffect(() => stop, [stop])`) 여기서 먼저 끈다 —
+   * 라우팅이 한 프레임 늦어도 카메라 표시등은 즉시 꺼져야 사용자가 불안해하지 않는다.
+   */
+  const goBack = useCallback(() => {
+    camera.stop()
+    navigate(onboarding ? '/signup/profile' : '/me/edit')
+  }, [camera, navigate, onboarding])
+
   async function startCamera() {
     setError(null)
     await camera.start()
@@ -201,7 +215,12 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
               </span>
             </label>
 
+            {/* '이전'과 '건너뛰기'는 방향이 반대다 — 붙여 두면 오클릭이 곧 단계 건너뛰기가 된다.
+                이전은 왼쪽 끝, 건너뛰기는 주 동작 옆에 둔다. */}
             <Cluster gap={8}>
+              <Button variant="secondary" leadingIcon="chevron-left" onClick={goBack}>
+                이전
+              </Button>
               <Button variant="primary" disabled={!agreed || !group} onClick={startCamera}>
                 카메라 켜기
               </Button>
@@ -272,6 +291,16 @@ export function FaceCapturePage({ mode = 'onboarding' }: FaceCapturePageProps) {
             )}
 
             <Cluster gap={8}>
+              {/* 카메라를 켠 뒤에도 되돌아갈 길을 남긴다 — 이 단계의 출구가 '건너뛰기'(앞으로)뿐이면
+                  프로필을 고치러 갈 수가 없다. 분석 중에는 잠근다(요청이 떠 있다). */}
+              <Button
+                variant="secondary"
+                leadingIcon="chevron-left"
+                disabled={analyzing || skipping}
+                onClick={goBack}
+              >
+                이전
+              </Button>
               <Button variant="primary" loading={analyzing} disabled={!canCapture} onClick={handleCapture}>
                 {attempts === 0 ? '촬영하기' : '다시 촬영'}
               </Button>
