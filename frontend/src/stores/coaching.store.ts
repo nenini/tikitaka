@@ -62,10 +62,21 @@ export interface CoachMessageInput {
   expiresAtSessionElapsedMs?: number
 }
 
+/** 레일에 남길 코칭 기록 상한. 세션 30분이면 이보다 많이 오지 않는다. */
+const HISTORY_LIMIT = 50
+
 interface CoachingState {
   intensity: CoachIntensity
   /** 도착 순서대로 쌓인 큐. 만료되거나 사용자가 닫아야 빠진다. */
   messages: CoachMessage[]
+  /**
+   * 지나간 코칭 기록. **최신이 앞**이다.
+   *
+   * `messages` 와 달리 **만료·닫기로 사라지지 않는다.** 오버레이는 몇 초 뒤 없어지는데,
+   * 그게 유일한 사본이면 사용자가 눈을 돌린 사이 조언이 통째로 증발한다.
+   * 세션이 끝날 때까지 남겨 두고 레일에서 다시 읽게 한다.
+   */
+  history: CoachMessage[]
   pushMessage: (msg: CoachMessageInput) => void
   /** 사용자가 닫은 카드를 큐에서 뺀다 — 뒤에 대기하던 카드가 올라온다. */
   dismiss: (id: string) => void
@@ -101,6 +112,7 @@ export function scaleTtl(ms: number): number {
 export const useCoachingStore = create<CoachingState>((set) => ({
   intensity: 'balanced',
   messages: [],
+  history: [],
 
   pushMessage: (msg) =>
     set((s) => {
@@ -116,7 +128,11 @@ export const useCoachingStore = create<CoachingState>((set) => ({
         expiresAt: at + ttlMs,
       }
       // 넣는 김에 만료된 것도 함께 치운다 — 큐가 조용히 길어지지 않게.
-      return { messages: [...s.messages.filter((m) => m.expiresAt > at), next].slice(-20) }
+      return {
+        messages: [...s.messages.filter((m) => m.expiresAt > at), next].slice(-20),
+        // 기록은 최신이 앞. 여기서는 만료를 걸러내지 않는다 — 그게 이 배열의 존재 이유다.
+        history: [next, ...s.history].slice(0, HISTORY_LIMIT),
+      }
     }),
 
   dismiss: (id) => set((s) => ({ messages: s.messages.filter((m) => m.id !== id) })),
@@ -128,7 +144,8 @@ export const useCoachingStore = create<CoachingState>((set) => ({
       return kept.length === s.messages.length ? s : { messages: kept }
     }),
 
-  clear: () => set({ messages: [] }),
+  // 세션이 바뀌면 기록도 함께 비운다 — 지난 세션 코칭이 새 세션 레일에 남으면 안 된다.
+  clear: () => set({ messages: [], history: [] }),
   setIntensity: (intensity) => set({ intensity }),
 }))
 

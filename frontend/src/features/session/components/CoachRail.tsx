@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { Icon } from '@/components'
+import type { CoachMessage } from '@/stores/coaching.store'
+import { CoachHistoryCard } from './CoachHistoryCard'
 import { ExtensionOfferCard } from './ExtensionOfferCard'
 import type { ExtensionChoice } from './ExtensionOfferCard'
 import { GoalProgressCard } from './GoalProgressCard'
@@ -20,6 +22,10 @@ export interface CoachRailProps {
   pendingMessageCount?: number
   /** 안전 경고 카드. 코칭보다 위에 놓는다 — 성격이 다르고 더 급하다 */
   safetyWarning?: ReactNode
+  /** 지나간 코칭 기록(최신이 앞). 오버레이가 사라져도 여기 남는다 */
+  coachHistory?: readonly CoachMessage[]
+  /** 세션 시작 시각(ms) — 기록에 경과 시각을 붙이는 데 쓴다 */
+  sessionStartedAtMs?: number | null
   goalLabel: string
   /**
    * 내 발화 비율 0~100.
@@ -49,6 +55,8 @@ export function CoachRail({
   silenceHint,
   pendingMessageCount = 0,
   safetyWarning,
+  coachHistory = [],
+  sessionStartedAtMs,
   goalLabel,
   speakingRatio,
   missions = [],
@@ -83,13 +91,16 @@ export function CoachRail({
 
       {silenceHint}
 
-      {/* 코칭 카드 자체는 영상 위(카메라 근처)로 옮겼다 — SessionStage 의 coachOverlay.
-          여기에는 대기 중인 건수만 남긴다. 카드를 양쪽에 그리면 같은 말이 두 번 보인다. */}
+      {/* 지금 띄울 코칭은 영상 위(카메라 근처)에 뜬다 — SessionStage 의 coachOverlay.
+          여기 쌓이는 것은 **지나간 기록**이다. 오버레이는 몇 초 뒤 사라지므로
+          그것만으로는 눈을 돌린 사이 조언이 통째로 없어진다. */}
       {pendingMessageCount > 0 && (
         <span className="bt-caption bt-muted" role="status" aria-live="polite">
           코칭 <span className="bt-numeric">{pendingMessageCount}</span>건이 더 기다리고 있어요
         </span>
       )}
+
+      <CoachHistoryCard history={coachHistory} sessionStartedAtMs={sessionStartedAtMs} />
 
       {/* 발화 비율 지표는 서버 경로가 생길 때만 그린다(가짜 숫자 금지) */}
       {typeof speakingRatio === 'number' && (
