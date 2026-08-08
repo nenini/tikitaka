@@ -86,8 +86,21 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: '/', element: <HomePage /> },
-          // 매칭 F2 진입점 — 트랙 선택. 이후 큐/카드는 몰입 흐름이라 셸 밖.
+          // 매칭 F2 진입점 — 트랙 선택.
           { path: '/matching', element: <TrackSelectPage /> },
+          /*
+           * 매칭 대기 큐도 셸 안에 둔다.
+           *
+           * 대기는 **집중해야 하는 과업이 아니라 배경 상태**다 — 화면이 스스로
+           * "이 화면을 벗어나도 대기는 유지돼요" 라고 안내하고, 기다리는 동안
+           * 챗봇으로 연습하라고 권한다. 그런 화면에서 전역 네비를 감추면
+           * 나가는 길만 막고 대기는 그대로 도는 셈이 된다.
+           *
+           * ⚠️ 개편 명세(§2.1)는 대기를 `S-FOCUS`(전역 네비 없음)로 분류한다.
+           *    수락(카드)과 한 묶음으로 본 것인데, 카드는 마감이 도는 시한부 결정이고
+           *    대기는 그렇지 않다. 여기서는 둘을 갈라 카드만 셸 밖에 남긴다.
+           */
+          { path: '/matching/queue/:requestId', element: <MatchQueuePage /> },
           // AppShell 네비의 '리포트' 목적지. 목록은 `GET /v1/growth/sessions` 를 원천으로 쓴다
           // — 리포트 전용 목록 엔드포인트가 없고, 세션 이력에 리포트 유무가 함께 온다.
           { path: '/reports', element: <ReportListPage /> },
@@ -106,8 +119,8 @@ export const router = createBrowserRouter([
       },
 
       // ── 몰입형 · 흐름 화면 (셸 밖) ──
-      // 매칭 F2 흐름: 대기 큐 → 매칭 카드 → (수락) 대기방
-      { path: '/matching/queue/:requestId', element: <MatchQueuePage /> },
+      // 매칭 F2 흐름: (셸 안) 대기 큐 → 매칭 카드 → (수락) 대기방.
+      // 카드부터 셸을 벗는다 — 수락 마감이 도는 시한부 결정이라 다른 데로 새면 놓친다.
       { path: '/matching/pair/:pairId', element: <MatchCardPage /> },
       // 대기방(기기 점검) → 세션. 대기방을 거쳐 WebRTC 세션으로 진입한다.
       //

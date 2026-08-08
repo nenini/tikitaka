@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Callout, Card, ExitToHomeButton, Icon, Modal, Stack, TagChip } from '@/components'
+import { Button, Callout, Card, Icon, Modal, Stack, TagChip } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getCurrentMatchRequest, leaveQueue, updateMatchRequest } from './api'
 import { QueueSetupModal } from './QueueSetupModal'
@@ -96,16 +96,15 @@ export function MatchQueuePage() {
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-5 py-6">
-      {/* '홈으로' 는 **대기를 취소하지 않는다.** 취소는 아래 '매칭 대기 취소' 뿐이라,
-          둘을 헷갈리지 않게 톤을 나눈다(취소 secondary · 홈 ghost). */}
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="bt-h1">상대를 찾고 있어요</h1>
-          <p className="bt-body bt-muted mt-1">
-            조건이 맞는 사람이 나타나면 바로 연결해 드려요.
-          </p>
-        </div>
-        <ExitToHomeButton />
+      {/* 이 화면은 앱 셸 안이라 전역 네비가 나가는 길을 맡는다.
+          예전에 헤더에 두던 '홈으로'는 셸이 없던 시절의 대체물이라 걷어냈다 —
+          네비와 같은 일을 하는 버튼이 둘이면 '매칭 대기 취소'와 헷갈리기만 한다.
+          대기를 실제로 해제하는 길은 아래 '매칭 대기 취소' 하나뿐이다. */}
+      <header className="mb-5">
+        <h1 className="bt-h1">상대를 찾고 있어요</h1>
+        <p className="bt-body bt-muted mt-1">
+          조건이 맞는 사람이 나타나면 바로 연결해 드려요.
+        </p>
       </header>
 
       {loadError && (

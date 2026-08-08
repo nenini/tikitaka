@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth.store'
 /*  스플래시 스크린 — 서비스 진입 시 가장 먼저 마주하는 화면                     */
 /*  1차 확정 옵션:                                                             */
 /*   ① 히어로 사진 풀블리드(문구 없음 · 사진만)                                 */
-/*   ② 정중앙 START — 배경 없는 투명 텍스트                                     */
+/*   ② START — 배경 없는 투명 텍스트. 가로 중앙, 세로는 41%(커플 위)            */
 /*   ③ 3초 후 자동 이동(누르면 즉시). 인증·온보딩 상태로 분기:                   */
 /*      미로그인 → 랜딩·로그인(/login)                                          */
 /*      로그인 + 프로필 없음 → 온보딩 첫 단계(/signup/verify)                    */
@@ -56,7 +56,11 @@ export function SplashPage() {
 
   return (
     <main
-      className="tk-brand-scope relative flex min-h-dvh items-center justify-center overflow-hidden"
+      /* pb-[18vh]: START 를 화면 정중앙이 아니라 **세로 41%** 에 세운다.
+         히어로 사진의 커플이 세로 48~68% 에 있어, 정중앙에 두면 맞잡은 손과 겹친다.
+         패딩으로 미는 이유는 버튼의 transform 이 등장 애니메이션에 이미 쓰이고 있어서다
+         (translateY 를 여기서 또 쓰면 둘이 싸운다). */
+      className="relative flex min-h-dvh items-center justify-center overflow-hidden pb-[18vh]"
       style={{
         // 히어로 사진 풀블리드(WebP 2560×1440 · 362KB) · 없을 때 브랜드 그라데이션 폴백
         background:
@@ -72,23 +76,11 @@ export function SplashPage() {
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, rgba(3,12,8,.28) 0%, rgba(3,12,8,.04) 48%, rgba(3,12,8,.58) 100%), radial-gradient(60% 45% at 50% 50%, rgba(3,12,8,.30) 0%, rgba(3,12,8,.08) 60%, rgba(3,12,8,0) 100%)',
+            // 초점을 START 와 같은 41% 에 맞춘다 — 50% 에 두면 글자는 스크림 밖에 서고
+            // 정작 밝게 살려야 할 커플만 어두워진다.
+            'radial-gradient(60% 45% at 50% 41%, rgba(18,9,14,.34) 0%, rgba(18,9,14,.10) 60%, rgba(18,9,14,0) 100%)',
         }}
       />
-
-      <div className="absolute left-1/2 top-[max(1.5rem,env(safe-area-inset-top))] z-10 -translate-x-1/2 text-white">
-        <span className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.04em]">
-          <img
-            src="/tika-logo-whitever.webp"
-            alt=""
-            aria-hidden="true"
-            width={82}
-            height={48}
-            className="h-7 w-auto drop-shadow-lg"
-          />
-          티키타카
-        </span>
-      </div>
 
       <button
         type="button"
@@ -100,11 +92,8 @@ export function SplashPage() {
           transition: 'opacity 700ms 160ms ease-out, transform 700ms 160ms cubic-bezier(.22,1,.36,1)',
         }}
       >
-        <span className="mb-2 font-serif text-[14px] italic tracking-[0.08em] text-white/75">
-          Practice · Connect · Bloom
-        </span>
         <span
-          className="select-none text-[24px] font-light sm:text-[28px]"
+          className="select-none text-[26px] font-light sm:text-[30px]"
           style={{
             letterSpacing: '0.42em',
             // 마지막 글자 뒤 자간까지 더해지는 것을 상쇄해 시각적 중앙을 맞춘다
@@ -112,7 +101,7 @@ export function SplashPage() {
             textShadow: '0 2px 18px rgba(0,0,0,.45)',
           }}
         >
-          시작하기
+          START
         </span>
         {/* 자동 이동까지 남은 시간을 문구 없이 알리는 헤어라인 */}
         <span aria-hidden="true" className="mt-3 block h-px w-[132px] bg-white/25">
@@ -125,10 +114,6 @@ export function SplashPage() {
           />
         </span>
       </button>
-
-      <p className="absolute bottom-[max(1.75rem,env(safe-area-inset-bottom))] left-1/2 z-10 w-full -translate-x-1/2 px-6 text-center text-[12px] leading-5 text-white/70">
-        30분의 대화 연습이 오늘의 자신감을 만듭니다
-      </p>
     </main>
   )
 }

@@ -148,16 +148,28 @@ export function ConsentPage() {
             </span>
           )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            block
-            trailingAffordance
-            loading={submitting}
-            onClick={onContinue}
-          >
-            동의하고 계속
-          </Button>
+          {/* 좁은 화면에선 세로 스택(primary 위), sm 이상에선 나란히 — 본인 인증 단계와 같은 규칙 */}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              variant="secondary"
+              size="lg"
+              leadingIcon="chevron-left"
+              disabled={submitting}
+              onClick={() => navigate('/signup/verify')}
+            >
+              이전
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              className="flex-1"
+              trailingAffordance
+              loading={submitting}
+              onClick={onContinue}
+            >
+              동의하고 계속
+            </Button>
+          </div>
         </>
       )}
     </OnboardingShell>
