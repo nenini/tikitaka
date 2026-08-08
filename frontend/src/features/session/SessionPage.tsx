@@ -215,6 +215,8 @@ export function SessionPage() {
      큐에 쌓아두고 우선순위·도착순으로 하나만 고른다. 서버가 준 TTL 이 지나면
      스스로 사라지고, 뒤에 대기하던 카드가 올라온다. */
   const messages = useCoachingStore((s) => s.messages)
+  // 오버레이가 사라져도 레일에 남는 기록(최신이 앞).
+  const coachHistory = useCoachingStore((s) => s.history)
   const dismissMessage = useCoachingStore((s) => s.dismiss)
   const pruneExpired = useCoachingStore((s) => s.pruneExpired)
 
@@ -444,6 +446,12 @@ export function SessionPage() {
                 />
               }
               pendingMessageCount={pendingMessageCount}
+              coachHistory={coachHistory}
+              // 기록의 '몇 분쯤' 표시 기준. 서버가 준 실제 시작 시각을 쓴다 —
+              // 클라이언트 마운트 시각을 쓰면 새로고침할 때마다 0 부터 다시 센다.
+              sessionStartedAtMs={
+                status?.actualStartAt ? new Date(status.actualStartAt).getTime() : null
+              }
               safetyWarning={
                 realtime.safety ? (
                   <SafetyWarningCard
