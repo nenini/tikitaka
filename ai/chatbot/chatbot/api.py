@@ -74,7 +74,7 @@ class ChatStreamRequest(_CamelModel):
     history: list[HistoryMessage] = Field(default_factory=list)
 
 
-def get_llm() -> ChatLLM:
+def _build_llm() -> ChatLLM:
     """기본은 GMS(OpenAI 호환), 키가 없으면 로컬 Ollama.
 
     로컬 EXAONE 7.8B 는 6GB GPU 에 다 안 올라가 일부가 CPU 로 넘어간다. 실측(2026-08-09,
@@ -102,6 +102,30 @@ def get_llm() -> ChatLLM:
     model = os.environ.get("OLLAMA_MODEL", "exaone3.5:7.8b")
     timeout = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
     return OllamaAdapter(model=model, host=host, timeout_seconds=timeout)
+
+
+_llm: ChatLLM | None = None
+
+
+def get_llm() -> ChatLLM:
+    """어댑터는 한 번만 만든다.
+
+    요청마다 env 를 다시 읽을 이유가 없고, 폴백 경고도 한 번만 남아야 한다 —
+    헬스체크가 15초마다 도는데 매번 경고를 찍으면 로그에서 다른 게 안 보인다.
+    어댑터는 설정만 들고 있고 HTTP 클라이언트는 호출할 때 만들므로 공유해도 안전하다.
+    """
+    global _llm
+    if _llm is None:
+        _llm = _build_llm()
+    return _llm
+
+
+def llm_backend_name() -> str:
+    """지금 실제로 붙는 백엔드 이름. `/health` 가 쓴다.
+
+    `get_llm()` 이 만든 **바로 그 인스턴스**를 보므로 판정이 어긋날 수 없다.
+    """
+    return "gms" if isinstance(get_llm(), GmsChatAdapter) else "ollama"
 
 
 LLMDep = Annotated[ChatLLM, Depends(get_llm)]
@@ -149,7 +173,12 @@ def _prior_and_input(history: list[HistoryMessage]) -> tuple[list[ChatMessage], 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    """`llm` 은 지금 실제로 붙는 백엔드다 — `gms` 또는 `ollama`.
+
+    설정이 없으면 조용히 Ollama 로 폴백하는데, 그 상태가 겉으로는 정상으로 보인다.
+    배포 후 `curl /health` 한 번으로 구분할 수 있어야 한다. 키 값은 노출하지 않는다.
+    """
+    return {"status": "ok", "llm": llm_backend_name()}
 
 
 @app.post("/api/v1/chat/stream")
