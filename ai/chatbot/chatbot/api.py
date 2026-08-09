@@ -31,7 +31,7 @@ from starlette.responses import Response
 from chatbot.conversation import Conversation
 from chatbot.llm import ChatLLM, OllamaAdapter
 from chatbot.persona import build_system_prompt
-from chatbot.persona_catalog import PersonaNotFound, get_persona, select_persona
+from chatbot.persona_catalog import PersonaNotFound, get_persona, select_partner
 from chatbot.queue_gate import LlmGate, QueueFull, QueueTimeout, gate_from_env
 from chatbot.schemas import ChatMessage
 
@@ -160,8 +160,14 @@ def stream_chat(
                     emit_persona = False
                 else:
                     condition = request.persona_condition or PersonaCondition()
-                    entry = select_persona(
-                        gender=condition.preferred_gender,
+                    # ⚠️ `preferredGender` 에는 **사용자 본인의 성별**이 온다.
+                    #    BE(AiChatContextService)가 profile.getGender() 를 그대로 담기
+                    #    때문이다 — 필드 이름과 내용이 어긋나 있다. 그대로 넘기면 동성
+                    #    페르소나가 나오므로 select_partner 로 뒤집어서 고른다.
+                    #    계약을 바로잡으면(BE가 반대 성별을 담으면) select_persona 로
+                    #    되돌리고 이 주석을 지운다.
+                    entry = select_partner(
+                        condition.preferred_gender,
                         age=condition.preferred_age,
                         min_age=condition.min_preferred_age,
                         max_age=condition.max_preferred_age,
