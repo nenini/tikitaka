@@ -21,6 +21,8 @@ def client() -> Iterator[TestClient]:
 
 
 def _first_request() -> dict[str, object]:
+    # ⚠️ preferredGender 는 **사용자 본인의 성별**이다(BE가 profile.getGender() 를 담는다).
+    #    여기서는 "여성 사용자"라는 뜻이고, 기대 결과는 남성 페르소나다.
     return {
         "userId": 1,
         "sessionId": 15,
@@ -54,8 +56,34 @@ def test_first_message_selects_persona(client: TestClient) -> None:
     assert "event: chunk" in text
     assert "event: done" in text
     key = _persona_key(text)
-    assert key.startswith("FEMALE_")  # 여성 조건 → 여성 페르소나
+    assert key.startswith("MALE_")  # 여성 사용자 → 남성 페르소나
     assert f'"personaKey": "{key}"' in text  # done에 같은 키
+
+
+def test_persona_is_the_opposite_gender_of_the_user() -> None:
+    """소개팅 연습이므로 상대는 사용자와 **반대 성별**이어야 한다.
+
+    `preferredGender` 라는 이름과 달리 BE 는 여기에 사용자 본인의 성별을 담는다
+    (`AiChatContextService`: `new AiChatPersonaCondition(profile.getGender(), age)`).
+    그대로 `select_persona` 에 넘기면 동성 페르소나가 나온다 — 실제로 그랬고,
+    이 테스트가 없어서 아무도 몰랐다.
+    """
+    from chatbot.persona_catalog import select_partner
+
+    assert select_partner("MALE").spec.gender == "female"
+    assert select_partner("FEMALE").spec.gender == "male"
+
+
+def test_opposite_gender_matching_survives_age_filters(client: TestClient) -> None:
+    """나이 조건이 붙어도 성별 반전이 유지된다 — 나이로 좁히다 동성이 섞이면 안 된다."""
+    body = _first_request()
+    body["personaCondition"] = {
+        "preferredGender": "MALE",  # 남성 사용자
+        "minPreferredAge": 25,
+        "maxPreferredAge": 30,
+    }
+    key = _persona_key(client.post("/api/v1/chat/stream", json=body).text)
+    assert key.startswith("FEMALE_")  # 남성 사용자 → 여성 페르소나
 
 
 def test_followup_reuses_key_without_persona_event(client: TestClient) -> None:
