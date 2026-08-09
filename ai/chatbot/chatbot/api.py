@@ -16,6 +16,7 @@ POST로 보내면, AI는 SSE로 응답한다:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Iterator
 from typing import Annotated
@@ -29,11 +30,13 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from chatbot.conversation import Conversation
-from chatbot.llm import ChatLLM, OllamaAdapter
+from chatbot.llm import ChatLLM, GmsChatAdapter, GmsChatConfigError, OllamaAdapter
 from chatbot.persona import build_system_prompt
 from chatbot.persona_catalog import PersonaNotFound, get_persona, select_partner
 from chatbot.queue_gate import LlmGate, QueueFull, QueueTimeout, gate_from_env
 from chatbot.schemas import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 _TOKEN_ENV = "AI_CHAT_INTERNAL_TOKEN"
 
@@ -72,6 +75,27 @@ class ChatStreamRequest(_CamelModel):
 
 
 def get_llm() -> ChatLLM:
+    """기본은 GMS(OpenAI 호환), 키가 없으면 로컬 Ollama.
+
+    로컬 EXAONE 7.8B 는 6GB GPU 에 다 안 올라가 일부가 CPU 로 넘어간다. 실측(2026-08-09,
+    10턴): **평균 62초, 첫 응답은 120초 타임아웃으로 실패**했다. 채팅에서는 못 쓰는 속도다.
+
+    `CHATBOT_LLM_BACKEND=ollama` 를 주면 강제로 로컬을 쓴다 — GPU 서버에 여유가 있거나
+    외부 호출을 막아야 할 때를 위해 남겨 둔다.
+
+    ⚠️ GMS 를 쓰면 **대화 원문이 외부로 나간다.** AI 연습 대화(사람 상대가 없는 세션)에
+       한해 허용한 팀 결정(2026-08-05)을 따른다. 사람 간 화상 세션의 전사는 여전히
+       외부로 나가지 않는다.
+    """
+    backend = os.environ.get("CHATBOT_LLM_BACKEND", "gms").strip().lower()
+    if backend != "ollama":
+        try:
+            return GmsChatAdapter.from_env()
+        except GmsChatConfigError:
+            logger.warning(
+                "GMS 설정이 없어 로컬 Ollama 로 폴백합니다 "
+                "(GMS_BASE_URL·GMS_API_KEY 확인). 응답이 크게 느려집니다."
+            )
     # 컨테이너에선 호스트 Ollama를 가리켜야 함(OLLAMA_HOST). 모델도 env로 교체 가능
     # (GPU 여유에 따라 7.8B ↔ 2.4B 전환 등). 미설정 시 로컬 기본값.
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
