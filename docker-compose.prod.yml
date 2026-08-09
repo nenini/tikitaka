@@ -74,6 +74,13 @@ services:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:18150}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-exaone3.5:7.8b}
       AI_CHAT_INTERNAL_TOKEN: ${AI_CHAT_INTERNAL_TOKEN:-}
+      # 챗봇 LLM 은 GMS(OpenAI 호환)가 기본이다. 이 셋이 비면 컨테이너가 조용히
+      # Ollama 로 폴백해 응답이 수십 초로 느려진다 — `curl /health` 의 `llm` 값으로
+      # 확인할 수 있다(gms / ollama). 빌드 컨텍스트가 ./ai/chatbot 이라
+      # ai/tts/.env 는 이미지에 없으므로 여기서 넘겨야 한다.
+      GMS_BASE_URL: ${GMS_BASE_URL:-}
+      GMS_API_KEY: ${GMS_API_KEY:-}
+      GMS_CHAT_MODEL: ${GMS_CHAT_MODEL:-gpt-4o-mini}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 15s
