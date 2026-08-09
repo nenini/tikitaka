@@ -47,6 +47,25 @@ def test_health(client: TestClient) -> None:
     assert client.get("/health").json()["status"] == "ok"
 
 
+def test_health_reports_which_llm_backend_is_live(client: TestClient) -> None:
+    """설정이 없으면 조용히 Ollama 로 폴백한다 — 겉으로는 정상으로 보인다.
+
+    배포 후 `curl /health` 로 구분할 수 있어야 해서 백엔드 이름을 싣는다.
+    키 값은 절대 나가면 안 된다.
+    """
+    body = client.get("/health").json()
+    assert body["llm"] in {"gms", "ollama"}
+    assert "key" not in json.dumps(body).lower()
+
+
+def test_llm_adapter_is_built_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """요청마다 다시 만들면 폴백 경고가 헬스체크(15초)마다 쌓인다."""
+    import chatbot.api as api
+
+    monkeypatch.setattr(api, "_llm", None)
+    assert api.get_llm() is api.get_llm()
+
+
 def test_first_message_selects_persona(client: TestClient) -> None:
     response = client.post("/api/v1/chat/stream", json=_first_request())
     assert response.status_code == 200
