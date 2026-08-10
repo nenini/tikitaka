@@ -253,7 +253,9 @@ export function HomePage() {
             <h1 id="home-hero-title">
               좋은 대화는,
               <br />
-              연습할수록 자연스러워져요.
+              연습할수록
+              <br />
+              자연스러워져요.
             </h1>
           </div>
         </div>
@@ -262,7 +264,7 @@ export function HomePage() {
           <p className="tk-home-cta-sheet__eyebrow">
             {user?.nickname ? `${user.nickname} 님의 오늘` : '오늘의 티키타카'}
           </p>
-          <h2>오늘도 한 걸음, 연습해볼까요?</h2>
+          <h2>오늘도 한 걸음, <br />연습해볼까요?</h2>
           <p className="tk-home-cta-sheet__status">{heroStatus}</p>
           <Button variant="primary" size="lg" block onClick={() => navigate(heroTarget)}>
             {heroAction}
