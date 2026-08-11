@@ -44,6 +44,24 @@ export async function getSessionDetail(sessionId: number): Promise<SessionDetail
   return unwrap(await apiClient.get<ApiEnvelope<SessionDetail>>(`/v1/sessions/${sessionId}`))
 }
 
+/**
+ * 코칭 버튼 — 최근 대화를 근거로 질문을 하나 추천받는다.
+ *
+ * 추천 문구는 이 응답이 아니라 **기존 코칭 경로**(STOMP 개인 큐)로 도착한다.
+ * 여기서 돌아오는 건 "만들어졌다"는 사실과 `requestId` 뿐이다.
+ *
+ * 서버가 문구를 못 만들면(전사가 아직 없거나 LLM 실패) 실패로 던진다 —
+ * 고정 문구로 때우면 질문을 요청한 사람에게 엉뚱한 격려가 간다.
+ */
+export async function requestCoachingSuggestion(sessionId: number): Promise<string> {
+  const accepted = unwrap(
+    await apiClient.post<ApiEnvelope<{ requestId: string }>>(
+      `/v1/sessions/${sessionId}/coaching-requests`,
+    ),
+  )
+  return accepted.requestId
+}
+
 /** 서버가 계산한 상태·잔여 시간. 클라이언트 타이머의 기준점으로 쓴다. */
 export async function getSessionStatus(sessionId: number): Promise<SessionStatusSnapshot> {
   return unwrap(
