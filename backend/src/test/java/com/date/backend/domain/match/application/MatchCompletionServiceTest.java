@@ -28,7 +28,10 @@ class MatchCompletionServiceTest {
 		MatchRequest first = mock(MatchRequest.class);
 		MatchRequest second = mock(MatchRequest.class);
 		LocalDateTime scheduledAt = LocalDateTime.of(2026, 7, 29, 10, 0);
-		LocalDateTime completedAt = scheduledAt.plusMinutes(35);
+		// MatchCompletionService.SESSION_DURATION 과 같은 값(private 이라 참조 불가).
+		int sessionDurationMinutes = 3;
+		LocalDateTime completedAt =
+				scheduledAt.plusMinutes(sessionDurationMinutes);
 
 		when(pair.getId()).thenReturn(1L);
 		when(pair.getStatus()).thenReturn(MatchStatus.CONFIRMED);
@@ -39,7 +42,7 @@ class MatchCompletionServiceTest {
 		when(pair.getUserBId()).thenReturn(20L);
 		when(pairRepository.findAllByStatusAndScheduledAtBefore(
 				MatchStatus.CONFIRMED,
-				completedAt.minusMinutes(35)
+				completedAt.minusMinutes(sessionDurationMinutes)
 		)).thenReturn(List.of(pair));
 		when(pairRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(pair));
 

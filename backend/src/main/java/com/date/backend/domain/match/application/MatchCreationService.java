@@ -147,13 +147,9 @@ public class MatchCreationService {
 		if (constraintRepository.areUsersBlocked(first.getUserId(), second.getUserId())) {
 			return false;
 		}
-		if (constraintRepository.areUsersInCooldown(
-				first.getUserId(),
-				second.getUserId(),
-				matchedAt
-		)) {
-			return false;
-		}
+		// 같은 상대와의 재매칭 쿨다운(기본 7일, 만료 매칭은 24시간)을 걸지 않는다.
+		// 정책값으로는 끌 수 없다 — matching_policies 의 CHECK 가 1일 미만을 막는다.
+		// areUsersInCooldown 은 남겨 둔다(쿼리·테스트 유지).
 
 		Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
 				.collect(Collectors.toMap(User::getId, Function.identity()));

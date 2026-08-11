@@ -26,6 +26,9 @@ public class MatchPair {
 	private static final BigDecimal MAX_COMPONENT_SCORE = new BigDecimal("100.000");
 	private static final BigDecimal MAX_TOTAL_SCORE = new BigDecimal("100.000");
 
+	/** 양쪽 수락이 끝난 뒤 세션이 시작되기까지의 대기 시간. */
+	public static final int SESSION_START_DELAY_SECONDS = 30;
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "matchPairId")
@@ -214,12 +217,15 @@ public class MatchPair {
 		if (!confirmationTime.isBefore(acceptDeadlineAt)) {
 			throw new IllegalStateException("수락 마감이 지난 매칭은 확정할 수 없습니다.");
 		}
-		if (!proposedScheduledAt.isAfter(confirmationTime)) {
-			throw new IllegalArgumentException("예약 시각은 확정 시각보다 늦어야 합니다.");
-		}
 		this.status = MatchStatus.CONFIRMED;
 		this.confirmedAt = confirmationTime;
-		this.scheduledAt = proposedScheduledAt;
+		// 세션은 제안 슬롯이 아니라 **양쪽 수락이 끝난 시점** 기준으로 잡는다.
+		// confirm() 은 두 번째 수락에서만 불리므로 "둘 다 수락 후 30초"가 된다.
+		// proposedScheduledAt 은 후보 탐색·수락 마감 산출에만 남고 시작 시각과 무관해졌으므로
+		// "제안 시각이 확정 시각보다 늦어야 한다"는 가드를 지웠다.
+		// (그 가드는 원래도 도달 불가였다 — 생성자가 proposed > acceptDeadline 을 강제하고
+		//  위에서 confirmationTime < acceptDeadline 을 요구하므로 항상 참이었다.)
+		this.scheduledAt = confirmationTime.plusSeconds(SESSION_START_DELAY_SECONDS);
 	}
 
 	public void reject() {
