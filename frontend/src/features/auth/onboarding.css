@@ -1,0 +1,293 @@
+.tk-brand-scope {
+  color-scheme: light;
+  --bt-color-bg: #ffffff;
+  --bt-color-bg-elevated: #ffffff;
+  --bt-color-surface: #ffffff;
+  --bt-color-surface-sunken: #fff0f4;
+  --bt-color-text: #17120f;
+  --bt-color-text-secondary: #5d5659;
+  --bt-color-text-tertiary: #777074;
+  --bt-color-text-link: #2f1d17;
+  --bt-color-border: rgb(23 18 15 / 12%);
+  --bt-color-border-strong: rgb(23 18 15 / 22%);
+  --bt-color-brand: #2f1d17;
+  --bt-color-brand-subtle: #fff0f4;
+  --bt-color-action: #ffb3c7;
+  --bt-color-action-hover: #ff99b5;
+  --bt-color-action-press: #e86c95;
+  --bt-color-action-subtle: #fff0f4;
+  --bt-color-action-on: #17120f;
+  --bt-color-info: #4f474a;
+  --bt-color-info-bg: #fff0f4;
+  --bt-color-focus: #17120f;
+  --bt-shadow-card: 0 12px 36px rgb(23 18 15 / 9%);
+  background:
+    radial-gradient(circle at 12% 8%, rgb(255 179 199 / 44%), transparent 28rem),
+    radial-gradient(circle at 88% 86%, rgb(255 221 230 / 56%), transparent 32rem),
+    #fff7f9;
+  color: var(--bt-color-text);
+}
+
+.tk-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #0b0d0c;
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.tk-brand-lockup img {
+  width: auto;
+  height: 1.8rem;
+  object-fit: contain;
+}
+
+.tk-brand-lockup--inverse {
+  color: #ffffff;
+}
+
+.tk-brand-lockup--inverse img {
+  filter: drop-shadow(0 3px 12px rgb(0 0 0 / 35%));
+}
+
+.tk-onboarding-shell {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(20rem, 0.88fr) minmax(0, 1.12fr);
+}
+
+.tk-onboarding-visual {
+  position: sticky;
+  top: 0;
+  isolation: isolate;
+  min-height: 100svh;
+  overflow: hidden;
+  padding: clamp(1.5rem, 3.2vw, 3.5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #ffffff;
+  background:
+    url('/hero-couple.webp') 53% center / cover no-repeat,
+    #2f1d17;
+}
+
+.tk-onboarding-visual__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgb(47 29 23 / 50%) 0%, transparent 34%),
+    linear-gradient(0deg, rgb(69 42 33 / 72%) 0%, rgb(47 29 23 / 10%) 58%);
+}
+
+.tk-onboarding-visual__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tk-onboarding-visual__step {
+  border: 1px solid rgb(255 255 255 / 32%);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  color: rgb(255 255 255 / 88%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+
+.tk-onboarding-visual__copy {
+  max-width: 34rem;
+}
+
+.tk-onboarding-visual__eyebrow,
+.tk-onboarding-eyebrow {
+  margin: 0 0 0.85rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.tk-onboarding-visual__eyebrow {
+  color: #ffb3c7;
+}
+
+.tk-onboarding-eyebrow {
+  color: #2f1d17;
+}
+
+.tk-onboarding-visual__title {
+  margin: 0;
+  font-size: clamp(2.35rem, 4.6vw, 4.7rem);
+  font-weight: 520;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.tk-onboarding-visual__description {
+  max-width: 31rem;
+  margin: 1.4rem 0 0;
+  color: rgb(255 255 255 / 78%);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.tk-onboarding-panel {
+  min-width: 0;
+  padding: clamp(1.5rem, 4.5vw, 5rem);
+  display: grid;
+  align-items: center;
+  background:
+    radial-gradient(circle at 82% 12%, rgb(255 179 199 / 34%), transparent 24rem),
+    radial-gradient(circle at 12% 92%, rgb(255 221 230 / 46%), transparent 28rem),
+    rgb(255 247 249 / 92%);
+}
+
+.tk-onboarding-panel__inner {
+  width: 100%;
+  margin-inline: auto;
+}
+
+.tk-onboarding-panel__inner--sm {
+  max-width: 31rem;
+}
+
+.tk-onboarding-panel__inner--md {
+  max-width: 39rem;
+}
+
+.tk-onboarding-panel__inner--lg {
+  max-width: 48rem;
+}
+
+.tk-onboarding-mobile-brand {
+  display: none;
+}
+
+.tk-onboarding-header {
+  margin-bottom: 1.75rem;
+}
+
+.tk-onboarding-header .bt-steps {
+  margin-bottom: 1.75rem;
+}
+
+.tk-onboarding-header h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 3.55rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+
+.tk-onboarding-header > p:last-child {
+  max-width: 38rem;
+  margin: 0.85rem 0 0;
+  color: var(--bt-color-text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.tk-onboarding-content > .bt-card,
+.tk-onboarding-content form > .bt-stack > .bt-card {
+  border: 1px solid rgb(255 255 255 / 86%);
+  border-radius: 1.5rem;
+  box-shadow: var(--bt-shadow-card);
+}
+
+.tk-onboarding-content .bt-btn--primary {
+  min-height: 3rem;
+}
+
+.tk-onboarding-content .bt-input {
+  background: rgb(255 255 255 / 86%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.tk-login-hero {
+  background-position: center, center;
+  background-repeat: no-repeat;
+  background-size: cover, cover;
+}
+
+@media (min-width: 64rem) {
+  .tk-login-hero {
+    background-position:
+      calc(50% + 3.5rem) calc(50% + 2.25rem),
+      center;
+    background-size: auto calc(100% + 5rem), cover;
+  }
+}
+
+.tk-login-panel {
+  background:
+    radial-gradient(circle at 78% 16%, rgb(255 179 199 / 38%), transparent 23rem),
+    radial-gradient(circle at 10% 92%, rgb(255 221 230 / 56%), transparent 27rem),
+    #fff7f9;
+}
+
+@media (max-width: 900px) {
+  .tk-onboarding-shell {
+    display: block;
+  }
+
+  .tk-onboarding-visual {
+    display: none;
+  }
+
+  .tk-onboarding-panel {
+    min-height: 100svh;
+    padding:
+      max(1.25rem, env(safe-area-inset-top))
+      clamp(1.25rem, 5vw, 2rem)
+      max(2rem, env(safe-area-inset-bottom));
+    align-items: start;
+  }
+
+  .tk-onboarding-mobile-brand {
+    margin-bottom: clamp(2.5rem, 9vh, 5rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .tk-onboarding-mobile-brand > span:last-child {
+    border: 1px solid var(--bt-color-border);
+    border-radius: 999px;
+    padding: 0.45rem 0.7rem;
+    color: var(--bt-color-text-secondary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+  }
+}
+
+@media (max-width: 560px) {
+  .tk-onboarding-header {
+    margin-bottom: 1.35rem;
+  }
+
+  .tk-onboarding-header h1 {
+    font-size: clamp(2rem, 10.5vw, 2.7rem);
+  }
+
+  .tk-onboarding-content .bt-card {
+    border-radius: 1.25rem;
+    padding: 1.15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-onboarding-shell *,
+  .tk-onboarding-shell *::before,
+  .tk-onboarding-shell *::after {
+    scroll-behavior: auto !important;
+  }
+}

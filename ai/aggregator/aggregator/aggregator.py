@@ -1,0 +1,521 @@
+"""세션 집계기 — STT TranscriptEvent를 받아 감지 → 분석 이벤트 + 코칭 명령을 발행한다.
+
+파이프라인(친구 리뷰 #3):
+  전사 → 감지기(AnalysisEvent) → [분석 emit] → CoachingPolicy(게이트·쿨다운·TTL)
+       → 통과 시 CoachingCommand → [코칭 emit]
+
+분석 이벤트(무슨 일이 감지됐다)와 코칭 명령(사용자에게 전달하라)은 서로 다른 스트림이다.
+"""
+
+from __future__ import annotations
+
+import logging
+from collections import deque
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from uuid import UUID
+
+from stt.events import (
+    SpeechEndedEvent,
+    SpeechStartedEvent,
+    SttEvent,
+    TranscriptFinalizedEvent,
+)
+
+from aggregator.coaching import CoachingCommand, CoachingPolicy, noop_coaching
+from aggregator.coaching_arbitrator import CoachingArbitrator
+from aggregator.coaching_candidates import CoachingCandidate
+from aggregator.coaching_detectors import (
+    AttentionCoachingDetector,
+    ConversationCoachingDetector,
+    SmileCoachingDetector,
+    VisionSetupCoachingDetector,
+    VolumeCoachingDetector,
+)
+from aggregator.config import MvpCoachingConfig
+from aggregator.detectors import Detector, default_detectors
+from aggregator.events import AnalysisEvent, SilenceDetected
+from aggregator.state import SessionState
+from aggregator.speech_events import parse_stt_event
+from aggregator.transcripts import TranscriptSegment
+from aggregator.vision_events import (
+    VISION_EVENT_ADAPTER,
+    VisionBehaviorEventBase,
+    VisionEvent,
+    VisionEventBatch,
+    VisionMetricSnapshot,
+)
+
+logger = logging.getLogger(__name__)
+
+AnalysisEmitter = Callable[[AnalysisEvent], None]
+CoachingEmitter = Callable[[CoachingCommand], None]
+
+_VISION_DEDUPE_CAPACITY = 4096
+_STT_DEDUPE_CAPACITY = 4096
+
+# Longest single utterance the watchdog will believe before deciding the
+# SPEECH_ENDED that should have closed it was lost. Deliberately far past any
+# real turn in a dating session — this only has to catch a pinned flag, not
+# police long talkers, and LONG_TALK coaching already owns that job.
+_MAX_UTTERANCE_MS = 120_000
+
+
+@dataclass
+class VisionBatchIngestionResult:
+    accepted_event_ids: list[UUID] = field(default_factory=list)
+    duplicate_event_ids: list[UUID] = field(default_factory=list)
+    stale_event_ids: list[UUID] = field(default_factory=list)
+
+
+class VisionSessionMismatchError(ValueError):
+    """An event was delivered to the wrong session aggregator."""
+
+
+class VisionSequenceError(ValueError):
+    """A client instance sent a sequence number that did not advance."""
+
+
+class SttSessionMismatchError(ValueError):
+    """An STT event was delivered to the wrong session aggregator."""
+
+
+class SttSequenceError(ValueError):
+    """An STT client instance sent a sequence number that did not advance."""
+
+
+class SessionAggregator:
+    """한 세션의 상태·감지기·코칭 정책을 보유하고 두 스트림을 발행한다."""
+
+    def __init__(
+        self,
+        session_id: str,
+        *,
+        on_analysis: AnalysisEmitter,
+        on_coaching: CoachingEmitter = noop_coaching,
+        detectors: Sequence[Detector] | None = None,
+        policy: CoachingPolicy | None = None,
+        config: MvpCoachingConfig | None = None,
+        participant_user_ids: Sequence[str] | None = None,
+    ) -> None:
+        self.state = SessionState(session_id=session_id)
+        self.state.register_participants(list(participant_user_ids or ()))
+        self._on_analysis = on_analysis
+        self._on_coaching = on_coaching
+        self.detectors: list[Detector] = (
+            list(detectors) if detectors is not None else default_detectors()
+        )
+        self.config = (
+            config
+            if config is not None
+            else (policy.config if policy is not None else MvpCoachingConfig())
+        )
+        self.policy = (
+            policy if policy is not None else CoachingPolicy(config=self.config)
+        )
+        self._attention_detector = AttentionCoachingDetector(self.config)
+        self._conversation_detector = ConversationCoachingDetector(self.config)
+        self._vision_setup_detector = VisionSetupCoachingDetector(self.config)
+        self._smile_detector = SmileCoachingDetector(self.config)
+        self._volume_detector = VolumeCoachingDetector(self.config)
+        self._coaching_arbitrator = CoachingArbitrator()
+        self._vision_event_ids: set[UUID] = set()
+        self._vision_event_id_order: deque[UUID] = deque()
+        self._vision_last_seq: dict[tuple[str, UUID], int] = {}
+        self._stt_event_ids: set[str] = set()
+        self._stt_event_id_order: deque[str] = deque()
+        self._stt_last_seq: dict[tuple[str, str], int] = {}
+        self._last_suppressed: dict[str, tuple[str, ...]] = {}
+
+    def _dispatch(self, events: list[AnalysisEvent]) -> None:
+        for event in events:
+            self._on_analysis(event)  # 분석 이벤트(#112·지표·디버깅)
+            command = self.policy.evaluate(event, self.state)
+            if command is not None:
+                self._on_coaching(command)  # 코칭 명령(#114 개인 전달)
+
+    def _dispatch_candidates(
+        self,
+        candidates: list[CoachingCandidate],
+    ) -> None:
+        for candidate in candidates:
+            command = self.policy.evaluate_candidate(candidate, self.state)
+            if command is not None:
+                self._on_coaching(command)
+
+    def _dispatch_arbitrated(
+        self,
+        candidates: list[CoachingCandidate],
+    ) -> None:
+        """타깃별로 우선순위 순서대로 시도하되, 정책이 거부하면 다음 후보로 넘어간다.
+
+        타깃당 최대 1건이라는 중재 규칙은 그대로다. 달라지는 건 "1등이 거부당하면
+        아무것도 안 나간다"에서 "그다음 순위가 나간다"로 바뀌는 것뿐이다.
+        `evaluate_candidate` 는 거부할 때 상태를 건드리지 않으므로 순서대로 물어봐도
+        안전하다.
+        """
+        for target, ordered in self._coaching_arbitrator.ranked(
+            candidates
+        ).items():
+            for candidate in ordered:
+                command = self.policy.evaluate_candidate(candidate, self.state)
+                if command is not None:
+                    self._last_suppressed.pop(target, None)
+                    self._on_coaching(command)
+                    break
+            else:
+                # 후보는 있었는데 전부 거부됐다. 이 구간이 지금까지 완전 암전이라
+                # "코칭이 왜 하나도 안 나갔나"를 사후에 알 수 없었다.
+                #
+                # **매 tick 찍으면 안 된다.** 거부는 한 번 시작되면 그 구간 내내
+                # 이어진다(같은 trigger_id 는 계속 거부된다). tick 이 0.5초라
+                # 30분 세션이면 대상 1명당 수천 줄이 되고, 정작 봐야 할
+                # silence detected·coaching requested 가 묻힌다.
+                kinds = tuple(item.coaching_type for item in ordered)
+                if self._last_suppressed.get(target) != kinds:
+                    self._last_suppressed[target] = kinds
+                    logger.info(
+                        "coaching suppressed session=%s target=%s candidates=%s",
+                        self.state.session_id,
+                        target,
+                        list(kinds),
+                    )
+
+    def push_stt_event(
+        self,
+        event: SttEvent | Mapping[str, object],
+    ) -> bool:
+        """Validate and apply one STT v2 event."""
+        parsed = parse_stt_event(event)
+        if parsed.session_id != self.state.session_id:
+            raise SttSessionMismatchError(
+                f"STT event session {parsed.session_id!r} does not match "
+                f"aggregator session {self.state.session_id!r}"
+            )
+        if parsed.event_id in self._stt_event_ids:
+            return False
+
+        sequence_key = (parsed.user_id, parsed.client_instance_id)
+        previous_seq = self._stt_last_seq.get(sequence_key)
+        if previous_seq is not None and parsed.seq <= previous_seq:
+            # **역행을 예외로 막지 않는다.** seq 발급은 단조지만 전달 순서는 구조적으로
+            # 보장되지 않는다 — SPEECH는 feed() 반환값으로 즉시 나가고 TRANSCRIPT는
+            # worker 큐를 거쳐 poll(50ms)로 나온다. 생산자와 경로가 둘이라 발급 1·2·4·5가
+            # 먼저 가고 3이 나중에 오는 일이 정상적으로 생긴다(실측).
+            #
+            # 예전엔 여기서 예외를 던졌고 그 대가가 너무 컸다: poll 루프가 죽어 전사가
+            # 쌓이고, 종료 처리가 중단돼 전사 보관·리포트·실패통지가 통째로 날아갔다
+            # (2026-08-06 운영 세션 2건). 순서는 신호일 뿐 정합성 게이트가 아니다.
+            # 중복은 event_id 로 이미 막는다.
+            logger.warning(
+                "STT seq out of order session=%s user=%s received=%d previous=%d "
+                "type=%s — 이벤트는 그대로 처리한다",
+                parsed.session_id,
+                parsed.user_id,
+                parsed.seq,
+                previous_seq,
+                parsed.event_type,
+            )
+
+        user = self.state.user(parsed.user_id)
+        if isinstance(parsed, SpeechStartedEvent):
+            user.is_speaking = True
+            user.current_utterance_id = UUID(parsed.utterance_id)
+            user.speech_started_at_ms = (
+                parsed.payload.observed_start_elapsed_ms
+            )
+            user.last_speech_started_at_ms = (
+                parsed.payload.observed_start_elapsed_ms
+            )
+            # **침묵 시계를 여기서 되돌리지 않는다.** 발화가 열렸다는 것만으로는
+            # 진짜 말인지 알 수 없고, VAD 는 250ms 잡음에도 열린다. 말하는 중이라는
+            # 사실은 SilenceDetector 의 is_speaking 게이트가 이미 막는다.
+        elif isinstance(parsed, SpeechEndedEvent):
+            user.is_speaking = False
+            user.current_utterance_id = None
+            user.speech_started_at_ms = None
+            user.last_speech_ended_at_ms = (
+                parsed.payload.observed_end_elapsed_ms
+            )
+            # **여기서도 침묵 시계를 되돌리지 않는다.** VAD 가 소리를 잡았다는 것과
+            # 그게 말이었다는 것은 다르다. 700ms 필터로 잡음을 걸러 보려 했지만
+            # 기침·의자 소리는 그 선을 넘고, 그런 게 10초에 한 번만 나도 침묵이
+            # 영영 성립하지 않는다 — 문턱만 올라갈 뿐 구조가 같다.
+            #
+            # 대신 전사가 끝날 때까지 **판단을 보류**한다(SilenceDetector 의
+            # AWAITING_TRANSCRIPT 게이트). 시계는 전사만 민다.
+            self._volume_detector.on_speech_ended(
+                self.state,
+                parsed.user_id,
+                rms_dbfs=parsed.payload.rms_dbfs,
+                speech_duration_ms=parsed.payload.speech_duration_ms,
+            )
+        else:
+            self._apply_transcript(parsed)
+
+        # 최댓값을 유지한다. 늦게 온 낮은 seq 로 기준을 내리면 그 뒤 정상 이벤트가
+        # 전부 역행으로 보여 로그가 도배된다.
+        self._stt_last_seq[sequence_key] = max(
+            parsed.seq, previous_seq if previous_seq is not None else parsed.seq
+        )
+        self._remember_stt_event_id(parsed.event_id)
+        return True
+
+    def push_transcript(self, event: TranscriptFinalizedEvent) -> None:
+        """Compatibility entry point for finalized STT v2 transcripts."""
+        self.push_stt_event(event)
+
+    def _apply_transcript(self, event: TranscriptFinalizedEvent) -> None:
+        """Store a finalized transcript and run content detectors."""
+        utterance = TranscriptSegment(
+            event_id=event.event_id,
+            utterance_id=event.utterance_id,
+            session_id=event.session_id,
+            user_id=event.user_id,
+            participant_identity=event.participant_identity,
+            client_instance_id=event.client_instance_id,
+            seq=event.seq,
+            start_ms=event.payload.segment_start_ms,
+            end_ms=event.payload.segment_end_ms,
+            text=event.payload.text,
+            confidence=event.confidence,
+            language=event.payload.language,
+            occurred_at=event.occurred_at,
+        )
+        self.state.add_utterance(utterance)
+        self._conversation_detector.on_utterance(self.state, utterance)
+        for detector in self.detectors:
+            self._dispatch(detector.on_utterance(self.state, utterance))
+
+    def _remember_stt_event_id(self, event_id: str) -> None:
+        self._stt_event_ids.add(event_id)
+        self._stt_event_id_order.append(event_id)
+        if len(self._stt_event_id_order) > _STT_DEDUPE_CAPACITY:
+            expired = self._stt_event_id_order.popleft()
+            self._stt_event_ids.discard(expired)
+
+    def push_vision_event(
+        self,
+        event: VisionEvent | Mapping[str, object],
+    ) -> bool:
+        """Validate and store one Vision v4 event without coaching."""
+        parsed = (
+            event
+            if isinstance(event, (VisionBehaviorEventBase, VisionMetricSnapshot))
+            else VISION_EVENT_ADAPTER.validate_python(event)
+        )
+        if parsed.session_id != self.state.session_id:
+            raise VisionSessionMismatchError(
+                f"Vision event session {parsed.session_id!r} does not match "
+                f"aggregator session {self.state.session_id!r}"
+            )
+        if parsed.event_id in self._vision_event_ids:
+            return False
+
+        sequence_key = (parsed.user_id, parsed.client_instance_id)
+        previous_seq = self._vision_last_seq.get(sequence_key)
+        if previous_seq is not None and parsed.seq <= previous_seq:
+            raise VisionSequenceError(
+                "Vision seq must increase for one user/client instance: "
+                f"received {parsed.seq}, previous {previous_seq}"
+            )
+
+        if isinstance(parsed, VisionMetricSnapshot):
+            self.state.apply_vision_metric(parsed)
+            self._smile_detector.on_metric(self.state, parsed)
+        else:
+            self.state.apply_vision_behavior(parsed)
+            self._dispatch_candidates(
+                self._vision_setup_detector.on_vision_event(self.state, parsed)
+            )
+            self._dispatch_candidates(
+                self._attention_detector.on_vision_event(self.state, parsed)
+            )
+
+        self._vision_last_seq[sequence_key] = parsed.seq
+        self._remember_vision_event_id(parsed.event_id)
+        return True
+
+    def push_vision_batch(
+        self,
+        batch: VisionEventBatch | Mapping[str, object],
+    ) -> VisionBatchIngestionResult:
+        """Validate a TS batch, restore seq order, and ingest each event."""
+        parsed = (
+            batch
+            if isinstance(batch, VisionEventBatch)
+            else VisionEventBatch.model_validate(batch)
+        )
+        ordered_events = parsed.ordered_events()
+        for event in ordered_events:
+            if event.session_id != self.state.session_id:
+                raise VisionSessionMismatchError(
+                    f"Vision event session {event.session_id!r} does not match "
+                    f"aggregator session {self.state.session_id!r}"
+                )
+
+        result = VisionBatchIngestionResult()
+        seen_batch_event_ids: set[UUID] = set()
+        seen_batch_sequences: set[tuple[str, UUID, int]] = set()
+        for event in ordered_events:
+            if (
+                event.event_id in self._vision_event_ids
+                or event.event_id in seen_batch_event_ids
+            ):
+                result.duplicate_event_ids.append(event.event_id)
+                continue
+            seen_batch_event_ids.add(event.event_id)
+            sequence_key = (event.user_id, event.client_instance_id, event.seq)
+            if sequence_key in seen_batch_sequences:
+                result.stale_event_ids.append(event.event_id)
+                continue
+            seen_batch_sequences.add(sequence_key)
+            try:
+                accepted = self.push_vision_event(event)
+            except VisionSequenceError:
+                # Dropped, not just reordered. If this fires on an episode
+                # START its END arrives unmatched later, and if it fires on an
+                # END the episode stays open and blocks attention coaching for
+                # the rest of the session. Both were invisible before.
+                logger.warning(
+                    "vision event dropped as stale session=%s user=%s "
+                    "type=%s seq=%d episode=%s",
+                    event.session_id,
+                    event.user_id,
+                    event.event_type,
+                    event.seq,
+                    getattr(event, "episode_id", None),
+                )
+                result.stale_event_ids.append(event.event_id)
+                continue
+            if accepted:
+                result.accepted_event_ids.append(event.event_id)
+        return result
+
+    def _remember_vision_event_id(self, event_id: UUID) -> None:
+        self._vision_event_ids.add(event_id)
+        self._vision_event_id_order.append(event_id)
+        if len(self._vision_event_id_order) > _VISION_DEDUPE_CAPACITY:
+            expired = self._vision_event_id_order.popleft()
+            self._vision_event_ids.discard(expired)
+
+    def tick(self, now_ms: int, *, awaiting_transcripts: int = 0) -> None:
+        """시간 기반 감지(침묵 등)를 구동한다. now_ms = 세션 경과 시간.
+
+        awaiting_transcripts: 전사가 아직 안 끝난 발화 수. 0 이 아니면 침묵 판정을
+        보류한다 — 그 소리가 말인지 잡음인지 아직 모르기 때문이다. 기본 0 이라
+        오디오 어댑터 없이 도는 데모·테스트는 그대로 동작한다.
+        """
+        self.state.awaiting_transcripts = awaiting_transcripts
+        self._expire_stuck_speaking(now_ms)
+        candidates: list[CoachingCandidate] = []
+        for detector in self.detectors:
+            events = detector.on_tick(self.state, now_ms)
+            for event in events:
+                self._on_analysis(event)
+                if isinstance(event, SilenceDetected):
+                    target_user_id = self._silence_coaching_target()
+                    if target_user_id is None:
+                        logger.info(
+                            "silence coaching skipped session=%s "
+                            "reason=NO_TARGET elapsedMs=%d",
+                            self.state.session_id,
+                            event.session_elapsed_ms,
+                        )
+                        continue
+                    candidates.append(
+                        CoachingCandidate(
+                            coaching_type="SILENCE_RECOVERY",
+                            target_user_id=target_user_id,
+                            message_key="SILENCE_RECOVERY_01",
+                            reason_code="LONG_SILENCE",
+                            triggered_at_ms=event.session_elapsed_ms,
+                            # **구간마다 안정적이어야 한다.** 감지기는 침묵이 이어지는
+                            # 동안 주기적으로 다시 내는데(중재기에서 밀렸을 때 재시도),
+                            # event_id 를 쓰면 매번 새 UUID 라 정책이 중복을 못 막아
+                            # 같은 침묵에 코칭이 여러 번 나간다. last_activity_ms 는
+                            # 그 침묵 구간의 고유 식별자다.
+                            trigger_id=(
+                                f"silence:{self.state.last_activity_ms}"
+                                f":{target_user_id}"
+                            ),
+                            priority="LOW",
+                        )
+                    )
+        candidates.extend(
+            self._conversation_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(
+            self._vision_setup_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
+        candidates.extend(self._volume_detector.on_tick(self.state, now_ms))
+        self._dispatch_arbitrated(candidates)
+
+    def _expire_stuck_speaking(self, now_ms: int) -> None:
+        """Release a speaking flag that no SPEECH_ENDED ever closed.
+
+        ``is_speaking`` is cleared in exactly one place — the SpeechEndedEvent
+        branch of ``push_stt_event``. A single dropped end event therefore
+        pins the flag for the rest of the session, and every rule that reads
+        it goes quiet with it: SilenceDetector bails on the first line of
+        ``on_tick``, and attention coaching treats the user as mid-utterance.
+        The failure is silent and session-long, so bound it by the longest
+        utterance anyone could plausibly hold.
+        """
+        for user in self.state.users.values():
+            if not user.is_speaking:
+                continue
+            started_at = user.speech_started_at_ms
+            if started_at is None or now_ms - started_at < _MAX_UTTERANCE_MS:
+                continue
+            logger.warning(
+                "speaking flag stuck, releasing session=%s user=%s "
+                "startedAtMs=%d nowMs=%d",
+                self.state.session_id,
+                user.user_id,
+                started_at,
+                now_ms,
+            )
+            user.is_speaking = False
+            user.current_utterance_id = None
+            user.speech_started_at_ms = None
+            user.last_speech_ended_at_ms = now_ms
+
+    def _silence_coaching_target(self) -> str | None:
+        """Return the counterpart of the most recent finalized speaker.
+
+        Silence coaching must not ask the person who just spoke to carry the
+        conversation again. The dating session contract has two participants,
+        so the other registered participant is the single coaching target.
+        If either side cannot be identified, it is safer to emit no coaching.
+        """
+        segments = self.state.transcript_buffer.ordered_segments()
+        if not segments:
+            return None
+        last_speaker_id = segments[-1].user_id
+        return next(
+            (
+                user_id
+                for user_id in self.state.participant_user_ids
+                if user_id != last_speaker_id
+            ),
+            None,
+        )
+
+    def tick_vision(self, now_ms: int) -> None:
+        """Advance only coaching rules that depend on Vision observations.
+
+        A browser Vision packet is not an authoritative speech clock. Running
+        the full tick from that packet can make its client-side elapsed time
+        wake STT silence/long-talk rules immediately. The session runtime's
+        own clock remains responsible for ``tick``; Vision transports use
+        this narrower entry point.
+        """
+        candidates: list[CoachingCandidate] = []
+        candidates.extend(
+            self._vision_setup_detector.on_tick(self.state, now_ms)
+        )
+        candidates.extend(self._smile_detector.on_tick(self.state, now_ms))
+        candidates.extend(self._volume_detector.on_tick(self.state, now_ms))
+        self._dispatch_arbitrated(candidates)

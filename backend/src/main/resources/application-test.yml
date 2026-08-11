@@ -1,0 +1,64 @@
+spring:
+  flyway:
+    enabled: false
+
+  datasource:
+    url: jdbc:h2:mem:date;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+match:
+  worker:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 10000
+    batch-size: 20
+    max-attempts: 3
+    initial-backoff-seconds: 5
+    max-backoff-seconds: 300
+    processing-timeout-seconds: 60
+  scheduler:
+    enabled: false
+    fixed-delay-ms: 10000
+    initial-delay-ms: 10000
+
+notification:
+  waiting-recommendation:
+    enabled: false
+    fixed-delay-ms: 600000
+    initial-delay-ms: 60000
+    batch-size: 100
+  sse:
+    enabled: false
+    timeout-ms: 1800000
+    retry-ms: 3000
+    heartbeat-interval-ms: 30000
+  worker:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 10000
+    batch-size: 20
+    max-attempts: 3
+    retry-delay-seconds: 5
+    processing-timeout-seconds: 60
+
+session:
+  realtime:
+    heartbeat-timeout: 15s
+    reconnect-grace-period: 20s
+    monitor-enabled: false
+    monitor-fixed-delay-ms: 5000
+    monitor-initial-delay-ms: 5000
+    monitor-batch-size: 100
+  timer:
+    enabled: false
+    fixed-delay-ms: 1000
+    initial-delay-ms: 1000
+    batch-size: 100
+    ending-soon-before: 5m
+    ending-imminent-before: 1m

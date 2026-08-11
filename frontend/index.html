@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Pretendard Variable (디자인 시스템 기본 서체). 오프라인/사내망이면 npm 'pretendard' 로 교체 -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+    />
+    <title>티키타카 · 화상 모의 소개팅 대화 연습</title>
+    <!--
+      초기 테마 깜빡임(FOUC) 방지. React 가 실행되기 전에 동기적으로 data-theme 를 칠한다.
+      저장 키·값은 components/layout/theme.tsx 의 THEME_STORAGE_KEY / ThemeMode 와 반드시 일치해야 한다.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('bt-theme')
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var theme = stored === 'light' || stored === 'dark' ? stored : prefersDark ? 'dark' : 'light'
+          document.documentElement.dataset.theme = theme
+          document.documentElement.style.colorScheme = theme
+        } catch (e) {
+          /* 스토리지 접근 불가(프라이빗 모드 등) — 기본값으로 진행 */
+        }
+      })()
+    </script>
+  </head>
+  <body class="bt-root">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

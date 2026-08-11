@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      target: development
+    restart: "no"
+    command: ["./gradlew", "bootRun", "--no-daemon"]
+    volumes:
+      - gradle-cache:/root/.gradle
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /workspace/src
+        - action: rebuild
+          path: ./build.gradle
+        - action: rebuild
+          path: ./settings.gradle
+
+volumes:
+  gradle-cache:

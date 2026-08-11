@@ -1,0 +1,23 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# 시크릿 (GMS API 키 — 커밋 금지)
+.env
+.env.*
+!.env.example
+
+# 합성 결과물 (데모 출력 — 커밋 금지)
+*.wav
+*.mp3
+*.pcm
+
+# 로컬 실험 산출물 — 평가셋·측정 스크립트는 레포 밖에 둔다.
+#   평가셋 오디오: ~/stt_평가셋/   (개인 음성 = 민감정보, 레포에 넣지 않음)
+#   측정 스크립트: 세션 스크래치패드
+eval_*/
+

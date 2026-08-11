@@ -1,0 +1,799 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-23T01:09:51.057712+00:00",
+  "baseline": {
+    "model": "dinov2_vits14-frozen-dual-head",
+    "metrics": {
+      "sampleCount": 199,
+      "top1HitRate": 0.115578,
+      "top2HitRate": 0.286432,
+      "macroF1": 0.106649,
+      "coverage": 0.231156,
+      "abstentionRatio": 0.768844,
+      "confirmedAccuracy": 0.086957,
+      "wrongConfirmedRate": 0.211055,
+      "groups": {
+        "female": {
+          "sampleCount": 107,
+          "top1HitRate": 0.140187,
+          "top2HitRate": 0.224299,
+          "macroF1": 0.130532,
+          "labels": [
+            "dog",
+            "cat",
+            "rabbit",
+            "fox",
+            "deer",
+            "turtle",
+            "hamster",
+            "snake",
+            "dinosaur"
+          ],
+          "confusionMatrix": [
+            [
+              1,
+              0,
+              1,
+              2,
+              2,
+              3,
+              2,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              1,
+              0,
+              2,
+              1,
+              2,
+              4,
+              1
+            ],
+            [
+              1,
+              0,
+              1,
+              0,
+              1,
+              5,
+              2,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              0,
+              2,
+              2,
+              2,
+              0,
+              2,
+              2
+            ],
+            [
+              2,
+              2,
+              0,
+              1,
+              2,
+              1,
+              1,
+              1,
+              2
+            ],
+            [
+              2,
+              0,
+              3,
+              1,
+              1,
+              1,
+              1,
+              2,
+              1
+            ],
+            [
+              4,
+              1,
+              1,
+              2,
+              3,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              2,
+              0,
+              2,
+              1,
+              0,
+              6,
+              1
+            ],
+            [
+              1,
+              1,
+              2,
+              1,
+              2,
+              1,
+              1,
+              2,
+              1
+            ]
+          ],
+          "classes": {
+            "dog": {
+              "precision": 0.083333,
+              "recall": 0.083333,
+              "f1": 0.083333,
+              "support": 12
+            },
+            "cat": {
+              "precision": 0.166667,
+              "recall": 0.083333,
+              "f1": 0.111111,
+              "support": 12
+            },
+            "rabbit": {
+              "precision": 0.090909,
+              "recall": 0.083333,
+              "f1": 0.086957,
+              "support": 12
+            },
+            "fox": {
+              "precision": 0.222222,
+              "recall": 0.166667,
+              "f1": 0.190476,
+              "support": 12
+            },
+            "deer": {
+              "precision": 0.117647,
+              "recall": 0.166667,
+              "f1": 0.137931,
+              "support": 12
+            },
+            "turtle": {
+              "precision": 0.066667,
+              "recall": 0.083333,
+              "f1": 0.074074,
+              "support": 12
+            },
+            "hamster": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            },
+            "snake": {
+              "precision": 0.333333,
+              "recall": 0.5,
+              "f1": 0.4,
+              "support": 12
+            },
+            "dinosaur": {
+              "precision": 0.1,
+              "recall": 0.083333,
+              "f1": 0.090909,
+              "support": 12
+            }
+          }
+        },
+        "male": {
+          "sampleCount": 92,
+          "top1HitRate": 0.086957,
+          "top2HitRate": 0.358696,
+          "macroF1": 0.07978,
+          "labels": [
+            "dog",
+            "cat",
+            "rabbit",
+            "fox",
+            "deer",
+            "snake",
+            "dinosaur",
+            "wolf"
+          ],
+          "confusionMatrix": [
+            [
+              0,
+              0,
+              2,
+              4,
+              4,
+              1,
+              0,
+              1
+            ],
+            [
+              2,
+              0,
+              2,
+              3,
+              1,
+              3,
+              0,
+              0
+            ],
+            [
+              2,
+              2,
+              1,
+              0,
+              4,
+              2,
+              1,
+              0
+            ],
+            [
+              2,
+              1,
+              0,
+              5,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              2,
+              1,
+              4,
+              1,
+              0,
+              1,
+              0,
+              2
+            ],
+            [
+              2,
+              2,
+              1,
+              0,
+              2,
+              0,
+              2,
+              2
+            ],
+            [
+              1,
+              2,
+              1,
+              0,
+              1,
+              2,
+              2,
+              3
+            ],
+            [
+              1,
+              1,
+              0,
+              1,
+              1,
+              1,
+              6,
+              0
+            ]
+          ],
+          "classes": {
+            "dog": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "cat": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            },
+            "rabbit": {
+              "precision": 0.090909,
+              "recall": 0.083333,
+              "f1": 0.086957,
+              "support": 12
+            },
+            "fox": {
+              "precision": 0.357143,
+              "recall": 0.416667,
+              "f1": 0.384615,
+              "support": 12
+            },
+            "deer": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            },
+            "snake": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            },
+            "dinosaur": {
+              "precision": 0.166667,
+              "recall": 0.166667,
+              "f1": 0.166667,
+              "support": 12
+            },
+            "wolf": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            }
+          }
+        }
+      }
+    }
+  },
+  "candidate": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-07-23T01:09:51.057712+00:00",
+    "evaluationType": "person-disjoint-grouped-4-fold",
+    "model": "dinov2_vits14-person-balanced-class-prototype-cosine",
+    "dataset": {
+      "eligibleImages": 199,
+      "uniquePeople": 68,
+      "weakLabels": true
+    },
+    "configuration": {
+      "batch_size": 16,
+      "folds": 4,
+      "temperature": 0.07,
+      "minimum_calibration_coverage": 0.2,
+      "target_confirmed_accuracy": 0.7
+    },
+    "initialPolicy": {
+      "success_threshold": 0.45,
+      "minimum_margin": 0.08,
+      "second_suggestion_threshold": 0.25
+    },
+    "folds": [
+      {
+        "fold": 1,
+        "trainingImages": 150,
+        "validationImages": 49,
+        "trainingPeople": 51,
+        "validationPeople": 17,
+        "metrics": {
+          "top1HitRate": 0.081633,
+          "top2HitRate": 0.183673,
+          "macroF1": 0.075817,
+          "coverage": 0.0,
+          "abstentionRatio": 1.0,
+          "confirmedAccuracy": null,
+          "wrongConfirmedRate": 0.0
+        }
+      },
+      {
+        "fold": 2,
+        "trainingImages": 149,
+        "validationImages": 50,
+        "trainingPeople": 51,
+        "validationPeople": 17,
+        "metrics": {
+          "top1HitRate": 0.08,
+          "top2HitRate": 0.16,
+          "macroF1": 0.052338,
+          "coverage": 0.0,
+          "abstentionRatio": 1.0,
+          "confirmedAccuracy": null,
+          "wrongConfirmedRate": 0.0
+        }
+      },
+      {
+        "fold": 3,
+        "trainingImages": 148,
+        "validationImages": 51,
+        "trainingPeople": 51,
+        "validationPeople": 17,
+        "metrics": {
+          "top1HitRate": 0.078431,
+          "top2HitRate": 0.176471,
+          "macroF1": 0.079739,
+          "coverage": 0.0,
+          "abstentionRatio": 1.0,
+          "confirmedAccuracy": null,
+          "wrongConfirmedRate": 0.0
+        }
+      },
+      {
+        "fold": 4,
+        "trainingImages": 150,
+        "validationImages": 49,
+        "trainingPeople": 51,
+        "validationPeople": 17,
+        "metrics": {
+          "top1HitRate": 0.102041,
+          "top2HitRate": 0.306122,
+          "macroF1": 0.102428,
+          "coverage": 0.0,
+          "abstentionRatio": 1.0,
+          "confirmedAccuracy": null,
+          "wrongConfirmedRate": 0.0
+        }
+      }
+    ],
+    "aggregateInitial": {
+      "sampleCount": 199,
+      "top1HitRate": 0.085427,
+      "top2HitRate": 0.20603,
+      "macroF1": 0.082477,
+      "coverage": 0.0,
+      "abstentionRatio": 1.0,
+      "confirmedAccuracy": null,
+      "wrongConfirmedRate": 0.0,
+      "groups": {
+        "female": {
+          "sampleCount": 107,
+          "top1HitRate": 0.074766,
+          "top2HitRate": 0.130841,
+          "macroF1": 0.069346,
+          "labels": [
+            "dog",
+            "cat",
+            "rabbit",
+            "fox",
+            "deer",
+            "turtle",
+            "hamster",
+            "snake",
+            "dinosaur"
+          ],
+          "confusionMatrix": [
+            [
+              0,
+              0,
+              0,
+              1,
+              1,
+              3,
+              4,
+              2,
+              1
+            ],
+            [
+              1,
+              0,
+              2,
+              2,
+              2,
+              0,
+              1,
+              3,
+              1
+            ],
+            [
+              1,
+              0,
+              1,
+              1,
+              1,
+              5,
+              1,
+              1,
+              1
+            ],
+            [
+              3,
+              1,
+              0,
+              0,
+              1,
+              4,
+              0,
+              3,
+              0
+            ],
+            [
+              2,
+              1,
+              0,
+              2,
+              1,
+              1,
+              2,
+              1,
+              2
+            ],
+            [
+              2,
+              1,
+              1,
+              0,
+              0,
+              2,
+              2,
+              2,
+              2
+            ],
+            [
+              7,
+              0,
+              0,
+              0,
+              0,
+              2,
+              0,
+              0,
+              2
+            ],
+            [
+              1,
+              1,
+              1,
+              3,
+              1,
+              1,
+              0,
+              3,
+              1
+            ],
+            [
+              1,
+              1,
+              2,
+              1,
+              1,
+              2,
+              1,
+              2,
+              1
+            ]
+          ],
+          "classes": {
+            "dog": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "cat": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "rabbit": {
+              "precision": 0.142857,
+              "recall": 0.083333,
+              "f1": 0.105263,
+              "support": 12
+            },
+            "fox": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "deer": {
+              "precision": 0.125,
+              "recall": 0.083333,
+              "f1": 0.1,
+              "support": 12
+            },
+            "turtle": {
+              "precision": 0.1,
+              "recall": 0.166667,
+              "f1": 0.125,
+              "support": 12
+            },
+            "hamster": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            },
+            "snake": {
+              "precision": 0.176471,
+              "recall": 0.25,
+              "f1": 0.206897,
+              "support": 12
+            },
+            "dinosaur": {
+              "precision": 0.090909,
+              "recall": 0.083333,
+              "f1": 0.086957,
+              "support": 12
+            }
+          }
+        },
+        "male": {
+          "sampleCount": 92,
+          "top1HitRate": 0.097826,
+          "top2HitRate": 0.293478,
+          "macroF1": 0.097249,
+          "labels": [
+            "dog",
+            "cat",
+            "rabbit",
+            "fox",
+            "deer",
+            "snake",
+            "dinosaur",
+            "wolf"
+          ],
+          "confusionMatrix": [
+            [
+              0,
+              1,
+              1,
+              4,
+              3,
+              1,
+              0,
+              2
+            ],
+            [
+              2,
+              2,
+              3,
+              1,
+              1,
+              2,
+              0,
+              0
+            ],
+            [
+              4,
+              4,
+              0,
+              0,
+              2,
+              2,
+              0,
+              0
+            ],
+            [
+              2,
+              1,
+              1,
+              2,
+              1,
+              0,
+              0,
+              5
+            ],
+            [
+              2,
+              1,
+              3,
+              1,
+              2,
+              1,
+              0,
+              1
+            ],
+            [
+              2,
+              5,
+              0,
+              0,
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              0,
+              0,
+              3,
+              3,
+              2,
+              2
+            ],
+            [
+              0,
+              0,
+              0,
+              4,
+              1,
+              2,
+              4,
+              0
+            ]
+          ],
+          "classes": {
+            "dog": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "cat": {
+              "precision": 0.133333,
+              "recall": 0.181818,
+              "f1": 0.153846,
+              "support": 11
+            },
+            "rabbit": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 12
+            },
+            "fox": {
+              "precision": 0.166667,
+              "recall": 0.166667,
+              "f1": 0.166667,
+              "support": 12
+            },
+            "deer": {
+              "precision": 0.142857,
+              "recall": 0.181818,
+              "f1": 0.16,
+              "support": 11
+            },
+            "snake": {
+              "precision": 0.083333,
+              "recall": 0.090909,
+              "f1": 0.086957,
+              "support": 11
+            },
+            "dinosaur": {
+              "precision": 0.285714,
+              "recall": 0.166667,
+              "f1": 0.210526,
+              "support": 12
+            },
+            "wolf": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 11
+            }
+          }
+        }
+      }
+    },
+    "calibration": {
+      "successThreshold": 0.2,
+      "minimumMargin": 0.0,
+      "secondSuggestionThreshold": 0.25,
+      "coverage": 0.462312,
+      "confirmedAccuracy": 0.065217,
+      "targetConfirmedAccuracy": 0.7,
+      "targetMet": false,
+      "recommendationAvailable": false,
+      "minimumCoverage": 0.2,
+      "exploratoryOnly": true
+    },
+    "privacy": {
+      "featureLifetime": "process-memory-only",
+      "persistedImageFeatures": false,
+      "persistedPersonPrototypes": false,
+      "containsIndividualIdentifiers": false
+    },
+    "limitations": [
+      "Celebrity reference labels are weak labels, not objective ground truth.",
+      "Only three training people per class are available in each fold.",
+      "Threshold calibration and reporting use the same out-of-fold predictions.",
+      "Webcam domain performance is not measured by this dataset.",
+      "This report does not establish production readiness."
+    ]
+  },
+  "replacementDecision": {
+    "minimumRequiredGain": 0.02,
+    "metricGains": {
+      "top1HitRate": -0.030151,
+      "top2HitRate": -0.080402,
+      "macroF1": -0.024172
+    },
+    "replacementRecommended": false,
+    "reason": "Prototype did not pass every aggregate replacement criterion."
+  }
+}

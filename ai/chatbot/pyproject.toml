@@ -1,0 +1,46 @@
+[project]
+name = "chatbot"
+version = "0.1.0"
+description = "소개팅 연습 AI 챗봇 — 로컬 LLM + 속성 조합형 페르소나 (AI-DATE-01/02)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.13.4",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "httpx>=0.28",          # GmsChatAdapter 스트리밍 (프로덕션 경로)
+    "python-dotenv>=1.1",   # ai/tts/.env 공유 — GMS 키를 두 곳에 두지 않는다
+    # llama-cpp-python 은 LLM 통합 단계에서 추가 (빌드 무거움 — 모델 확정 후)
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# 명시하지 않으면 setuptools가 flat-layout에서 finetune·personas 까지 패키지로 보고
+# "Multiple top-level packages" 로 빌드를 거부한다. 관제실이 경로 의존으로 쓴다.
+[tool.hatch.build.targets.wheel]
+packages = ["chatbot"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "mypy>=1.13",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+# files 가 없으면 인자 없는 `uv run mypy` 가 "Missing target" 으로 실패한다 — CI에서
+# 타입 검사가 통째로 안 돌게 된다. aggregator·tts 와 같은 형태로 맞춘다.
+files = ["chatbot", "tests"]
+
+# 선택 의존 — LocalAdapter 전용이라 설치하지 않는다(스텁 없음)
+[[tool.mypy.overrides]]
+module = ["llama_cpp.*"]
+ignore_missing_imports = true

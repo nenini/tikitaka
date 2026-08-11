@@ -1,0 +1,113 @@
+@import 'tailwindcss';
+
+/* BloomTalk 디자인 시스템 (SSOT). 순서: 토큰 → 컴포넌트 */
+@import './design-system/tokens.css';
+@import './design-system/components.css';
+@import './features/auth/onboarding.css';
+@import './features/home/home.css';
+
+/* =========================================================================
+   Tailwind ↔ 디자인 시스템 브릿지
+   --bt-* semantic 토큰을 Tailwind @theme 에 매핑한다.
+   `@theme inline` 은 유틸리티에 값(var(--bt-*))을 그대로 인라인하므로,
+   [data-theme="dark"] 에서 토큰이 바뀌면 Tailwind 유틸리티도 자동으로 따라간다.
+
+   → 인라인 Tailwind 유틸(bg-action, text-danger, rounded-xl …)을 쓰되
+     값은 항상 디자인 시스템 토큰에서 나온다. (raw 색상 유틸은 쓰지 말 것)
+   ========================================================================= */
+@theme inline {
+  /* 색 — semantic */
+  --color-bg: var(--bt-color-bg);
+  --color-surface: var(--bt-color-surface);
+  --color-surface-sunken: var(--bt-color-surface-sunken);
+  --color-ink: var(--bt-color-text);
+  --color-muted: var(--bt-color-text-secondary);
+  --color-faint: var(--bt-color-text-tertiary);
+  --color-line: var(--bt-color-border);
+
+  --color-brand: var(--bt-color-brand);
+  --color-action: var(--bt-color-action);
+  --color-action-hover: var(--bt-color-action-hover);
+  --color-link: var(--bt-color-text-link);
+
+  --color-success: var(--bt-color-success);
+  --color-warning: var(--bt-color-warning);
+  --color-danger: var(--bt-color-danger);
+  --color-like: var(--bt-color-like);
+
+  /* 라운드 — 디자인 시스템 스케일로 덮어쓴다 */
+  --radius-sm: var(--bt-radius-sm);
+  --radius-md: var(--bt-radius-md);
+  --radius-lg: var(--bt-radius-lg);
+  --radius-xl: var(--bt-radius-xl);
+  --radius-2xl: var(--bt-radius-2xl);
+
+  /* 서체 */
+  --font-sans: var(--bt-font-sans);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.tk-app-atmosphere {
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  background:
+    radial-gradient(circle at 8% 4%, rgb(255 179 199 / 42%), transparent 30rem),
+    radial-gradient(circle at 92% 46%, rgb(255 221 230 / 52%), transparent 34rem),
+    linear-gradient(145deg, #fff7f9 0%, #ffffff 46%, #fff0f4 100%);
+  background-attachment: fixed;
+}
+
+.tk-glass-nav {
+  background: rgb(255 255 255 / 68%);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  backdrop-filter: blur(22px) saturate(1.35);
+  box-shadow: 0 8px 28px rgb(75 45 34 / 7%);
+}
+
+.tk-app-content {
+  min-width: 0;
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.tk-mobile-nav {
+  width: 100%;
+  max-width: 100vw;
+  padding:
+    0.35rem max(0.5rem, env(safe-area-inset-right, 0px))
+    calc(0.35rem + env(safe-area-inset-bottom, 0px))
+    max(0.5rem, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--bt-color-border);
+  box-sizing: border-box;
+}
+
+.tk-mobile-nav .bt-nav {
+  width: min(100%, 34rem);
+  margin-inline: auto;
+  padding: 0.3rem clamp(0.15rem, 1.5vw, 0.65rem);
+  box-sizing: border-box;
+}
+
+.tk-mobile-nav .bt-nav__group {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+
+.tk-mobile-nav .bt-nav__item {
+  min-width: 0;
+  flex: 1 1 0;
+  padding-inline: 0.15rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 48rem) {
+  .tk-app-content {
+    padding-bottom: 0;
+  }
+}

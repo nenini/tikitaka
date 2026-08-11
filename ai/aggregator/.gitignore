@@ -1,0 +1,11 @@
+.venv/
+.venv-kanana/
+.env
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# voice_demo 가 떨구는 wav. 확인용 산출물이라 레포에 남기지 않는다.
+demo_out/

@@ -1,0 +1,225 @@
+spring:
+  application:
+    name: backend
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  jackson:
+    time-zone: Asia/Seoul
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+        jdbc:
+          time_zone: Asia/Seoul
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
+app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  local-seed:
+    match-test-users-enabled: ${LOCAL_MATCH_TEST_USERS_ENABLED:false}
+    result-test-session-enabled: ${LOCAL_RESULT_TEST_SESSION_ENABLED:false}
+
+auth:
+  jwt:
+    secret: ${JWT_SECRET:date-service-local-development-secret-key-change-me-please}
+    access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:1800}
+    refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:1209600}
+  password-reset:
+    token-validity-seconds: ${PASSWORD_RESET_TOKEN_VALIDITY_SECONDS:900}
+    url: ${PASSWORD_RESET_URL:http://localhost:3000/password-reset}
+    from: ${MAIL_FROM:no-reply@date.local}
+  oauth:
+    state-validity-seconds: ${OAUTH_STATE_VALIDITY_SECONDS:300}
+    secure-cookie: ${OAUTH_SECURE_COOKIE:false}
+    success-redirect: ${app.frontend.base-url}/oauth/callback
+    google:
+      client-id: ${GOOGLE_OAUTH_CLIENT_ID:}
+      client-secret: ${GOOGLE_OAUTH_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth2/google/callback}
+    naver:
+      client-id: ${NAVER_OAUTH_CLIENT_ID:}
+      client-secret: ${NAVER_OAUTH_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_OAUTH_REDIRECT_URI:http://localhost:8080/api/v1/auth/oauth2/naver/callback}
+
+face:
+  analysis:
+    request-validity-seconds: ${FACE_ANALYSIS_REQUEST_VALIDITY_SECONDS:600}
+
+ai:
+  session:
+    internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
+    coaching-min-interval: ${AI_COACHING_MIN_INTERVAL:10s}
+  session-event:
+    base-url: ${AI_SESSION_BASE_URL:}
+    event-path: ${AI_SESSION_EVENT_PATH:/api/v1/sessions/events}
+    connect-timeout: ${AI_SESSION_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_SESSION_REQUEST_TIMEOUT:5s}
+    internal-token: ${AI_SESSION_INTERNAL_TOKEN:}
+    max-attempts: ${AI_SESSION_EVENT_MAX_ATTEMPTS:3}
+    retry-delay: ${AI_SESSION_EVENT_RETRY_DELAY:1s}
+  transcript:
+    base-url: ${AI_TRANSCRIPT_BASE_URL:${AI_SESSION_BASE_URL:}}
+    path-template: ${AI_TRANSCRIPT_PATH_TEMPLATE:/api/v1/sessions/{sessionId}/transcript}
+    connect-timeout: ${AI_TRANSCRIPT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_TRANSCRIPT_REQUEST_TIMEOUT:15s}
+    internal-token: ${AI_TRANSCRIPT_INTERNAL_TOKEN:${AI_SESSION_INTERNAL_TOKEN:}}
+    max-attempts: ${AI_TRANSCRIPT_MAX_ATTEMPTS:5}
+    retry-delay: ${AI_TRANSCRIPT_RETRY_DELAY:2s}
+  report:
+    # AI가 세션 종료 후 결과를 Backend로 push하므로 기본 outbound generate 호출은 비활성화합니다.
+    base-url: ${AI_REPORT_BASE_URL:}
+    generation-path: ${AI_REPORT_GENERATION_PATH:/internal/v1/session-reports/generate}
+    connect-timeout: ${AI_REPORT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_REPORT_REQUEST_TIMEOUT:10s}
+    max-attempts: ${AI_REPORT_MAX_ATTEMPTS:3}
+    retry-delay: ${AI_REPORT_RETRY_DELAY:2s}
+    generation-timeout: ${AI_REPORT_GENERATION_TIMEOUT:5m}
+    timeout-batch-size: ${AI_REPORT_TIMEOUT_BATCH_SIZE:100}
+    timeout-monitor-fixed-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_FIXED_DELAY_MS:30000}
+    timeout-monitor-initial-delay-ms: ${AI_REPORT_TIMEOUT_MONITOR_INITIAL_DELAY_MS:30000}
+  chat:
+    base-url: ${AI_CHAT_BASE_URL:}
+    stream-path: ${AI_CHAT_STREAM_PATH:/api/v1/chat/stream}
+    connect-timeout: ${AI_CHAT_CONNECT_TIMEOUT:3s}
+    request-timeout: ${AI_CHAT_REQUEST_TIMEOUT:270s}
+    sse-timeout: ${AI_CHAT_SSE_TIMEOUT:300s}
+    internal-token: ${AI_CHAT_INTERNAL_TOKEN:}
+
+match:
+  policy:
+    setting-recommendation-delay-seconds: ${MATCH_SETTING_RECOMMENDATION_DELAY_SECONDS:86400}
+  worker:
+    enabled: ${MATCH_WORKER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_WORKER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${MATCH_WORKER_INITIAL_DELAY_MS:10000}
+    batch-size: ${MATCH_WORKER_BATCH_SIZE:20}
+    max-attempts: ${MATCH_WORKER_MAX_ATTEMPTS:3}
+    initial-backoff-seconds: ${MATCH_WORKER_INITIAL_BACKOFF_SECONDS:5}
+    max-backoff-seconds: ${MATCH_WORKER_MAX_BACKOFF_SECONDS:300}
+    processing-timeout-seconds: ${MATCH_WORKER_PROCESSING_TIMEOUT_SECONDS:60}
+  scheduler:
+    enabled: ${MATCH_SCHEDULER_ENABLED:true}
+    fixed-delay-ms: ${MATCH_SCHEDULER_FIXED_DELAY_MS:10000}
+    initial-delay-ms: ${MATCH_SCHEDULER_INITIAL_DELAY_MS:10000}
+
+result:
+  evaluation-submission-window: ${RESULT_EVALUATION_SUBMISSION_WINDOW:48h}
+
+room:
+  entry-open-before: ${ROOM_ENTRY_OPEN_BEFORE:10m}
+  entry-close-after: ${ROOM_ENTRY_CLOSE_AFTER:10m}
+
+session:
+  realtime:
+    heartbeat-timeout: ${SESSION_HEARTBEAT_TIMEOUT:15s}
+    reconnect-grace-period: ${SESSION_RECONNECT_GRACE_PERIOD:20s}
+    monitor-enabled: ${SESSION_REALTIME_MONITOR_ENABLED:true}
+    monitor-fixed-delay-ms: ${SESSION_REALTIME_MONITOR_FIXED_DELAY_MS:5000}
+    monitor-initial-delay-ms: ${SESSION_REALTIME_MONITOR_INITIAL_DELAY_MS:5000}
+    monitor-batch-size: ${SESSION_REALTIME_MONITOR_BATCH_SIZE:100}
+  timer:
+    enabled: ${SESSION_TIMER_ENABLED:true}
+    fixed-delay-ms: ${SESSION_TIMER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${SESSION_TIMER_INITIAL_DELAY_MS:1000}
+    batch-size: ${SESSION_TIMER_BATCH_SIZE:100}
+    # 세션 길이(WaitingRoom.BASE_DURATION_SECONDS)에 맞춘 값.
+    # 분 단위로 두면 1분 세션에서 두 알림이 시작과 동시에 떠 버린다.
+    ending-soon-before: ${SESSION_ENDING_SOON_BEFORE:30s}
+    ending-imminent-before: ${SESSION_ENDING_IMMINENT_BEFORE:10s}
+
+livekit:
+  url: ${LIVEKIT_URL:}
+  api-key: ${LIVEKIT_API_KEY:}
+  api-secret: ${LIVEKIT_API_SECRET:}
+  empty-timeout-seconds: ${LIVEKIT_EMPTY_TIMEOUT_SECONDS:600}
+  max-participants: ${LIVEKIT_MAX_PARTICIPANTS:3}
+
+moderation:
+  no-show:
+    grace-period: ${NO_SHOW_GRACE_PERIOD:5m}
+    first-restriction: ${NO_SHOW_FIRST_RESTRICTION:1d}
+    second-restriction: ${NO_SHOW_SECOND_RESTRICTION:3d}
+    repeated-restriction: ${NO_SHOW_REPEATED_RESTRICTION:7d}
+    scheduler:
+      enabled: ${NO_SHOW_SCHEDULER_ENABLED:true}
+      fixed-delay-ms: ${NO_SHOW_SCHEDULER_FIXED_DELAY_MS:30000}
+      initial-delay-ms: ${NO_SHOW_SCHEDULER_INITIAL_DELAY_MS:10000}
+      batch-size: ${NO_SHOW_SCHEDULER_BATCH_SIZE:100}
+
+notification:
+  waiting-recommendation:
+    enabled: ${NOTIFICATION_WAITING_RECOMMENDATION_ENABLED:true}
+    fixed-delay-ms: ${NOTIFICATION_WAITING_RECOMMENDATION_FIXED_DELAY_MS:600000}
+    initial-delay-ms: ${NOTIFICATION_WAITING_RECOMMENDATION_INITIAL_DELAY_MS:60000}
+    batch-size: ${NOTIFICATION_WAITING_RECOMMENDATION_BATCH_SIZE:100}
+  sse:
+    enabled: ${NOTIFICATION_SSE_ENABLED:true}
+    timeout-ms: ${NOTIFICATION_SSE_TIMEOUT_MS:1800000}
+    retry-ms: ${NOTIFICATION_SSE_RETRY_MS:3000}
+    heartbeat-interval-ms: ${NOTIFICATION_SSE_HEARTBEAT_INTERVAL_MS:30000}
+  worker:
+    enabled: ${NOTIFICATION_WORKER_ENABLED:true}
+    fixed-delay-ms: ${NOTIFICATION_WORKER_FIXED_DELAY_MS:1000}
+    initial-delay-ms: ${NOTIFICATION_WORKER_INITIAL_DELAY_MS:10000}
+    batch-size: ${NOTIFICATION_WORKER_BATCH_SIZE:20}
+    max-attempts: ${NOTIFICATION_WORKER_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${NOTIFICATION_WORKER_RETRY_DELAY_SECONDS:5}
+    processing-timeout-seconds: ${NOTIFICATION_WORKER_PROCESSING_TIMEOUT_SECONDS:60}

@@ -1,0 +1,25 @@
+{
+  "sessionId": "session-123",
+  "userId": "123456789012345678",
+  "participantIdentity": "participant-123",
+  "clientInstanceId": "ac8682da-b2f0-4fbb-86ba-9d7b3d88798c",
+  "seq": 3,
+  "utteranceId": "6cd66154-e669-40c1-95f0-4d17554dc1a0",
+  "sessionElapsedMs": 7200,
+  "confidence": 0.92,
+  "version": 2,
+  "eventId": "bfeeb008-a5e8-4f89-bd88-42c97dc00324",
+  "occurredAt": "2026-07-28T10:30:07.200000+00:00",
+  "eventType": "TRANSCRIPT_FINALIZED",
+  "kind": "transcript",
+  "source": "WHISPER_STT",
+  "modelVersion": "faster-whisper-large-v3",
+  "ruleVersion": "stt-transcript-rule-v1",
+  "payload": {
+    "text": "   ",
+    "language": "ko",
+    "isFinal": true,
+    "segmentStartMs": 1200,
+    "segmentEndMs": 5200
+  }
+}

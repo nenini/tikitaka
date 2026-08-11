@@ -1,0 +1,361 @@
+/* ==========================================================================
+   BloomTalk Design System — Design Tokens
+   컨셉아트 `디자인시안/디자인_설렘.png` 에서 픽셀 샘플링해 추출한 값을 기준으로,
+   WCAG 2.1 AA 대비를 만족하도록 램프를 확장한 토큰 세트.
+
+   레이어
+     1. Primitive  — 원시 색/치수. 화면에서 직접 쓰지 않는다.
+     2. Semantic   — 의미 기반 별칭. 컴포넌트는 이 레이어만 참조한다.
+     3. Component  — 컴포넌트 전용 토큰.
+
+   규칙: 컴포넌트 CSS에서 primitive(--bt-blue-500 등)를 직접 참조하지 않는다.
+        반드시 semantic(--bt-color-action 등)을 거친다. 다크모드가 여기서 갈린다.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. PRIMITIVE
+   ========================================================================== */
+:root {
+  /* ---- Klarna Pink + white reference -------------------------------- */
+  --bt-klarna-50:  #FFF7F9;
+  --bt-klarna-100: #FFF0F4;
+  --bt-klarna-200: #FFDDE6;
+  --bt-klarna-300: #FFC9D6;
+  --bt-klarna-400: #FFB3C7;
+  --bt-klarna-500: #FF99B5;
+  --bt-klarna-600: #E86C95;
+  --bt-klarna-700: #B8436D;
+  --bt-klarna-800: #923251;
+  --bt-klarna-900: #6A253D;
+  --bt-klarna-ink: #17120F;
+
+  /* ---- Chocolate · 딥 로즈를 대체하는 따뜻한 중성 강조색 ----------- */
+  --bt-chocolate-100: #F6EDE8;
+  --bt-chocolate-300: #C9A696;
+  --bt-chocolate-500: #8A5A44;
+  --bt-chocolate-600: #6F4635;
+  --bt-chocolate-700: #5A382C;
+  --bt-chocolate-800: #452A21;
+  --bt-chocolate-900: #2F1D17;
+
+  /* ---- Bloom Blue (brand) · hue 220.5 / sat 82% ------------------------
+     500 = 컨셉아트 버튼·FAB·링에서 샘플링한 실제 값(#5B8BEF).
+     흰 글자 대비 3.29:1 → 텍스트를 얹는 면에는 600 이상을 쓴다. */
+  --bt-blue-50:  #EFF3FD;
+  --bt-blue-100: #DEE8FC;
+  --bt-blue-200: #BED1F9;
+  --bt-blue-300: #99B7F5;
+  --bt-blue-400: #7DA3F2;
+  --bt-blue-500: #5B8BEF; /* 컨셉 원본 · 장식/아이콘/그래프 전용 */
+  --bt-blue-600: #336EEB; /* AA 액션 · 흰 글자 4.59:1 */
+  --bt-blue-700: #1553D6; /* 6.48:1 · 링크 텍스트, pressed */
+  --bt-blue-800: #1041A7;
+  --bt-blue-900: #0C2F79;
+
+  /* ---- Mist (neutral) · 컨셉의 따뜻한 화이트 배경 계열 ---------------- */
+  --bt-mist-0:   #FFFFFF;
+  --bt-mist-25:  #FCFCFD; /* 글래스 카드 내부 샘플값 */
+  --bt-mist-50:  #F8F8FA; /* 페이지 배경 샘플값 */
+  --bt-mist-100: #F2F3F5;
+  --bt-mist-200: #E8E9EC; /* hairline */
+  --bt-mist-300: #D8DAE0;
+  --bt-mist-400: #B4B7C0;
+  --bt-mist-500: #8A8D98; /* 3.31:1 · disabled/placeholder 한정 */
+  --bt-mist-600: #62656E; /* 5.82:1 · 보조 텍스트 AA */
+  --bt-mist-700: #474A53;
+  --bt-mist-800: #2C2E36;
+  --bt-mist-900: #1C1F27; /* 다크 surface */
+  --bt-mist-950: #14161C; /* 다크 배경 */
+  --bt-ink:      #17181F; /* 17.69:1 · 헤드라인 샘플값 */
+
+  /* ---- Leaf (success) · hue 140.5 · "강점" 불릿 계열 ------------------ */
+  --bt-leaf-50:  #F1FBF5;
+  --bt-leaf-100: #E4F6EA;
+  --bt-leaf-200: #C9EED6;
+  --bt-leaf-400: #93DCAC;
+  --bt-leaf-500: #57C97E; /* 접속 표시 dot · 비텍스트 */
+  --bt-leaf-700: #208844; /* 4.50:1 · 텍스트 AA */
+  --bt-leaf-800: #186532;
+
+  /* ---- Pollen (warning) · hue 36 ------------------------------------- */
+  --bt-pollen-50:  #FEF8EE;
+  --bt-pollen-100: #FCF0DE;
+  --bt-pollen-200: #FAE2BD;
+  --bt-pollen-500: #F0A93C;
+  --bt-pollen-700: #A6690C; /* 4.52:1 */
+  --bt-pollen-800: #7B4E09;
+
+  /* ---- Rose (danger + like) · hue 354.5 · 통화종료/하트 샘플값 -------- */
+  --bt-rose-50:  #FDEFF1;
+  --bt-rose-100: #FBE0E2;
+  --bt-rose-200: #F6C0C5;
+  --bt-rose-400: #ED828C;
+  --bt-rose-500: #E4404F; /* 컨셉 원본 · 아이콘 버튼(비텍스트) */
+  --bt-rose-600: #E12D3E; /* 4.52:1 · 라벨 있는 fill */
+  --bt-rose-700: #CE1D2D; /* 5.47:1 · 텍스트 */
+  --bt-rose-800: #A11723;
+
+  /* ---- Typography ----------------------------------------------------- */
+  --bt-font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+                  system-ui, Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --bt-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  /* 장식 전용. "Practice, Connect, Bloom" 태그라인 외 사용 금지(가독성). */
+  --bt-font-script: "Caveat", "Dancing Script", cursive;
+
+  --bt-text-display: 40px;  --bt-lh-display: 1.2;
+  --bt-text-h1:      32px;  --bt-lh-h1:      1.3;
+  --bt-text-h2:      24px;  --bt-lh-h2:      1.35;
+  --bt-text-h3:      20px;  --bt-lh-h3:      1.4;
+  --bt-text-lg:      17px;  --bt-lh-lg:      1.6;
+  --bt-text-body:    16px;  --bt-lh-body:    1.6;
+  --bt-text-sm:      14px;  --bt-lh-sm:      1.6;
+  --bt-text-caption: 12px;  --bt-lh-caption: 1.5;
+  --bt-text-micro:   11px;  --bt-lh-micro:   1.45;
+
+  --bt-weight-regular:  400;
+  --bt-weight-medium:   500;
+  --bt-weight-semibold: 600;
+  --bt-weight-bold:     700;
+
+  /* 한글은 자간을 좁혀야 제목이 뭉치지 않는다. 본문은 0. */
+  --bt-tracking-display: -0.035em;
+  --bt-tracking-heading: -0.02em;
+  --bt-tracking-body:     0;
+  --bt-tracking-caps:     0.08em;
+
+  /* ---- Spacing · 4px 베이스 8pt 그리드 -------------------------------- */
+  --bt-space-1:  4px;
+  --bt-space-2:  8px;
+  --bt-space-3:  12px;
+  --bt-space-4:  16px;
+  --bt-space-5:  20px;
+  --bt-space-6:  24px;
+  --bt-space-8:  32px;
+  --bt-space-10: 40px;
+  --bt-space-12: 48px;
+  --bt-space-16: 64px;
+  --bt-space-20: 80px;
+
+  /* ---- Radius --------------------------------------------------------- */
+  --bt-radius-xs:   8px;
+  --bt-radius-sm:   12px;
+  --bt-radius-md:   16px;
+  --bt-radius-lg:   20px;
+  --bt-radius-xl:   28px;  /* 컨셉의 메인 카드 */
+  --bt-radius-2xl:  32px;
+  --bt-radius-pill: 999px;
+
+  /* ---- Elevation · 낮은 알파 + 넓은 확산 ------------------------------ */
+  --bt-shadow-xs: 0 1px 2px rgba(28, 31, 39, 0.04);
+  --bt-shadow-sm: 0 2px 8px rgba(28, 31, 39, 0.05);
+  --bt-shadow-md: 0 8px 24px rgba(28, 31, 39, 0.06);
+  --bt-shadow-lg: 0 16px 40px rgba(28, 31, 39, 0.08);
+  --bt-shadow-xl: 0 24px 64px rgba(28, 31, 39, 0.10);
+  --bt-shadow-action: 0 8px 20px rgba(255, 153, 181, 0.32);
+  --bt-shadow-inset:  inset 0 1px 0 rgba(255, 255, 255, 0.7);
+
+  /* ---- Glass ---------------------------------------------------------- */
+  --bt-glass-fill:   rgba(255, 255, 255, 0.62);
+  --bt-glass-stroke: rgba(255, 255, 255, 0.82);
+  --bt-glass-blur:   blur(24px) saturate(1.35);
+
+  /* ---- Motion --------------------------------------------------------- */
+  --bt-duration-instant: 100ms;
+  --bt-duration-fast:    160ms;
+  --bt-duration-base:    220ms;
+  --bt-duration-slow:    320ms;
+  --bt-duration-bloom:   560ms; /* 코치 카드 등장, 점수 링 채우기 */
+  --bt-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --bt-ease-out:      cubic-bezier(0, 0, 0.2, 1);
+  --bt-ease-in:       cubic-bezier(0.4, 0, 1, 1);
+  --bt-ease-bloom:    cubic-bezier(0.34, 1.4, 0.64, 1); /* 완만한 오버슛 */
+
+  /* ---- Z-index -------------------------------------------------------- */
+  --bt-z-base:    0;
+  --bt-z-sticky:  100;
+  --bt-z-nav:     200;
+  --bt-z-overlay: 300;
+  --bt-z-modal:   400;
+  --bt-z-coach:   500; /* 코치 토스트는 모달보다 위. 세션을 가리지 않게 작게. */
+  --bt-z-toast:   600;
+
+  /* ---- Layout --------------------------------------------------------- */
+  --bt-container: 1080px;
+  --bt-gutter:    24px;
+  --bt-tap-min:   44px; /* 최소 터치 타깃 */
+}
+
+/* ==========================================================================
+   2. SEMANTIC — Light (기본)
+   ========================================================================== */
+:root,
+[data-theme="light"] {
+  --bt-color-bg:            var(--bt-klarna-50);
+  --bt-color-bg-elevated:   var(--bt-mist-0);
+  --bt-color-surface:       var(--bt-mist-0);
+  --bt-color-surface-sunken: var(--bt-klarna-100);
+  --bt-color-surface-glass: var(--bt-glass-fill);
+
+  --bt-color-text:           var(--bt-klarna-ink);
+  --bt-color-text-secondary: #5D5659;
+  --bt-color-text-tertiary:  #777074;
+  --bt-color-text-inverse:   var(--bt-mist-0);
+  --bt-color-text-link:      var(--bt-chocolate-900);
+  --bt-color-text-disabled:  #A59DA1;
+
+  --bt-color-border:        rgba(23, 18, 15, 0.12);
+  --bt-color-border-strong: rgba(23, 18, 15, 0.22);
+  --bt-color-border-glass:  var(--bt-glass-stroke);
+
+  /* brand = 정체성(장식). action = 누를 수 있는 것. 둘은 다르다. */
+  --bt-color-brand:         var(--bt-chocolate-900);
+  --bt-color-brand-subtle:  var(--bt-klarna-100);
+  --bt-color-action:        var(--bt-klarna-400);
+  --bt-color-action-hover:  var(--bt-klarna-500);
+  --bt-color-action-press:  var(--bt-klarna-600);
+  --bt-color-action-subtle: var(--bt-klarna-100);
+  --bt-color-action-on:     var(--bt-klarna-ink);
+
+  --bt-color-success:        var(--bt-leaf-700);
+  --bt-color-success-bg:     var(--bt-leaf-100);
+  --bt-color-success-marker: var(--bt-leaf-500);
+  --bt-color-warning:        var(--bt-pollen-700);
+  --bt-color-warning-bg:     var(--bt-pollen-100);
+  --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* `*-bg` **위에** 얹는 글자색.
+     `--bt-color-success`(4.50:1)는 **흰 배경 기준** 값이라, 같은 계열 틴트 위에 올리면
+     4.0:1 로 떨어져 AA 를 놓친다. 틴트 배경을 쓰는 칩·배지는 이쪽을 쓴다. */
+  --bt-color-success-on-bg: var(--bt-leaf-800);
+  --bt-color-warning-on-bg: var(--bt-pollen-800);
+  --bt-color-danger:         var(--bt-rose-700);
+  --bt-color-danger-bg:      var(--bt-rose-100);
+  --bt-color-danger-fill:    var(--bt-rose-600);
+  --bt-color-danger-marker:  var(--bt-rose-500);
+  --bt-color-info:           #4F474A;
+  --bt-color-info-bg:        var(--bt-klarna-100);
+
+  /* 호감(하트)은 danger와 같은 색상 계열을 쓴다. 색만으로 구분하지 말고
+     반드시 아이콘+라벨을 동반할 것. DESIGN_SYSTEM.md §3.3 참고. */
+  --bt-color-like: var(--bt-klarna-700);
+
+  /* 면 틴트 — 같은 흰 카드를 여러 장 늘어놓지 않기 위한 "의미별로 물든 면".
+     의미색 램프의 가장 옅은 단계라 채도가 낮고(원칙 6), 본문색을 그대로 얹어도 AA 를 지킨다.
+     `*-bg`(칩·배지 틴트)와는 다른 역할이다 — 저쪽은 글자를 감싸는 알약, 이쪽은 섹션 하나를 담는 면. */
+  --bt-color-panel-success:      var(--bt-leaf-50);
+  --bt-color-panel-success-line: var(--bt-leaf-200);
+  --bt-color-panel-warning:      var(--bt-pollen-50);
+  --bt-color-panel-warning-line: var(--bt-pollen-200);
+  --bt-color-panel-brand:        var(--bt-klarna-100);
+  --bt-color-panel-brand-line:   var(--bt-klarna-300);
+
+  --bt-color-focus: var(--bt-klarna-ink);
+  --bt-color-scrim: rgba(23, 18, 15, 0.58);
+
+  --bt-shadow-card:
+    0 18px 48px rgba(75, 45, 34, 0.10),
+    0 2px 10px rgba(23, 18, 15, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+/* ==========================================================================
+   3. SEMANTIC — Dark
+   화상 세션(§9)·상황형 대기방(§8)은 상대 영상이 주인공이므로 항상 다크로 고정한다.
+   그 외 화면의 다크모드는 OS 설정을 따른다.
+   ========================================================================== */
+[data-theme="dark"] {
+  --bt-color-bg:            var(--bt-chocolate-900);
+  --bt-color-bg-elevated:   #3A251D;
+  --bt-color-surface:       #3A251D;
+  --bt-color-surface-sunken: #21130F;
+  --bt-color-surface-glass: rgba(58, 37, 29, 0.76);
+
+  --bt-color-text:           var(--bt-mist-100);
+  --bt-color-text-secondary: #D7CFD2;
+  --bt-color-text-tertiary:  #AAA1A5;
+  --bt-color-text-inverse:   var(--bt-chocolate-900);
+  --bt-color-text-link:      var(--bt-klarna-300);
+  --bt-color-text-disabled:  #7C7477;
+
+  --bt-color-border:        rgba(255, 255, 255, 0.10);
+  --bt-color-border-strong: rgba(255, 255, 255, 0.18);
+  --bt-color-border-glass:  rgba(255, 255, 255, 0.14);
+
+  /* 다크에서는 램프가 뒤집힌다: 밝은 톤이 대비를 얻는다. */
+  --bt-color-brand:         var(--bt-klarna-400);
+  --bt-color-brand-subtle:  rgba(255, 179, 199, 0.16);
+  --bt-color-action:        var(--bt-klarna-400);
+  --bt-color-action-hover:  var(--bt-klarna-300);
+  --bt-color-action-press:  var(--bt-klarna-500);
+  --bt-color-action-subtle: rgba(255, 179, 199, 0.16);
+  --bt-color-action-on:     var(--bt-klarna-ink);
+
+  --bt-color-success:        var(--bt-leaf-400);
+  --bt-color-success-bg:     rgba(87, 201, 126, 0.16);
+  --bt-color-success-marker: var(--bt-leaf-500);
+  --bt-color-warning:        var(--bt-pollen-200);
+  --bt-color-warning-bg:     rgba(240, 169, 60, 0.16);
+  --bt-color-warning-marker: var(--bt-pollen-500);
+
+  /* 다크에서는 틴트가 반투명이라 배경이 어두운 쪽으로 남는다 —
+     밝은 톤이 그대로 대비를 얻으므로 본색과 같은 값을 쓴다(라이트에서만 갈린다). */
+  --bt-color-success-on-bg: var(--bt-leaf-400);
+  --bt-color-warning-on-bg: var(--bt-pollen-200);
+  --bt-color-danger:         var(--bt-rose-400);
+  --bt-color-danger-bg:      rgba(228, 64, 79, 0.18);
+  --bt-color-danger-fill:    var(--bt-rose-500);
+  --bt-color-danger-marker:  var(--bt-rose-500);
+  --bt-color-info:           var(--bt-klarna-300);
+  --bt-color-info-bg:        rgba(255, 179, 199, 0.16);
+
+  --bt-color-like: var(--bt-klarna-400);
+
+  /* 다크에서는 램프의 50 단계가 오히려 밝은 면이 된다. 어두운 표면 위에 의미색을
+     아주 낮은 알파로 얹어 "물든 면"의 인상만 남긴다. */
+  --bt-color-panel-success:      rgba(87, 201, 126, 0.10);
+  --bt-color-panel-success-line: rgba(87, 201, 126, 0.22);
+  --bt-color-panel-warning:      rgba(240, 169, 60, 0.10);
+  --bt-color-panel-warning-line: rgba(240, 169, 60, 0.22);
+  --bt-color-panel-brand:        rgba(255, 179, 199, 0.12);
+  --bt-color-panel-brand-line:   rgba(255, 179, 199, 0.24);
+
+  --bt-color-focus: var(--bt-klarna-300);
+  --bt-color-scrim: rgba(0, 0, 0, 0.64);
+
+  --bt-glass-fill:   rgba(28, 31, 39, 0.72);
+  --bt-glass-stroke: rgba(255, 255, 255, 0.12);
+
+  /* 어두운 배경에서 그림자는 보이지 않는다. 대비는 표면 밝기로 만든다. */
+  --bt-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --bt-shadow-md:   0 8px 24px rgba(0, 0, 0, 0.4);
+  --bt-shadow-lg:   0 16px 40px rgba(0, 0, 0, 0.5);
+  --bt-shadow-xl:   0 24px 64px rgba(0, 0, 0, 0.6);
+  --bt-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+/* 스코프 테마 필수 규칙.
+   `data-theme`을 루트가 아닌 요소(예: 항상 다크인 화상 세션 컨테이너)에 걸면
+   변수는 그 서브트리에서 새 값으로 바뀌지만, `color`는 이미 상위에서 계산된
+   값이 그대로 상속된다 → 다크 배경 위에 라이트 텍스트가 얹혀 대비 1.1:1이 된다.
+   테마 경계에서 color/background를 다시 잡아줘야 한다. */
+[data-theme] {
+  color: var(--bt-color-text);
+}
+
+/* 접근성: 동작 축소를 켠 사용자에게 꽃잎 애니메이션·오버슛을 강제하지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bt-duration-instant: 1ms;
+    --bt-duration-fast:    1ms;
+    --bt-duration-base:    1ms;
+    --bt-duration-slow:    1ms;
+    --bt-duration-bloom:   1ms;
+    --bt-ease-bloom: var(--bt-ease-standard);
+  }
+}

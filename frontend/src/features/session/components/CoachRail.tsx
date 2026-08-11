@@ -1,0 +1,142 @@
+import type { ReactNode } from 'react'
+import { Button, Icon } from '@/components'
+import type { CoachMessage } from '@/stores/coaching.store'
+import { CoachHistoryCard } from './CoachHistoryCard'
+import { ExtensionOfferCard } from './ExtensionOfferCard'
+import type { ExtensionChoice } from './ExtensionOfferCard'
+import { GoalProgressCard } from './GoalProgressCard'
+import { MissionProgressCard } from './MissionProgressCard'
+import type { SessionMission } from '../types'
+
+export interface CoachRailProps {
+  /**
+   * 침묵 단계 힌트(주제·질문). 코칭과 같은 "나에게만 보이는" 영역이라 여기 모은다 —
+   * 영상 위에 얹으면 상대 얼굴을 가리기 때문이다(원칙 2).
+   * 나타났다 사라지는 시간 민감 정보라 레일 **맨 위**에 둔다.
+   */
+  silenceHint?: ReactNode
+  /**
+   * 뒤에서 대기 중인 코칭 수.
+   * 표시하지 않으면 사용자는 코칭이 하나뿐이라고 믿고 닫아버린다.
+   */
+  pendingMessageCount?: number
+  /** 안전 경고 카드. 코칭보다 위에 놓는다 — 성격이 다르고 더 급하다 */
+  safetyWarning?: ReactNode
+  /** 지나간 코칭 기록(최신이 앞). 오버레이가 사라져도 여기 남는다 */
+  coachHistory?: readonly CoachMessage[]
+  /** 세션 시작 시각(ms) — 기록에 경과 시각을 붙이는 데 쓴다 */
+  sessionStartedAtMs?: number | null
+  goalLabel: string
+  /**
+   * 내 발화 비율 0~100.
+   * ⚠️ 백엔드에 실시간 발화 비율을 내려주는 경로가 없다(분석 이벤트는 AI→BE 단방향).
+   *    값이 없으면 카드를 그리지 않는다 — 가짜 숫자를 세우지 않기 위해서다.
+   */
+  speakingRatio?: number | null
+  /** 서버가 배정한 세션 미션. 없으면 카드를 그리지 않는다 */
+  missions?: SessionMission[]
+  /** 종료 5분 전(서버 제출 창)부터 true */
+  extensionVisible: boolean
+  extensionChoice: ExtensionChoice
+  /** 제출 실패 사유 */
+  extensionError?: string | null
+  onAcceptExtension: () => void
+  onDeclineExtension: () => void
+  /** 질문 추천 요청 중 — 버튼을 잠근다. 이 잠금이 연타 방지의 전부다 */
+  suggestionPending?: boolean
+  /** 추천을 만들지 못했을 때의 안내. 없으면 그리지 않는다 */
+  suggestionError?: string | null
+  /** 없으면 버튼 자체를 그리지 않는다 */
+  onRequestSuggestion?: () => void
+}
+
+/**
+ * 코치 영역 (§10). 데스크탑은 오른쪽 레일, 모바일은 영상 아래 스트립으로 배치된다
+ * — 배치는 부모가 정하고 여기서는 내용만 그린다.
+ *
+ * 🔒 이 영역 전체가 **본인 화면 전용**이다. 상대 소켓으로 전송되지 않으며,
+ * 사용자가 그 사실을 알 수 있도록 상단에 항상 "나에게만 보여요"를 명시한다.
+ */
+export function CoachRail({
+  silenceHint,
+  pendingMessageCount = 0,
+  safetyWarning,
+  coachHistory = [],
+  sessionStartedAtMs,
+  goalLabel,
+  speakingRatio,
+  missions = [],
+  extensionVisible,
+  extensionChoice,
+  extensionError,
+  onAcceptExtension,
+  onDeclineExtension,
+  suggestionPending = false,
+  suggestionError,
+  onRequestSuggestion,
+}: CoachRailProps) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="bt-caption flex items-center gap-1">
+        <Icon name="lock" size={12} />
+        코치 · 나에게만 보여요
+      </div>
+
+      {/* 레일의 나머지는 전부 조건부라 나타났다 사라진다. 버튼을 그 아래 두면
+          위 카드가 뜰 때마다 밀려서, 누르려는 순간 위치가 바뀐다. **맨 위 고정.** */}
+      {onRequestSuggestion && (
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="tonal"
+            size="sm"
+            loading={suggestionPending}
+            onClick={onRequestSuggestion}
+          >
+            질문 추천받기
+          </Button>
+          {suggestionError && (
+            <span className="bt-caption bt-muted" role="status" aria-live="polite">
+              {suggestionError}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 연장 제안은 시한부 요청이라 레일 **맨 위에 고정**한다.
+          아래에 두면 레일이 스크롤될 때 화면 밖으로 밀려 응답 기회 자체가 사라진다. */}
+      {extensionVisible && (
+        <div className="bt-rail-sticky">
+          <ExtensionOfferCard
+            choice={extensionChoice}
+            error={extensionError}
+            onAccept={onAcceptExtension}
+            onDecline={onDeclineExtension}
+          />
+        </div>
+      )}
+
+      {/* 안전 경고는 코칭 제안과 성격이 다르다 — 먼저, 그리고 따로 보여준다 */}
+      {safetyWarning}
+
+      {silenceHint}
+
+      {/* 지금 띄울 코칭은 영상 위(카메라 근처)에 뜬다 — SessionStage 의 coachOverlay.
+          여기 쌓이는 것은 **지나간 기록**이다. 오버레이는 몇 초 뒤 사라지므로
+          그것만으로는 눈을 돌린 사이 조언이 통째로 없어진다. */}
+      {pendingMessageCount > 0 && (
+        <span className="bt-caption bt-muted" role="status" aria-live="polite">
+          코칭 <span className="bt-numeric">{pendingMessageCount}</span>건이 더 기다리고 있어요
+        </span>
+      )}
+
+      <CoachHistoryCard history={coachHistory} sessionStartedAtMs={sessionStartedAtMs} />
+
+      {/* 발화 비율 지표는 서버 경로가 생길 때만 그린다(가짜 숫자 금지) */}
+      {typeof speakingRatio === 'number' && (
+        <GoalProgressCard goalLabel={goalLabel} speakingRatio={speakingRatio} />
+      )}
+
+      <MissionProgressCard missions={missions} />
+    </div>
+  )
+}
