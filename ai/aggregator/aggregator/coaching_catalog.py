@@ -21,6 +21,9 @@ COACHING_MESSAGES: dict[str, str] = {
     "RESPONSE_PROMPT_01": "짧게라도 자신의 생각을 이야기해 보세요.",
     "RESPONSE_PROMPT_02": "떠오르는 생각부터 편하게 답해 보세요.",
     "RESPONSE_PROMPT_03": "상대방의 질문에 자신의 경험을 덧붙여 보세요.",
+    # 사용자가 버튼으로 요청한 질문 추천. 문구는 항상 LLM이 만들고, 만들지 못하면
+    # 코칭을 보내지 않는다 — 이 값은 키 목록을 온전히 두기 위한 자리다.
+    "QUESTION_SUGGESTION_01": "대화 흐름에 맞는 질문을 건네보세요.",
     "VOLUME_GUIDANCE_UP_01": "목소리가 조금 작아요. 조금만 크게 말해 보세요.",
     "VOLUME_GUIDANCE_DOWN_01": "목소리가 조금 커요. 편안한 크기로 낮춰 보세요.",
 }

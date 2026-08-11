@@ -7,6 +7,17 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+
+class QuestionSuggestionRequest(BaseModel):
+    """BE 가 버튼 요청을 넘길 때 쓰는 본문."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    user_id: str
+    request_id: str
 
 from aggregator.session_contracts import (
     SessionEventRequest,
@@ -16,6 +27,7 @@ from aggregator.session_manager import (
     CoachingSender,
     SessionEventContractError,
     SessionManager,
+    SessionNotActiveError,
 )
 from aggregator.audio_adapter import SessionAudioAdapterFactory
 from aggregator.settings import IntegrationSettings
@@ -116,6 +128,43 @@ def create_app(
             return await manager.handle(body)
         except SessionEventContractError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.post(
+        "/api/v1/sessions/{session_id}/coaching-requests",
+        status_code=202,
+    )
+    async def request_question_suggestion(
+        session_id: str,
+        body: QuestionSuggestionRequest,
+        x_internal_token: str | None = Header(
+            default=None,
+            alias="X-Internal-Token",
+        ),
+    ) -> dict[str, str]:
+        """사용자가 버튼으로 요청한 질문 추천.
+
+        문구 생성까지 **여기서 동기로** 끝낸다. 만들지 못한 걸 202 로 돌려주면 FE 는
+        오지 않을 카드를 기다리게 된다 — 실패는 즉시 알려야 버튼을 풀 수 있다.
+        생성에 성공하면 코칭은 기존 발행 경로(→ BE → STOMP)로 나간다.
+        """
+        _verify_token(resolved_settings.internal_token, x_internal_token)
+        try:
+            created = await manager.request_question_suggestion(
+                session_id,
+                body.user_id,
+                body.request_id,
+            )
+        except SessionNotActiveError as error:
+            raise HTTPException(
+                status_code=404,
+                detail="session is not active",
+            ) from error
+        if not created:
+            raise HTTPException(
+                status_code=503,
+                detail="question suggestion is unavailable",
+            )
+        return {"requestId": body.request_id}
 
     return app
 

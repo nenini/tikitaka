@@ -16,7 +16,7 @@ from stt.events import SttEvent, TranscriptFinalizedEvent, TranscriptPayload
 from aggregator.backend_contracts import BackendCoachingReceipt
 from aggregator.coaching import CoachingCommand
 from aggregator.session_contracts import SessionEventRequest
-from aggregator.session_manager import SessionManager
+from aggregator.session_manager import SessionManager, SessionNotActiveError
 from aggregator.task_guard import log_task_failure
 from aggregator.report.input import ReportInput
 from aggregator.settings import IntegrationSettings
@@ -761,3 +761,116 @@ def test_failed_background_task_is_logged(
         "background task failed name=probe" in record.getMessage()
         for record in caplog.records
     )
+
+
+# ── 요청형 질문 추천 (코칭 버튼) ─────────────────────────────────────
+def _transcript(text: str) -> TranscriptFinalizedEvent:
+    return TranscriptFinalizedEvent(
+        session_id="15",
+        user_id="1",
+        participant_identity="user-1",
+        client_instance_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        utterance_id="cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        seq=1,
+        session_elapsed_ms=1000,
+        confidence=0.9,
+        payload=TranscriptPayload(
+            text=text,
+            language="ko",
+            segment_start_ms=0,
+            segment_end_ms=1000,
+        ),
+    )
+
+
+async def _started_session(
+    message: str | None,
+) -> tuple[SessionManager, FakeSender, FakeMessageGenerator]:
+    sender = FakeSender()
+    generator = FakeMessageGenerator(message)
+    manager = SessionManager(
+        IntegrationSettings(
+            internal_token="token",
+            backend_base_url="http://backend:8080",
+            tick_interval_seconds=3600,
+            coaching_llm_enabled=True,
+        ),
+        sender=sender,
+        audio_adapter_factory=FakeAudioAdapterFactory(),
+        message_generator=generator,
+    )
+    await manager.startup()
+    await manager.handle(_started())
+    return manager, sender, generator
+
+
+def test_question_suggestion_emits_manual_coaching() -> None:
+    async def scenario() -> None:
+        manager, sender, generator = await _started_session("어떤 영화 좋아하세요?")
+        runtime = manager.runtime("15")
+        await runtime.push_stt_event(_transcript("반갑습니다."))
+
+        created = await manager.request_question_suggestion("15", "1", "req-1")
+        await runtime.wait_until_delivered()
+
+        assert created is True
+        manual = [
+            command
+            for command in sender.commands
+            if command.coaching_type == "QUESTION_SUGGESTION"
+        ]
+        assert len(manual) == 1
+        assert manual[0].target_user_id == "1"
+        assert manual[0].message_text == "어떤 영화 좋아하세요?"
+        assert manual[0].reason_code == "USER_REQUESTED"
+        # 자동 코칭과 겹치면 BE 중복 차단에 걸려 조용히 사라진다
+        assert manual[0].deduplication_key == "manual:req-1"
+        segments, target_user_id = generator.calls[0]
+        assert segments[0].text == "반갑습니다."
+        assert target_user_id == "1"
+        await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_question_suggestion_sends_nothing_when_llm_gives_up() -> None:
+    """고정 문구로 폴백하지 않는다 — 질문을 요청한 사람에게 격려가 가면 안 된다."""
+
+    async def scenario() -> None:
+        manager, sender, _ = await _started_session(None)
+        runtime = manager.runtime("15")
+        await runtime.push_stt_event(_transcript("반갑습니다."))
+
+        created = await manager.request_question_suggestion("15", "1", "req-2")
+
+        assert created is False
+        assert sender.commands == []
+        await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_question_suggestion_needs_something_to_talk_about() -> None:
+    """세션 시작 직후 버튼을 누르는 일이 실제로 생긴다. 전사가 없으면 만들 수 없다."""
+
+    async def scenario() -> None:
+        manager, sender, generator = await _started_session("어떤 영화 좋아하세요?")
+
+        created = await manager.request_question_suggestion("15", "1", "req-3")
+
+        assert created is False
+        assert sender.commands == []
+        assert generator.calls == []  # LLM 을 부르지도 않는다
+        await manager.close()
+
+    asyncio.run(scenario())
+
+
+def test_question_suggestion_on_unknown_session_raises() -> None:
+    async def scenario() -> None:
+        manager, _, _ = await _started_session("어떤 영화 좋아하세요?")
+        with pytest.raises(SessionNotActiveError):
+            await manager.request_question_suggestion("999", "1", "req-4")
+        await manager.close()
+
+    asyncio.run(scenario())
