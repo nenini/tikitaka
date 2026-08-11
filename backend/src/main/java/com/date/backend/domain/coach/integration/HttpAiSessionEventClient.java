@@ -129,6 +129,62 @@ public class HttpAiSessionEventClient implements AiSessionEventClient {
 		}
 	}
 
+	@Override
+	public QuestionSuggestionResult requestQuestionSuggestion(
+			Long sessionId,
+			Long userId,
+			String requestId
+	) {
+		URI uri = URI.create(
+				properties.baseUrl()
+						+ "/api/v1/sessions/" + sessionId + "/coaching-requests"
+		);
+		HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+				// AI 가 문구를 만든 뒤 응답한다. 세션 이벤트용 타임아웃(기본 5초)보다
+				// 오래 걸릴 수 있어 별도로 잡는다.
+				.timeout(properties.requestTimeout().plusSeconds(5))
+				.header("Accept", "application/json")
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(
+						serializeSuggestionRequest(userId, requestId),
+						StandardCharsets.UTF_8
+				));
+		if (!properties.internalToken().isBlank()) {
+			builder.header("X-Internal-Token", properties.internalToken());
+		}
+		try {
+			HttpResponse<String> response = httpClient.send(
+					builder.build(),
+					HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+			);
+			return switch (response.statusCode()) {
+				case 202 -> QuestionSuggestionResult.CREATED;
+				case 404 -> QuestionSuggestionResult.SESSION_NOT_ACTIVE;
+				default -> QuestionSuggestionResult.UNAVAILABLE;
+			};
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			return QuestionSuggestionResult.UNAVAILABLE;
+		} catch (IOException exception) {
+			return QuestionSuggestionResult.UNAVAILABLE;
+		}
+	}
+
+	private String serializeSuggestionRequest(Long userId, String requestId) {
+		try {
+			return objectMapper.writeValueAsString(java.util.Map.of(
+					"userId", String.valueOf(userId),
+					"requestId", requestId
+			));
+		} catch (JsonProcessingException exception) {
+			throw new AiSessionEventDeliveryException(
+					"Question suggestion request serialization failed.",
+					exception,
+					false
+			);
+		}
+	}
+
 	private static String eventId(String sessionId, String eventType) {
 		return "session-" + sessionId + "-"
 				+ eventType.toLowerCase().replace('_', '-');
