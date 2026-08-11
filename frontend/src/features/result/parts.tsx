@@ -54,6 +54,53 @@ export function MetricRow({ metric, value, onChange, disabled, compact, last }: 
 /** 1~5 척도의 양 끝. 항목이 달라도 방향은 같아야 해서 한 곳에 둔다. */
 const RATING_ANCHORS = ['아쉬웠어요', '아주 좋았어요'] as const satisfies readonly [string, string]
 
+/* ── 받은 평가 한 줄(읽기 전용) ─────────────────────────── */
+
+export interface ScoreReadoutProps {
+  label: string
+  score: number
+  max?: number
+  /** 목록의 마지막 행 — 구분선을 그리지 않는다 */
+  last?: boolean
+}
+
+/**
+ * 받은 점수 1행 — 항목명 + 하트 + 숫자.
+ *
+ * `Rating` 을 쓰지 않는다. 그쪽은 radio 라 화면에 두면 **눌러서 바꿀 수 있게** 보인다 —
+ * 받은 평가는 고칠 수 없는 값이다. 그래서 입력 기능이 없는 표시용을 따로 둔다.
+ *
+ * 하트만 두지 않고 숫자를 함께 적는다. 하트 5개를 눈으로 세는 것보다 빠르고,
+ * 확대·고대비 환경에서 모양이 뭉개져도 값이 남는다.
+ */
+export function ScoreReadout({ label, score, max = 5, last }: ScoreReadoutProps) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4 py-2"
+      style={last ? undefined : { borderBottom: '1px solid var(--bt-color-border)' }}
+    >
+      <span className="bt-body-sm">{label}</span>
+      <div className="flex flex-none items-center gap-2">
+        <span className="flex" aria-hidden>
+          {Array.from({ length: max }, (_, i) => (
+            <Icon
+              key={i}
+              name={i < score ? 'heart-fill' : 'heart'}
+              size={17}
+              style={{ color: i < score ? 'var(--bt-rose-500)' : 'var(--bt-color-border-strong)' }}
+            />
+          ))}
+        </span>
+        {/* 스크린리더에는 하트가 아니라 이 값이 읽힌다 */}
+        <span className="bt-caption bt-muted bt-numeric w-4 text-right">
+          <span className="bt-sr-only">{max}점 중 </span>
+          {score}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 /* ── 서술형(선택) ───────────────────────────────────────── */
 
 export interface FreeTextFieldProps {

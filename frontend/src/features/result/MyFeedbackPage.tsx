@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Badge, Button, Callout, Card, Cluster, Icon, Spinner, Stack } from '@/components'
+import { Button, Callout, Card, Cluster, Icon, Spinner, Stack } from '@/components'
 import { errorMessageOf } from '@/shared/api/envelope'
 import { getPublicProfile } from '@/features/profile/api'
 import { getReportStatus } from '@/features/report/api'
 import type { ReportStatus } from '@/features/report/types'
 import { getEvaluationItems, getEvaluationStatus, getReceivedEvaluation } from './api'
+import { ScoreReadout } from './parts'
 import { canOpenReport, PHASE_NOTICE, resolveSessionEndPhase } from './sessionEndFlow'
 import { formatDeadline } from './format'
 import type {
@@ -129,13 +130,18 @@ export function MyFeedbackPage() {
       {received ? (
         <Card>
           <Stack gap={14}>
-            <Cluster gap={8}>
-              {metrics.map((m) => (
-                <Badge key={m.key} tone="neutral">
-                  {m.label} <span className="bt-numeric">{received[m.key as EvaluationItemKey]}</span>
-                </Badge>
+            {/* 낼 때와 같은 언어로 보여준다 — 하트로 매겼는데 숫자로 받으면 두 화면이 갈린다 */}
+            <div>
+              {metrics.map((m, i) => (
+                <ScoreReadout
+                  key={m.key}
+                  label={m.label}
+                  score={received[m.key as EvaluationItemKey]}
+                  max={m.maxScore}
+                  last={i === metrics.length - 1}
+                />
               ))}
-            </Cluster>
+            </div>
 
             {received.goodBehaviorText && (
               <div>

@@ -976,35 +976,31 @@ textarea.bt-input {
    -------------------------------------------------------------------------- */
 .bt-rating {
   display: inline-flex;
-  gap: var(--bt-space-2);
+  /* 하트는 서로 붙어 있어야 하나의 척도로 읽힌다. 간격을 주면 5개가 따로 보인다 */
+  gap: 0;
   padding: 0;
   margin: 0;
   border: 0;
 }
 
+/* 하트는 26px 이지만 히트 영역은 --bt-tap-min 정사각형을 유지한다 —
+   모바일에서 탭이 빗나가면 척도 자체를 못 쓴다. */
 .bt-rating__item {
   display: grid;
   place-items: center;
   width: var(--bt-tap-min);
   height: var(--bt-tap-min);
-  border: 1px solid var(--bt-color-border-strong);
-  border-radius: var(--bt-radius-md);
-  background: var(--bt-color-surface);
-  color: var(--bt-color-text-secondary);
-  font-weight: var(--bt-weight-semibold);
-  font-variant-numeric: tabular-nums;
+  border: 0;
+  background: none;
+  color: var(--bt-color-border-strong);
   cursor: pointer;
-  transition: all var(--bt-duration-fast) var(--bt-ease-standard);
+  transition: color var(--bt-duration-fast) var(--bt-ease-standard);
 }
 
-.bt-rating__item:hover {
-  border-color: var(--bt-blue-300);
-}
-
-.bt-rating__item[data-checked] {
-  background: var(--bt-color-action);
-  border-color: var(--bt-color-action);
-  color: var(--bt-color-action-on);
+/* 올린 지점까지 누적으로 채운다(React 가 data-filled 를 붙인다).
+   빈 하트와 채운 하트는 색뿐 아니라 **모양**도 다르다 — 색각 이상에서도 구분된다. */
+.bt-rating__item[data-filled] {
+  color: var(--bt-rose-500);
 }
 
 .bt-rating:disabled .bt-rating__item {

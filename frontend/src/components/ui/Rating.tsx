@@ -1,5 +1,6 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { cn } from '../../shared/lib/cn'
+import { Icon } from '../Icon'
 
 export interface RatingProps {
   /** 선택값 (1~max). 미선택은 undefined */
@@ -40,16 +41,35 @@ export function Rating({
   const groupName = name ?? autoName
   const items = Array.from({ length: max }, (_, i) => i + 1)
 
+  /**
+   * 마우스를 올린 지점까지 미리 채워 보여준다.
+   * 이게 없으면 하트가 누적 척도가 아니라 **체크박스 5개**처럼 느껄진다 —
+   * 4를 누를 때 1~3도 함께 켜진다는 걸 눌러보기 전에 알 수 없다.
+   */
+  const [hovered, setHovered] = useState<number | null>(null)
+  const filledUpTo = hovered ?? value ?? 0
+
   const scale = (
-    <fieldset className="bt-rating" disabled={disabled}>
+    <fieldset
+      className="bt-rating"
+      disabled={disabled}
+      // 개별 항목이 아니라 그룹에서 푼다 — 항목끼리 옮겨다닐 때 깜빡이지 않는다
+      onMouseLeave={() => setHovered(null)}
+    >
       <legend className="bt-sr-only">{ariaLabel}</legend>
       {items.map((n) => {
         const checked = value === n
         // 끝점에는 앵커 문구를 함께 읽어준다 — "1점"만으로는 방향을 알 수 없다.
         const anchorHint = anchors && (n === 1 ? anchors[0] : n === max ? anchors[1] : null)
         return (
-          <label key={n} className="bt-rating__item" data-checked={checked || undefined}>
-            {/* 이름은 aria-label 로 못박는다 — 숫자만 읽고 끝나지 않게 "n점"으로 나간다 */}
+          <label
+            key={n}
+            className="bt-rating__item"
+            data-filled={n <= filledUpTo || undefined}
+            data-checked={checked || undefined}
+            onMouseEnter={disabled ? undefined : () => setHovered(n)}
+          >
+            {/* 이름은 aria-label 로 못박는다 — 하트 모양은 읽히지 않으므로 "n점"으로 나간다 */}
             <input
               type="radio"
               className="bt-sr-only"
@@ -59,7 +79,8 @@ export function Rating({
               aria-label={anchorHint ? `${n}점 — ${anchorHint}` : `${n}점`}
               onChange={() => onChange(n)}
             />
-            <span>{n}</span>
+            {/* 채워짐은 색이 아니라 **모양**으로도 구분된다 — 색만으로 구분하면 안 된다 */}
+            <Icon name={n <= filledUpTo ? 'heart-fill' : 'heart'} size={26} aria-hidden />
           </label>
         )
       })}
