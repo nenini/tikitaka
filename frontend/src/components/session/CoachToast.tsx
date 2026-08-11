@@ -11,7 +11,8 @@ export interface CoachToastProps {
    * 같은 문구의 코칭이 연속으로 들어와도 표시 시간이 온전히 보장된다.
    */
   messageId?: string | number
-  title: ReactNode
+  /** 없으면 제목 줄을 그리지 않는다 — 본문만으로 뜻이 통하는 코칭에는 군말이 된다 */
+  title?: ReactNode
   text?: ReactNode
   /** AI 추정 헤지 배지 표시 (표정/감정/반응 추정이면 필수) */
   hedge?: boolean
@@ -54,7 +55,7 @@ export function CoachToast({
         <Icon name="sparkle" size={15} />
       </span>
       <div className="bt-coach__body">
-        <div className="bt-coach__title">{title}</div>
+        {title != null && <div className="bt-coach__title">{title}</div>}
         {text != null && <div className="bt-coach__text">{text}</div>}
         {hedge && (
           <div className="bt-coach__hedge">
