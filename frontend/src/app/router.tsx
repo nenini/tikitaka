@@ -54,15 +54,22 @@ import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage'
 import { ReportsAdminPage } from '@/features/admin/ReportsAdminPage'
 import { PolicyAdminPage } from '@/features/admin/PolicyAdminPage'
 import { AdminPlaceholder } from '@/features/admin/AdminPlaceholder'
+import { RootLayout } from './RootLayout'
 
 /**
  * 앱 라우팅.
+ * - 최상위는 경로 없는 `RootLayout` — 화면을 그리지 않고 스크롤 복원만 맡는다.
  * - 공개 라우트(가입/로그인) vs 보호 라우트(그 외)로 분리.
  * - 보호 라우트 중 top-level 화면(홈/매칭/리포트/성장/마이)은 공유 AppShell(상단·하단 네비) 안에 둔다.
  * - 세션(WebRTC·다크 고정)·대기방·챗봇처럼 몰입형 화면은 셸 밖에 둔다.
  * - 관리자(/admin)는 ADMIN 롤 가드 + 전용 셸을 따로 쓴다.
  */
 export const router = createBrowserRouter([
+  {
+    // 모든 화면이 이 아래 들어와야 스크롤 복원이 걸린다. 새 라우트를 최상위에 나란히
+    // 추가하면 그 화면만 조용히 빠지므로, 반드시 이 `children` 안에 넣는다.
+    element: <RootLayout />,
+    children: [
   // 서비스 첫 진입 화면 — 3초 후(또는 START 클릭 시) 인증 상태에 따라 홈/로그인으로 이동
   { path: '/splash', element: <SplashPage /> },
   { path: '/login', element: <LoginPage /> },
@@ -178,6 +185,8 @@ export const router = createBrowserRouter([
           { path: '/admin/analytics', element: <AdminPlaceholder title="리포트" /> },
         ],
       },
+    ],
+  },
     ],
   },
 ])
