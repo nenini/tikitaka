@@ -303,10 +303,14 @@ export interface SessionExtensionEvent {
 }
 
 /**
- * 서버가 제출을 받아 주는 창(분). `SessionExtensionDecisionService.DECISION_WINDOW_MINUTES`.
- * 이보다 이르면 `SESSION_EXTENSION_WINDOW_NOT_OPEN` 으로 거절된다.
+ * 연장 카드를 띄우기 시작하는 잔여 시간(초).
+ *
+ * ⚠️ 서버가 제출을 받아 주는 창(`SessionExtensionDecisionService.DECISION_WINDOW_MINUTES`,
+ *    종료 5분 전)보다 **좁아야 한다.** 서버 창보다 이르게 띄우면 그 시점의 클릭이
+ *    `SESSION_EXTENSION_WINDOW_NOT_OPEN` 으로 거절되고, 아래 `setExtensionClosed(true)` 가
+ *    카드를 영구히 닫아 진짜 창이 열려도 다시 뜨지 않는다.
  */
-export const EXTENSION_WINDOW_MINUTES = 5
+export const EXTENSION_WINDOW_SECONDS = 20
 
 /** `/user/queue/sessions/{id}/safety` — `SafetyWarningResponse`. */
 export interface SafetyWarningEvent {
