@@ -33,6 +33,16 @@ public enum CoachErrorCode implements ErrorCode {
 			HttpStatus.BAD_REQUEST,
 			"AI_COACHING_CONTRACT_INVALID",
 			"AI 코칭 이벤트 계약이 올바르지 않습니다."
+	),
+	COACHING_REQUEST_SESSION_NOT_ACTIVE(
+			HttpStatus.CONFLICT,
+			"COACHING_REQUEST_SESSION_NOT_ACTIVE",
+			"진행 중인 세션에서만 질문을 추천받을 수 있습니다."
+	),
+	COACHING_REQUEST_UNAVAILABLE(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"COACHING_REQUEST_UNAVAILABLE",
+			"지금은 추천을 만들지 못했습니다. 잠시 후 다시 시도해 주세요."
 	);
 
 	private final HttpStatus status;

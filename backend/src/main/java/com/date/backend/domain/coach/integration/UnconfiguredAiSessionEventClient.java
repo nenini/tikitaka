@@ -19,4 +19,13 @@ public class UnconfiguredAiSessionEventClient
 	public void send(AiSessionEndedEvent event) {
 		// The integration is optional in local and test environments.
 	}
+
+	@Override
+	public QuestionSuggestionResult requestQuestionSuggestion(
+			Long sessionId,
+			Long userId,
+			String requestId
+	) {
+		return QuestionSuggestionResult.NOT_CONFIGURED;
+	}
 }
