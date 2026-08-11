@@ -26,12 +26,12 @@ public class WaitingRoom {
 	 * ⚠️ 반드시 {@link #BASE_DURATION_SECONDS} 보다 커야 한다 —
 	 * 작으면 연장 합의 순간 종료 시각이 과거가 되어 세션이 즉시 끝난다.
 	 */
-	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 90;
+	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 120;
 	/**
 	 * 연장 합의 전의 실제 세션 길이(`extensionDecisionDeadlineAt`).
 	 * 타이머가 보는 종료 시각은 합의 전까지 이 값이므로, **여기가 체감 세션 길이다.**
 	 */
-	public static final int BASE_DURATION_SECONDS = 60;
+	public static final int BASE_DURATION_SECONDS = 90;
 	/**
 	 * 연장으로 늘어나는 시간. **{@code DEFAULT_PLANNED - BASE} 와 같아야 한다** —
 	 * REST 잔여 시간은 {@code plannedDurationSec + extensionDurationSec} 로 계산하는데,

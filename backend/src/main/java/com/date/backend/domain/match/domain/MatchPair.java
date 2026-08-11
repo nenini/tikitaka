@@ -27,7 +27,7 @@ public class MatchPair {
 	private static final BigDecimal MAX_TOTAL_SCORE = new BigDecimal("100.000");
 
 	/** 양쪽 수락이 끝난 뒤 세션이 시작되기까지의 대기 시간. */
-	public static final int SESSION_START_DELAY_SECONDS = 15;
+	public static final int SESSION_START_DELAY_SECONDS = 30;
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
