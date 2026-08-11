@@ -27,7 +27,7 @@ import {
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
 import { sessionElapsedSeedMs } from './sessionElapsed'
-import { EXTENSION_WINDOW_MINUTES } from './types'
+import { EXTENSION_WINDOW_SECONDS } from './types'
 import type {
   SessionDetail,
   SessionExtensionDecision,
@@ -295,7 +295,7 @@ export function SessionPage() {
     sessionPhase === 'IN_PROGRESS' &&
     extensionRemainingSec != null &&
     extensionRemainingSec > 0 &&
-    extensionRemainingSec <= EXTENSION_WINDOW_MINUTES * 60
+    extensionRemainingSec <= EXTENSION_WINDOW_SECONDS
 
   // 양측 합의가 성립하면 카드를 닫는다. 상대의 결정은 여전히 보여주지 않는다(W-15) —
   // 닫는 이유는 "이미 정해진 일에 다시 답하게 하지 않기" 위해서다.
