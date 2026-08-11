@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Icon } from '@/components'
+import { Button, Icon } from '@/components'
 import type { CoachMessage } from '@/stores/coaching.store'
 import { CoachHistoryCard } from './CoachHistoryCard'
 import { ExtensionOfferCard } from './ExtensionOfferCard'
@@ -42,6 +42,12 @@ export interface CoachRailProps {
   extensionError?: string | null
   onAcceptExtension: () => void
   onDeclineExtension: () => void
+  /** 질문 추천 요청 중 — 버튼을 잠근다. 이 잠금이 연타 방지의 전부다 */
+  suggestionPending?: boolean
+  /** 추천을 만들지 못했을 때의 안내. 없으면 그리지 않는다 */
+  suggestionError?: string | null
+  /** 없으면 버튼 자체를 그리지 않는다 */
+  onRequestSuggestion?: () => void
 }
 
 /**
@@ -65,6 +71,9 @@ export function CoachRail({
   extensionError,
   onAcceptExtension,
   onDeclineExtension,
+  suggestionPending = false,
+  suggestionError,
+  onRequestSuggestion,
 }: CoachRailProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -72,6 +81,26 @@ export function CoachRail({
         <Icon name="lock" size={12} />
         코치 · 나에게만 보여요
       </div>
+
+      {/* 레일의 나머지는 전부 조건부라 나타났다 사라진다. 버튼을 그 아래 두면
+          위 카드가 뜰 때마다 밀려서, 누르려는 순간 위치가 바뀐다. **맨 위 고정.** */}
+      {onRequestSuggestion && (
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="tonal"
+            size="sm"
+            loading={suggestionPending}
+            onClick={onRequestSuggestion}
+          >
+            질문 추천받기
+          </Button>
+          {suggestionError && (
+            <span className="bt-caption bt-muted" role="status" aria-live="polite">
+              {suggestionError}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* 연장 제안은 시한부 요청이라 레일 **맨 위에 고정**한다.
           아래에 두면 레일이 스크롤될 때 화면 밖으로 밀려 응답 기회 자체가 사라진다. */}

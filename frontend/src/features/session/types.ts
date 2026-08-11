@@ -236,6 +236,7 @@ export type CoachingType =
   | 'VISION_SETUP_GUIDANCE'
   | 'EXPRESSION_GUIDANCE'
   | 'VOLUME_GUIDANCE'
+  | 'QUESTION_SUGGESTION'
 
 /** `CoachingPriority` (backend). */
 export type CoachingPriority = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -398,6 +399,8 @@ export function toCoachTone(type: CoachingType): 'positive' | 'negative' | 'neut
     // 카메라 안내(VISION_SETUP_GUIDANCE)가 같은 이유로 이미 neutral 이다.
     case 'VISION_SETUP_GUIDANCE':
     case 'VOLUME_GUIDANCE':
+    // 사용자가 직접 요청한 추천이다. 지적이 아니므로 negative 로 두지 않는다.
+    case 'QUESTION_SUGGESTION':
       return 'neutral'
     case 'EXPRESSION_GUIDANCE':
     case 'REACTION_PROMPT':

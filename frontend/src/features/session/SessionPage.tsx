@@ -21,6 +21,7 @@ import {
   getSessionDetail,
   getSessionMissions,
   getSessionStatus,
+  requestCoachingSuggestion,
   startSession,
   terminateSession,
 } from './api'
@@ -189,6 +190,24 @@ export function SessionPage() {
   const sessionPhase = status?.status
   const visionEnabled =
     status?.expressionAnalysisEnabled ?? (validSession ? isVisionEnabled(sessionId) : false)
+
+  /* ── 코칭 버튼 ──
+     추천 문구는 이 요청의 응답이 아니라 기존 코칭 경로(STOMP)로 도착한다.
+     여기서는 "만들어졌는가"만 알면 되고, 그 사이 버튼을 잠가 연타를 막는다.
+     서버 쿨다운은 두지 않는다 — 언제 도움이 필요한지는 사용자가 정한다. */
+  const [suggestionPending, setSuggestionPending] = useState(false)
+  const [suggestionError, setSuggestionError] = useState<string | null>(null)
+  const requestSuggestion = useCallback(() => {
+    if (!validSession) return
+    setSuggestionPending(true)
+    setSuggestionError(null)
+    void requestCoachingSuggestion(sessionId)
+      .catch(() => {
+        // 실패를 고정 문구로 때우지 않는다 — 질문을 요청한 사람에게 엉뚱한 격려가 간다.
+        setSuggestionError('지금은 추천을 만들지 못했어요. 잠시 후 다시 눌러 주세요.')
+      })
+      .finally(() => setSuggestionPending(false))
+  }, [validSession, sessionId])
 
   const vision = useVisionAnalysis({
     visionEnabled,
@@ -444,6 +463,11 @@ export function SessionPage() {
                   questionsState={silenceQuestions.length > 0 ? 'ready' : 'empty'}
                   onDismiss={realtime.dismissSilence}
                 />
+              }
+              suggestionPending={suggestionPending}
+              suggestionError={suggestionError}
+              onRequestSuggestion={
+                sessionPhase === 'IN_PROGRESS' ? requestSuggestion : undefined
               }
               pendingMessageCount={pendingMessageCount}
               coachHistory={coachHistory}
