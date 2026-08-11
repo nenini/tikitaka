@@ -36,9 +36,10 @@ import static org.mockito.Mockito.when;
 class SessionExtensionDecisionServiceTest {
 	private static final LocalDateTime STARTED_AT =
 			LocalDateTime.of(2026, 7, 31, 20, 0);
-	// 8분 세션 기준 연장 결정 창 [20:03, 20:08) KST 안쪽 (STARTED_AT + 5분)
+	// 1분 세션 기준 연장 결정 창 [19:56, 20:01) KST 안쪽 (STARTED_AT + 45초).
+	// 창 = [세션종료 - DECISION_WINDOW_MINUTES(5분), 세션종료), 종료 = STARTED_AT + BASE_DURATION_SECONDS.
 	private static final Clock DECISION_WINDOW_CLOCK = Clock.fixed(
-			Instant.parse("2026-07-31T11:05:00Z"),
+			Instant.parse("2026-07-31T11:00:45Z"),
 			ZoneId.of("Asia/Seoul")
 	);
 
@@ -150,9 +151,11 @@ class SessionExtensionDecisionServiceTest {
 
 	@Test
 	void decisionBeforeLastFiveMinutesIsRejected() {
-		// 창이 열리기 직전 (20:03 KST 이전)
+		// 창이 열리기 직전 (19:56 KST 이전).
+		// 1분 세션에서는 창 개시가 세션 시작(20:00)보다 앞서므로 세션 도중에는
+		// 이 분기에 닿지 않는다 — 창 계산 자체를 고정하는 경계 테스트로만 남는다.
 		Clock tooEarlyClock = Clock.fixed(
-				Instant.parse("2026-07-31T11:02:59Z"),
+				Instant.parse("2026-07-31T10:55:59Z"),
 				ZoneId.of("Asia/Seoul")
 		);
 		SessionExtensionDecisionService service = service(tooEarlyClock);

@@ -105,12 +105,8 @@ class MatchCreationServiceTest {
 				anyCollection(),
 				anyCollection()
 		)).thenReturn(List.of());
+		// 재매칭 쿨다운은 더 이상 매칭 생성에서 검사하지 않는다.
 		when(constraintRepository.areUsersBlocked(101L, 102L)).thenReturn(false);
-		when(constraintRepository.areUsersInCooldown(
-				101L,
-				102L,
-				matchedAt
-		)).thenReturn(false);
 		when(userRepository.findAllById(List.of(101L, 102L)))
 				.thenReturn(List.of(firstUser, secondUser));
 		when(profileRepository.findAllById(List.of(101L, 102L)))
