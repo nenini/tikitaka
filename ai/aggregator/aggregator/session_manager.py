@@ -203,6 +203,68 @@ class SessionRuntime:
                 event.event_type,
             )
 
+    async def request_question_suggestion(
+        self,
+        target_user_id: str,
+        request_id: str,
+    ) -> bool:
+        """사용자가 버튼으로 요청한 질문 추천. 만들었으면 True.
+
+        **`CoachingPolicy` 를 타지 않는다.** 쿨다운·중복은 AI 가 판단할 일이 아니라
+        사용자가 이미 결정한 것이다. 연타는 FE 가 요청 중 버튼을 잠가 막는다.
+
+        문구를 만들지 못하면 **코칭을 보내지 않고 False** 를 돌려준다. 자동 코칭처럼
+        고정 문구로 폴백하면, 질문을 요청한 사람에게 엉뚱한 격려가 가서 버튼이 고장 난
+        것처럼 보인다. 발화가 아직 없을 때(`generate` 가 None)도 같은 경로다.
+        """
+        segments = self.aggregator.state.transcript_buffer.ordered_segments()
+        message_text = await self._generate_question(segments, target_user_id)
+        if message_text is None:
+            return False
+
+        elapsed = self.elapsed_ms()
+        self._on_coaching(
+            CoachingCommand(
+                session_id=self.session_id,
+                target_user_id=target_user_id,
+                coaching_type="QUESTION_SUGGESTION",
+                message_key="QUESTION_SUGGESTION_01",
+                priority="MEDIUM",
+                reason_code="USER_REQUESTED",
+                triggered_at_session_elapsed_ms=elapsed,
+                expires_at_session_elapsed_ms=(
+                    elapsed + self.aggregator.config.coaching_ttl_ms
+                ),
+                # 자동 코칭과 절대 겹치지 않게 접두사를 둔다 — 겹치면 BE 중복 차단에 걸린다.
+                deduplication_key=f"manual:{request_id}",
+                message_text=message_text,
+            )
+        )
+        return True
+
+    async def _generate_question(
+        self,
+        segments: tuple[TranscriptSegment, ...],
+        target_user_id: str,
+    ) -> str | None:
+        if not self._settings.coaching_llm_configured or not segments:
+            return None
+        try:
+            return await self._message_generator.generate(segments, target_user_id)
+        except ContextualCoachingError as error:
+            logger.info(
+                "question suggestion rejected session=%s reason=%s",
+                self.session_id,
+                type(error).__name__,
+            )
+            return None
+        except Exception:
+            logger.exception(
+                "question suggestion failed session=%s",
+                self.session_id,
+            )
+            return None
+
     def _on_coaching(self, command: CoachingCommand) -> None:
         if self.features is not None and not self.features.coaching_enabled:
             return
@@ -886,6 +948,17 @@ class SessionManager:
             return self._sessions[session_id]
         except KeyError as error:
             raise SessionNotActiveError(session_id) from error
+
+    async def request_question_suggestion(
+        self,
+        session_id: str,
+        target_user_id: str,
+        request_id: str,
+    ) -> bool:
+        return await self.runtime(session_id).request_question_suggestion(
+            target_user_id,
+            request_id,
+        )
 
     def _remember(self, event_id: str) -> None:
         self._processed_event_ids.add(event_id)

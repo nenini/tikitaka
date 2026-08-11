@@ -193,4 +193,5 @@ def test_coaching_types_match_backend_enum() -> None:
         "VISION_SETUP_GUIDANCE",
         "EXPRESSION_GUIDANCE",
         "VOLUME_GUIDANCE",
+        "QUESTION_SUGGESTION",
     }
