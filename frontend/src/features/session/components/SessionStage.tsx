@@ -91,9 +91,13 @@ export function SessionStage({
         </div>
       )}
 
-      {/* 하단 우: 내 영상 PIP. */}
+      {/* 하단 우: 내 영상 PIP.
+          내 얼굴이 너무 작아 표정을 확인할 수 없다는 피드백으로 키웠다(데스크탑 한 변 약 1.8배).
+          세로 3:4 비율을 유지한다 — 트랙이 `objectFit: cover` 라 비율이 어긋나면
+          얼굴 좌우가 잘린다(TrackView).
+          모바일은 따로 작게 둔다. 좁은 화면에서 데스크탑 크기면 상대 얼굴을 덮는다. */}
       <div
-        className="absolute bottom-3 right-3 h-[110px] w-[82px] overflow-hidden rounded-lg sm:h-[150px] sm:w-[112px]"
+        className="absolute bottom-3 right-3 h-[150px] w-[112px] overflow-hidden rounded-lg sm:h-[268px] sm:w-[200px]"
         style={{
           background: 'var(--bt-mist-900)',
           border: '1px solid var(--bt-color-border-glass)',
