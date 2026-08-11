@@ -305,6 +305,48 @@ def test_shutdown_cancels_report_after_configured_timeout(
     asyncio.run(scenario())
 
 
+def test_reused_session_id_starts_a_new_session_instead_of_deduping() -> None:
+    """BE 를 재배포해 세션번호가 재사용되면 eventId 가 통째로 겹친다.
+
+    BE 의 eventId 는 `session-{번호}-{종류}` 뿐이라(HttpAiSessionEventClient.eventId)
+    번호가 1부터 다시 발급되면 예전 세션과 문자열이 같아진다. 시각까지 보지 않으면
+    새 세션이 DUPLICATE 로 버려지고 전사·코칭·리포트가 전부 사라진다(2026-08-11 운영 1건).
+    """
+
+    async def scenario() -> None:
+        manager = SessionManager(
+            IntegrationSettings(
+                internal_token="token",
+                backend_base_url="http://backend:8080",
+                tick_interval_seconds=3600,
+            ),
+            sender=FakeSender(),
+            audio_adapter_factory=FakeAudioAdapterFactory(),
+            report_publisher=FakeReportPublisher(),  # type: ignore[arg-type]
+            now=lambda: datetime(2026, 7, 30, 10, 0, tzinfo=timezone.utc),
+        )
+        await manager.startup()
+
+        assert (await manager.handle(_started())).status == "PROCESSED"
+        assert (await manager.handle(_started())).status == "DUPLICATE"
+        assert (await manager.handle(_ended())).status == "PROCESSED"
+        assert manager.active_session_count == 0
+
+        # 같은 eventId, 다른 시각 = 번호를 재사용한 별개 세션이다.
+        reused = _started()
+        object.__setattr__(
+            reused,
+            "actual_start_at",
+            datetime(2026, 7, 30, 14, 7, 46, tzinfo=timezone.utc),
+        )
+        assert (await manager.handle(reused)).status == "PROCESSED"
+        assert manager.active_session_count == 1
+
+        await manager.close()
+
+    asyncio.run(scenario())
+
+
 def test_lifecycle_is_idempotent_and_cleans_up_session() -> None:
     async def scenario() -> None:
         sender = FakeSender()

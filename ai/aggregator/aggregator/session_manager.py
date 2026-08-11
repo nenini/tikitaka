@@ -588,7 +588,8 @@ class SessionManager:
         )
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._sessions: dict[str, SessionRuntime] = {}
-        self._processed_event_ids: set[str] = set()
+        self._processed_events: dict[str, str] = {}
+        """event_id → 그 이벤트의 발생 시각. 값까지 같아야 재시도로 본다(_is_replay 참고)."""
         self._processed_event_order: deque[str] = deque()
         self._lifecycle_lock = asyncio.Lock()
         self._retained_transcripts: dict[str, RetainedTranscript] = {}
@@ -631,7 +632,7 @@ class SessionManager:
                 raise SessionEventContractError(
                     f"unsupported session event version: {event.version}"
                 )
-            if event.event_id in self._processed_event_ids:
+            if self._is_replay(event):
                 return SessionEventResponse(
                     event_id=event.event_id,
                     status="DUPLICATE",
@@ -644,7 +645,7 @@ class SessionManager:
                 raise SessionEventContractError(
                     f"unsupported eventType: {event.event_type}"
                 )
-            self._remember(event.event_id)
+            self._remember(event)
             return SessionEventResponse(
                 event_id=event.event_id,
                 status=status,
@@ -960,12 +961,35 @@ class SessionManager:
             request_id,
         )
 
-    def _remember(self, event_id: str) -> None:
-        self._processed_event_ids.add(event_id)
-        self._processed_event_order.append(event_id)
+    @staticmethod
+    def _occurred_at(event: SessionEventRequest) -> str:
+        """이벤트를 유일하게 만드는 시각. BE eventId 는 세션번호+종류뿐이라 이것까지 봐야 한다."""
+        moment = event.actual_start_at or event.ended_at
+        return moment.isoformat() if moment is not None else ""
+
+    def _is_replay(self, event: SessionEventRequest) -> bool:
+        """BE 재시도인가.
+
+        ⚠️ eventId 만으로 판단하면 안 된다. BE 는 `session-{세션번호}-{종류}` 로만 만들어
+        (`HttpAiSessionEventClient.eventId`) **세션번호가 재사용되면 문자열이 그대로 겹친다.**
+        BE 를 재배포해 세션번호가 1번부터 다시 발급되면, 예전에 처리한 번호와 충돌한 새 세션이
+        DUPLICATE 로 조용히 버려진다 — 관제실이 세션을 아예 안 들고 있게 되어 전사·코칭·리포트가
+        전부 사라진다(2026-08-11 운영 1건: 리포트가 PENDING 에서 안 풀림).
+
+        재시도는 **같은 이벤트 객체를 그대로 다시 보내므로** 시각이 바이트 단위로 같다.
+        반면 번호를 재사용한 새 세션은 시각이 다르다. 그래서 시각까지 일치할 때만 재시도로 본다.
+        """
+        seen = self._processed_events.get(event.event_id)
+        return seen is not None and seen == self._occurred_at(event)
+
+    def _remember(self, event: SessionEventRequest) -> None:
+        event_id = event.event_id
+        if event_id not in self._processed_events:
+            self._processed_event_order.append(event_id)
+        self._processed_events[event_id] = self._occurred_at(event)
         if len(self._processed_event_order) > _PROCESSED_EVENT_CAPACITY:
             expired = self._processed_event_order.popleft()
-            self._processed_event_ids.discard(expired)
+            self._processed_events.pop(expired, None)
 
     async def close(self) -> None:
         sessions = list(self._sessions.values())
