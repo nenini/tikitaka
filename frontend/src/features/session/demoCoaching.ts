@@ -9,48 +9,49 @@ import type { CoachMessageInput } from '@/stores/coaching.store'
 /*  2분짜리 시연에서 원하는 코칭이 원하는 순서로 나올 보장이 없고, AI 워커·LiveKit   */
 /*  연결·GPU 지연 중 하나만 삐끗하면 아무것도 안 뜬다.                            */
 /*                                                                            */
-/*  시연 모드에서는 자동 코칭을 끄고, 발표자가 키를 눌러 **정해둔 순서대로** 띄운다.  */
+/*  자동 코칭을 끄고, 발표자가 키를 눌러 **정해둔 순서대로** 띄운다.                */
 /*  카드는 실제 코칭과 똑같은 스토어·컴포넌트를 지나므로 화면에 보이는 결과는 같다.   */
+/*                                                                            */
+/*  ⚠️ **모든 세션에서 기본으로 켜져 있다**(본선 시연용 빌드). 실제 사용자도 이 대본을 */
+/*     보게 되고 서버가 보내는 진짜 코칭은 화면에 뜨지 않는다. 시연이 끝나면          */
+/*     `isDemoCoaching()` 의 기본값을 false 로 되돌린다.                          */
+/*     급하게 원래 동작을 봐야 하면 `?demo=0` 으로 열어 그 탭만 끌 수 있다.          */
 /* -------------------------------------------------------------------------- */
 
-/** 시연 모드 래치. 세션 화면은 앱 내부 이동으로 들어와 쿼리가 사라지므로 탭 단위로 기억한다. */
-const FLAG_KEY = 'tk.demo-coaching'
+/** 시연 모드를 **끈** 탭임을 기억한다. 없으면 켜져 있는 것으로 본다. */
+const OFF_KEY = 'tk.demo-coaching-off'
 
 /** 발표자가 누르는 키. 화면에는 아무 표시도 하지 않는다. */
 export const DEMO_COACHING_KEY = ']'
 
 /**
- * `?demo=1` 을 탭에 기억시킨다. **앱 부팅 때 한 번 호출한다**(`main.tsx`).
+ * `?demo=0` / `?demo=1` 을 탭에 기억시킨다. **앱 부팅 때 한 번 호출한다**(`main.tsx`).
  *
  * ⚠️ 이걸 `isDemoCoaching()` 안에서 하면 안 된다. 그 함수는 세션 화면에서만 불리는데
  *    `/session/{id}` 는 대기방에서 `navigate()` 로 들어와 **쿼리가 이미 사라진 뒤**다.
- *    그래서 홈에서 `?demo=1` 로 열어도 래치 코드가 한 번도 돌지 않아 항상 꺼져 있었다.
  *    쿼리를 읽을 수 있는 건 **페이지가 로드되는 그 순간뿐**이므로 진입점에서 처리한다.
- *
- * 끄려면 `?demo=0` 으로 열거나 탭을 닫는다.
  */
 export function latchDemoCoaching(): void {
   try {
     const param = new URLSearchParams(window.location.search).get('demo')
-    if (param === '1') sessionStorage.setItem(FLAG_KEY, '1')
-    if (param === '0') sessionStorage.removeItem(FLAG_KEY)
+    if (param === '0') sessionStorage.setItem(OFF_KEY, '1')
+    if (param === '1') sessionStorage.removeItem(OFF_KEY)
   } catch {
-    /* 스토리지를 못 쓰는 환경이면 시연 모드가 아닌 것으로 둔다 */
+    /* 스토리지를 못 쓰면 기본값(켜짐)으로 둔다 */
   }
 }
 
 /**
- * 시연 모드인가. 래치된 플래그만 읽는다(래치는 `latchDemoCoaching()` 이 한다).
+ * 시연 코칭을 쓸 것인가. **기본은 켜짐**이다 — 모든 세션에서 대본이 나온다.
  *
- * ⚠️ 이 값이 false 면 키 입력을 아예 받지 않고 자동 코칭도 평소대로 동작한다.
- *    실제 사용자가 우연히 이 키를 눌러 가짜 코칭을 보는 일이 없어야 한다.
+ * `?demo=0` 으로 연 탭에서만 꺼진다. 그 탭에서는 키 입력을 받지 않고 서버가 보내는
+ * 자동 코칭이 평소대로 화면에 뜬다.
  */
 export function isDemoCoaching(): boolean {
   try {
-    return sessionStorage.getItem(FLAG_KEY) === '1'
+    return sessionStorage.getItem(OFF_KEY) !== '1'
   } catch {
-    // 스토리지를 못 쓰는 환경이면 시연 모드가 아닌 것으로 본다(실사용을 건드리지 않는 쪽).
-    return false
+    return true
   }
 }
 
