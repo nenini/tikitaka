@@ -20,20 +20,33 @@ const FLAG_KEY = 'tk.demo-coaching'
 export const DEMO_COACHING_KEY = ']'
 
 /**
- * 시연 모드인가.
+ * `?demo=1` 을 탭에 기억시킨다. **앱 부팅 때 한 번 호출한다**(`main.tsx`).
  *
- * 어느 화면이든 `?demo=1` 로 한 번 열면 그 탭에서 계속 유지된다
- * (`/session/{id}` 는 대기방에서 `navigate()` 로 들어오기 때문에 쿼리가 남지 않는다).
+ * ⚠️ 이걸 `isDemoCoaching()` 안에서 하면 안 된다. 그 함수는 세션 화면에서만 불리는데
+ *    `/session/{id}` 는 대기방에서 `navigate()` 로 들어와 **쿼리가 이미 사라진 뒤**다.
+ *    그래서 홈에서 `?demo=1` 로 열어도 래치 코드가 한 번도 돌지 않아 항상 꺼져 있었다.
+ *    쿼리를 읽을 수 있는 건 **페이지가 로드되는 그 순간뿐**이므로 진입점에서 처리한다.
+ *
  * 끄려면 `?demo=0` 으로 열거나 탭을 닫는다.
+ */
+export function latchDemoCoaching(): void {
+  try {
+    const param = new URLSearchParams(window.location.search).get('demo')
+    if (param === '1') sessionStorage.setItem(FLAG_KEY, '1')
+    if (param === '0') sessionStorage.removeItem(FLAG_KEY)
+  } catch {
+    /* 스토리지를 못 쓰는 환경이면 시연 모드가 아닌 것으로 둔다 */
+  }
+}
+
+/**
+ * 시연 모드인가. 래치된 플래그만 읽는다(래치는 `latchDemoCoaching()` 이 한다).
  *
  * ⚠️ 이 값이 false 면 키 입력을 아예 받지 않고 자동 코칭도 평소대로 동작한다.
  *    실제 사용자가 우연히 이 키를 눌러 가짜 코칭을 보는 일이 없어야 한다.
  */
 export function isDemoCoaching(): boolean {
   try {
-    const param = new URLSearchParams(window.location.search).get('demo')
-    if (param === '1') sessionStorage.setItem(FLAG_KEY, '1')
-    if (param === '0') sessionStorage.removeItem(FLAG_KEY)
     return sessionStorage.getItem(FLAG_KEY) === '1'
   } catch {
     // 스토리지를 못 쓰는 환경이면 시연 모드가 아닌 것으로 본다(실사용을 건드리지 않는 쪽).
