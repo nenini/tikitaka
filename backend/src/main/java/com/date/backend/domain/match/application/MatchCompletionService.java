@@ -14,12 +14,7 @@ import java.util.List;
 @Service
 public class MatchCompletionService {
 
-	/**
-	 * 확정된 매칭을 COMPLETED 로 넘기는 기준. 이 시간이 지나기 전까지 두 사람은
-	 * CONFIRMED 상태에 묶여 새 매칭을 잡을 수 없다({@code MatchCreationService}).
-	 * 세션 길이({@code WaitingRoom.BASE_DURATION_SECONDS})에 입장 여유를 더한 값으로 둔다.
-	 */
-	private static final Duration SESSION_DURATION = Duration.ofMinutes(3);
+	private static final Duration SESSION_DURATION = Duration.ofMinutes(35);
 
 	private final MatchPairRepository pairRepository;
 	private final ActiveMatchRequestRepository activeRequestRepository;
