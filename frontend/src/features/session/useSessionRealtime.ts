@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ConnectionState as BtConnectionState } from '@/components'
 import { useStomp, useStompSubscription } from '@/shared/realtime/useStomp'
 import { useCoachingStore } from '@/stores/coaching.store'
-import { isDemoCoaching } from './demoCoaching'
 import {
   sessionCommands,
   sessionTopics,
@@ -157,9 +156,6 @@ export function useSessionRealtime({
   useStompSubscription(connection, topics?.coaching ?? null, (body) => {
     const event = body as CoachingMessageEvent
     if (!event?.messageText) return
-    // 시연 모드에서는 발표자가 키로 띄우는 것만 보여준다. 구독은 그대로 두고 표시만 막는다 —
-    // 끊으면 서버 쪽 전달 실패로 보이고, 시연이 끝난 뒤 원상복구도 확인해야 한다.
-    if (isDemoCoaching()) return
     // 코칭 스토어는 "화면에 띄울 카드"만 담는다 — 원시 이벤트를 그대로 넣지 않는다.
     // 우선순위와 만료(TTL)는 겹침·자동 사라짐 처리에 쓰이므로 반드시 함께 넘긴다.
     pushCoachMessage({
