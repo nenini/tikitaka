@@ -247,14 +247,11 @@ class LiveKitSessionReconnectIntegrationTest {
 				secondRequest,
 				new BigDecimal("25.000"),
 				new BigDecimal("25.000"),
-				BASE_TIME.minusSeconds(1),
+				BASE_TIME.minusHours(1),
 				BASE_TIME,
 				BASE_TIME.minusHours(2)
 		);
-		// 세션 시작 시각은 확정 시각 + SESSION_START_DELAY_SECONDS 다.
-		// 아래에서 lifecycleService.start() 가 실제 입장 창을 검사하므로,
-		// scheduledAt 이 BASE_TIME 에 정확히 떨어지도록 확정 시각을 역산한다.
-		pair.confirm(BASE_TIME.minusSeconds(MatchPair.SESSION_START_DELAY_SECONDS));
+		pair.confirm(BASE_TIME.minusMinutes(90));
 		pair = matchPairRepository.saveAndFlush(pair);
 		provisioningService.provision(pair);
 

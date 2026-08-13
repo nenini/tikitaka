@@ -31,31 +31,6 @@ class MatchPairCancellationTest {
 	}
 
 	@Test
-	void schedulesSessionShortlyAfterConfirmationRatherThanProposedSlot() {
-		MatchRequest first = request(1L, 101L);
-		MatchRequest second = request(2L, 102L);
-		LocalDateTime matchedAt = LocalDateTime.of(2026, 7, 27, 9, 0);
-		LocalDateTime proposedScheduledAt = matchedAt.plusDays(2);
-		MatchPair pair = new MatchPair(
-				first,
-				second,
-				new BigDecimal("25.000"),
-				new BigDecimal("25.000"),
-				matchedAt.plusMinutes(5),
-				proposedScheduledAt,
-				matchedAt
-		);
-		LocalDateTime confirmedAt = matchedAt.plusMinutes(2);
-
-		pair.confirm(confirmedAt);
-
-		assertThat(pair.getScheduledAt()).isEqualTo(
-				confirmedAt.plusSeconds(MatchPair.SESSION_START_DELAY_SECONDS)
-		);
-		assertThat(pair.getScheduledAt()).isNotEqualTo(proposedScheduledAt);
-	}
-
-	@Test
 	void rejectsCancellationAtOrAfterScheduledTime() {
 		MatchPair pair = confirmedPair();
 

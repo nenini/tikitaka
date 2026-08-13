@@ -22,23 +22,18 @@ import java.util.Objects;
 @Table(name = "sessions")
 public class WaitingRoom {
 	/**
-	 * 연장까지 합의됐을 때의 세션 길이(`expectedEndAt`).
-	 * ⚠️ 반드시 {@link #BASE_DURATION_SECONDS} 보다 커야 한다 —
-	 * 작으면 연장 합의 순간 종료 시각이 과거가 되어 세션이 즉시 끝난다.
+	 * 연장까지 합의됐을 때의 세션 길이(`expectedEndAt`) — 30분 + 연장 5분.
+	 * ⚠️ 반드시 {@link #BASE_DURATION_SECONDS} + {@link #EXTENSION_DURATION_SECONDS} 와 같아야 한다.
+	 * REST 잔여 시간은 `plannedDurationSec + extensionDurationSec` 로 계산하는데 실제 종료는
+	 * 이 값이라, 어긋나면 화면에 뜨는 남은 시간이 거짓이 된다.
 	 */
-	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 150;
+	public static final int DEFAULT_PLANNED_DURATION_SECONDS = 35 * 60;
 	/**
 	 * 연장 합의 전의 실제 세션 길이(`extensionDecisionDeadlineAt`).
-	 * 타이머가 보는 종료 시각은 합의 전까지 이 값이므로, **여기가 체감 세션 길이다.**
+	 * 타이머가 보는 종료 시각은 합의 전까지 이 값이므로 **여기가 체감 세션 길이다.**
 	 */
-	public static final int BASE_DURATION_SECONDS = 120;
-	/**
-	 * 연장으로 늘어나는 시간. **{@code DEFAULT_PLANNED - BASE} 와 같아야 한다** —
-	 * REST 잔여 시간은 {@code plannedDurationSec + extensionDurationSec} 로 계산하는데,
-	 * 실제 종료는 {@code expectedEndAt}(= 시작 + planned)라 어긋나면 남은 시간이 거짓이 된다.
-	 */
-	public static final int EXTENSION_DURATION_SECONDS =
-			DEFAULT_PLANNED_DURATION_SECONDS - BASE_DURATION_SECONDS;
+	public static final int BASE_DURATION_SECONDS = 30 * 60;
+	public static final int EXTENSION_DURATION_SECONDS = 5 * 60;
 	public static final int AI_VIDEO_DURATION_SECONDS = 5 * 60;
 
 	@Id

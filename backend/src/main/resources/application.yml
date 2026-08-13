@@ -180,10 +180,8 @@ session:
     fixed-delay-ms: ${SESSION_TIMER_FIXED_DELAY_MS:1000}
     initial-delay-ms: ${SESSION_TIMER_INITIAL_DELAY_MS:1000}
     batch-size: ${SESSION_TIMER_BATCH_SIZE:100}
-    # 세션 길이(WaitingRoom.BASE_DURATION_SECONDS)에 맞춘 값.
-    # 분 단위로 두면 1분 세션에서 두 알림이 시작과 동시에 떠 버린다.
-    ending-soon-before: ${SESSION_ENDING_SOON_BEFORE:30s}
-    ending-imminent-before: ${SESSION_ENDING_IMMINENT_BEFORE:10s}
+    ending-soon-before: ${SESSION_ENDING_SOON_BEFORE:5m}
+    ending-imminent-before: ${SESSION_ENDING_IMMINENT_BEFORE:1m}
 
 livekit:
   url: ${LIVEKIT_URL:}
