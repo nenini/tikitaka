@@ -9,7 +9,6 @@ import { errorCodeOf, errorMessageOf } from '@/shared/api/envelope'
 import { themeForHour } from '@/features/room/api'
 import { AudioTrackView } from './livekit/TrackView'
 import { useSessionMedia } from './useSessionMedia'
-import { isDemoCoaching, useDemoCoaching } from './demoCoaching'
 import { isVisionEnabled, useVisionAnalysis } from './vision'
 import { CoachOverlay } from './components/CoachOverlay'
 import { CoachRail } from './components/CoachRail'
@@ -28,7 +27,7 @@ import {
 } from './api'
 import { silenceStageOfEvent, useSessionRealtime } from './useSessionRealtime'
 import { sessionElapsedSeedMs } from './sessionElapsed'
-import { EXTENSION_WINDOW_SECONDS } from './types'
+import { EXTENSION_WINDOW_MINUTES } from './types'
 import type {
   SessionDetail,
   SessionExtensionDecision,
@@ -192,12 +191,6 @@ export function SessionPage() {
   const visionEnabled =
     status?.expressionAnalysisEnabled ?? (validSession ? isVisionEnabled(sessionId) : false)
 
-  /* ── 시연용 코칭 ──
-     `?demo=1` 로 한 번 들어온 탭에서만 동작한다. 발표자가 키를 누르면 정해둔 순서대로
-     띄우고, 그동안 서버가 보내는 자동 코칭은 표시하지 않는다(useSessionRealtime).
-     화면에는 어떤 표시도 하지 않는다 — 발표 화면에 힌트가 보이면 안 된다. */
-  const demoCoaching = useDemoCoaching(isDemoCoaching() && sessionPhase === 'IN_PROGRESS')
-
   /* ── 코칭 버튼 ──
      추천 문구는 이 요청의 응답이 아니라 기존 코칭 경로(STOMP)로 도착한다.
      여기서는 "만들어졌는가"만 알면 되고, 그 사이 버튼을 잠가 연타를 막는다.
@@ -206,14 +199,6 @@ export function SessionPage() {
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const requestSuggestion = useCallback(() => {
     if (!validSession) return
-    // 시연 모드에서는 서버를 부르지 않고 대본의 질문 추천을 바로 띄운다.
-    // 부르면 결과가 STOMP 로 돌아오는데 그 경로를 막아 둔 상태라(useSessionRealtime)
-    // 버튼을 눌러도 아무 일이 없다 — 발표 중에 고장으로 보인다.
-    if (demoCoaching.showLlmSuggestion) {
-      setSuggestionError(null)
-      demoCoaching.showLlmSuggestion()
-      return
-    }
     setSuggestionPending(true)
     setSuggestionError(null)
     void requestCoachingSuggestion(sessionId)
@@ -222,7 +207,7 @@ export function SessionPage() {
         setSuggestionError('지금은 추천을 만들지 못했어요. 잠시 후 다시 눌러 주세요.')
       })
       .finally(() => setSuggestionPending(false))
-  }, [validSession, sessionId, demoCoaching])
+  }, [validSession, sessionId])
 
   const vision = useVisionAnalysis({
     visionEnabled,
@@ -310,7 +295,7 @@ export function SessionPage() {
     sessionPhase === 'IN_PROGRESS' &&
     extensionRemainingSec != null &&
     extensionRemainingSec > 0 &&
-    extensionRemainingSec <= EXTENSION_WINDOW_SECONDS
+    extensionRemainingSec <= EXTENSION_WINDOW_MINUTES * 60
 
   // 양측 합의가 성립하면 카드를 닫는다. 상대의 결정은 여전히 보여주지 않는다(W-15) —
   // 닫는 이유는 "이미 정해진 일에 다시 답하게 하지 않기" 위해서다.

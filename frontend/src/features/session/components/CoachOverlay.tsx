@@ -1,6 +1,12 @@
 import { CoachToast } from '@/components'
 import type { CoachMessage } from '@/stores/coaching.store'
 
+const TONE_TITLE: Record<CoachMessage['tone'], string> = {
+  positive: '잘 되고 있어요',
+  negative: '이렇게 해볼까요',
+  neutral: '참고해 주세요',
+}
+
 export interface CoachOverlayProps {
   /**
    * 현재 띄울 코칭 메시지. **한 번에 하나만** 받는다(원칙 2) —
@@ -23,10 +29,10 @@ export function CoachOverlay({ message, onDismiss }: CoachOverlayProps) {
   return (
     <CoachToast
       messageId={message.id}
-      // 제목과 "AI 추정 · 참고용" 헤지를 두지 않는다.
-      // 카드가 1~2줄인데 "참고해 주세요" 같은 머리말과 헤지가 붙으면 본문보다 군말이 길고,
-      // 세션 중에는 읽는 시간 자체가 비용이다. 톤은 옆 레일의 코칭 기록이 라벨로 남긴다.
+      title={TONE_TITLE[message.tone]}
       text={message.text}
+      // 표정·반응 추정 기반 코칭에는 헤지 표기가 필수다(원칙 3).
+      hedge={message.tone !== 'neutral'}
       // 서버가 정한 유효 시간이 지나면 스스로 사라진다(COACH-04).
       // 사용자가 직접 닫는 길도 그대로 열어 둔다.
       autoDismissMs={message.ttlMs}
