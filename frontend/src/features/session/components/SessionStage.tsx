@@ -97,7 +97,7 @@ export function SessionStage({
           얼굴 좌우가 잘린다(TrackView).
           모바일은 따로 작게 둔다. 좁은 화면에서 데스크탑 크기면 상대 얼굴을 덮는다. */}
       <div
-        className="absolute bottom-3 right-3 h-[150px] w-[112px] overflow-hidden rounded-lg sm:h-[268px] sm:w-[200px]"
+        className="absolute bottom-3 right-3 h-[150px] w-[112px] overflow-hidden rounded-lg sm:h-[320px] sm:w-[240px]"
         style={{
           background: 'var(--bt-mist-900)',
           border: '1px solid var(--bt-color-border-glass)',
