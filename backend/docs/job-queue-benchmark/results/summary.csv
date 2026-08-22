@@ -1,0 +1,15 @@
+scenario,mode,request_count,batch_size,workers,simulated_work_ms,repetitions,lock_conflicts_total,elapsed_ms_median,throughput_per_second_median,attempts_median,unique_processed_median,duplicate_attempts_median,progress_ratio_median,batch_latency_p50_ms_median,batch_latency_p95_ms_median,batch_latency_max_ms_median
+no-candidate-progress,db-job-queue,1000,50,1,5.0,5,0,287.601,3477.036,1000,1000,0,1.0,13.255,17.125,17.444
+no-candidate-progress,direct-scheduler,1000,50,1,5.0,5,0,214.595,232.998,1000,50,950,0.05,10.232,10.913,11.088
+successful-throughput,db-job-queue,1000,50,1,5.0,5,0,274.128,3647.93,1000,1000,0,1.0,12.746,15.865,21.697
+successful-throughput,db-job-queue,1000,50,2,5.0,5,0,136.054,7350.036,1000,1000,0,1.0,11.388,14.044,16.103
+successful-throughput,db-job-queue,1000,50,4,5.0,5,9,103.091,9700.199,1000,1000,0,1.0,16.373,22.273,24.519
+successful-throughput,db-job-queue,5000,50,1,5.0,3,0,1361.927,3671.27,5000,5000,0,1.0,13.065,15.994,21.932
+successful-throughput,db-job-queue,5000,50,2,5.0,3,0,641.492,7794.328,5000,5000,0,1.0,11.953,15.099,24.52
+successful-throughput,db-job-queue,5000,50,4,5.0,3,1,505.35,9894.131,5000,5000,0,1.0,18.252,28.252,41.654
+successful-throughput,direct-scheduler,1000,50,1,5.0,5,0,278.39,3592.079,1000,1000,0,1.0,12.919,14.666,15.869
+successful-throughput,direct-scheduler,1000,50,2,5.0,5,0,283.591,3526.202,2000,1000,1000,1.0,12.994,15.746,23.172
+successful-throughput,direct-scheduler,1000,50,4,5.0,5,0,275.013,3636.186,4000,1000,3000,1.0,12.217,15.164,16.843
+successful-throughput,direct-scheduler,5000,50,1,5.0,3,0,1174.356,4257.651,5000,5000,0,1.0,11.295,13.701,19.559
+successful-throughput,direct-scheduler,5000,50,2,5.0,3,0,1186.013,4215.804,10000,5000,5000,1.0,11.643,14.078,15.734
+successful-throughput,direct-scheduler,5000,50,4,5.0,3,0,1156.75,4322.454,20000,5000,15000,1.0,10.824,14.983,31.63
