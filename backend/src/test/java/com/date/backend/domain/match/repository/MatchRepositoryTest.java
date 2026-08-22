@@ -319,6 +319,62 @@ class MatchRepositoryTest {
 		)).isFalse();
 	}
 
+	@Test
+	void findsCooldownCandidatesInBothPairDirectionsWithoutDuplicateResults() {
+		List<FaceTagCatalog> faceTags =
+				faceTagCatalogRepository.findAllByActiveTrueOrderByDisplayOrderAsc();
+		User source = saveUser("cooldown-source@example.com", LocalDate.of(2000, 2, 1));
+		User leftCandidate = saveUser("cooldown-left@example.com", LocalDate.of(2000, 2, 2));
+		User rightCandidate = saveUser("cooldown-right@example.com", LocalDate.of(2000, 2, 3));
+		User expiredCandidate = saveUser("cooldown-expired@example.com", LocalDate.of(2000, 2, 4));
+		User omittedCandidate = saveUser("cooldown-omitted@example.com", LocalDate.of(2000, 2, 5));
+		LocalDateTime now = LocalDateTime.of(2026, 7, 30, 12, 0);
+
+		rejectPair(source, leftCandidate, faceTags, now.minusDays(1));
+		rejectPair(rightCandidate, source, faceTags, now.minusDays(2));
+		rejectPair(leftCandidate, source, faceTags, now.minusDays(3));
+		rejectPair(source, expiredCandidate, faceTags, now.minusDays(8));
+		rejectPair(source, omittedCandidate, faceTags, now.minusHours(1));
+		entityManager.flush();
+
+		Set<Long> result = candidateConstraintRepository.findCooldownCandidateUserIds(
+				source.getId(),
+				List.of(
+						leftCandidate.getId(),
+						rightCandidate.getId(),
+						expiredCandidate.getId()
+				),
+				now
+		);
+
+		assertThat(result).containsExactlyInAnyOrder(
+				leftCandidate.getId(),
+				rightCandidate.getId()
+		);
+		assertThat(candidateConstraintRepository.findCooldownCandidateUserIds(
+				source.getId(),
+				List.of(),
+				now
+		)).isEmpty();
+	}
+
+	private MatchPair rejectPair(
+			User firstRequestUser,
+			User secondRequestUser,
+			List<FaceTagCatalog> faceTags,
+			LocalDateTime rejectedAt
+	) {
+		MatchPair pair = savePendingPair(
+				firstRequestUser,
+				secondRequestUser,
+				faceTags,
+				rejectedAt.minusHours(1),
+				7
+		);
+		pair.reject(rejectedAt);
+		return pair;
+	}
+
 	private MatchPair savePendingPair(
 			User userA,
 			User userB,

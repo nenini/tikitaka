@@ -89,15 +89,27 @@ public class MatchCandidateConstraintRepository {
 				now
 		).addValue("candidateUserIds", candidateUserIds);
 		return new HashSet<>(jdbcTemplate.queryForList("""
-				SELECT DISTINCT CASE
-					WHEN userAId = :sourceUserId THEN userBId
-					ELSE userAId
-				END AS candidateUserId
+				SELECT userBId AS candidateUserId
 				FROM match_pairs
-				WHERE (
-					(userAId = :sourceUserId AND userBId IN (:candidateUserIds))
-					OR (userBId = :sourceUserId AND userAId IN (:candidateUserIds))
+				WHERE userAId = :sourceUserId
+				AND userBId IN (:candidateUserIds)
+				AND (
+					(status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+						AND COALESCE(completedAt, closedAt, cancelledAt) <= :now
+						AND TIMESTAMPADD(
+							DAY,
+							recentMatchExclusionDaysSnapshot,
+							COALESCE(completedAt, closedAt, cancelledAt)
+						) > :now)
+					OR (status = 'EXPIRED'
+						AND closedAt <= :now
+						AND TIMESTAMPADD(HOUR, 24, closedAt) > :now)
 				)
+				UNION ALL
+				SELECT userAId AS candidateUserId
+				FROM match_pairs
+				WHERE userBId = :sourceUserId
+				AND userAId IN (:candidateUserIds)
 				AND (
 					(status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
 						AND COALESCE(completedAt, closedAt, cancelledAt) <= :now
